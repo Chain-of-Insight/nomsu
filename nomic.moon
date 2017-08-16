@@ -82,7 +82,7 @@ class Thunk
 lingo = [[
     actions <- {| (%nl " "*)* ((" "*) action ((%nl " "*)+ action)*)? (%nl " "*)* |} -> Thunk
     action <- {| token (" "+ token)* " "* |} -> Action
-    token <- expression / ({(!"[" [^ {}()$])+} -> Word)
+    token <- expression / ({(!"[" !%nl [^ {}()$])+} -> Word)
     expression <- number / string / list / variable / thunk / subexpression
     number <- ('-'? [0-9]+ ("." [0-9]+)?) -> tonumber
     string <- ('"' {(("\\" .) / [^"])*} '"') -> tostring
@@ -151,10 +151,12 @@ def = (game, invocation, action)->
     rule = Rule(invocations, action)
     for invocation in *rule.invocations
         game.rules[invocation] = rule
-    print rule
+    if __DEBUG__
+        print rule
 
 run = (game, str)->
-    print(">> #{str\gsub("\n", "\n.. ")}")
+    if __DEBUG__
+        print(">> #{str\gsub("\n", "\n.. ")}")
     thunk = lingo\match str
     unless thunk
         error("failed to parse nomic:\n#{str}")

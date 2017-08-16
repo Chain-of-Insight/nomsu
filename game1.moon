@@ -1,99 +1,40 @@
 #!/usr/bin/env moon
-nomic = require 'nomic'
-game = nomic()
+game = require 'core'
 
------------------- CORE STUFF ---------------------
-game\def [[say $str]], (locals)=>
-    with locals
-        print(.str)
-        return nil
-
-game\def [[return $retval]], (locals)=> locals.retval
-
-game\def [[do $thunk]], (locals)=>
-    locals.thunk\run(@, locals)
-
-game\def {[[true]], [[yes]]}, (locals)=> true
-game\def {[[false]], [[no]]}, (locals)=> false
-game\def {[[nil]], [[None]], [[nop]], [[done]]}, (locals)=> nil
-
-game\def [[$x == $y]], (locals)=>
-    with locals
-        print("testing equality of #{.x} and #{.y}")
-        if type(.x) != type(.y)
-            return false
-        if type(.x) == 'table'
-            for k,v in pairs(.x)
-                if .y[k] != v
-                    return false
-            for k,v in pairs(.y)
-                if .x[k] != v
-                    return false
-            return true
-        else
-            return .x == .y
-
-game\def [[not $x]], (locals)=> not locals.x
-game\def [[$x != $y]], [[return (not (x == y))]]
-game\def [[$x < $y]], (locals)=> locals.x < locals.y
-game\def [[$x <= $y]], (locals)=> locals.x <= locals.y
-game\def [[$x > $y]], (locals)=> locals.x > locals.y
-game\def [[$x >= $y]], (locals)=> locals.x >= locals.y
-
-
-game\def [[if $condition then $body else $else_body]], (locals)=>
-    with locals
-        if .condition
-            return .body\run(@, locals)
-        else return .else_body\run(@, locals)
-
-game\def [[if $condition then $body]], [[if $condition then $body else {}]]
-game\def [[when $condition do $body]], [[if $condition then $body else {}]]
-
-
+export __DEBUG__
+__DEBUG__ = true
 ------------------ BASIC TESTS ---------------------
-
-game\run [[say "Hello world!"]]
 game\run [[
-    say "Hello!"
-    say "World!"
+
+say "=========== INITIALIZING GAME ============"
+
+"fart" := {say "poot"}
+
+fart
+
+"fart twice" := {
+    fart
+    fart
+}
+
+fart twice
+
+["greet", "say hello"] := { say "Hello!" }
+
+greet
+
+say (return "returned value")
+do {say "did"}
+say 6
+say -6
+say [1,2,3]
+
 ]]
-
-game\def {[[greet]], [[say hello]]}, [[say "Hello!"]]
-game\run[[greet]]
-game\run[[say hello]]
-
-game\run [["ping" := {say "pong"}]]
-game\run [[ping]]
-
-
-game\run [[say (return "returned value")]]
-
-game\run [[do {say "did"}]]
-
-game\run [[say 5]]
-game\run [[say -5]]
-
-
-game\def [[fart]], [[say "poot"]]
-game\run [[fart]]
-game\def [[fart twice]], [[
-    say "poot"
-    say "poot again"
-]]
-game\run [[fart twice]]
-
-game\def [[sum $items]], (locals)=>
-    tot = 0
-    for x in *locals.items do tot += x
-    return tot
+error("done")
 
 game\run "say [1,2,3]"
 game\run "sum [1,2,3]"
 game\run "say (sum [1,2,3])"
-
-game\def [[print $x]], [[say $x]]
-game\run [[print "printing variables works"]]
 
 
 game\def [[you]], (_)=> @you
