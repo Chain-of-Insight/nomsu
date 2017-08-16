@@ -2,7 +2,7 @@
 nomic = require 'nomic'
 game = nomic()
 
-
+------------------ CORE STUFF ---------------------
 game\def [[say $str]], (locals)=>
     with locals
         print(.str)
@@ -15,7 +15,43 @@ game\def [[do $thunk]], (locals)=>
 
 game\def {[[true]], [[yes]]}, (locals)=> true
 game\def {[[false]], [[no]]}, (locals)=> false
-game\def {[[nil]], [[None]], [[nop]]}, (locals)=> nil
+game\def {[[nil]], [[None]], [[nop]], [[done]]}, (locals)=> nil
+
+game\def [[$x == $y]], (locals)=>
+    with locals
+        print("testing equality of #{.x} and #{.y}")
+        if type(.x) != type(.y)
+            return false
+        if type(.x) == 'table'
+            for k,v in pairs(.x)
+                if .y[k] != v
+                    return false
+            for k,v in pairs(.y)
+                if .x[k] != v
+                    return false
+            return true
+        else
+            return .x == .y
+
+game\def [[not $x]], (locals)=> not locals.x
+game\def [[$x != $y]], [[return (not (x == y))]]
+game\def [[$x < $y]], (locals)=> locals.x < locals.y
+game\def [[$x <= $y]], (locals)=> locals.x <= locals.y
+game\def [[$x > $y]], (locals)=> locals.x > locals.y
+game\def [[$x >= $y]], (locals)=> locals.x >= locals.y
+
+
+game\def [[if $condition then $body else $else_body]], (locals)=>
+    with locals
+        if .condition
+            return .body\run(@, locals)
+        else return .else_body\run(@, locals)
+
+game\def [[if $condition then $body]], [[if $condition then $body else {}]]
+game\def [[when $condition do $body]], [[if $condition then $body else {}]]
+
+
+------------------ BASIC TESTS ---------------------
 
 game\run [[say "Hello world!"]]
 game\run [[
@@ -26,6 +62,9 @@ game\run [[
 game\def {[[greet]], [[say hello]]}, [[say "Hello!"]]
 game\run[[greet]]
 game\run[[say hello]]
+
+game\run [["ping" := {say "pong"}]]
+game\run [[ping]]
 
 
 game\run [[say (return "returned value")]]
@@ -72,6 +111,7 @@ game\def [[remember that $key $relation $value]], (locals)=>
         assert .relation, "no relation!!"
         if not @relations[.relation] then @relations[.relation] = {}
         @relations[.relation][.key] = .value
+        return nil
 
 game\def [[remember that $key $relation]], [[remember that $key $relation (true)]]
 
@@ -79,6 +119,7 @@ game\def [[forget about $key $relation]], (locals)=>
     with locals
         if not @relations[.relation] then @relations[.relation] = {}
         @relations[.relation][.key] = nil
+        return nil
 
 game\def [[the value of $key $relation]], (locals)=>
     with locals
@@ -92,44 +133,6 @@ game\def [[it is true that $key $relation]], [[return ((the value of $key $relat
 game\run [[remember that "socrates" "is mortal"]]
 game\run [[say (the value of "socrates" "is mortal")]]
 
-game\def [[$x == $y]], (locals)=>
-    with locals
-        print("testing equality of #{.x} and #{.y}")
-        if type(.x) != type(.y)
-            return false
-        if type(.x) == 'table'
-            for k,v in pairs(.x)
-                if .y[k] != v
-                    return false
-            for k,v in pairs(.y)
-                if .x[k] != v
-                    return false
-            return true
-        else
-            return .x == .y
-
-game\def [[not $x]], (locals)=> not locals.x
-
-game\def [[$x != $y]], [[return (not (x == y))]]
-
-game\def [[$x < $y]], (locals)=> locals.x < locals.y
-
-game\def [[$x <= $y]], (locals)=> locals.x <= locals.y
-
-game\def [[$x > $y]], (locals)=> locals.x > locals.y
-
-game\def [[$x >= $y]], (locals)=> locals.x >= locals.y
-
--- TODO: the rest of the comparisons
-
-game\def [[if $condition then $body else $else_body]], (locals)=>
-    with locals
-        if .condition
-            return .body\run(@, locals)
-        else return .else_body\run(@, locals)
-
-game\def [[if $condition then $body]], [[if $condition then $body else {}]]
-game\def [[when $condition do $body]], [[if $condition then $body else {}]]
 
 game\def [[all keys where $relation is $value]], (locals)=>
     with locals

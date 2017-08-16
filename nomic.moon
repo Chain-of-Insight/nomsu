@@ -5,12 +5,6 @@ type = moon.type
 
 export __DEBUG__
 
-invocation_def = [[
-    name <- {| {chunk} (" " {chunk})* |} -> semicolonify
-    chunk <- ({"$"} %S+) / ({%S+})
-]]
-invocation_def = re.compile(invocation_def, {semicolonify: (bits) -> table.concat(bits, ";")})
-
 
 as_value = (x, globals, locals)->
     assert (globals and locals), "Shit's fucked"
@@ -115,9 +109,14 @@ class Rule
             unless thunk
                 error("failed to parse!")
             @fn = (globals,locals)-> thunk\run(globals, locals)
-        else
+        elseif type(action) == Thunk
+            @body_str = tostring(action)
+            @fn = (globals,locals)-> action\run(globals, locals)
+        elseif type(action) == 'function'
             @body_str = "<lua function>"
             @fn = action
+        else
+            error("Invalid action type: #{type(action)}")
 
         eq = (x,y)->
             if #x != #y then return false
@@ -166,4 +165,8 @@ run = (game, str)->
     return ret
 
 return ()->
-    {rules:{}, relations:{}, :run, :def}
+    game = {rules:{}, relations:{}, :run, :def}
+    game\def [[$invocations := $body]], (locals)=>
+        game\def locals.invocations, locals.body
+        return nil
+    return game
