@@ -1,10 +1,8 @@
 #!/usr/bin/env moon
 game = require 'core'
 
-export __DEBUG__
-__DEBUG__ = true
 ------------------ BASIC TESTS ---------------------
-game\run [[
+game\run [=[
 
 say "=========== INITIALIZING GAME ============"
 
@@ -27,15 +25,28 @@ say (return "returned value")
 do {say "did"}
 say 6
 say -6
-say [1,2,3]
+say []
+say [1,2,3,4]
+say [[1,2],[3,[4,5]]]
+say (sum [1,2,3,4]) 
+help "fart"
+help "fart;twice"
 
-]]
-error("done")
+"five" := {return 5}
+say (6 times 6)
+"fitz" := {say (return 99)}
+fitz
+"bazwiz $x" := {say (sum $x)}
+bazwiz [10,20,30]
+"foobar $x" := {say (return $x)}
+foobar 55
 
-game\run "say [1,2,3]"
-game\run "sum [1,2,3]"
-game\run "say (sum [1,2,3])"
+"$x squared" := {$x times $x}
+"$x plus one" := {$x + 1}
+"$x foo" := {($x * $x) + 1}
+say (5 foo)
 
+]=]
 
 game\def [[you]], (_)=> @you
 game\run [[you]]
@@ -66,9 +77,14 @@ game\def [[the value of $key $relation]], (locals)=>
     with locals
         return (@relations[.relation] or {})[.key]
 
-game\def [[it is true that $key $relation $value]], [[return ((the value of $key $relation) == $value)]]
+game\def [[it is true that $key $relation $value]], [[(the value of $key $relation) == $value]]
 
-game\def [[it is true that $key $relation]], [[return ((the value of $key $relation) == (true))]]
+game\def [[it is true that $key $relation]], [[(the value of $key $relation) == (true)]]
+
+game\run[[
+    remember that "socrates" "is mortal"
+    say (it is true that "socrates" "is mortal"))
+]]
 
 
 game\run [[remember that "socrates" "is mortal"]]
@@ -92,7 +108,6 @@ game\run [[say (if (1 == 1) then {return "Ternary yes"} else {return "Ternary no
 game\def [[$who is a member]], [[return (it is true that $who "is a member")]]
 game\def [[you are a member]], [[return ((you) is a member)]]
 game\run [[say (you are a member)]]
-error("done")
 
 game\run [[
     if (you are a member) then {say "youre a member!"} else {say "youre not a member"}

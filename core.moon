@@ -2,10 +2,37 @@
 nomic = require 'nomic'
 game = nomic()
 
+is_list = (t)->
+    i = 0
+    for _ in pairs(t)
+        i += 1
+        if t[i] == nil then return false
+    return true
+
+repr = (x)->
+    if type(x) == 'table'
+        if is_list x
+            "[#{table.concat([repr(i) for i in *x], ", ")}]"
+        else
+            "{#{table.concat(["#{k}: #{v}" for k,v in pairs x], ", ")}}"
+    else
+        tostring(x)
+
 game\def {[[print $str]], [[say $str]]}, (locals)=>
     with locals
-        print(.str)
+        print(repr(.str))
         return nil
+
+game\def [[help $invocation]], (locals)=>
+    with locals
+        if @rules[.invocation]
+            print(@rules[.invocation])
+            return nil
+        for i,r in pairs(@rules)
+            if i\match .invocation
+                print("Rule: #{@rules[.invocation]}")
+        return nil
+
 
 game\def [[return $retval]], (locals)=> locals.retval
 
@@ -16,9 +43,8 @@ game\def {[[true]], [[yes]]}, (locals)=> true
 game\def {[[false]], [[no]]}, (locals)=> false
 game\def {[[nil]], [[None]], [[nop]], [[done]]}, (locals)=> nil
 
-game\def [[$x == $y]], (locals)=>
+game\def {[[$x == $y]], [[equal $x $y]]}, (locals)=>
     with locals
-        print("testing equality of #{.x} and #{.y}")
         if type(.x) != type(.y)
             return false
         if type(.x) == 'table'
@@ -38,6 +64,12 @@ game\def [[$x < $y]], (locals)=> locals.x < locals.y
 game\def [[$x <= $y]], (locals)=> locals.x <= locals.y
 game\def [[$x > $y]], (locals)=> locals.x > locals.y
 game\def [[$x >= $y]], (locals)=> locals.x >= locals.y
+
+game\def {[[$x + $y]], [[$x plus $y]]}, (locals)=> locals.x + locals.y
+game\def {[[$x - $y]], [[$x minus $y]]}, (locals)=> locals.x - locals.y
+game\def {[[$x * $y]], [[$x times $y]]}, (locals)=> locals.x * locals.y
+game\def {[[$x / $y]], [[$x divided by $y]]}, (locals)=> locals.x / locals.y
+game\def {[[$x ^ $y]], [[$x to the power of $y]]}, (locals)=> locals.x ^ locals.y
 
 
 game\def [[if $condition then $body else $else_body]], (locals)=>

@@ -5,25 +5,27 @@ type = moon.type
 
 export __DEBUG__
 
+currently_parsing = nil
 
-as_value = (x, globals, locals)->
-    assert (globals and locals), "Shit's fucked"
+
+as_value = (x, game, locals)->
+    assert (game and locals), "Shit's fucked"
     if type(x) == 'number' or type(x) == 'string' or type(x) == 'table'
         return x
-    ret = x\as_value globals, locals
+    ret = x\as_value game, locals
     return ret
 
 class Var
     new:(@name)=>
-    as_value:(globals, locals)=>
+    as_value:(game, locals)=>
         if __DEBUG__
             print("Looking up variable #{@name} = #{locals[@name]}")
         if locals[@name] == nil
             print("LOCALS:")
             for k,v in pairs locals
                 print("    #{k} = #{v}")
-            print("GLOBALS:")
-            for k,v in pairs globals
+            print("game:")
+            for k,v in pairs game
                 print("    #{k} = #{v}")
             error("Could not find #{@name}")
         locals[@name]
@@ -45,51 +47,55 @@ class Action
 
     __tostring:=> "Action(#{@name})"
 
-    as_value:(globals, locals)=>
-        assert((globals and locals), "f'd up")
-        ret = @\run globals, locals
+    as_value:(game, locals)=>
+        assert((game and locals), "f'd up")
+        ret = @\run game, locals
         return ret
 
-    run:(globals, locals)=>
-        assert((globals and locals), "f'd up")
-        rule = globals.rules[@name]
+    run:(game, locals)=>
+        assert((game and locals), "f'd up")
+        rule = game.rules[@name]
         unless rule
             error("Tried to run rule, but couldn't find: #{@name}")
         arg_names = rule.arg_names
         new_locals = {}
         for i, arg in ipairs(@args)
-            new_locals[arg_names[i]] = as_value(arg, globals, locals)
+            new_locals[arg_names[i]] = as_value(arg, game, locals)
 
-        ret = rule.fn(globals, new_locals)
+        ret = rule.fn(game, new_locals)
         return ret
 
 class Thunk
     new:(@actions)=>
+        if @actions.startPos
+            assert currently_parsing, "Not currently parsing!"
+        @body_str = currently_parsing\sub(@actions.startPos, @actions.endPos-1)
         if __DEBUG__
             print("CONSTRUCTING THUNK WITH ACTIONS:")
             for k,v in pairs @actions
                 print("    #{k} = #{v}")
     as_value:=>@
-    run:(globals, locals)=>
-        assert((globals and locals), "f'd up")
+    run:(game, locals)=>
+        assert((game and locals), "f'd up")
         ret = nil
         for a in *@actions
-            ret = a\run globals,locals
+            ret = a\run game,locals
         return ret
     __tostring:=>
-        "Thunk(#{table.concat([tostring(a) for a in *@actions], ", ") .. tostring(@actions.returnValue or "") })"
+        --"Thunk(#{table.concat([tostring(a) for a in *@actions], ", ") .. tostring(@actions.returnValue or "") })"
+        "{#{@body_str}}"
 
 lingo = [[
-    actions <- {| (%nl " "*)* ((" "*) action ((%nl " "*)+ action)*)? (%nl " "*)* |} -> Thunk
-    action <- {| token (" "+ token)* " "* |} -> Action
-    token <- expression / ({(!"[" !%nl [^ {}()$])+} -> Word)
+    actions <- {| {:startPos: {}:} (%ws*) (%nl %ws*)* (action ((%nl %ws*)+ action)*)? (%nl %ws*)* {:endPos: {}:} |} -> Thunk
+    action <- {| token (%ws+ token)* %ws* |} -> Action
+    token <- expression / (!"$" {%wordchars+} -> Word)
     expression <- number / string / list / variable / thunk / subexpression
     number <- ('-'? [0-9]+ ("." [0-9]+)?) -> tonumber
     string <- ('"' {(("\\" .) / [^"])*} '"') -> tostring
-    list <- {| '[' (expression (',' (' '*) expression)*)? ']' |}
-    variable <- ("$" {%S+}) -> Var
-    subexpression <- "(" action ")"
-    thunk <- ("{" {| actions |} "}") -> Thunk
+    list <- {| '[' (expression (',' (%ws*) expression)*)? ']' |}
+    variable <- ("$" {%wordchars+}) -> Var
+    subexpression <- ("(" %ws* action ")")
+    thunk <- ("{" actions "}")
 ]]
 defs = {
     Var: (...)->Var(...)
@@ -98,6 +104,8 @@ defs = {
     Thunk: (...)->Thunk(...)
     tostring: tostring
     tonumber: tonumber
+    ws: lpeg.S(" \t")
+    wordchars: lpeg.P(1)-lpeg.S(' \t\n{}[]()"')
 }
 lingo = re.compile lingo, defs
 
@@ -105,13 +113,17 @@ class Rule
     new:(invocations, action)=>
         if type(action) == 'string'
             @body_str = action
+            export currently_parsing
+            old_parsing = currently_parsing
+            currently_parsing = action
             thunk = lingo\match action
+            currently_parsing = old_parsing
             unless thunk
                 error("failed to parse!")
-            @fn = (globals,locals)-> thunk\run(globals, locals)
+            @fn = (game,locals)-> thunk\run(game, locals)
         elseif type(action) == Thunk
             @body_str = tostring(action)
-            @fn = (globals,locals)-> action\run(globals, locals)
+            @fn = (game,locals)-> action\run(game, locals)
         elseif type(action) == 'function'
             @body_str = "<lua function>"
             @fn = action
@@ -149,6 +161,8 @@ class Rule
 def = (game, invocation, action)->
     invocations = if type(invocation) == 'table' then invocation else {invocation}
     rule = Rule(invocations, action)
+    if game.src
+        rule.body_str = game.src
     for invocation in *rule.invocations
         game.rules[invocation] = rule
     if __DEBUG__
@@ -157,17 +171,32 @@ def = (game, invocation, action)->
 run = (game, str)->
     if __DEBUG__
         print(">> #{str\gsub("\n", "\n.. ")}")
+    export currently_parsing
+    old_parsing = currently_parsing
+    currently_parsing = str
     thunk = lingo\match str
+    currently_parsing = old_parsing
     unless thunk
         error("failed to parse nomic:\n#{str}")
+    -- TODO: remove
     game.you = "@spill"
     ret = thunk\run game, {}
     if ret != nil
         print("= #{ret}")
     return ret
 
+repl = (game)->
+    while true
+        io.write(">> ")
+        buf = ""
+        while buf\sub(-2,-1) != "\n\n"
+            buf ..= io.read("*line").."\n"
+        if buf == "exit\n\n" or buf == "quit\n\n"
+            break
+        game\run buf
+
 return ()->
-    game = {rules:{}, relations:{}, :run, :def}
+    game = {rules:{}, relations:{}, :run, :def, :repl}
     game\def [[$invocations := $body]], (locals)=>
         game\def locals.invocations, locals.body
         return nil
