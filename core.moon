@@ -1,26 +1,11 @@
 #!/usr/bin/env moon
 nomic = require 'nomic'
+utils = require 'utils'
 game = nomic()
 
-is_list = (t)->
-    i = 0
-    for _ in pairs(t)
-        i += 1
-        if t[i] == nil then return false
-    return true
-
-repr = (x)->
-    if type(x) == 'table'
-        if is_list x
-            "[#{table.concat([repr(i) for i in *x], ", ")}]"
-        else
-            "{#{table.concat(["#{k}: #{v}" for k,v in pairs x], ", ")}}"
-    else
-        tostring(x)
-
-game\def {[[print $str]], [[say $str]]}, (args)=> print(repr(args.str))
+game\def {[[print $str]], [[say $str]]}, (args)=> print(utils.repr(args.str))
 game\def {[[printf $str]]}, (args)=>
-    for s in *args.str do io.write(repr(s))
+    for s in *args.str do io.write(utils.repr(s))
     io.write("\n")
 
 game\def [[return $value]], (args)=> args.value
@@ -36,7 +21,7 @@ game\def [[$signature := $body]], (args)=>
             return
 
     @\def args.signature, args.body
-    print "Defined new rule: \"#{game.repr(args.signature)}\""
+    print "Defined new rule: #{utils.repr(args.signature)}"
     --print debug.getinfo(args.body, "S").source
     return nil
 
@@ -78,7 +63,7 @@ game\def [[help $invocation]], (args)=>
                 rules[r] = c
                 invocations[r] = i
         best = [r for r in pairs rules]
-        table.sort best, ((a,b)-> rules[a] > rules[b])
+        utils.sort best, rules
         if rules[best[1]] > 0
             for r in *best
                 if rules[r] < rules[best[1]]
@@ -95,18 +80,7 @@ game\macro "None", -> "nil"
 game\macro "null", -> "nil"
 game\def [[nop]], ((args)=> nil), "... does nothing, returns nil ..."
 
-game\def [[$x == $y]], (args)=>
-    with args
-        if .x == .y then return true
-        if type(.x) != type(.y) then return false
-        if type(.x) != 'table' then return false
-        for k,v in pairs(.x)
-            if .y[k] != v
-                return false
-        for k,v in pairs(.y)
-            if .x[k] != v
-                return false
-        return true
+game\def [[$x == $y]], (args)=> utils.equivalent(args.x, args.y)
 game\run [=[
     ["$x != $y", "$x <> $y", "$x ~= $y"] := {return (not (x == y))}
 ]=]
@@ -147,57 +121,25 @@ game\run [=[
 
 game\def [[random]], -> math.random()
 
-game\def [[sum $items]], (args)=>
-    tot = 0
-    for x in *args.items do tot += x
-    return tot
-
-game\def [[all $items]], (args)=>
-    for x in *args.items
-        if not x then return false
-    return true
-
-game\def [[any $items]], (args)=>
-    for x in *args.items
-        if x then return true
-    return false
-
-game\def {[[average $items]], [[avg $items]]}, (args)=>
-    tot = 0
-    for x in *args.items do tot += x
-    return tot / #args.items
-
+game\def [[sum $items]], (args)=> utils.sum(args.items)
+game\def [[all $items]], (args)=> utils.all(args.items)
+game\def [[any $items]], (args)=> utils.any(args.items)
+game\def {[[average $items]], [[avg $items]]}, (args)=> utils.sum(items)/#items
 game\def {[[min $items]], [[smallest $items]], [[lowest $items]], [[fewest $items]]}, (args)=>
-    with args
-        min = .items[1]
-        for i=2,#.items
-            if .items[i] < min
-                min = .items[i]
-        return min
+    utils.min(args.items)
 
 game\def {[[max $items]], [[largest $items]], [[highest $items]], [[most $items]]}, (args)=>
-    with args
-        max = .items[1]
-        for i=2,#.items
-            if .items[i] > max
-                max = .items[i]
-        return max
+    utils.max(args.items)
 
 game\def {[[argmin $items]]}, (args)=>
-    with args
-        min = .items[1]
-        for i=2,#.items
-            if .items[i][2] < min[2]
-                min = .items[i]
-        return min
-
+    utils.min(args.items, ((i)->i[2]))
 game\def {[[argmax $items]]}, (args)=>
-    with args
-        max = .items[1]
-        for i=2,#.items
-            if .items[i][2] > max[2]
-                max = .items[i]
-        return max
+    utils.max(args.items, ((i)->i[2]))
+
+game\def {[[min $items with respect to $keys]]}, (args)=>
+    utils.min(args.items, args.keys)
+game\def {[[max $items with respect to $keys]]}, (args)=>
+    utils.max(args.items, args.keys)
 
 game\def {[[$index st in $list]], [[$index nd in $list]], [[$index rd in $list]], [[$index th in $list]]}, (args)=>
     with args
@@ -211,10 +153,8 @@ game\def {[[index of $item in $list]]}, (args)=>
         if type(.list) != 'table'
             print "Not a list: #{.list}"
             return
-        for i,x in ipairs .list
-            if x == .item
-                return i
-        return nil
+        utils.key_for(args.list, args.item)
+
 game\run [=[
     ["$item is in $list", "$list contains $item"] := {(index of $item in $list) != (nil)}
 ]=]
@@ -224,7 +164,7 @@ game\def {[[# $list]], [[length of $list]], [[size of $list]]}, (args)=>
         if type(.list) != 'table'
             print "Not a list: #{.list}"
             return
-        #.list
+        return #(.list)
 
 
 return game

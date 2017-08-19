@@ -1,4 +1,5 @@
 #!/usr/bin/env moon
+utils = require 'utils'
 Game = require 'nomic'
 core_game = require 'core'
 
@@ -40,7 +41,7 @@ game\def {"restrict $actions to $whitelist"}, (args)=>
         whitelist = @all_aliases(if type(.whitelist) == 'table' then .whitelist else {.whitelist})
         @\set_whitelist actions, whitelist
         for action in *actions
-            print("Restricting #{Game.repr(action)} to #{Game.repr(whitelist)}")
+            print("Restricting #{utils.repr(action)} to #{utils.repr(whitelist)}")
 
 game\def {"permit $whitelist to $actions"}, (args)=>
     with args
@@ -50,7 +51,7 @@ game\def {"permit $whitelist to $actions"}, (args)=>
             if not @authorized[action]
                 print "#{action} is already available to everyone."
                 continue
-            print("Permitting #{Game.repr(action)} to #{Game.repr(whitelist)}")
+            print("Permitting #{utils.repr(action)} to #{utils.repr(whitelist)}")
             for w in *whitelist
                 @authorized[action][w] = true
 
@@ -62,7 +63,7 @@ game\def {"revoke $actions rights from $whitelist"}, (args)=>
             if not @authorized[action]
                 print "#{action} is available to everyone, it can't be restricted."
                 continue
-            print("Revoking the right of #{Game.repr(action)} to use #{Game.repr(whitelist)}")
+            print("Revoking the right of #{utils.repr(action)} to use #{utils.repr(whitelist)}")
             for w in *whitelist
                 @authorized[action][w] = nil
 
@@ -134,6 +135,10 @@ sudo {
         if (everyone approves $pending) {
             sudo $pending
             unpropose
+        } else {
+            let "approvers" = (# (* $pending = "approved"))
+            let "num-players" = (# (players))
+            printf [$approvers, "/", $num-players, " players have approved"]
         }
     }
 
@@ -190,8 +195,10 @@ propose {
     "fart" := {
         say "poot"
     }
+    say "fart should have been defined"
 }
 approve
+say "doop"
 fart
 
 propose {
@@ -311,7 +318,9 @@ approve
 arbitrarily define "butts" := {say "BUTTS"}
 butts
 
-arbitrarily define "ass" := {say "ASS"}
-ass
-
 ]=]
+
+
+
+
+

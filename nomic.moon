@@ -4,10 +4,10 @@ moon = require 'moon'
 type = moon.type
 
 is_list = (t)->
-    i = 0
+    i = 1
     for _ in pairs(t)
-        i += 1
         if t[i] == nil then return false
+        i += 1
     return true
 
 repr = (x)->
@@ -105,17 +105,18 @@ FunctionCall = (tokens)->
     code = table.concat(ret, "\n")
     return code
 
-Thunk = (lines)->
+Thunk = (statements)->
     ret = {}
     add_line ret, "function(game, locals)"
     indent!
-    for i,line in ipairs lines
-        if line\match "locals%[\".*\"%] = .*"
-            table.insert ret, indent_block(line)
-        elseif i == #lines
-            table.insert ret, indent_block("return "..line..";")
+    for i,statement in ipairs statements
+        -- TODO: clean up? This is a bit hacky. I should *know* if this is a var assignment.
+        if statement\match "locals%[\".*\"%] = .*"
+            table.insert ret, indent_block(statement)
+        elseif i == #statements
+            table.insert ret, indent_block("return "..statement..";")
         else
-            table.insert ret, indent_block(line..";")
+            table.insert ret, indent_block(statement..";")
     dedent!
     add_line ret, "end"
     return table.concat(ret, "\n")
