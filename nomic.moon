@@ -3,10 +3,7 @@ lpeg = require 'lpeg'
 moon = require 'moon'
 type = moon.type
 
-export __DEBUG__
-
 currently_parsing = nil
-
 
 as_value = (x, game, locals)->
     assert (game and locals), "Shit's fucked"
@@ -18,16 +15,8 @@ as_value = (x, game, locals)->
 class Var
     new:(@name)=>
     as_value:(game, locals)=>
-        if __DEBUG__
-            print("Looking up variable #{@name} = #{locals[@name]}")
         if locals[@name] == nil
-            print("LOCALS:")
-            for k,v in pairs locals
-                print("    #{k} = #{v}")
-            print("game:")
-            for k,v in pairs game
-                print("    #{k} = #{v}")
-            error("Could not find #{@name}")
+            error("Attempt to access undefined variable: #{@name}")
         locals[@name]
     __tostring:=> "Var(#{@text})"
 
@@ -39,10 +28,6 @@ class Action
     new:(tokens)=>
         words = [(if type(t) == Word then t.text else "$") for t in *tokens]
         @name = table.concat(words, ";")
-        if __DEBUG__
-            print("ACTION: #{@name}")
-            for t in *tokens
-                print("    TOKEN: #{t}")
         @args = [t for t in *tokens when type(t) != Word]
 
     __tostring:=> "Action(#{@name})"
@@ -66,21 +51,21 @@ class Action
         return ret
 
 class Thunk
-    new:(@actions)=>
+    new:(@actions, @body_str)=>
         if @actions.startPos
             assert currently_parsing, "Not currently parsing!"
-        @body_str = currently_parsing\sub(@actions.startPos, @actions.endPos-1)
-        if __DEBUG__
-            print("CONSTRUCTING THUNK WITH ACTIONS:")
-            for k,v in pairs @actions
-                print("    #{k} = #{v}")
+        unless @body_str
+            @body_str = currently_parsing\sub(@actions.startPos, @actions.endPos-1)
+
     as_value:=>@
+
     run:(game, locals)=>
         assert((game and locals), "f'd up")
         ret = nil
         for a in *@actions
             ret = a\run game,locals
         return ret
+
     __tostring:=>
         --"Thunk(#{table.concat([tostring(a) for a in *@actions], ", ") .. tostring(@actions.returnValue or "") })"
         "{#{@body_str}}"
@@ -110,22 +95,12 @@ defs = {
 lingo = re.compile lingo, defs
 
 class Rule
-    new:(invocations, action)=>
-        if type(action) == 'string'
-            @body_str = action
-            export currently_parsing
-            old_parsing = currently_parsing
-            currently_parsing = action
-            thunk = lingo\match action
-            currently_parsing = old_parsing
-            unless thunk
-                error("failed to parse!")
-            @fn = (game,locals)-> thunk\run(game, locals)
-        elseif type(action) == Thunk
-            @body_str = tostring(action)
+    new:(invocations, action, docstring)=>
+        if type(action) == Thunk
+            @body_str = docstring or tostring(action)
             @fn = (game,locals)-> action\run(game, locals)
         elseif type(action) == 'function'
-            @body_str = "<lua function>"
+            @body_str = docstring or "<lua function>"
             @fn = action
         else
             error("Invalid action type: #{type(action)}")
@@ -158,46 +133,51 @@ class Rule
         "Rule: #{table.concat(@raw_invocations, " | ")} :=\n  #{@body_str\gsub("\n","\n  ")}"
 
 
-def = (game, invocation, action)->
-    invocations = if type(invocation) == 'table' then invocation else {invocation}
-    rule = Rule(invocations, action)
-    if game.src
-        rule.body_str = game.src
-    for invocation in *rule.invocations
-        game.rules[invocation] = rule
-    if __DEBUG__
-        print rule
+class Game
+    new:(parent)=>
+        @rules = setmetatable({}, {__index:parent and parent.rules or nil})
+        @relations = setmetatable({}, {__index:parent and parent.relations or nil})
 
-run = (game, str)->
-    if __DEBUG__
-        print(">> #{str\gsub("\n", "\n.. ")}")
-    export currently_parsing
-    old_parsing = currently_parsing
-    currently_parsing = str
-    thunk = lingo\match str
-    currently_parsing = old_parsing
-    unless thunk
-        error("failed to parse nomic:\n#{str}")
-    -- TODO: remove
-    game.you = "@spill"
-    ret = thunk\run game, {}
-    if ret != nil
-        print("= #{ret}")
-    return ret
+    def: (invocation, action, docstring)=>
+        invocations = if type(invocation) == 'table' then invocation else {invocation}
+        rule = Rule(invocations, action, docstring)
+        for invocation in *rule.invocations
+            @rules[invocation] = rule
+    
+    proxy: (rule)=>
+        for i in *rule.invocations
+            @rules[i] = rule
 
-repl = (game)->
-    while true
-        io.write(">> ")
-        buf = ""
-        while buf\sub(-2,-1) != "\n\n"
-            buf ..= io.read("*line").."\n"
-        if buf == "exit\n\n" or buf == "quit\n\n"
-            break
-        game\run buf
+    run: (str, user)=>
+        export currently_parsing
+        old_parsing = currently_parsing
+        currently_parsing = str
+        ok,thunk = pcall lingo.match, lingo, str
+        currently_parsing = old_parsing
+        if not ok
+            error(thunk)
 
-return ()->
-    game = {rules:{}, relations:{}, :run, :def, :repl}
-    game\def [[$invocations := $body]], (locals)=>
-        game\def locals.invocations, locals.body
-        return nil
-    return game
+        unless thunk
+            error("failed to parse nomic:\n#{str}")
+
+        prev_you = @you
+        @you = user or "anon"
+        ok,ret = pcall thunk.run, thunk, @, {}
+        @you = prev_you
+        if not ok
+            error(ret)
+        if ret != nil
+            print("= #{ret}")
+        return ret
+
+    repl:=>
+        while true
+            io.write(">> ")
+            buf = ""
+            while buf\sub(-2,-1) != "\n\n"
+                buf ..= io.read("*line").."\n"
+            if buf == "exit\n\n" or buf == "quit\n\n"
+                break
+            @\run buf
+
+return Game

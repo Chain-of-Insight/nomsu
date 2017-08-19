@@ -23,43 +23,58 @@ game\def {[[print $str]], [[say $str]]}, (locals)=>
         print(repr(.str))
         return nil
 
+game\def [[$invocations := $body]], (locals)=>
+    game\def locals.invocations, locals.body
+    return nil
+
 game\def [[help $invocation]], (locals)=>
     with locals
-        if @rules[.invocation]
-            print(@rules[.invocation])
+        if @rules[.invocation\gsub(" ",";")]
+            print(@rules[.invocation\gsub(" ",";")])
             return nil
+        words = [w for w in .invocation\gmatch("%S+")]
+        match_count = (i)->
+            iws = [w for w in i\gmatch("[^;$]+")]
+            count = 0
+            for w in *words
+                for iw in *iws
+                    if w == iw then count += 1
+            count += 1/#iws
+            return count
+        rules = {}
         for i,r in pairs(@rules)
-            if i\match .invocation
-                print("Rule: #{@rules[.invocation]}")
+            rules[r] = math.max((rules[r] or 0), match_count(i))
+        best = [r for r in pairs rules]
+        table.sort best, ((a,b)-> rules[a] > rules[b])
+        if rules[best[1]] > 0
+            for r in *best
+                if rules[r] < rules[best[1]]
+                    break
+                print("Closest match for \"#{.invocation}\" is:\n#{r}")
         return nil
 
 
-game\def [[return $retval]], (locals)=> locals.retval
+game\def [[return $retval]], ((locals)=> locals.retval), "... returns the specified value ..."
 
-game\def [[do $thunk]], (locals)=>
-    locals.thunk\run(@, locals)
-
-game\def {[[true]], [[yes]]}, (locals)=> true
-game\def {[[false]], [[no]]}, (locals)=> false
-game\def {[[nil]], [[None]], [[nop]], [[done]]}, (locals)=> nil
+game\def {[[true]], [[yes]]}, ((locals)=> true), "... returns true ..."
+game\def {[[false]], [[no]]}, ((locals)=> false), "... returns false ..."
+game\def {[[nil]], [[None]], [[nop]], [[done]]}, ((locals)=> nil), "... does nothing, returns nil ..."
 
 game\def {[[$x == $y]], [[equal $x $y]]}, (locals)=>
     with locals
-        if type(.x) != type(.y)
-            return false
-        if type(.x) == 'table'
-            for k,v in pairs(.x)
-                if .y[k] != v
-                    return false
-            for k,v in pairs(.y)
-                if .x[k] != v
-                    return false
-            return true
-        else
-            return .x == .y
+        if .x == .y then return true
+        if type(.x) != type(.y) then return false
+        if type(.x) != 'table' then return false
+        for k,v in pairs(.x)
+            if .y[k] != v
+                return false
+        for k,v in pairs(.y)
+            if .x[k] != v
+                return false
+        return true
 
 game\def [[not $x]], (locals)=> not locals.x
-game\def [[$x != $y]], [[return (not (x == y))]]
+game\run [["$x != $y" := {return (not (x == y))}]]
 game\def [[$x < $y]], (locals)=> locals.x < locals.y
 game\def [[$x <= $y]], (locals)=> locals.x <= locals.y
 game\def [[$x > $y]], (locals)=> locals.x > locals.y
@@ -78,8 +93,15 @@ game\def [[if $condition then $body else $else_body]], (locals)=>
             return .body\run(@, locals)
         else return .else_body\run(@, locals)
 
-game\def [[if $condition then $body]], [[if $condition then $body else {}]]
-game\def [[when $condition do $body]], [[if $condition then $body else {}]]
+game\run [[
+["if $condition then $body", "when $condition do $body"] := {if $condition then $body else {}}
+]]
+game\run [[
+["unless $condition do $body"] := {if (not $condition) then $body else {}}
+]]
+game\run [[
+["unless $condition do $body else $else_body"] := {if (not $condition) then $body else $else_body}
+]]
 
 
 game\def [[sum $items]], (locals)=>
@@ -107,5 +129,24 @@ game\def {[[max $items]], [[largest $items]], [[highest $items]], [[most $items]
             if .items[i] > max
                 max = .items[i]
         return max
+
+game\def {[[argmin $items]]}, (locals)=>
+    with locals
+        min = .items[1]
+        for i=2,#.items
+            if .items[i][2] < min[2]
+                min = .items[i]
+        return min
+
+game\def {[[argmax $items]]}, (locals)=>
+    with locals
+        max = .items[1]
+        for i=2,#.items
+            if .items[i][2] > max[2]
+                max = .items[i]
+        return max
+
+game\def {[[$index st in $list]], [[$index nd in $list]], [[$index rd in $list]], [[$index th in $list]]}, (locals)=>
+    locals.list[locals.index]
 
 return game

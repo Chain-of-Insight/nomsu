@@ -1,5 +1,7 @@
 #!/usr/bin/env moon
-game = require 'core'
+Game = require 'nomic'
+core_game = require 'core'
+game = Game(core_game)
 
 ------------------ BASIC TESTS ---------------------
 game\run [=[
@@ -22,7 +24,6 @@ fart twice
 greet
 
 say (return "returned value")
-do {say "did"}
 say 6
 say -6
 say []
@@ -30,7 +31,15 @@ say [1,2,3,4]
 say [[1,2],[3,[4,5]]]
 say (sum [1,2,3,4]) 
 help "fart"
-help "fart;twice"
+help "fart twice"
+
+"fart thrice" := {
+    fart
+    fart
+    fart
+}
+help "fart lol"
+help "yes"
 
 "five" := {return 5}
 say (6 times 6)
@@ -46,13 +55,20 @@ foobar 55
 "$x foo" := {($x * $x) + 1}
 say (5 foo)
 
+say (1 st in [1,2,3,4,5])
+say (2 nd in [1,2,3,4,5])
+say (3 rd in [1,2,3,4,5])
+say (4 th in [1,2,3,4,5])
+
 ]=]
 
 game\def [[you]], (_)=> @you
 game\run [[you]]
 game\run [[say (you)]]
 
-game\def [[five]], [[return 5]]
+game\run [[
+    "five" := {return 5}
+]]
 game\run [[say (five)]]
 game\def [[$x squared]], (locals)=> locals.x^2
 game\run [[say ((five) squared)]]
@@ -65,7 +81,9 @@ game\def [[remember that $key $relation $value]], (locals)=>
         @relations[.relation][.key] = .value
         return nil
 
-game\def [[remember that $key $relation]], [[remember that $key $relation (true)]]
+game\run [[
+    "remember that $key $relation" := {remember that $key $relation (true)}
+]]
 
 game\def [[forget about $key $relation]], (locals)=>
     with locals
@@ -77,9 +95,8 @@ game\def [[the value of $key $relation]], (locals)=>
     with locals
         return (@relations[.relation] or {})[.key]
 
-game\def [[it is true that $key $relation $value]], [[(the value of $key $relation) == $value]]
-
-game\def [[it is true that $key $relation]], [[(the value of $key $relation) == (true)]]
+game\run [["it is true that $key $relation $value" := {(the value of $key $relation) == $value}]]
+game\run [["it is true that $key $relation" := {(the value of $key $relation) == (true)}]]
 
 game\run[[
     remember that "socrates" "is mortal"
@@ -105,8 +122,8 @@ game\run [[if (1 == 2) then {say "Affirmative"}]]
 
 game\run [[say (if (1 == 1) then {return "Ternary yes"} else {return "Ternary no"})]]
 
-game\def [[$who is a member]], [[return (it is true that $who "is a member")]]
-game\def [[you are a member]], [[return ((you) is a member)]]
+game\run [["$who is a member" := {return (it is true that $who "is a member")}]]
+game\run [["you are a member" := {return ((you) is a member)}]]
 game\run [[say (you are a member)]]
 
 game\run [[
