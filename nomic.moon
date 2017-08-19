@@ -1,23 +1,8 @@
 re = require 're'
 lpeg = require 'lpeg'
+utils = require 'utils'
 moon = require 'moon'
 type = moon.type
-
-is_list = (t)->
-    i = 1
-    for _ in pairs(t)
-        if t[i] == nil then return false
-        i += 1
-    return true
-
-repr = (x)->
-    if type(x) == 'table'
-        if is_list x
-            "[#{table.concat([repr(i) for i in *x], ", ")}]"
-        else
-            "{#{table.concat(["#{k}: #{v}" for k,v in pairs x], ", ")}}"
-    else
-        tostring(x)
 
 currently_parsing = nil
 macros = nil
@@ -86,7 +71,7 @@ FunctionCall = (tokens)->
     args = [t for t in *tokens when t.type != 'word']
     rule_name = table.concat(words, " ")
     if rule_name == "$"
-        error("Empty rule: #{repr(tokens)}")
+        error("Empty rule: #{utils.repr(tokens)}")
 
     if macros[rule_name]
         return macros[rule_name](unpack(args))
@@ -219,7 +204,7 @@ class Game
         return [c for c in pairs canonicals]
 
     set_whitelist: (actions, whitelist)=>
-        if is_list whitelist then whitelist = {w,true for w in *whitelist}
+        if utils.is_list whitelist then whitelist = {w,true for w in *whitelist}
         for action in *@all_aliases(actions)
             @authorized[action] = whitelist
     
@@ -256,7 +241,7 @@ class Game
         if not @rules[invocation]
             error "Could not find rule: '#{invocation}'"
         if not @\check_authorization invocation
-            print "Not authorized to #{invocation} from callstack: #{repr(@callstack)}"
+            print "Not authorized to #{invocation} from callstack: #{utils.repr(@callstack)}"
             return
         table.insert @callstack, invocation
         arg_names = @arg_names[invocation]
@@ -280,7 +265,5 @@ class Game
             if buf == "exit\n\n" or buf == "quit\n\n"
                 break
             @\run buf
-
-    repr: repr
 
 return Game
