@@ -230,6 +230,23 @@ class Game
             unless skip_indent
                 line = ind(ded(line))
             table.insert ret_lines, line
+        
+        comma_separated_items = (open, items, close)->
+            buffer = open
+            so_far = indent_level*2
+            indented ->
+                export buffer,so_far
+                for i,item in ipairs(items)
+                    if i < #items then item ..= ", "
+                    if so_far + #item >= 80 and #buffer > 0
+                        lua buffer
+                        so_far -= #buffer
+                        buffer = item
+                    else
+                        so_far += #item
+                        buffer ..= item
+                buffer ..= close
+                lua buffer
 
         switch tree.type
             when "File"
@@ -267,23 +284,14 @@ class Game
                 for token in *tree.value
                     table.insert name_bits, if token.type == "Word" then token.value else "%"
                 name = table.concat(name_bits, " ")
-                args = [a for a in *tree.value when a.type != "Word"]
-
                 if @macros[name]
                     -- TODO: figure out args
+                    args = [a for a in *tree.value when a.type != "Word"]
                     return @macros[name][1](self, args, transform)
 
-                if #args == 0
-                    lua "game:call(#{utils.repr(name, true)})"
-                else
-                    lua "game:call(#{utils.repr(name, true)},"
-                    indented ->
-                        for i,a in ipairs(args)
-                            if a.type != "Word"
-                                line = transform(a)
-                                if i != #args then line ..=","
-                                lua line
-                    lua ")"
+                args = [ded(transform(a)) for a in *tree.value when a.type != "Word"]
+                table.insert args, 1, utils.repr(name, true)
+                comma_separated_items("game:call(", args, ")")
 
             when "String"
                 lua utils.repr(tree.value, true)
@@ -297,12 +305,7 @@ class Game
                 elseif #tree.value == 1
                     lua "{#{transform(tree.value)}}"
                 else
-                    lua "{"
-                    indented ->
-                        for i in *tree.value
-                            -- I like the trailing comma
-                            lua transform(i)..","
-                    lua "}"
+                    comma_separated_items("{", [ded(transform(item)) for item in *tree.value], "}")
 
             when "Var"
                 lua "vars[#{utils.repr(tree.value,true)}]"

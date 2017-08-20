@@ -68,6 +68,16 @@ say both..
     "hello"
     and "world"
 
+say [..]
+    "this is a stupidly long list", "the items go way past the 80 character", "limit that older consoles"
+    "had.", "It just keeps going and going"
+
+rule "dumbfunc %a %b %c %d %e":
+    say "doop"
+
+dumbfunc..
+    "this is a stupidly long list" "the items go way past the 80 character" "limit that older consoles"
+    "had." "It just keeps going and going"
 
 rule "four": return 4
 say both..
