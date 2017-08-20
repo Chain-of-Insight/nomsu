@@ -11,9 +11,9 @@ utils = {
         switch type(x)
             when 'table'
                 if utils.is_list x
-                    "[#{table.concat([utils.repr(i, true) for i in *x], ", ")}]"
+                    "{#{table.concat([utils.repr(i, true) for i in *x], ", ")}}"
                 else
-                    "{#{table.concat(["[#{k}]: #{v}" for k,v in pairs x], ", ")}}"
+                    "{#{table.concat(["[#{utils.repr(k, true)}]: #{utils.repr(v, true)}" for k,v in pairs x], ", ")}}"
             when 'string'
                 if not add_quotes
                     x
@@ -36,9 +36,8 @@ utils = {
     values: (t)-> [v for _,v in pairs(t)]
 
     sum: (t)->
-        tot = 0
-        for _,x in pairs(t) do tot += x
-        return tot
+        with tot = 0
+            for _,x in pairs(t) do tot += x
 
     all: (t)->
         for _,x in pairs t
@@ -52,25 +51,23 @@ utils = {
 
     min: (list, keyFn=((x)->x))->
         assert utils.is_list(list), "min() expects to be operating on a list"
-        best = list[1]
-        if type(keyFn) == 'table'
-            keyTable = keyFn
-            keyFn = (k)->keyTable[k]
-        for i=2,#list
-            if keyFn(list[i]) < keyFn(best)
-                best = list[i]
-        return best
+        with best = list[1]
+            if type(keyFn) == 'table'
+                keyTable = keyFn
+                keyFn = (k)->keyTable[k]
+            for i=2,#list
+                if keyFn(list[i]) < keyFn(best)
+                    best = list[i]
     
     max: (list, keyFn=((x)->x))->
         assert utils.is_list(list), "min() expects to be operating on a list"
-        best = list[1]
-        if type(keyFn) == 'table'
-            keyTable = keyFn
-            keyFn = (k)->keyTable[k]
-        for i=2,#list
-            if keyFn(list[i]) > keyFn(best)
-                best = list[i]
-        return best
+        with best = list[1]
+            if type(keyFn) == 'table'
+                keyTable = keyFn
+                keyFn = (k)->keyTable[k]
+            for i=2,#list
+                if keyFn(list[i]) > keyFn(best)
+                    best = list[i]
     
     sort: (list, keyFn=((x)->x), reverse=false)->
         assert utils.is_list(list), "min() expects to be operating on a list"
