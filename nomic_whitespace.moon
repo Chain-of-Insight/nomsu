@@ -185,7 +185,7 @@ class Game
             indentified = add_indent_tokens(text)
             print("Indentified:\n[[#{indentified}]]")
             print("\nCompiling...")
-        code = compile(text, @macros)
+        code = self\compile(text)
         if @debug
             print(code)
         lua_thunk, err = loadstring(code)
@@ -237,7 +237,7 @@ class Game
                     return transform(tree.value.errors)
 
                 lua "return (function(game, vars)"
-                indented->
+                indented ->
                     lua transform(tree.value.body)
                 lua "end)"
 
@@ -253,15 +253,14 @@ class Game
                 if not tree.value
                     error("Thunk without value: #{utils.repr(tree)}")
                 lua "(function(game,vars)"
-                indented->
+                indented ->
                     lua "local ret"
                     lua transform(tree.value)
                     lua "return ret"
                 lua "end)"
-                return table.concat ret,"\n"
 
             when "Statement"
-                return ind"ret = #{transform(tree.value,indent_level)}"
+                lua "ret = #{ded(transform(tree.value))}"
 
             when "FunctionCall"
                 name_bits = {}
@@ -272,39 +271,41 @@ class Game
 
                 if @macros[name]
                     -- TODO: figure out args
-                    return @macros[name][1](args, transform,indent_level,@macros)
+                    return @macros[name][1](self, args, transform)
 
                 if #args == 0
-                    return ind"game:call(#{utils.repr(name, true)})"
-                ret = {
-                    ind"game:call(#{utils.repr(name, true)},"
-                }
-                for i,a in ipairs(args)
-                    if a.type != "Word"
-                        line = transform(a,indent_level+1)
-                        if i != #args then line ..=","
-                        table.insert ret, line
-                table.insert ret, ind")"
-                return table.concat ret, "\n"
+                    lua "game:call(#{utils.repr(name, true)})"
+                else
+                    lua "game:call(#{utils.repr(name, true)},"
+                    indented ->
+                        for i,a in ipairs(args)
+                            if a.type != "Word"
+                                line = transform(a)
+                                if i != #args then line ..=","
+                                lua line
+                    lua ")"
 
             when "String"
-                return ind"\"#{tree.value}\""
+                lua utils.repr(tree.value, true)
 
             when "Number"
-                return ind(tree.value)
+                lua tree.value
 
             when "List"
                 if #tree.value == 0
-                    return "{}"
+                    lua "{}"
                 elseif #tree.value == 1
-                    return ind"{#{transform(tree.value,0)}}"
+                    lua "{#{transform(tree.value)}}"
                 else
-                    bits = [transform(i, indent_level+1) for i in *tree.value]
-                    -- I like the trailing comma
-                    return ind"{\n"..table.concat(bits, ",\n")..",\n"..ind"}"
+                    lua "{"
+                    indented ->
+                        for i in *tree.value
+                            -- I like the trailing comma
+                            lua transform(i)..","
+                    lua "}"
 
             when "Var"
-                return ind"vars[#{utils.repr(tree.value,true)}]"
+                lua "vars[#{utils.repr(tree.value,true)}]"
 
             else
                 error("Unknown/unimplemented thingy: #{utils.repr(tree)}")

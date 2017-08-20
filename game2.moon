@@ -35,20 +35,6 @@ g\def "return %x", (vars)=>
 g\run_debug[[
 say "hello world!"
 
-say (lua "23 + 42")
-
-macro "print %y": say %y
-
-macro "%x + %y":
-    lua (join ["(",%x," + ",%y,")"])
-    lua "(#{%x} + #{%y})"
-
-(five) + 4
-
-print "done"
-]]
-[[
-
 rule "fart": say "poot"
 rule "doublefart":
     say "poot"
