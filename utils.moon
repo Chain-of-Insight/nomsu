@@ -30,7 +30,7 @@ utils = {
                 tostring(x)
     
     split: (str, sep="%s")->
-        [chunk for chunk in str\gmatch("[^#{sep}]")]
+        [chunk for chunk in str\gmatch("[^#{sep}]+")]
 
     keys: (t)-> [k for k in pairs(t)]
     values: (t)-> [v for _,v in pairs(t)]
