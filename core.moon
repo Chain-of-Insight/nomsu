@@ -30,10 +30,8 @@ g\defmacro "let %varname = %value", (vars, helpers, ftype)=>
 
 singleton = (aliases, value)->
     g\defmacro aliases, (vars,helpers,ftype)=>
-        if ftype == "Expression"
-            helpers.lua(value)
-        else
-            helpers.lua("ret = #{value}")
+        if ftype == "Expression" then helpers.lua(value)
+        else helpers.lua("ret = #{value}")
 
 infix = (ops)->
     for op in *ops
@@ -41,23 +39,15 @@ infix = (ops)->
         if type(op) == 'table'
             {alias,op} = op
         g\defmacro "%x #{op} %y", (vars,helpers,ftype)=>
-            if ftype == "Statement"
-                helpers.lua("ret = (#{helpers.var('x')} #{op} #{helpers.var('y')})")
-            elseif ftype == "Expression"
-                helpers.lua("(#{helpers.var('x')} #{op} #{helpers.var('y')})")
-            else error("Unknown: #{ftype}")
+            helpers.lua("(#{helpers.var('x')} #{op} #{helpers.var('y')})")
 unary = (ops)->
     for op in *ops
         g\defmacro "#{op} %x", (vars,helpers,ftype)=>
-            if ftype == "Statement"
-                helpers.lua("ret = #{op}(#{helpers.var('x')})")
-            elseif ftype == "Expression"
-                helpers.lua("#{op}(#{helpers.var('x')})")
-            else error("Unknown: #{ftype}")
+            helpers.lua("#{op}(#{helpers.var('x')})")
 
 singleton {"true","yes"}, "true"
 singleton {"false","no"}, "false"
-singleton {"nil","null"}, "nil"
+singleton {"nil","null","nop","pass"}, "nil"
 infix{"+","-","*","/","==",{"!=","~="},"<","<=",">",">=","^","and","or"}
 unary{"-","#","not"}
 g\def [[%x == %y]], (args)=> utils.equivalent(args.x, args.y)
@@ -185,12 +175,13 @@ g\defmacro "for %varname in %iterable %body", (vars,helpers,ftype)=>
 
 g\simplemacro "if %condition %body", [[
 if %condition %body
-..else: nil
+..else: pass
 ]]
 
 g\simplemacro "unless %condition %body", [[
 if (not %condition) %body
-..else: nil]]
+..else: pass
+]]
 
 g\def [[do %action]], (vars)=> return vars.action(self,vars)
 
@@ -206,6 +197,5 @@ g\defmacro [[lua %lua_code]], (vars,helpers,ftype)=>
 
 g\defmacro [[macro %spec %body]], (vars,helpers,ftype)=>
     self\simplemacro vars.spec.value.value, vars.body.value.value.src
-
 
 return g

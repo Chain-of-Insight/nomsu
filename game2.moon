@@ -190,9 +190,12 @@ rule "do %thing also %also-thing":
     do %thing
     do %also-thing
     return 99
-
+]]
+g\run[[
 do: say "one liner"
 ..also: say "another one liner"
+]]
+g\run[[
 
 say (..)
     do:
@@ -200,6 +203,8 @@ say (..)
         return 5
         say "bye"
 
+]]
+g\run[[
 say (do: return "wow")
 if 1: say "hi1" ..else: say "bye1"
 

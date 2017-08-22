@@ -79,6 +79,7 @@ lingo = [=[
                 (({ {|
                     (expression (%word_boundary fn_bit)+) / (word (%word_boundary fn_bit)*)
                 |} }) -> FunctionCall)
+                / (expression)
              }) -> Statement)
         |} }) -> Block
 
@@ -222,7 +223,7 @@ class Game
             print(code)
         lua_thunk, err = loadstring(code)
         if not lua_thunk
-            error("Failed to compile generated code:\n#{code}")
+            error("Failed to compile generated code:\n#{code}\n\n#{err}")
         action = lua_thunk!
         if @debug
             print("Running...")
@@ -299,7 +300,7 @@ class Game
 
             when "Errors"
                 -- TODO: Better error reporting via tree.src
-                error("\nParse error on: #{tree.value}")
+                error("\nParse error on: #{utils.repr(tree.value\match("[^\n]*"), true)}")
 
             when "Block"
                 for chunk in *tree.value
@@ -317,14 +318,19 @@ class Game
                 lua "end)"
 
             when "Statement"
-                ret = transform(tree.value)
-                return ret
+                if tree.value.type == "FunctionCall"
+                    name_bits = {}
+                    for token in *tree.value.value
+                        table.insert name_bits, if token.type == "Word" then token.value else "%"
+                    name = table.concat(name_bits, " ")
+                    if @macros[name]
+                        lua transform(tree.value)
+                        ret = table.concat ret_lines, "\n"
+                        return ret
+                lua "ret = #{ded(transform(tree.value))}"
 
             when "Expression"
-                ret = transform(tree.value)
-                if parent.type == "Statement"
-                    ret = "ret = "..ded(ret)
-                return ret
+                lua transform(tree.value)
 
             when "FunctionCall"
                 name_bits = {}
@@ -341,8 +347,6 @@ class Game
                     m = fn(self, args, helpers, parent.type)
                     if m != nil then return m
                 else
-                    if parent.type == "Statement"
-                        lua "ret ="
                     args = [ded(transform(a)) for a in *tree.value when a.type != "Word"]
                     table.insert args, 1, utils.repr(name, true)
                     comma_separated_items("game:call(", args, ")")
