@@ -1,49 +1,10 @@
 #!/usr/bin/env moon
 utils = require 'utils'
 Game = require 'nomic'
-g = Game()
+g = Game(require'core')
 
 print("===========================================================================================")
 
-g\def "rule %spec %body", (vars)=>
-    self\def vars.spec, vars.body
-    print "Defined rule: #{vars.spec}"
-
-g\def "say %x", (vars)=>
-    print(utils.repr(vars.x))
-
-g\defmacro "return %retval", (vars,helpers,ftype)=>
-    with helpers
-        switch ftype
-            when "Expression"
-                error("Cannot use a return statement as an expression")
-            when "Statement"
-                .lua "do return "..(.ded(.transform(vars.retval))).." end"
-            else
-                error"Unknown: #{ftype}"
-    return nil
-
-g\defmacro "true", (vars,helpers,ftype)=> helpers.lua("true")
-g\defmacro "false", (vars,helpers,ftype)=> helpers.lua("false")
-g\defmacro "nil", (vars,helpers,ftype)=> helpers.lua("nil")
-infix = (ops)->
-    for op in *ops
-        g\defmacro "%x #{op} %y", (vars,helpers,ftype)=>
-            if ftype == "Statement"
-                helpers.lua("ret = (#{helpers.var('x')} #{op} #{helpers.var('y')})")
-            elseif ftype == "Expression"
-                helpers.lua("(#{helpers.var('x')} #{op} #{helpers.var('y')})")
-            else error("Unknown: #{ftype}")
-unary = (ops)->
-    for op in *ops
-        g\defmacro "#{op} %x", (vars,helpers,ftype)=>
-            if ftype == "Statement"
-                helpers.lua("ret = #{op}(#{helpers.var('x')})")
-            elseif ftype == "Expression"
-                helpers.lua("#{op}(#{helpers.var('x')})")
-            else error("Unknown: #{ftype}")
-infix{"+","-","*","/","==","!=","<","<=",">",">=","^"}
-unary{"-","#","not"}
 
 g\test[[
 say "foo"
@@ -224,76 +185,6 @@ say both ..
 say "done"
 ]]
 
-g\defmacro "if %condition %if_body else %else_body", (vars,helpers,ftype)=>
-    with helpers
-        switch ftype
-            when "Expression"
-                .lua "((#{.ded(.transform(vars.condition))}) and"
-                .indented ->
-                    .lua "("..(.ded(.transform(vars.if_body)))..")"
-                    .lua "or ("..(.ded(.transform(vars.if_body))).."))(game, vars)"
-            when "Statement"
-                .lua("if (#{.ded(.transform(vars.condition))}) then")
-                .indented ->
-                    if_body = vars.if_body
-                    while if_body.type != "Block"
-                        if_body = if_body.value
-                        if if_body == nil then error("Failed to find body.")
-                    for statement in *if_body.value
-                        .lua(.ded(.transform(statement)))
-                .lua("else")
-                .indented ->
-                    else_body = vars.else_body
-                    while else_body.type != "Block"
-                        else_body = else_body.value
-                        if else_body == nil then error("Failed to find body.")
-                    for statement in *else_body.value
-                        .lua(.ded(.transform(statement)))
-                .lua("end")
-    return nil
-
-g\defmacro "for %varname in %iterable %body", (vars,helpers,ftype)=>
-    with helpers
-        switch ftype
-            when "Expression"
-                .lua "(function(game, vars)"
-                .indented ->
-                    .lua "local comprehension, vars = {}, setmetatable({}, {__index=vars})"
-                    .lua "for i, value in ipairs(#{.ded(.transform(vars.iterable))}) do"
-                    .indented ->
-                        .lua "local comp_value"
-                        .lua "vars[#{.ded(.transform(vars.varname))}] = value"
-                        body = vars.body
-                        while body.type != "Block"
-                            body = body.value
-                        if body == nil then error("Failed to find body.")
-                        for statement in *body.value
-                            -- TODO: Clean up this ugly bit
-                            .lua("comp_value = "..(.ded(.transform(statement.value, {type:"Expression"}))))
-                        .lua "table.insert(comprehension, comp_value)"
-                    .lua "end"
-                    .lua "return comprehension"
-                .lua "end)(game,vars)"
-            when "Statement"
-                .lua "do"
-                .indented ->
-                    .lua "local vars = setmetatable({}, {__index=vars})"
-                    .lua "for i, value in ipairs(#{.ded(.transform(vars.iterable))}) do"
-                    .indented ->
-                        .lua "vars[#{.ded(.transform(vars.varname))}] = value"
-                        body = vars.body
-                        while body.type != "Block"
-                            body = body.value
-                        if body == nil then error("Failed to find body.")
-                        for statement in *body.value
-                            .lua(.ded(.transform(statement)))
-                    .lua "end"
-                .lua "end"
-    return nil
-
---g\defmacro "if %condition %if_body", "if %condition %if_body else: return nil"
-
-g\def [[do %action]], (vars)=> return vars.action(self,vars)
 g\run[[
 rule "do %thing also %also-thing":
     do %thing
@@ -334,13 +225,20 @@ g\run[[
 say (1 + (-(2 * 3)))
 ]]
 
-g\run_debug[[
+g\run[[
 for "x" in ["A","B","C"]:
     say %x
 ]]
-g\run_debug[[
+g\run[[
 say (for "x" in [1,2,3]:%x + 100)
 say (..)
     for "x" in [1,2,3]:
         %x + 200
+]]
+
+g\run[[
+if (1 == 1):
+    say "Simple macros work!"
+unless (1 > 2):
+    say "This one too!"
 ]]

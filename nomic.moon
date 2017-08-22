@@ -63,26 +63,26 @@ add_indent_tokens = (str)->
         string <- '"' (("\\" .) / [^"])* '"'
     ]=]
     indentflagger = re.compile indentflagger, defs
-    indentflagger\match(str)
+    indentflagger\match(str.."\n")
     while #indent_stack > 1
         table.remove indent_stack
         table.insert result, "}\n"
     return (table.concat result)\sub(1,-2)
 
 lingo = [=[
-    file <- ({} {| {:body: (" " block) :} ({:errors: errors :})? |} {}) -> File
-    errors <- ({} {.+} {}) -> Errors
-    block <- ({} {| statement (%nodent statement)* |} {}) -> Block
-    statement <- ({} (functioncall / expression) {}) -> Statement
-    one_liner <- ({} {|
-            (({} 
-                (({} {|
+    file <- ({ {| {:body: (" " block) :} ({:errors: errors :})? |} }) -> File
+    errors <- ({ {.+} }) -> Errors
+    block <- ({ {| statement (%nodent statement)* |} }) -> Block
+    statement <- ({ (functioncall / expression) }) -> Statement
+    one_liner <- ({ {|
+            (({ 
+                (({ {|
                     (expression (%word_boundary fn_bit)+) / (word (%word_boundary fn_bit)*)
-                |} {}) -> FunctionCall)
-             {}) -> Statement)
-        |} {}) -> Block
+                |} }) -> FunctionCall)
+             }) -> Statement)
+        |} }) -> Block
 
-    functioncall <- ({} {| (expression %word_boundary fn_bits) / (word (%word_boundary fn_bits)?) |} {}) -> FunctionCall
+    functioncall <- ({ {| (expression %word_boundary fn_bits) / (word (%word_boundary fn_bits)?) |} }) -> FunctionCall
     fn_bit <- (expression / word)
     fn_bits <-
         ((".." %ws? (%indent %nodent indented_fn_bits %dedent) (%nodent ".." %ws? fn_bits)?)
@@ -92,35 +92,36 @@ lingo = [=[
         fn_bit ((%nodent / %word_boundary) indented_fn_bits)?
     
     thunk <-
-        ({} ":" %ws?
+        ({ ":" %ws?
            ((%indent %nodent block %dedent (%nodent "..")?)
-            / (one_liner (%ws? ((%nodent? "..")))?)) {}) -> Thunk
+            / (one_liner (%ws? ((%nodent? "..")))?)) }) -> Thunk
 
-    word <- ({} !number {%wordchar+} {}) -> Word
-    expression <- ({} (string / number / variable / list / thunk / subexpression) {}) -> Expression
+    word <- ({ !number {%wordchar+} }) -> Word
+    expression <- ({ (string / number / variable / list / thunk / subexpression) }) -> Expression
 
-    string <- ({} '"' {(("\\" .) / [^"])*} '"' {}) -> String
-    number <- ({} {'-'? [0-9]+ ("." [0-9]+)?} {}) -> Number
-    variable <- ({} ("%" {%wordchar+}) {}) -> Var
+    string <- ({ '"' {(("\\" .) / [^"])*} '"' }) -> String
+    number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
+    variable <- ({ ("%" {%wordchar+}) }) -> Var
 
     subexpression <-
         ("(" %ws? (functioncall / expression) %ws? ")")
-        / ("(..)" %ws? %indent %nodent (expression / (({} {| indented_fn_bits |} {}) -> FunctionCall)) %dedent (%nodent "..")?)
+        / ("(..)" %ws? %indent %nodent (expression / (({ {| indented_fn_bits |} }) -> FunctionCall)) %dedent (%nodent "..")?)
 
-    list <- ({} {|
+    list <- ({ {|
         ("[..]" %ws? %indent %nodent indented_list ","? %dedent (%nodent "..")?)
         / ("[" %ws? (list_items ","?)?  %ws?"]")
-      |} {}) -> List
+      |} }) -> List
     list_items <- (expression (list_sep list_items)?)
     list_sep <- %ws? "," %ws?
     indented_list <-
         expression (((list_sep %nodent?) / %nodent) indented_list)?
 ]=]
 
+wordchar = lpeg.P(1)-lpeg.S(' \t\n\r%:;,.{}[]()"')
 defs =
     eol: #(linebreak) + (lpeg.P("")-lpeg.P(1))
     ws: lpeg.S(" \t")^1
-    wordchar: lpeg.P(1)-lpeg.S(' \t\n\r%:;,.{}[]()"')
+    wordchar: wordchar
     indent: linebreak * lpeg.P("{") * lpeg.S(" \t")^0
     nodent: linebreak * lpeg.P(" ") * lpeg.S(" \t")^0
     dedent: linebreak * lpeg.P("}") * lpeg.S(" \t")^0
@@ -129,8 +130,8 @@ defs =
 setmetatable(defs, {
     __index: (t,key)->
         --print("WORKING for #{key}")
-        fn = (start, value, stop, ...)->
-            token = {type: key, range:{start,stop}, value: value}
+        fn = (src, value, ...)->
+            token = {type: key, src:src, value: value}
             return token
         t[key] = fn
         return fn
@@ -139,9 +140,9 @@ lingo = re.compile lingo, defs
 
 
 class Game
-    new:=>
-        @defs = {}
-        @macros = {}
+    new:(parent)=>
+        @defs = setmetatable({}, {__index:parent and parent.defs})
+        @macros = setmetatable({}, {__index: parent and parent.macros})
         @debug = false
 
     call: (fn_name,...)=>
@@ -154,7 +155,7 @@ class Game
         for i,name in ipairs(arg_names)
             args[name] = select(i,...)
             if @debug
-                print("arg #{utils.repr(name,true)} = #{select(i,...)}")
+                print("arg #{utils.repr(name,true)} = #{utils.repr(select(i,...), true)}")
         ret = fn(self, args)
         if @debug
             print "returned #{utils.repr(ret,true)}"
@@ -189,6 +190,26 @@ class Game
         invocations,arg_names = self\get_invocations spec
         for invocation in *invocations
             @macros[invocation] = {fn, arg_names}
+
+    simplemacro: (spec, replacement)=>
+        replace_grammar = [[
+            stuff <- {~ (var / string / .)+ ~}
+            var <- ("%" {%wordchar+}) -> replacer
+            string <- '"' (("\\" .) / [^"])* '"'
+        ]]
+        replacement = add_indent_tokens replacement
+        fn = (vars, helpers, ftype)=>
+            replacer = (varname)->
+                ret = vars[varname].src
+                return ret
+            replacement_grammar = re.compile(replace_grammar, {:wordchar, :replacer})
+            replaced = replacement_grammar\match(replacement)
+            tree = lingo\match (replaced)
+            if not tree
+                error "Couldn't match:\n#{replaced}"
+            helpers.lua(helpers.transform(tree.value.body))
+            return code
+        self\defmacro spec, fn
     
     run: (text)=>
         if @debug
@@ -276,7 +297,7 @@ class Game
                 lua "end)"
 
             when "Errors"
-                -- TODO: Better error reporting via tree.range[1]
+                -- TODO: Better error reporting via tree.src
                 error("\nParse error on: #{tree.value}")
 
             when "Block"
