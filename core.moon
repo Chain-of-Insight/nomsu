@@ -194,5 +194,18 @@ if (not %condition) %body
 
 g\def [[do %action]], (vars)=> return vars.action(self,vars)
 
+g\defmacro [[lua %lua_code]], (vars,helpers,ftype)=>
+    with helpers
+        lua_code = vars.lua_code.value
+        switch lua_code.type
+            when "List"
+                .lua table.concat[i.value.value for i in *lua_code.value]
+            else
+                .lua(lua_code.value)
+    return nil
+
+g\defmacro [[macro %spec %body]], (vars,helpers,ftype)=>
+    self\simplemacro vars.spec.value.value, vars.body.value.value.src
+
 
 return g

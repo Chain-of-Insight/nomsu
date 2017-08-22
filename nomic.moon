@@ -187,6 +187,7 @@ class Game
         return invocations, arg_names
 
     defmacro: (spec, fn)=>
+        assert fn, "No function supplied"
         invocations,arg_names = self\get_invocations spec
         for invocation in *invocations
             @macros[invocation] = {fn, arg_names}
