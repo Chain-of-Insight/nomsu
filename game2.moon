@@ -1,6 +1,6 @@
 #!/usr/bin/env moon
 utils = require 'utils'
-Game = require 'nomic_whitespace'
+Game = require 'nomic'
 g = Game()
 
 print("===========================================================================================")
@@ -21,7 +21,6 @@ g\defmacro "return %retval", (vars,helpers,ftype)=>
                 .lua "do return "..(.ded(.transform(vars.retval))).." end"
             else
                 error"Unknown: #{ftype}"
-
     return nil
 
 g\defmacro "true", (vars,helpers,ftype)=> helpers.lua("true")

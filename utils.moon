@@ -34,6 +34,7 @@ utils = {
 
     keys: (t)-> [k for k in pairs(t)]
     values: (t)-> [v for _,v in pairs(t)]
+    set: (list)-> {i,true for i in *list}
 
     sum: (t)->
         with tot = 0
