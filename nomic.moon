@@ -60,7 +60,7 @@ add_indent_tokens = (str)->
     indentflagger = [=[
         file <- line*
         line <- ((string / [^%linebreak])* %linebreak) -> process_line
-        string <- '"' (("\\" .) / [^"])* '"'
+        string <- '"' (("\" .) / [^"])* '"'
     ]=]
     indentflagger = re.compile indentflagger, defs
     indentflagger\match(str.."\n")
@@ -100,7 +100,7 @@ lingo = [=[
     word <- ({ !number {%wordchar+} }) -> Word
     expression <- ({ (string / number / variable / list / thunk / subexpression) }) -> Expression
 
-    string <- ({ '"' {(("\\" .) / [^"])*} '"' }) -> String
+    string <- ({ '"' {(("\" .) / [^"])*} '"' }) -> String
     number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
     variable <- ({ ("%" {%wordchar+}) }) -> Var
 
@@ -197,7 +197,7 @@ class Game
         replace_grammar = [[
             stuff <- {~ (var / string / .)+ ~}
             var <- ("%" {%wordchar+}) -> replacer
-            string <- '"' (("\\" .) / [^"])* '"'
+            string <- '"' (("\" .) / [^"])* '"'
         ]]
         replacement = add_indent_tokens replacement
         fn = (vars, helpers, ftype)=>
@@ -206,11 +206,14 @@ class Game
                 return ret
             replacement_grammar = re.compile(replace_grammar, {:wordchar, :replacer})
             replaced = replacement_grammar\match(replacement)
-            tree = lingo\match (replaced)
-            if not tree
-                error "Couldn't match:\n#{replaced}"
-            helpers.lua(helpers.transform(tree.value.body))
-            return code
+            tree = lingo\match replaced
+            if tree.value.errors and #tree.value.errors.value > 0
+                ret = helpers.transform(tree.value.errors)
+                return ret
+            result = helpers.transform(tree.value.body)
+            helpers.lua(result)
+            return
+
         self\defmacro spec, fn
     
     run: (text)=>
@@ -352,7 +355,9 @@ class Game
                     comma_separated_items("game:call(", args, ")")
 
             when "String"
-                lua utils.repr(tree.value, true)
+                escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
+                unescaped = tree.value\gsub("\\(.)", ((c)-> escapes[c] or c))
+                lua utils.repr(unescaped, true)
 
             when "Number"
                 lua tree.value

@@ -11,6 +11,9 @@ g\def [[printf %str]], (args)=>
     for s in *args.str do io.write(utils.repr(s))
     io.write("\n")
 
+g\def [[quote %str]], (vars)=>
+    return utils.repr(vars.str, true)
+
 g\defmacro "return %retval", (vars,helpers,ftype)=>
     with helpers
         switch ftype
@@ -25,7 +28,7 @@ g\defmacro "return %retval", (vars,helpers,ftype)=>
 g\defmacro "let %varname = %value", (vars, helpers, ftype)=>
     with helpers
         if ftype == "Expression" then error("Cannot set a variable in an expression.")
-        .lua "vars[#{.ded(.transform(vars.varname))} = #{.ded(.transform(vars.value))}"
+        .lua "vars[#{.ded(.transform(vars.varname))}] = #{.ded(.transform(vars.value))}"
     return nil
 
 singleton = (aliases, value)->
@@ -188,11 +191,15 @@ g\def [[do %action]], (vars)=> return vars.action(self,vars)
 g\defmacro [[lua %lua_code]], (vars,helpers,ftype)=>
     with helpers
         lua_code = vars.lua_code.value
+        escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
+        unescape = (s)-> s\gsub("\\(.)", ((c)-> escapes[c] or c))
         switch lua_code.type
             when "List"
-                .lua table.concat[i.value.value for i in *lua_code.value]
-            else
-                .lua(lua_code.value)
+                -- TODO: handle subexpressions
+                .lua table.concat[unescape(i.value.value) for i in *lua_code.value]
+            when "String"
+                .lua(unescape(lua_code.value))
+            else error("Unknown type: #{lua_code.type}")
     return nil
 
 g\defmacro [[macro %spec %body]], (vars,helpers,ftype)=>

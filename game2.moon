@@ -247,3 +247,13 @@ if (1 == 1):
 unless (1 > 2):
     say "This one too!"
 ]]
+
+g\simplemacro [[smet %varname = %value]],[[
+lua ["vars[\"", %varname, "\"] = ", %value]
+lua ["vars[\"", %varname, "\"] = 2*vars[\"", %varname, "\"]"]
+]]
+
+g\run[[
+smet "fnord" = 23
+say %fnord
+]]
