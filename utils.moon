@@ -17,9 +17,9 @@ utils = {
             when 'string'
                 if not add_quotes
                     x
-                elseif not x\find[["]]
+                elseif not x\find[["]] and not x\find"\n"
                     "\"#{x}\""
-                elseif not x\find[[']]
+                elseif not x\find[[']] and not x\find"\n"
                     "\'#{x}\'"
                 else
                     for i=0,math.huge

@@ -4,8 +4,10 @@ utils = require 'utils'
 moon = require 'moon'
 
 lpeg.setmaxstack 10000 -- whoa
+{:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
-linebreak = lpeg.P("\r")^-1 * lpeg.P("\n")
+wordchar = P(1)-S(' \t\n\r%:;,.{}[]()"')
+spaces = S(" \t")^1
 
 get_line_indentation = (line)->
     indent_amounts = {[" "]:1, ["\t"]:4}
@@ -14,158 +16,27 @@ get_line_indentation = (line)->
         for c in leading_space\gmatch "[\t ]"
             sum += indent_amounts[c]
 
-pos_to_line = (str,pos)->
-    line_no = 1
-    for line in str\gmatch("[^%n]+")
-        if #line >= pos then return line, line_no
-        pos -= (#line + 1)
-        line_no += 1
-    error "Failed to find position #{pos} in str"
-
-pos_to_line_no = (str,pos)->
-    with line = 1
-        for _ in str\sub(1, pos)\gmatch("\n")
-            line += 1
-
-add_indent_tokens = (str)->
-    indent_stack = {0}
-    result = {}
-    -- TODO: Store mapping from new line numbers to old ones
-    defs =
-        linebreak: linebreak
-        process_line: (line)->
-            -- Remove blank lines
-            unless line\match"[^ \t\n]"
-                return
-            indent = get_line_indentation(line)
-            if indent > indent_stack[#indent_stack]
-                table.insert result, "{\n "
-                table.insert indent_stack, indent
-            elseif indent < indent_stack[#indent_stack]
-                dedents = 0
-                tokens = {}
-                while indent < indent_stack[#indent_stack]
-                    table.remove indent_stack
-                    table.insert tokens, "}"
-                table.insert tokens, " "
-                table.insert result, table.concat(tokens, "\n")
-            else
-                table.insert result, " "
-            -- Delete leading whitespace
-            --line = line\gsub("[ \t]*", "", 1)
-            -- Delete trailing whitespace and carriage returns
-            line = line\gsub("[ \t\r]*\n", "\n", 1)
-            table.insert result, line
-
-    indentflagger = [=[
-        file <- line*
-        line <- ((string / [^%linebreak])* %linebreak) -> process_line
-        string <- '"' (("\" .) / [^"])* '"'
-    ]=]
-    indentflagger = re.compile indentflagger, defs
-    indentflagger\match(str.."\n")
-    while #indent_stack > 1
-        table.remove indent_stack
-        table.insert result, "}\n"
-    return (table.concat result)\sub(1,-2)
-
-lingo = [=[
-    file <- ({ {| {:body: (" " block) :} ({:errors: errors :})? |} }) -> File
-    errors <- ({ {.+} }) -> Errors
-    block <- ({ {| statement (%nodent statement)* |} }) -> Block
-    statement <- ({ (functioncall / expression) }) -> Statement
-    one_liner <- ({ {|
-            (({ 
-                (({ {|
-                    (expression (%word_boundary fn_bit)+) / (word (%word_boundary fn_bit)*)
-                |} }) -> FunctionCall)
-                / (expression)
-             }) -> Statement)
-        |} }) -> Block
-
-    functioncall <- ({ {| (expression %word_boundary fn_bits) / (word (%word_boundary fn_bits)?) |} }) -> FunctionCall
-    fn_bit <- (expression / word)
-    fn_bits <-
-        ((".." %ws? (%indent %nodent indented_fn_bits %dedent) (%nodent ".." %ws? fn_bits)?)
-         / (%nodent ".." fn_bit fn_bits)
-         / (fn_bit (%word_boundary fn_bits)?))
-    indented_fn_bits <-
-        fn_bit ((%nodent / %word_boundary) indented_fn_bits)?
-    
-    thunk <-
-        ({ ":" %ws?
-           ((%indent %nodent block %dedent (%nodent "..")?)
-            / (one_liner (%ws? ((%nodent? "..")))?)) }) -> Thunk
-
-    word <- ({ !number {%wordchar+} }) -> Word
-    expression <- ({ (string / number / variable / list / thunk / subexpression) }) -> Expression
-
-    string <- ({ '"' {(("\" .) / [^"])*} '"' }) -> String
-    number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
-    variable <- ({ ("%" {%wordchar+}) }) -> Var
-
-    subexpression <-
-        ("(" %ws? (functioncall / expression) %ws? ")")
-        / ("(..)" %ws? %indent %nodent (expression / (({ {| indented_fn_bits |} }) -> FunctionCall)) %dedent (%nodent "..")?)
-
-    list <- ({ {|
-        ("[..]" %ws? %indent %nodent indented_list ","? %dedent (%nodent "..")?)
-        / ("[" %ws? (list_items ","?)?  %ws?"]")
-      |} }) -> List
-    list_items <- (expression (list_sep list_items)?)
-    list_sep <- %ws? "," %ws?
-    indented_list <-
-        expression (((list_sep %nodent?) / %nodent) indented_list)?
-]=]
-
-wordchar = lpeg.P(1)-lpeg.S(' \t\n\r%:;,.{}[]()"')
-defs =
-    eol: #(linebreak) + (lpeg.P("")-lpeg.P(1))
-    ws: lpeg.S(" \t")^1
-    wordchar: wordchar
-    indent: linebreak * lpeg.P("{") * lpeg.S(" \t")^0
-    nodent: linebreak * lpeg.P(" ") * lpeg.S(" \t")^0
-    dedent: linebreak * lpeg.P("}") * lpeg.S(" \t")^0
-    word_boundary: lpeg.S(" \t")^1 + lpeg.B(lpeg.P("..")) + lpeg.B(lpeg.S("\";)]")) + #lpeg.S("\":([") + #lpeg.P("..")
-
-setmetatable(defs, {
-    __index: (t,key)->
-        --print("WORKING for #{key}")
-        fn = (src, value, ...)->
-            token = {type: key, src:src, value: value}
-            return token
-        t[key] = fn
-        return fn
-})
-lingo = re.compile lingo, defs
-
 
 class Game
     new:(parent)=>
         @defs = setmetatable({}, {__index:parent and parent.defs})
-        @macros = setmetatable({}, {__index: parent and parent.macros})
         @debug = false
 
     call: (fn_name,...)=>
-        if @defs[fn_name] == nil
+        fn_info = @defs[fn_name]
+        if fn_info == nil
             error "Attempt to call undefined function: #{fn_name}"
-        {fn, arg_names} = @defs[fn_name]
+        {:fn, :arg_names} = fn_info
+        args = {name, select(i,...) for i,name in ipairs(arg_names)}
         if @debug
-            print("Calling #{fn_name}...")
-        args = {}
-        for i,name in ipairs(arg_names)
-            args[name] = select(i,...)
-            if @debug
-                print("arg #{utils.repr(name,true)} = #{utils.repr(select(i,...), true)}")
-        ret = fn(self, args)
-        if @debug
-            print "returned #{utils.repr(ret,true)}"
-        return ret
+            print "Calling #{fn_name} with args: #{utils.repr(args)}"
+        return fn(self, args)
 
     def: (spec, fn)=>
         invocations,arg_names = self\get_invocations spec
+        fn_info = {:fn, :arg_names, :invocations, is_macro:false}
         for invocation in *invocations
-            @defs[invocation] = {fn, arg_names}
+            @defs[invocation] = fn_info
 
     get_invocations:(text)=>
         if type(text) == 'string' then text = {text}
@@ -190,21 +61,55 @@ class Game
     defmacro: (spec, fn)=>
         assert fn, "No function supplied"
         invocations,arg_names = self\get_invocations spec
+        fn_info = {:fn, :arg_names, :invocations, is_macro:true}
         for invocation in *invocations
-            @macros[invocation] = {fn, arg_names}
+            @defs[invocation] = fn_info
 
     simplemacro: (spec, replacement)=>
+        spec = spec\gsub("\r", "")
+        replacement = replacement\gsub("\r", "")
+        indent_stack = {0}
+        push = (n)-> table.insert indent_stack, n
+        pop = ()-> table.remove indent_stack
+        check_indent = (subject,end_pos,spaces)->
+            num_spaces = get_line_indentation(spaces)
+            if num_spaces <= indent_stack[#indent_stack] then return nil
+            push num_spaces
+            return end_pos
+        check_dedent = (subject,end_pos,spaces)->
+            num_spaces = get_line_indentation(spaces)
+            if num_spaces >= indent_stack[#indent_stack] then return nil
+            pop!
+            return end_pos
+        check_nodent = (subject,end_pos,spaces)->
+            num_spaces = get_line_indentation(spaces)
+            if num_spaces != indent_stack[#indent_stack] then return nil
+            return end_pos
+
+        nl = P("\n")
+        blank_line = spaces^-1 * nl
+        defs =
+            eol: #(nl) + (P("")-P(1))
+            ws: S(" \t")^1
+            :wordchar
+            :replacer
+            :nl, :spaces
+            word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..")
+            indent: #(nl * blank_line^0 * Cmt(spaces^-1, check_indent))
+            dedent: #(nl * blank_line^0 * Cmt(spaces^-1, check_dedent))
+            new_line: nl * blank_line^0 * Cmt(spaces^-1, check_nodent)
+
         replace_grammar = [[
-            stuff <- {~ (var / string / .)+ ~}
+            stuff <- {~ (var / longstring / string / .)+ ~}
             var <- ("%" {%wordchar+}) -> replacer
             string <- '"' (("\" .) / [^"])* '"'
+            longstring <- ('"..' %indent %nl {(!%dedent .)*} %new_line '.."')
         ]]
-        replacement = add_indent_tokens replacement
         fn = (vars, helpers, ftype)=>
             replacer = (varname)->
                 ret = vars[varname].src
                 return ret
-            replacement_grammar = re.compile(replace_grammar, {:wordchar, :replacer})
+            replacement_grammar = re.compile(replace_grammar, defs)
             replaced = replacement_grammar\match(replacement)
             tree = lingo\match replaced
             if tree.value.errors and #tree.value.errors.value > 0
@@ -242,10 +147,98 @@ class Game
     parse: (str)=>
         if @debug
             print("PARSING:\n#{str}")
-        indentified = add_indent_tokens str
-        if @debug
-            print("\nINDENTIFIED:\n#{indentified}")
-        tree = lingo\match indentified
+        lingo = [=[
+            file <- ({ {| %new_line? {:body: block :} %new_line? ({:errors: errors :})? |} }) -> File
+            errors <- ({ {.+} }) -> Errors
+            block <- ({ {| statement (%new_line statement)* |} }) -> Block
+            statement <- ({ (functioncall / expression) }) -> Statement
+            one_liner <- ({ {|
+                    (({ 
+                        (({ {|
+                            (expression (%word_boundary fn_bit)+) / (word (%word_boundary fn_bit)*)
+                        |} }) -> FunctionCall)
+                        / (expression)
+                     }) -> Statement)
+                |} }) -> Block
+
+            functioncall <- ({ {| (expression %word_boundary fn_bits) / (word (%word_boundary fn_bits)?) |} }) -> FunctionCall
+            fn_bit <- (expression / word)
+            fn_bits <-
+                ((".." %ws? (%indent %new_line indented_fn_bits %dedent) (%new_line ".." %ws? fn_bits)?)
+                 / (%new_line ".." fn_bit fn_bits)
+                 / (fn_bit (%word_boundary fn_bits)?))
+            indented_fn_bits <-
+                fn_bit ((%new_line / %word_boundary) indented_fn_bits)?
+            
+            thunk <-
+                ({ ":" %ws?
+                   ((%indent %new_line block %dedent (%new_line "..")?)
+                    / (one_liner (%ws? (%new_line? ".."))?)) }) -> Thunk
+
+            word <- ({ !number {%wordchar+} }) -> Word
+            expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
+
+            string <- ({ (!('"..' %ws? %nl)) '"' {(("\" .) / [^"])*} '"' }) -> String
+            longstring <- ({ '"..' %ws? %indent %nl {(!%dedent .)* (%nl %ws? %eol)*} %new_line '.."' }) -> Longstring
+            number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
+            variable <- ({ ("%" {%wordchar+}) }) -> Var
+
+            subexpression <-
+                ("(" %ws? (functioncall / expression) %ws? ")")
+                / ("(..)" %ws? %indent %new_line ((({ {| indented_fn_bits |} }) -> FunctionCall) / expression) %dedent (%new_line "..")?)
+
+            list <- ({ {|
+                ("[..]" %ws? %indent %new_line indented_list ","? %dedent (%new_line "..")?)
+                / ("[" %ws? (list_items ","?)?  %ws?"]")
+              |} }) -> List
+            list_items <- (expression (list_sep list_items)?)
+            list_sep <- %ws? "," %ws?
+            indented_list <-
+                expression (((list_sep %new_line?) / %new_line) indented_list)?
+        ]=]
+
+        str = str\gsub("\r", "")
+        indent_stack = {0}
+        push = (n)-> table.insert indent_stack, n
+        pop = ()-> table.remove indent_stack
+        check_indent = (subject,end_pos,spaces)->
+            num_spaces = get_line_indentation(spaces)
+            if num_spaces <= indent_stack[#indent_stack] then return nil
+            push num_spaces
+            return end_pos
+        check_dedent = (subject,end_pos,spaces)->
+            num_spaces = get_line_indentation(spaces)
+            if num_spaces >= indent_stack[#indent_stack] then return nil
+            pop!
+            return end_pos
+        check_nodent = (subject,end_pos,spaces)->
+            num_spaces = get_line_indentation(spaces)
+            if num_spaces != indent_stack[#indent_stack] then return nil
+            return end_pos
+
+        nl = P("\n")
+        blank_line = spaces^-1 * nl
+        defs =
+            eol: #(nl) + (P("")-P(1))
+            ws: S(" \t")^1
+            :wordchar
+            :nl, :spaces
+            word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..")
+            indent: #(nl * blank_line^0 * Cmt(spaces^-1, check_indent))
+            dedent: #(nl * blank_line^0 * Cmt(spaces^-1, check_dedent))
+            new_line: nl * blank_line^0 * Cmt(spaces^-1, check_nodent)
+
+        setmetatable(defs, {
+            __index: (t,key)->
+                --print("WORKING for #{key}")
+                fn = (src, value, ...)->
+                    token = {type: key, src:src, value: value}
+                    return token
+                t[key] = fn
+                return fn
+        })
+        lingo = re.compile lingo, defs
+        tree = lingo\match(str\gsub("\r","").."\n")
         if @debug
             print("\nPARSE TREE:")
             self\print_tree(tree)
@@ -326,7 +319,8 @@ class Game
                     for token in *tree.value.value
                         table.insert name_bits, if token.type == "Word" then token.value else "%"
                     name = table.concat(name_bits, " ")
-                    if @macros[name]
+                    if @defs[name] and @defs[name].is_macro
+                        -- This case here is to prevent "ret =" from getting prepended when the macro might not want it
                         lua transform(tree.value)
                         ret = table.concat ret_lines, "\n"
                         return ret
@@ -340,8 +334,8 @@ class Game
                 for token in *tree.value
                     table.insert name_bits, if token.type == "Word" then token.value else "%"
                 name = table.concat(name_bits, " ")
-                if @macros[name]
-                    {fn, arg_names} = @macros[name]
+                if @defs[name] and @defs[name].is_macro
+                    {:fn, :arg_names} = @defs[name]
                     helpers = {:indented, :transform, :ind, :ded, :lua, :comma_separated_items}
                     args = [a for a in *tree.value when a.type != "Word"]
                     args = {name,args[i] for i,name in ipairs(arg_names)}
@@ -358,6 +352,15 @@ class Game
                 escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
                 unescaped = tree.value\gsub("\\(.)", ((c)-> escapes[c] or c))
                 lua utils.repr(unescaped, true)
+
+            when "Longstring"
+                first_nonblank_line = tree.value\match("[^\n]+")
+                indent = first_nonblank_line\match("[ \t]*")
+                result = {}
+                for line in (tree.value.."\n")\gmatch("(.-)\n")
+                    line = line\gsub("^"..indent, "", 1)
+                    table.insert result, line
+                lua utils.repr(table.concat(result, "\n"), true)
 
             when "Number"
                 lua tree.value
@@ -417,6 +420,11 @@ class Game
                             self\_yield_tree(a, indent_level+1)
 
             when "String"
+                -- TODO: Better implement
+                coroutine.yield(ind(utils.repr(tree.value, true)))
+
+            when "Longstring"
+                -- TODO: Better implement
                 coroutine.yield(ind(utils.repr(tree.value, true)))
 
             when "Number"
@@ -453,20 +461,24 @@ class Game
         return code
 
     test: (src, expected)=>
-        if expected == nil
-            start,stop = src\find"==="
+        i = 1
+        while i != nil
+            start,stop = src\find("\n\n", i)
+
+            test = src\sub(i,start)
+            i = stop
+            start,stop = test\find"==="
             if not start or not stop then
-                error("WHERE'S THE ===? in:\n#{src}")
-            src, expected = src\sub(1,start-1), src\sub(stop+1,-1)
-        expected = expected\match'[\n]*(.*[^\n])'
-        if not expected then error("WTF???")
-        tree = self\parse(src)
-        got = if tree.value.errors and #tree.value.errors.value > 0
-            self\stringify_tree(tree.value.errors)
-        else
-            self\stringify_tree(tree.value.body)
-        if got != expected
-            error"TEST FAILED!\nSource:\n#{src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
+                error("WHERE'S THE ===? in:\n#{test}")
+            test_src, expected = test\sub(1,start-1), test\sub(stop+1,-1)
+            expected = expected\match'[\n]*(.*[^\n])'
+            tree = self\parse(test_src)
+            got = if tree.value.errors and #tree.value.errors.value > 0
+                self\stringify_tree(tree.value.errors)
+            else
+                self\stringify_tree(tree.value.body)
+            if got != expected
+                error"TEST FAILED!\nSource:\n#{test_src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
 
 
 return Game

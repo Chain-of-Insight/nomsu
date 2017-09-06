@@ -1,7 +1,86 @@
 #!/usr/bin/env moon
-nomic = require 'nomic'
+Nomic = require 'nomic'
 utils = require 'utils'
-g = nomic()
+
+
+class PermissionNomic extends Nomic
+    new: (...)=>
+        super(...)
+        @callstack = {}
+
+    call: (fn_name,...)=>
+        fn_info = @defs[fn_name]
+        if fn_info == nil
+            error "Attempt to call undefined function: #{fn_name}"
+        unless self\check_permission(fn_name)
+            error "You do not have the authority to call: #{fn_name}"
+        table.insert @callstack, fn_name
+        {:fn, :arg_names} = fn_info
+        args = {name, select(i,...) for i,name in ipairs(arg_names)}
+        if @debug
+            print "Calling #{fn_name} with args: #{utils.repr(args)}"
+        ret = fn(self, args)
+        table.remove @callstack
+        return ret
+
+    check_permission: (fn_name)=>
+        fn_info = @defs[fn_name]
+        if fn_info == nil
+            error "Undefined function: #{fn_name}"
+        if fn_info.whitelist == nil then return true
+        for caller in *@callstack
+            if fn_info.whitelist[caller]
+                return true
+        return false
+
+
+g = PermissionNomic()
+
+g\def {"restrict %fn to %whitelist"}, (vars)=>
+    fns = if type(vars.fn) == 'string' then {vars.fn} else vars.fn
+    whitelist = if type(vars.whitelist) == 'string' then {vars.whitelist} else vars.whitelist
+    whitelist = {w,true for w in *whitelist}
+    for fn in *fns
+        fn_info = @defs[fn]
+        if fn_info == nil
+            print "Undefined function: #{fn}"
+            continue
+        unless self\check_permission(fn)
+            print "You do not have permission to restrict function: #{fn}"
+            continue
+        @defs[fn] = whitelist
+
+g\def {"allow %whitelist to %fn"}, (vars)=>
+    fns = if type(vars.fn) == 'string' then {vars.fn} else vars.fn
+    whitelist = if type(vars.whitelist) == 'string' then {vars.whitelist} else vars.whitelist
+    for fn in *fns
+        fn_info = @defs[fn]
+        if fn_info == nil
+            print "Undefined function: #{fn}"
+            continue
+        if fn_info.whitelist == nil
+            print "Function is already allowed by everyone: #{fn}"
+            continue
+        unless self\check_permission(fn)
+            print "You do not have permission to grant permissions for function: #{fn}"
+            continue
+        for w in *whitelist do fn_info.whitelist[w] = true
+
+g\def {"forbid %blacklist to %fn"}, (vars)=>
+    fns = if type(vars.fn) == 'string' then {vars.fn} else vars.fn
+    blacklist = if type(vars.blacklist) == 'string' then {vars.blacklist} else vars.blacklist
+    for fn in *fns
+        fn_info = @defs[fn]
+        if fn_info == nil
+            print "Undefined function: #{fn}"
+            continue
+        if fn_info.whitelist == nil
+            print "Cannot remove items from a whitelist when there is no whitelist on function: #{fn}"
+            continue
+        unless self\check_permission(fn)
+            print "You do not have permission to restrict function: #{fn}"
+            continue
+        for b in *blacklist do fn_info.whitelist[b] = nil
 
 
 g\def {"say %x", "print %x"}, (vars)=>
@@ -41,8 +120,10 @@ infix = (ops)->
         alias = op
         if type(op) == 'table'
             {alias,op} = op
-        g\defmacro "%x #{op} %y", (vars,helpers,ftype)=>
-            helpers.lua("(#{helpers.var('x')} #{op} #{helpers.var('y')})")
+        g\defmacro "%x #{alias} %y", (vars,helpers,ftype)=>
+            value = "(#{helpers.var('x')} #{op} #{helpers.var('y')})"
+            if ftype == "Expression" then helpers.lua(value)
+            else helpers.lua("ret = #{value}")
 unary = (ops)->
     for op in *ops
         g\defmacro "#{op} %x", (vars,helpers,ftype)=>
@@ -51,7 +132,7 @@ unary = (ops)->
 singleton {"true","yes"}, "true"
 singleton {"false","no"}, "false"
 singleton {"nil","null","nop","pass"}, "nil"
-infix{"+","-","*","/","==",{"!=","~="},"<","<=",">",">=","^","and","or"}
+infix{"+","-","*","/","==",{"!=","~="},"<","<=",">",">=","^","and","or",{"mod","%"}}
 unary{"-","#","not"}
 g\def [[%x == %y]], (args)=> utils.equivalent(args.x, args.y)
 
@@ -176,6 +257,45 @@ g\defmacro "for %varname in %iterable %body", (vars,helpers,ftype)=>
                 .lua "end"
     return nil
 
+g\defmacro "for %varname = %start to %stop %body", (vars,helpers,ftype)=>
+    with helpers
+        switch ftype
+            when "Expression"
+                .lua "(function(game, vars)"
+                .indented ->
+                    .lua "local comprehension, vars = {}, setmetatable({}, {__index=vars})"
+                    .lua "for value=(#{.ded(.transform(vars.start))}),(#{.ded(.transform(vars.stop))}) do"
+                    .indented ->
+                        .lua "local comp_value"
+                        .lua "vars[#{.ded(.transform(vars.varname))}] = value"
+                        body = vars.body
+                        while body.type != "Block"
+                            body = body.value
+                        if body == nil then error("Failed to find body.")
+                        for statement in *body.value
+                            -- TODO: Clean up this ugly bit
+                            .lua("comp_value = "..(.ded(.transform(statement.value, {type:"Expression"}))))
+                        .lua "table.insert(comprehension, comp_value)"
+                    .lua "end"
+                    .lua "return comprehension"
+                .lua "end)(game,vars)"
+            when "Statement"
+                .lua "do"
+                .indented ->
+                    .lua "local vars = setmetatable({}, {__index=vars})"
+                    .lua "for value=(#{.ded(.transform(vars.start))}),(#{.ded(.transform(vars.stop))}) do"
+                    .indented ->
+                        .lua "vars[#{.ded(.transform(vars.varname))}] = value"
+                        body = vars.body
+                        while body.type != "Block"
+                            body = body.value
+                        if body == nil then error("Failed to find body.")
+                        for statement in *body.value
+                            .lua(.ded(.transform(statement)))
+                    .lua "end"
+                .lua "end"
+    return nil
+
 g\simplemacro "if %condition %body", [[
 if %condition %body
 ..else: pass
@@ -204,5 +324,6 @@ g\defmacro [[lua %lua_code]], (vars,helpers,ftype)=>
 
 g\defmacro [[macro %spec %body]], (vars,helpers,ftype)=>
     self\simplemacro vars.spec.value.value, vars.body.value.value.src
+
 
 return g

@@ -6,157 +6,6 @@ g = Game(require'core')
 print("===========================================================================================")
 
 
-g\test[[
-say "foo"
-===
-Call [say %]:
-  "foo"
-]]
-
-g\test[[
-say (4)
-===
-Call [say %]:
-  4
-]]
-
-g\test[[
-rule "fart": say "poot"
-===
-Call [rule % %]:
-  "fart"
-  Thunk:
-    Call [say %]:
-      "poot"
-]]
-
-g\test[[
-rule "doublefart":
-    say "poot"
-    say "poot"
-===
-Call [rule % %]:
-  "doublefart"
-  Thunk:
-    Call [say %]:
-      "poot"
-    Call [say %]:
-      "poot"
-]]
-
-g\test[[
-say (subexpressions work)
-===
-Call [say %]:
-  Call [subexpressions work]!
-]]
-
-g\test[[
-say ["lists", "work"]
-===
-Call [say %]:
-  List:
-    "lists"
-    "work"
-]]
-
-g\test[[
-say []
-===
-Call [say %]:
-  <Empty List>
-]]
-
-g\test[[
-say [..]
-    1, 2
-    3
-===
-Call [say %]:
-  List:
-    1
-    2
-    3
-]]
-
-g\test[[
-say both [..]
-    1,2
-..and [..]
-    3,4
-===
-Call [say both % and %]:
-  List:
-    1
-    2
-  List:
-    3
-    4
-]]
-
-g\test[[
-say both..
-    "hello"
-    and "world"
-===
-Call [say both % and %]:
-  "hello"
-  "world"
-]]
-
-g\test[[
-say both ..
-    "a list:"
-    and [..]
-        1,2,(three),(4)
-===
-Call [say both % and %]:
-  "a list:"
-  List:
-    1
-    2
-    Call [three]!
-    4
-]]
-
-g\test[[
-if 1: yes
-..else: no
-===
-Call [if % % else %]:
-  1
-  Thunk:
-    Call [yes]!
-  Thunk:
-    Call [no]!
-]]
-g\test[[
-if 1: yes ..else: no
-===
-Call [if % % else %]:
-  1
-  Thunk:
-    Call [yes]!
-  Thunk:
-    Call [no]!
-]]
-g\test[[
-say (do: return 5)
-===
-Call [say %]:
-  Call [do %]:
-    Thunk:
-      Call [return %]:
-        5
-]]
-g\test[[
-say (..)
-  fn call
-===
-Call [say %]:
-  Call [fn call]!
-]]
-
 g\run[[
 
 say [..]
@@ -256,4 +105,21 @@ lua ["vars[\"", %varname, "\"] = 2*vars[\"", %varname, "\"]"]
 g\run[[
 smet "fnord" = 23
 say %fnord
+]]
+
+g\run[[
+
+rule "fizz buzz":
+    for "i" = 1 to 100:
+        if ((%i mod 15) == 0):
+            say "fizzbuzz"
+        ..else: if ((%i mod 3) == 0):
+            say "fizz"
+        ..else: if ((%i mod 5) == 0):
+            say "buzz"
+        ..else:
+            say %i
+
+fizz buzz
+
 ]]
