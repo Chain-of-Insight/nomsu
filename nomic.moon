@@ -1,13 +1,19 @@
+#!/usr/bin/env moon
 re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
 moon = require 'moon'
+
+-- TODO:
+-- string interpolation
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
 wordchar = P(1)-S(' \t\n\r%:;,.{}[]()"')
 spaces = S(" \t")^1
+nl = P("\n")
+blank_line = spaces^-1 * nl
 
 get_line_indentation = (line)->
     indent_amounts = {[" "]:1, ["\t"]:4}
@@ -15,6 +21,64 @@ get_line_indentation = (line)->
         leading_space = line\gsub("([\t ]*).*", "%1")
         for c in leading_space\gmatch "[\t ]"
             sum += indent_amounts[c]
+
+make_parser = (lingo, extra_definitions)->
+    indent_stack = {0}
+    push = (n)-> table.insert indent_stack, n
+    pop = ()-> table.remove indent_stack
+    check_indent = (subject,end_pos,spaces)->
+        num_spaces = get_line_indentation(spaces)
+        if num_spaces <= indent_stack[#indent_stack] then return nil
+        push num_spaces
+        return end_pos
+    check_dedent = (subject,end_pos,spaces)->
+        num_spaces = get_line_indentation(spaces)
+        if num_spaces >= indent_stack[#indent_stack] then return nil
+        pop!
+        return end_pos
+    check_nodent = (subject,end_pos,spaces)->
+        num_spaces = get_line_indentation(spaces)
+        if num_spaces != indent_stack[#indent_stack] then return nil
+        return end_pos
+
+    defs =
+        :wordchar, :nl, :spaces
+        ws: S(" \t")^1
+        eol: #nl + (P("")-P(1))
+        word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..")
+        indent: #(nl * blank_line^0 * Cmt(spaces^-1, check_indent))
+        dedent: #(nl * blank_line^0 * Cmt(spaces^-1, check_dedent))
+        new_line: nl * blank_line^0 * Cmt(spaces^-1, check_nodent)
+        error_handler: (src,pos,errors)->
+            line_no = 1
+            for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
+            err_pos = #src - #errors + 1
+            if errors\sub(1,1) == "\n"
+                -- Indentation error
+                err_pos += #errors\match("[ \t]*", 2)
+            start_of_err_line = err_pos
+            while src\sub(start_of_err_line, start_of_err_line) != "\n" do start_of_err_line -= 1
+            start_of_prev_line = start_of_err_line - 1
+            while src\sub(start_of_prev_line, start_of_prev_line) != "\n" do start_of_prev_line -= 1
+            
+            prev_line,err_line,next_line = src\match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line+1)
+
+            pointer = ("-")\rep(err_pos - start_of_err_line + 1) .. "^"
+            error("\nParse error on line #{line_no}:\n|#{prev_line}\n|#{err_line}\n#{pointer}\n|#{next_line}")
+    
+    if extra_definitions
+        for k,v in pairs(extra_definitions) do defs[k] = v
+
+    setmetatable(defs, {
+        __index: (t,key)->
+            --print("WORKING for #{key}")
+            fn = (src, value, errors)->
+                token = {type: key, :src, :value, :errors}
+                return token
+            t[key] = fn
+            return fn
+    })
+    return re.compile lingo, defs
 
 class Game
     new:(parent)=>
@@ -67,37 +131,6 @@ class Game
     simplemacro: (spec, replacement)=>
         spec = spec\gsub("\r", "")
         replacement = replacement\gsub("\r", "")
-        indent_stack = {0}
-        push = (n)-> table.insert indent_stack, n
-        pop = ()-> table.remove indent_stack
-        check_indent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces <= indent_stack[#indent_stack] then return nil
-            push num_spaces
-            return end_pos
-        check_dedent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces >= indent_stack[#indent_stack] then return nil
-            pop!
-            return end_pos
-        check_nodent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces != indent_stack[#indent_stack] then return nil
-            return end_pos
-
-        nl = P("\n")
-        blank_line = spaces^-1 * nl
-        defs =
-            eol: #(nl) + (P("")-P(1))
-            ws: S(" \t")^1
-            :wordchar
-            :replacer
-            :nl, :spaces
-            word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..")
-            indent: #(nl * blank_line^0 * Cmt(spaces^-1, check_indent))
-            dedent: #(nl * blank_line^0 * Cmt(spaces^-1, check_dedent))
-            new_line: nl * blank_line^0 * Cmt(spaces^-1, check_nodent)
-
         replace_grammar = [[
             stuff <- {~ (var / longstring / string / .)+ ~}
             var <- ("%" {%wordchar+}) -> replacer
@@ -108,10 +141,11 @@ class Game
             replacer = (varname)->
                 ret = vars[varname].src
                 return ret
-            replacement_grammar = re.compile(replace_grammar, defs)
-            replaced = replacement_grammar\match(replacement)
-            tree = lingo\match replaced
-            result = helpers.transform(tree.value.body)
+            replacement_grammar = make_parser replace_grammar, {:replacer}
+            code = replacement_grammar\match(replacement)
+            tree = self\parse(code)
+            -- Ugh, this is magic code.
+            result = helpers.transform(tree.value.body.value[1].value.value.value)
             helpers.lua(result)
             return
 
@@ -192,64 +226,8 @@ class Game
             indented_list <-
                 expression (((list_sep %new_line?) / %new_line) indented_list)?
         ]=]
+        lingo = make_parser lingo
 
-        str = str\gsub("\r", "")
-        indent_stack = {0}
-        push = (n)-> table.insert indent_stack, n
-        pop = ()-> table.remove indent_stack
-        check_indent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces <= indent_stack[#indent_stack] then return nil
-            push num_spaces
-            return end_pos
-        check_dedent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces >= indent_stack[#indent_stack] then return nil
-            pop!
-            return end_pos
-        check_nodent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces != indent_stack[#indent_stack] then return nil
-            return end_pos
-
-        nl = P("\n")
-        blank_line = spaces^-1 * nl
-        defs =
-            eol: #(nl) + (P("")-P(1))
-            ws: S(" \t")^1
-            :wordchar
-            :nl, :spaces
-            word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..")
-            indent: #(nl * blank_line^0 * Cmt(spaces^-1, check_indent))
-            dedent: #(nl * blank_line^0 * Cmt(spaces^-1, check_dedent))
-            new_line: nl * blank_line^0 * Cmt(spaces^-1, check_nodent)
-            error_handler: (src,pos,errors)->
-                line_no = 1
-                for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
-                err_pos = #src - #errors + 1
-                if errors\sub(1,1) == "\n"
-                    -- Indentation error
-                    err_pos += #errors\match("[ \t]*", 2)
-                start_of_err_line = err_pos
-                while src\sub(start_of_err_line, start_of_err_line) != "\n" do start_of_err_line -= 1
-                start_of_prev_line = start_of_err_line - 1
-                while src\sub(start_of_prev_line, start_of_prev_line) != "\n" do start_of_prev_line -= 1
-                
-                prev_line,err_line,next_line = src\match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line+1)
-
-                pointer = ("-")\rep(err_pos - start_of_err_line + 1) .. "^"
-                error("\nParse error on line #{line_no}:\n|#{prev_line}\n|#{err_line}\n#{pointer}\n|#{next_line}")
-
-        setmetatable(defs, {
-            __index: (t,key)->
-                --print("WORKING for #{key}")
-                fn = (src, value, errors)->
-                    token = {type: key, :src, :value, :errors}
-                    return token
-                t[key] = fn
-                return fn
-        })
-        lingo = re.compile lingo, defs
         tree = lingo\match(str\gsub("\r","").."\n")
         if @debug
             print("\nPARSE TREE:")

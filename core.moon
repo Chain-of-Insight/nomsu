@@ -36,6 +36,22 @@ class PermissionNomic extends Nomic
 
 g = PermissionNomic()
 
+g\defmacro [[lua %lua_code]], (vars,helpers,ftype)=>
+    with helpers
+        lua_code = vars.lua_code.value
+        escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
+        unescape = (s)-> s\gsub("\\(.)", ((c)-> escapes[c] or c))
+        switch lua_code.type
+            when "List"
+                -- TODO: handle subexpressions
+                .lua table.concat[unescape(i.value.value) for i in *lua_code.value]
+            when "String"
+                .lua(unescape(lua_code.value))
+            when "Longstring"
+                .lua(lua_code.value)
+            else error("Unknown type: #{lua_code.type}")
+    return nil
+
 g\def {"restrict %fn to %whitelist"}, (vars)=>
     fns = if type(vars.fn) == 'string' then {vars.fn} else vars.fn
     whitelist = if type(vars.whitelist) == 'string' then {vars.whitelist} else vars.whitelist
@@ -308,22 +324,9 @@ if (not %condition) %body
 
 g\def [[do %action]], (vars)=> return vars.action(self,vars)
 
-g\defmacro [[lua %lua_code]], (vars,helpers,ftype)=>
-    with helpers
-        lua_code = vars.lua_code.value
-        escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-        unescape = (s)-> s\gsub("\\(.)", ((c)-> escapes[c] or c))
-        switch lua_code.type
-            when "List"
-                -- TODO: handle subexpressions
-                .lua table.concat[unescape(i.value.value) for i in *lua_code.value]
-            when "String"
-                .lua(unescape(lua_code.value))
-            else error("Unknown type: #{lua_code.type}")
-    return nil
 
 g\defmacro [[macro %spec %body]], (vars,helpers,ftype)=>
-    self\simplemacro vars.spec.value.value, vars.body.value.value.src
+    self\simplemacro vars.spec.value.value, vars.body.src
 
 
 return g
