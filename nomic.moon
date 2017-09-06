@@ -16,7 +16,6 @@ get_line_indentation = (line)->
         for c in leading_space\gmatch "[\t ]"
             sum += indent_amounts[c]
 
-
 class Game
     new:(parent)=>
         @defs = setmetatable({}, {__index:parent and parent.defs})
@@ -112,9 +111,6 @@ class Game
             replacement_grammar = re.compile(replace_grammar, defs)
             replaced = replacement_grammar\match(replacement)
             tree = lingo\match replaced
-            if tree.value.errors and #tree.value.errors.value > 0
-                ret = helpers.transform(tree.value.errors)
-                return ret
             result = helpers.transform(tree.value.body)
             helpers.lua(result)
             return
@@ -148,8 +144,8 @@ class Game
         if @debug
             print("PARSING:\n#{str}")
         lingo = [=[
-            file <- ({ {| %new_line? {:body: block :} %new_line? ({:errors: errors :})? |} }) -> File
-            errors <- ({ {.+} }) -> Errors
+            file <- ({ {| %new_line? {:body: block :} %new_line? (errors)? |} }) -> File
+            errors <- (({.+}) => error_handler)
             block <- ({ {| statement (%new_line statement)* |} }) -> Block
             statement <- ({ (functioncall / expression) }) -> Statement
             one_liner <- ({ {|
@@ -172,14 +168,14 @@ class Game
             
             thunk <-
                 ({ ":" %ws?
-                   ((%indent %new_line block %dedent (%new_line "..")?)
+                   ((%indent %new_line block ((%dedent (%new_line "..")?) / errors))
                     / (one_liner (%ws? (%new_line? ".."))?)) }) -> Thunk
 
             word <- ({ !number {%wordchar+} }) -> Word
             expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
 
             string <- ({ (!('"..' %ws? %nl)) '"' {(("\" .) / [^"])*} '"' }) -> String
-            longstring <- ({ '"..' %ws? %indent %nl {(!%dedent .)* (%nl %ws? %eol)*} %new_line '.."' }) -> Longstring
+            longstring <- ({ '"..' %ws? %indent %nl {(!%dedent .)* (%nl %ws? %eol)*} ((%new_line '.."') / errors) }) -> Longstring
             number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
             variable <- ({ ("%" {%wordchar+}) }) -> Var
 
@@ -188,7 +184,7 @@ class Game
                 / ("(..)" %ws? %indent %new_line ((({ {| indented_fn_bits |} }) -> FunctionCall) / expression) %dedent (%new_line "..")?)
 
             list <- ({ {|
-                ("[..]" %ws? %indent %new_line indented_list ","? %dedent (%new_line "..")?)
+                ("[..]" %ws? %indent %new_line indented_list ","? ((%dedent (%new_line "..")?) / errors))
                 / ("[" %ws? (list_items ","?)?  %ws?"]")
               |} }) -> List
             list_items <- (expression (list_sep list_items)?)
@@ -227,12 +223,28 @@ class Game
             indent: #(nl * blank_line^0 * Cmt(spaces^-1, check_indent))
             dedent: #(nl * blank_line^0 * Cmt(spaces^-1, check_dedent))
             new_line: nl * blank_line^0 * Cmt(spaces^-1, check_nodent)
+            error_handler: (src,pos,errors)->
+                line_no = 1
+                for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
+                err_pos = #src - #errors + 1
+                if errors\sub(1,1) == "\n"
+                    -- Indentation error
+                    err_pos += #errors\match("[ \t]*", 2)
+                start_of_err_line = err_pos
+                while src\sub(start_of_err_line, start_of_err_line) != "\n" do start_of_err_line -= 1
+                start_of_prev_line = start_of_err_line - 1
+                while src\sub(start_of_prev_line, start_of_prev_line) != "\n" do start_of_prev_line -= 1
+                
+                prev_line,err_line,next_line = src\match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line+1)
+
+                pointer = ("-")\rep(err_pos - start_of_err_line + 1) .. "^"
+                error("\nParse error on line #{line_no}:\n|#{prev_line}\n|#{err_line}\n#{pointer}\n|#{next_line}")
 
         setmetatable(defs, {
             __index: (t,key)->
                 --print("WORKING for #{key}")
-                fn = (src, value, ...)->
-                    token = {type: key, src:src, value: value}
+                fn = (src, value, errors)->
+                    token = {type: key, :src, :value, :errors}
                     return token
                 t[key] = fn
                 return fn
@@ -245,13 +257,14 @@ class Game
         assert tree, "Failed to parse: #{str}"
         return tree
     
-    transform: (tree, indent_level=0, parent=nil)=>
+    transform: (tree, indent_level=0, parent=nil, src=nil)=>
+        if src == nil then src = tree.src
         indented = (fn)->
             export indent_level
             indent_level += 1
             fn!
             indent_level -= 1
-        transform = (t,parent)-> self\transform(t, indent_level, parent or tree)
+        transform = (t,parent)-> self\transform(t, indent_level, parent or tree, src)
         ind = (line) -> ("  ")\rep(indent_level)..line
         ded = (lines)->
             if not lines.match then error("WTF: #{utils.repr(lines)}")
@@ -283,20 +296,12 @@ class Game
 
         switch tree.type
             when "File"
-                if tree.value.errors and #tree.value.errors.value > 0
-                    ret = transform(tree.value.errors)
-                    return ret
-
                 lua "return (function(game, vars)"
                 indented ->
                     lua "local ret"
                     lua transform(tree.value.body)
                     lua "return ret"
                 lua "end)"
-
-            when "Errors"
-                -- TODO: Better error reporting via tree.src
-                error("\nParse error on: #{utils.repr(tree.value\match("[^\n]*"), true)}")
 
             when "Block"
                 for chunk in *tree.value
@@ -473,10 +478,7 @@ class Game
             test_src, expected = test\sub(1,start-1), test\sub(stop+1,-1)
             expected = expected\match'[\n]*(.*[^\n])'
             tree = self\parse(test_src)
-            got = if tree.value.errors and #tree.value.errors.value > 0
-                self\stringify_tree(tree.value.errors)
-            else
-                self\stringify_tree(tree.value.body)
+            got = self\stringify_tree(tree.value.body)
             if got != expected
                 error"TEST FAILED!\nSource:\n#{test_src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
 
