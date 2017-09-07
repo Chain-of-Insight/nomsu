@@ -39,17 +39,24 @@ g = PermissionNomic()
 g\defmacro [[lua %lua_code]], (vars,helpers,ftype)=>
     with helpers
         lua_code = vars.lua_code.value
-        escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-        unescape = (s)-> s\gsub("\\(.)", ((c)-> escapes[c] or c))
+        as_lua_code = (str)->
+            switch str.type
+                when "String"
+                    escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
+                    unescaped = str.value\gsub("\\(.)", ((c)-> escapes[c] or c))
+                    return unescaped
+
+                when "Longstring"
+                    result = [line for line in str.value\gmatch("[ \t]*|([^\n]*)")]
+                    return table.concat(result, "\n")
+                else
+                    return str.value
+
         switch lua_code.type
             when "List"
                 -- TODO: handle subexpressions
-                .lua table.concat[unescape(i.value.value) for i in *lua_code.value]
-            when "String"
-                .lua(unescape(lua_code.value))
-            when "Longstring"
-                .lua(lua_code.value)
-            else error("Unknown type: #{lua_code.type}")
+                .lua table.concat[as_lua_code(i.value) for i in *lua_code.value]
+            else .lua(as_lua_code(lua_code))
     return nil
 
 g\def {"restrict %fn to %whitelist"}, (vars)=>
@@ -105,6 +112,9 @@ g\def {"say %x", "print %x"}, (vars)=>
 g\def [[printf %str]], (args)=>
     for s in *args.str do io.write(utils.repr(s))
     io.write("\n")
+
+g\def [[concat %strs]], (vars)=>
+    return table.concat([utils.repr(s) for s in *vars.strs], "")
 
 g\def [[quote %str]], (vars)=>
     return utils.repr(vars.str, true)

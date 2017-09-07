@@ -5,15 +5,17 @@ utils = require 'utils'
 moon = require 'moon'
 
 -- TODO:
+-- Comments
 -- string interpolation
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
 wordchar = P(1)-S(' \t\n\r%:;,.{}[]()"')
-spaces = S(" \t")^1
+comment = re.compile [[comment <- "(#" (comment / ((! "#)") .))* "#)"]]
+whitespace = (S(" \t") + comment)^1
 nl = P("\n")
-blank_line = spaces^-1 * nl
+blank_line = whitespace^-1 * nl
 
 get_line_indentation = (line)->
     indent_amounts = {[" "]:1, ["\t"]:4}
@@ -42,13 +44,12 @@ make_parser = (lingo, extra_definitions)->
         return end_pos
 
     defs =
-        :wordchar, :nl, :spaces
-        ws: S(" \t")^1
+        :wordchar, :nl, ws:whitespace, :comment
         eol: #nl + (P("")-P(1))
-        word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..")
-        indent: #(nl * blank_line^0 * Cmt(spaces^-1, check_indent))
-        dedent: #(nl * blank_line^0 * Cmt(spaces^-1, check_dedent))
-        new_line: nl * blank_line^0 * Cmt(spaces^-1, check_nodent)
+        word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..") + #P("/*")
+        indent: #(nl * blank_line^0 * Cmt(whitespace^-1, check_indent))
+        dedent: #(nl * blank_line^0 * Cmt(whitespace^-1, check_dedent))
+        new_line: nl * blank_line^0 * Cmt(whitespace^-1, check_nodent)
         error_handler: (src,pos,errors)->
             line_no = 1
             for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
@@ -63,15 +64,14 @@ make_parser = (lingo, extra_definitions)->
             
             prev_line,err_line,next_line = src\match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line+1)
 
-            pointer = ("-")\rep(err_pos - start_of_err_line + 1) .. "^"
-            error("\nParse error on line #{line_no}:\n|#{prev_line}\n|#{err_line}\n#{pointer}\n|#{next_line}")
+            pointer = ("-")\rep(err_pos - start_of_err_line + 0) .. "^"
+            error("\nParse error on line #{line_no}:\n\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n")
     
     if extra_definitions
         for k,v in pairs(extra_definitions) do defs[k] = v
 
     setmetatable(defs, {
         __index: (t,key)->
-            --print("WORKING for #{key}")
             fn = (src, value, errors)->
                 token = {type: key, :src, :value, :errors}
                 return token
@@ -106,19 +106,13 @@ class Game
         invocations = {}
         local arg_names
         for _text in *text
-            name_bits = {}
-            _arg_names = {}
-            for chunk in _text\gmatch("%S+")
-                if chunk\sub(1,1) == "%"
-                    table.insert name_bits, "%"
-                    table.insert _arg_names, chunk\sub(2,-1)
-                else
-                    table.insert name_bits, chunk
-            invocation = table.concat name_bits, " "
+            invocation = _text\gsub("%%%S+","%%")
+            _arg_names = [arg for arg in _text\gmatch("%%(%S+)")]
             table.insert(invocations, invocation)
-            if arg_names and not utils.equivalent(utils.set(arg_names), utils.set(_arg_names))
-                error("Conflicting argument names #{utils.repr(arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
-            arg_names = _arg_names
+            if arg_names
+                if not utils.equivalent(utils.set(arg_names), utils.set(_arg_names))
+                    error("Conflicting argument names #{utils.repr(arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
+            else arg_names = _arg_names
         return invocations, arg_names
 
     defmacro: (spec, fn)=>
@@ -131,12 +125,12 @@ class Game
     simplemacro: (spec, replacement)=>
         spec = spec\gsub("\r", "")
         replacement = replacement\gsub("\r", "")
-        replace_grammar = [[
+        replace_grammar = [=[
             stuff <- {~ (var / longstring / string / .)+ ~}
             var <- ("%" {%wordchar+}) -> replacer
             string <- '"' (("\" .) / [^"])* '"'
-            longstring <- ('"..' %indent %nl {(!%dedent .)*} %new_line '.."')
-        ]]
+            longstring <- ('".."' %ws? %indent {(%new_line "|" [^%nl]*)+} %dedent (%new_line '..')?)
+        ]=]
         fn = (vars, helpers, ftype)=>
             replacer = (varname)->
                 ret = vars[varname].src
@@ -153,12 +147,10 @@ class Game
     
     run: (text)=>
         if @debug
-            print("RUNNING TEXT:\n")
-            print(text)
+            print "RUNNING TEXT:\n#{text}"
         code = self\compile(text)
         if @debug
-            print("\nGENERATED LUA CODE:")
-            print(code)
+            print "\nGENERATED LUA CODE:\n#{code}"
         lua_thunk, err = loadstring(code)
         if not lua_thunk
             error("Failed to compile generated code:\n#{code}\n\n#{err}")
@@ -209,12 +201,12 @@ class Game
             expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
 
             string <- ({ (!('"..' %ws? %nl)) '"' {(("\" .) / [^"])*} '"' }) -> String
-            longstring <- ({ '"..' %ws? %indent %nl {(!%dedent .)* (%nl %ws? %eol)*} ((%new_line '.."') / errors) }) -> Longstring
+            longstring <- ({ '".."' %ws? %indent {(%new_line "|" [^%nl]*)+} ((%dedent (%new_line '..')?) / errors) }) -> Longstring
             number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
             variable <- ({ ("%" {%wordchar+}) }) -> Var
 
             subexpression <-
-                ("(" %ws? (functioncall / expression) %ws? ")")
+                (!%comment "(" %ws? (functioncall / expression) %ws? ")")
                 / ("(..)" %ws? %indent %new_line ((({ {| indented_fn_bits |} }) -> FunctionCall) / expression) %dedent (%new_line "..")?)
 
             list <- ({ {|
@@ -337,12 +329,7 @@ class Game
                 lua utils.repr(unescaped, true)
 
             when "Longstring"
-                first_nonblank_line = tree.value\match("[^\n]+")
-                indent = first_nonblank_line\match("[ \t]*")
-                result = {}
-                for line in (tree.value.."\n")\gmatch("(.-)\n")
-                    line = line\gsub("^"..indent, "", 1)
-                    table.insert result, line
+                result = [line for line in tree.value\gmatch("[ \t]*|([^\n]*)")]
                 lua utils.repr(table.concat(result, "\n"), true)
 
             when "Number"
