@@ -50,7 +50,7 @@ make_parser = (lingo, extra_definitions)->
     defs =
         :wordchar, :nl, ws:whitespace, :comment
         eol: #nl + (P("")-P(1))
-        word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..") + #P("/*")
+        word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..")
         indent: #(nl * blank_line^0 * Cmt(whitespace^-1, check_indent))
         dedent: #(nl * blank_line^0 * Cmt(whitespace^-1, check_dedent))
         new_line: nl * blank_line^0 * Cmt(whitespace^-1, check_nodent)
@@ -241,8 +241,7 @@ class Game
 
         switch tree.type
             when "File"
-                add [[
-                    return (function(game, vars)
+                add [[return (function(game, vars)
                         local ret]]
                 add to_lua(tree.value.body)
                 add [[
@@ -322,22 +321,8 @@ class Game
                 error("Unknown/unimplemented thingy: #{tree.type}")
 
         -- TODO: make indentation clean
-        -- Patch the buffer together
-        [=[
-        for code in *buffer
-            if code == "<INDENT>"
-                indent ..= INDENT
-            elseif code == "<DEDENT>"
-                indent = indent\gsub(INDENT, "", 1)
-            else
-                first_indent,middle,last_indent = code\match("(%s*)(.*\n(%s*)[^\n]*)")
-                if not first_indent
-                    error("No indent found on: [[#{code}]]")
-                table.insert(buffer, indent..(middle\gsub("\n"..first_indent, "\n"..indent)))
-                indent = last_indent
-                ]=]
-
-        return table.concat(buffer, "\n")
+        buffer = table.concat(buffer, "\n")
+        return buffer
 
     @comma_separated_items: (open, items, close)=>
         utils.accumulate "\n", ->
