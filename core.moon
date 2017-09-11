@@ -127,7 +127,7 @@ g\defmacro "return %retval", (vars, kind)=>
 g\defmacro "let %varname = %value", (vars, kind)=>
     if kind == "Expression"
         error("Cannot set a variable in an expression.")
-    return "vars[#{@tree_to_lua(vars.varname)}] = #{@tree_to_lua(vars.value)}"
+    return "vars[#{@tree_to_lua(vars.varname)}] = #{@tree_to_lua(vars.value)}", true
 
 singleton = (aliases, value)->
     g\defmacro aliases, ((vars)=> value)
@@ -231,23 +231,25 @@ g\defmacro "for %varname in %iterable %body", (vars, kind)=>
     if kind == "Expression"
         return "
 (function(game, vars)
-    local comprehension, vars = {}, setmetatable({}, {__index=vars})
+    local comprehension, old_loopval = {}, vars[#{@tree_to_lua(vars.varname)}]
     for i, value in ipairs(#{@tree_to_lua(vars.iterable)}) do
         local ret
         vars[#{@tree_to_lua(vars.varname)}] = value
-        #{@tree_to_lua(vars.body.value)}
+        #{@tree_to_lua(vars.body.value.value)}
         table.insert(comprehension, ret)
     end
+    vars[#{@tree_to_lua(vars.varname)}] = old_loopval
     return comprehension
 end)(game, vars)"
     else
         return "
 do
-    local comprehension, vars = {}, setmetatable({}, {__index=vars})
+    local comprehension, old_loopval = {}, vars[#{@tree_to_lua(vars.varname)}]
     for i, value in ipairs(#{@tree_to_lua(vars.iterable)}) do
         vars[#{@tree_to_lua(vars.varname)}] = value
-        #{@tree_to_lua(vars.body.value)}
+        #{@tree_to_lua(vars.body.value.value)}
     end
+    vars[#{@tree_to_lua(vars.varname)}] = old_loopval
 end", true
 
 g\simplemacro "for %varname = %start to %stop %body", [[for %varname in (lua ["utils.range(",%start,",",%stop,")"]) %body]]
@@ -273,7 +275,7 @@ g\defmacro [[macro %spec %body]], (vars, kind)=>
 g\defmacro [[test %code yields %tree]], (vars, kind)=>
     if kind == "Expression" then error("Tests must be statements.")
     got = self\stringify_tree(vars.code.value)
-    got = got\match("Thunk:\n  (.*)")\gsub("\n  ","\n")
+    got = got\match("Thunk:\n    (.*)")\gsub("\n    ","\n")
     got = utils.repr(got,true)
     expected = @tree_to_lua(vars.tree)
     return "
@@ -281,7 +283,7 @@ do
     local got = #{got}
     local expected = #{expected}
     if got ~= expected then
-        error('Test failed. Expected:\n'..expected..'\n\nButGot:\n'..got)
+        error('Test failed. Expected:\\n'..expected..'\\n\\nBut got:\\n'..got)
     end
 end", true
 
