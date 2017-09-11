@@ -5,9 +5,13 @@ utils = require 'utils'
 moon = require 'moon'
 
 -- TODO:
--- Comments
 -- string interpolation
+-- comprehensions?
+-- dicts?
+-- better scoping?
+-- first-class functions
 
+INDENT = "    "
 lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
@@ -116,7 +120,6 @@ class Game
         return invocations, arg_names
 
     defmacro: (spec, fn)=>
-        assert fn, "No function supplied"
         invocations,arg_names = self\get_invocations spec
         fn_info = {:fn, :arg_names, :invocations, is_macro:true}
         for invocation in *invocations
@@ -131,7 +134,7 @@ class Game
             string <- '"' (("\" .) / [^"])* '"'
             longstring <- ('".."' %ws? %indent {(%new_line "|" [^%nl]*)+} %dedent (%new_line '..')?)
         ]=]
-        fn = (vars, helpers, ftype)=>
+        fn = (vars, kind)=>
             replacer = (varname)->
                 ret = vars[varname].src
                 return ret
@@ -139,9 +142,7 @@ class Game
             code = replacement_grammar\match(replacement)
             tree = self\parse(code)
             -- Ugh, this is magic code.
-            result = helpers.transform(tree.value.body.value[1].value.value.value)
-            helpers.lua(result)
-            return
+            return @tree_to_lua(tree.value.body.value[1].value.value.value, kind), true
 
         self\defmacro spec, fn
     
@@ -226,83 +227,60 @@ class Game
             self\print_tree(tree)
         assert tree, "Failed to parse: #{str}"
         return tree
-    
-    transform: (tree, indent_level=0, parent=nil, src=nil)=>
-        if src == nil then src = tree.src
-        indented = (fn)->
-            export indent_level
-            indent_level += 1
-            fn!
-            indent_level -= 1
-        transform = (t,parent)-> self\transform(t, indent_level, parent or tree, src)
-        ind = (line) -> ("  ")\rep(indent_level)..line
-        ded = (lines)->
-            if not lines.match then error("WTF: #{utils.repr(lines)}")
-            lines\match"^%s*(.*)"
 
-        ret_lines = {}
-        lua = (line, skip_indent=false)->
-            unless skip_indent
-                line = ind(ded(line))
-            table.insert ret_lines, line
-            return line
-        
-        comma_separated_items = (open, items, close)->
-            buffer = open
-            so_far = indent_level*2
-            indented ->
-                export buffer,so_far
-                for i,item in ipairs(items)
-                    if i < #items then item ..= ", "
-                    if so_far + #item >= 80 and #buffer > 0
-                        lua buffer
-                        so_far -= #buffer
-                        buffer = item
-                    else
-                        so_far += #item
-                        buffer ..= item
-                buffer ..= close
-                lua buffer
+    tree_to_lua: (tree, kind="Expression")=>
+        assert tree, "No tree provided."
+        indent = ""
+        buffer = {}
+
+        to_lua = (t,kind)->
+            ret = self\tree_to_lua(t,kind)
+            return ret
+
+        add = (code)-> table.insert(buffer, code)
 
         switch tree.type
             when "File"
-                lua "return (function(game, vars)"
-                indented ->
-                    lua "local ret"
-                    lua transform(tree.value.body)
-                    lua "return ret"
-                lua "end)"
+                add [[
+                    return (function(game, vars)
+                        local ret]]
+                add to_lua(tree.value.body)
+                add [[
+                        return ret
+                    end)
+                ]]
 
             when "Block"
                 for chunk in *tree.value
-                    lua transform(chunk)
+                    add to_lua(chunk)
         
             when "Thunk"
-                if not tree.value
-                    error("Thunk without value: #{utils.repr(tree)}")
-                lua "(function(game,vars)"
-                indented ->
-                    lua "local ret"
-                    assert tree.value.type == "Block", "Non-block value in Thunk"
-                    lua transform(tree.value)
-                    lua "return ret"
-                lua "end)"
+                assert tree.value.type == "Block", "Non-block value in Thunk"
+                add [[
+                    (function(game, vars)
+                        local ret]]
+                add to_lua(tree.value)
+                add [[
+                        return ret
+                    end)
+                ]]
 
             when "Statement"
+                -- This case here is to prevent "ret =" from getting prepended when the macro might not want it
                 if tree.value.type == "FunctionCall"
                     name_bits = {}
                     for token in *tree.value.value
                         table.insert name_bits, if token.type == "Word" then token.value else "%"
                     name = table.concat(name_bits, " ")
                     if @defs[name] and @defs[name].is_macro
-                        -- This case here is to prevent "ret =" from getting prepended when the macro might not want it
-                        lua transform(tree.value)
-                        ret = table.concat ret_lines, "\n"
-                        return ret
-                lua "ret = #{ded(transform(tree.value))}"
+                        add @run_macro(tree.value, "Statement")
+                    else
+                        add "ret = "..(to_lua(tree.value)\match("%s*(.*)"))
+                else
+                    add "ret = "..(to_lua(tree.value)\match("%s*(.*)"))
 
             when "Expression"
-                lua transform(tree.value)
+                add to_lua(tree.value)
 
             when "FunctionCall"
                 name_bits = {}
@@ -310,50 +288,92 @@ class Game
                     table.insert name_bits, if token.type == "Word" then token.value else "%"
                 name = table.concat(name_bits, " ")
                 if @defs[name] and @defs[name].is_macro
-                    {:fn, :arg_names} = @defs[name]
-                    helpers = {:indented, :transform, :ind, :ded, :lua, :comma_separated_items}
-                    args = [a for a in *tree.value when a.type != "Word"]
-                    args = {name,args[i] for i,name in ipairs(arg_names)}
-                    helpers.var = (varname)->
-                        ded(transform(args[varname]))
-                    m = fn(self, args, helpers, parent.type)
-                    if m != nil then return m
+                    add @run_macro(tree, "Expression")
                 else
-                    args = [ded(transform(a)) for a in *tree.value when a.type != "Word"]
+                    args = [to_lua(a) for a in *tree.value when a.type != "Word"]
                     table.insert args, 1, utils.repr(name, true)
-                    comma_separated_items("game:call(", args, ")")
+                    add @@comma_separated_items("game:call(", args, ")")
 
             when "String"
                 escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
                 unescaped = tree.value\gsub("\\(.)", ((c)-> escapes[c] or c))
-                lua utils.repr(unescaped, true)
+                add utils.repr(unescaped, true)
 
             when "Longstring"
+                -- TODO: handle comments here?
                 result = [line for line in tree.value\gmatch("[ \t]*|([^\n]*)")]
-                lua utils.repr(table.concat(result, "\n"), true)
+                add utils.repr(table.concat(result, "\n"), true)
 
             when "Number"
-                lua tree.value
+                add tree.value
 
             when "List"
                 if #tree.value == 0
-                    lua "{}"
+                    add "{}"
                 elseif #tree.value == 1
-                    lua "{#{transform(tree.value)}}"
+                    add "{#{to_lua(tree.value)}}"
                 else
-                    comma_separated_items("{", [ded(transform(item)) for item in *tree.value], "}")
+                    add @@comma_separated_items("{", [to_lua(item) for item in *tree.value], "}")
 
             when "Var"
-                lua "vars[#{utils.repr(tree.value,true)}]"
+                add "vars[#{utils.repr(tree.value,true)}]"
 
             else
                 error("Unknown/unimplemented thingy: #{tree.type}")
-        
-        ret = table.concat ret_lines, "\n"
+
+        -- TODO: make indentation clean
+        -- Patch the buffer together
+        [=[
+        for code in *buffer
+            if code == "<INDENT>"
+                indent ..= INDENT
+            elseif code == "<DEDENT>"
+                indent = indent\gsub(INDENT, "", 1)
+            else
+                first_indent,middle,last_indent = code\match("(%s*)(.*\n(%s*)[^\n]*)")
+                if not first_indent
+                    error("No indent found on: [[#{code}]]")
+                table.insert(buffer, indent..(middle\gsub("\n"..first_indent, "\n"..indent)))
+                indent = last_indent
+                ]=]
+
+        return table.concat(buffer, "\n")
+
+    @comma_separated_items: (open, items, close)=>
+        utils.accumulate "\n", ->
+            buffer = open
+            so_far = 0
+            for i,item in ipairs(items)
+                if i < #items then item ..= ", "
+                if so_far + #item >= 80 and #buffer > 0
+                    coroutine.yield buffer
+                    so_far -= #buffer
+                    buffer = item
+                else
+                    so_far += #item
+                    buffer ..= item
+            buffer ..= close
+            coroutine.yield buffer
+    
+    run_macro: (tree, kind="Expression")=>
+        name_bits = {}
+        for token in *tree.value
+            table.insert name_bits, if token.type == "Word" then token.value else "%"
+        name = table.concat(name_bits, " ")
+        unless @defs[name] and @defs[name].is_macro
+            error("Macro not found: #{name}")
+        {:fn, :arg_names} = @defs[name]
+        args = [a for a in *tree.value when a.type != "Word"]
+        args = {name,args[i] for i,name in ipairs(arg_names)}
+        ret, manual_mode = fn(self, args, kind)
+        if not ret
+            error("No return value for macro: #{name}")
+        if kind == "Statement" and not manual_mode
+            ret = "ret = "..ret
         return ret
 
     _yield_tree: (tree, indent_level=0)=>
-        ind = (s) -> ("  ")\rep(indent_level)..s
+        ind = (s) -> INDENT\rep(indent_level)..s
         switch tree.type
             when "File"
                 coroutine.yield(ind"File:")
@@ -427,7 +447,8 @@ class Game
 
     compile: (src)=>
         tree = self\parse(src)
-        code = self\transform(tree,0)
+        assert tree, "Tree failed to compile: #{src}"
+        code = self\tree_to_lua(tree)
         return code
 
     test: (src, expected)=>

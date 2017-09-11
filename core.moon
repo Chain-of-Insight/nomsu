@@ -36,28 +36,28 @@ class PermissionNomic extends Nomic
 
 g = PermissionNomic()
 
-g\defmacro [[lua %lua_code]], (vars,helpers,ftype)=>
-    with helpers
-        lua_code = vars.lua_code.value
-        as_lua_code = (str)->
-            switch str.type
-                when "String"
-                    escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-                    unescaped = str.value\gsub("\\(.)", ((c)-> escapes[c] or c))
-                    return unescaped
+g\defmacro [[lua %lua_code]], (vars, kind)=>
+    lua_code = vars.lua_code.value
+    as_lua_code = (str)->
+        switch str.type
+            when "String"
+                escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
+                unescaped = str.value\gsub("\\(.)", ((c)-> escapes[c] or c))
+                return unescaped
 
-                when "Longstring"
-                    result = [line for line in str.value\gmatch("[ \t]*|([^\n]*)")]
-                    return table.concat(result, "\n")
-                else
-                    return str.value
+            when "Longstring"
+                -- TODO: handle comments?
+                result = [line for line in str.value\gmatch("[ \t]*|([^\n]*)")]
+                return table.concat(result, "\n")
+            else
+                return @tree_to_lua(str)
 
-        switch lua_code.type
-            when "List"
-                -- TODO: handle subexpressions
-                .lua table.concat[as_lua_code(i.value) for i in *lua_code.value]
-            else .lua(as_lua_code(lua_code))
-    return nil
+    switch lua_code.type
+        when "List"
+            -- TODO: handle subexpressions
+            return table.concat([as_lua_code(i.value) for i in *lua_code.value]), true
+        else
+            return as_lua_code(lua_code), true
 
 g\def {"restrict %fn to %whitelist"}, (vars)=>
     fns = if type(vars.fn) == 'string' then {vars.fn} else vars.fn
@@ -119,41 +119,31 @@ g\def [[concat %strs]], (vars)=>
 g\def [[quote %str]], (vars)=>
     return utils.repr(vars.str, true)
 
-g\defmacro "return %retval", (vars,helpers,ftype)=>
-    with helpers
-        switch ftype
-            when "Expression"
-                error("Cannot use a return statement as an expression")
-            when "Statement"
-                .lua "do return "..(.ded(.transform(vars.retval))).." end"
-            else
-                error"Unknown: #{ftype}"
-    return nil
+g\defmacro "return %retval", (vars, kind)=>
+    if kind == "Expression"
+        error("Cannot use a return statement as an expression")
+    return "do return "..((@tree_to_lua(vars.retval))\match("%s*(.*)")).." end", true
 
-g\defmacro "let %varname = %value", (vars, helpers, ftype)=>
-    with helpers
-        if ftype == "Expression" then error("Cannot set a variable in an expression.")
-        .lua "vars[#{.ded(.transform(vars.varname))}] = #{.ded(.transform(vars.value))}"
-    return nil
+g\defmacro "let %varname = %value", (vars, kind)=>
+    if kind == "Expression"
+        error("Cannot set a variable in an expression.")
+    return "vars[#{@tree_to_lua(vars.varname)}] = #{@tree_to_lua(vars.value)}"
 
 singleton = (aliases, value)->
-    g\defmacro aliases, (vars,helpers,ftype)=>
-        if ftype == "Expression" then helpers.lua(value)
-        else helpers.lua("ret = #{value}")
+    g\defmacro aliases, ((vars)=> value)
 
 infix = (ops)->
     for op in *ops
         alias = op
         if type(op) == 'table'
             {alias,op} = op
-        g\defmacro "%x #{alias} %y", (vars,helpers,ftype)=>
-            value = "(#{helpers.var('x')} #{op} #{helpers.var('y')})"
-            if ftype == "Expression" then helpers.lua(value)
-            else helpers.lua("ret = #{value}")
+        g\defmacro "%x #{alias} %y", (vars)=>
+            return "(#{@tree_to_lua(vars.x)} #{op} #{@tree_to_lua(vars.y)})"
+
 unary = (ops)->
     for op in *ops
-        g\defmacro "#{op} %x", (vars,helpers,ftype)=>
-            helpers.lua("#{op}(#{helpers.var('x')})")
+        g\defmacro "#{op} %x", (vars)=>
+            return "#{op}(#{@tree_to_lua(vars.x)})"
 
 singleton {"true","yes"}, "true"
 singleton {"false","no"}, "false"
@@ -164,7 +154,6 @@ g\def [[%x == %y]], (args)=> utils.equivalent(args.x, args.y)
 
 g\def "rule %spec %body", (vars)=>
     self\def vars.spec, vars.body
-    print "Defined rule: #{utils.repr(vars.spec)}"
 
 -- TODO: write help
 
@@ -216,127 +205,84 @@ g\def {[[# %list]], [[length of %list]], [[size of %list]]}, (args)=>
             return
         return #(.list)
 
-g\defmacro "if %condition %if_body else %else_body", (vars,helpers,ftype)=>
-    with helpers
-        switch ftype
-            when "Expression"
-                .lua "((#{.ded(.transform(vars.condition))}) and"
-                .indented ->
-                    .lua "("..(.ded(.transform(vars.if_body)))..")"
-                    .lua "or ("..(.ded(.transform(vars.if_body))).."))(game, vars)"
-            when "Statement"
-                .lua("if (#{.ded(.transform(vars.condition))}) then")
-                .indented ->
-                    if_body = vars.if_body
-                    while if_body.type != "Block"
-                        if_body = if_body.value
-                        if if_body == nil then error("Failed to find body.")
-                    for statement in *if_body.value
-                        .lua(.ded(.transform(statement)))
-                .lua("else")
-                .indented ->
-                    else_body = vars.else_body
-                    while else_body.type != "Block"
-                        else_body = else_body.value
-                        if else_body == nil then error("Failed to find body.")
-                    for statement in *else_body.value
-                        .lua(.ded(.transform(statement)))
-                .lua("end")
-    return nil
+g\defmacro "if %condition %if_body else %else_body", (vars, kind)=>
+    if kind == "Expression"
+        return ([[(function(game, vars)
+            if (%s) then
+                %s
+            else
+                %s
+            end
+        end)(game, vars)]])\format(@tree_to_lua(vars.condition),
+            @tree_to_lua(vars.if_body.value.value),
+            @tree_to_lua(vars.else_body.value.value))
+    else
+        return ([[
+            if (%s) then
+                %s
+            else
+                %s
+            end
+        ]])\format(@tree_to_lua(vars.condition),
+            @tree_to_lua(vars.if_body.value.value),
+            @tree_to_lua(vars.else_body.value.value)), true
 
-g\defmacro "for %varname in %iterable %body", (vars,helpers,ftype)=>
-    with helpers
-        switch ftype
-            when "Expression"
-                .lua "(function(game, vars)"
-                .indented ->
-                    .lua "local comprehension, vars = {}, setmetatable({}, {__index=vars})"
-                    .lua "for i, value in ipairs(#{.ded(.transform(vars.iterable))}) do"
-                    .indented ->
-                        .lua "local comp_value"
-                        .lua "vars[#{.ded(.transform(vars.varname))}] = value"
-                        body = vars.body
-                        while body.type != "Block"
-                            body = body.value
-                        if body == nil then error("Failed to find body.")
-                        for statement in *body.value
-                            -- TODO: Clean up this ugly bit
-                            .lua("comp_value = "..(.ded(.transform(statement.value, {type:"Expression"}))))
-                        .lua "table.insert(comprehension, comp_value)"
-                    .lua "end"
-                    .lua "return comprehension"
-                .lua "end)(game,vars)"
-            when "Statement"
-                .lua "do"
-                .indented ->
-                    .lua "local vars = setmetatable({}, {__index=vars})"
-                    .lua "for i, value in ipairs(#{.ded(.transform(vars.iterable))}) do"
-                    .indented ->
-                        .lua "vars[#{.ded(.transform(vars.varname))}] = value"
-                        body = vars.body
-                        while body.type != "Block"
-                            body = body.value
-                        if body == nil then error("Failed to find body.")
-                        for statement in *body.value
-                            .lua(.ded(.transform(statement)))
-                    .lua "end"
-                .lua "end"
-    return nil
+g\defmacro "for %varname in %iterable %body", (vars, kind)=>
+    if kind == "Expression"
+        return "
+(function(game, vars)
+    local comprehension, vars = {}, setmetatable({}, {__index=vars})
+    for i, value in ipairs(#{@tree_to_lua(vars.iterable)}) do
+        local ret
+        vars[#{@tree_to_lua(vars.varname)}] = value
+        #{@tree_to_lua(vars.body.value)}
+        table.insert(comprehension, ret)
+    end
+    return comprehension
+end)(game, vars)"
+    else
+        return "
+do
+    local comprehension, vars = {}, setmetatable({}, {__index=vars})
+    for i, value in ipairs(#{@tree_to_lua(vars.iterable)}) do
+        vars[#{@tree_to_lua(vars.varname)}] = value
+        #{@tree_to_lua(vars.body.value)}
+    end
+end", true
 
-g\defmacro "for %varname = %start to %stop %body", (vars,helpers,ftype)=>
-    with helpers
-        switch ftype
-            when "Expression"
-                .lua "(function(game, vars)"
-                .indented ->
-                    .lua "local comprehension, vars = {}, setmetatable({}, {__index=vars})"
-                    .lua "for value=(#{.ded(.transform(vars.start))}),(#{.ded(.transform(vars.stop))}) do"
-                    .indented ->
-                        .lua "local comp_value"
-                        .lua "vars[#{.ded(.transform(vars.varname))}] = value"
-                        body = vars.body
-                        while body.type != "Block"
-                            body = body.value
-                        if body == nil then error("Failed to find body.")
-                        for statement in *body.value
-                            -- TODO: Clean up this ugly bit
-                            .lua("comp_value = "..(.ded(.transform(statement.value, {type:"Expression"}))))
-                        .lua "table.insert(comprehension, comp_value)"
-                    .lua "end"
-                    .lua "return comprehension"
-                .lua "end)(game,vars)"
-            when "Statement"
-                .lua "do"
-                .indented ->
-                    .lua "local vars = setmetatable({}, {__index=vars})"
-                    .lua "for value=(#{.ded(.transform(vars.start))}),(#{.ded(.transform(vars.stop))}) do"
-                    .indented ->
-                        .lua "vars[#{.ded(.transform(vars.varname))}] = value"
-                        body = vars.body
-                        while body.type != "Block"
-                            body = body.value
-                        if body == nil then error("Failed to find body.")
-                        for statement in *body.value
-                            .lua(.ded(.transform(statement)))
-                    .lua "end"
-                .lua "end"
-    return nil
+g\simplemacro "for %varname = %start to %stop %body", [[for %varname in (lua ["utils.range(",%start,",",%stop,")"]) %body]]
 
 g\simplemacro "if %condition %body", [[
 if %condition %body
-..else: pass
+..else: nil
 ]]
 
 g\simplemacro "unless %condition %body", [[
 if (not %condition) %body
-..else: pass
+..else: nil
 ]]
 
 g\def [[do %action]], (vars)=> return vars.action(self,vars)
 
 
-g\defmacro [[macro %spec %body]], (vars,helpers,ftype)=>
+g\defmacro [[macro %spec %body]], (vars, kind)=>
+    if kind == "Expression" then error("Cannot use a macro definition in an expression.")
     self\simplemacro vars.spec.value.value, vars.body.src
+    return "", true
 
+g\defmacro [[test %code yields %tree]], (vars, kind)=>
+    if kind == "Expression" then error("Tests must be statements.")
+    got = self\stringify_tree(vars.code.value)
+    got = got\match("Thunk:\n  (.*)")\gsub("\n  ","\n")
+    got = utils.repr(got,true)
+    expected = @tree_to_lua(vars.tree)
+    return "
+do
+    local got = #{got}
+    local expected = #{expected}
+    if got ~= expected then
+        error('Test failed. Expected:\n'..expected..'\n\nButGot:\n'..got)
+    end
+end", true
 
 return g

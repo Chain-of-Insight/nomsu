@@ -31,6 +31,26 @@ utils = {
     
     split: (str, sep="%s")->
         [chunk for chunk in str\gmatch("[^#{sep}]+")]
+    
+    accumulate: (glue, co)->
+        if co == nil then glue, co = "", glue
+        bits = {}
+        for bit in coroutine.wrap(co)
+            table.insert(bits, bit)
+        return table.concat(bits, glue)
+
+    range: (start,stop,step)->
+        if stop == nil
+            start,stop,step = 1,start,1
+        elseif step == nil
+            step = 1
+        return setmetatable({:start,:stop,:step}, {
+            __ipairs: =>
+                iter = (i)=>
+                    if i < (@stop-@start)/@step
+                        return i+1, @start+i*@step
+                return iter, @, 0
+        })
 
     keys: (t)-> [k for k in pairs(t)]
     values: (t)-> [v for _,v in pairs(t)]
