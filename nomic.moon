@@ -102,7 +102,7 @@ class Game
         return fn(self, args)
 
     def: (spec, fn)=>
-        invocations,arg_names = self\get_invocations spec
+        invocations,arg_names = @get_invocations spec
         fn_info = {:fn, :arg_names, :invocations, is_macro:false}
         for invocation in *invocations
             @defs[invocation] = fn_info
@@ -122,7 +122,7 @@ class Game
         return invocations, arg_names
 
     defmacro: (spec, lua_gen_fn)=>
-        invocations,arg_names = self\get_invocations spec
+        invocations,arg_names = @get_invocations spec
         fn_info = {fn:lua_gen_fn, :arg_names, :invocations, is_macro:true}
         for invocation in *invocations
             @defs[invocation] = fn_info
@@ -130,7 +130,7 @@ class Game
     run: (text)=>
         if @debug
             print "RUNNING TEXT:\n#{text}"
-        code = self\compile(text)
+        code = @compile(text)
         if @debug
             print "\nGENERATED LUA CODE:\n#{code}"
         lua_thunk, err = loadstring(code)
@@ -144,7 +144,7 @@ class Game
     run_debug:(text)=>
         old_debug = @debug
         @debug = true
-        ret = self\run(text)
+        ret = @run(text)
         @debug = old_debug
         return ret
 
@@ -182,7 +182,7 @@ class Game
             word <- ({ !number {%wordchar+} }) -> Word
             expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
 
-            string <- ({ (!('"..' %ws? %nl)) '"' {(("\" .) / [^"])*} '"' }) -> String
+            string <- ({ (!longstring) '"' {(("\" .) / [^"])*} '"' }) -> String
             longstring <- ({ '".."' %ws? %indent {(%new_line "|" [^%nl]*)+} ((%dedent (%new_line '..')?) / errors) }) -> Longstring
             number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
             variable <- ({ ("%" {%wordchar+}) }) -> Var
@@ -205,7 +205,7 @@ class Game
         tree = lingo\match(str\gsub("\r","").."\n")
         if @debug
             print("\nPARSE TREE:")
-            self\print_tree(tree)
+            @print_tree(tree)
         assert tree, "Failed to parse: #{str}"
         return tree
 
@@ -222,7 +222,7 @@ class Game
         buffer = {}
 
         to_lua = (t,kind)->
-            ret = self\tree_to_lua(t,kind)
+            ret = @tree_to_lua(t,kind)
             return ret
 
         add = (code)-> table.insert(buffer, code)
@@ -255,10 +255,7 @@ class Game
             when "Statement"
                 -- This case here is to prevent "ret =" from getting prepended when the macro might not want it
                 if tree.value.type == "FunctionCall"
-                    name_bits = {}
-                    for token in *tree.value.value
-                        table.insert name_bits, if token.type == "Word" then token.value else "%"
-                    name = table.concat(name_bits, " ")
+                    name = @fn_name_from_tree(tree.value)
                     if @defs[name] and @defs[name].is_macro
                         add @run_macro(tree.value, "Statement")
                     else
@@ -270,10 +267,7 @@ class Game
                 add to_lua(tree.value)
 
             when "FunctionCall"
-                name_bits = {}
-                for token in *tree.value
-                    table.insert name_bits, if token.type == "Word" then token.value else "%"
-                name = table.concat(name_bits, " ")
+                name = @fn_name_from_tree(tree)
                 if @defs[name] and @defs[name].is_macro
                     add @run_macro(tree, "Expression")
                 else
@@ -298,7 +292,7 @@ class Game
                 if #tree.value == 0
                     add "{}"
                 elseif #tree.value == 1
-                    add "{#{to_lua(tree.value)}}"
+                    add "{#{to_lua(tree.value[1])}}"
                 else
                     add @@comma_separated_items("{", [to_lua(item) for item in *tree.value], "}")
 
@@ -328,11 +322,15 @@ class Game
             buffer ..= close
             coroutine.yield buffer
     
-    run_macro: (tree, kind="Expression")=>
+    fn_name_from_tree: (tree)=>
+        assert(tree.type == "FunctionCall", "Attempt to get fn name from non-functioncall tree: #{tree.type}")
         name_bits = {}
         for token in *tree.value
             table.insert name_bits, if token.type == "Word" then token.value else "%"
-        name = table.concat(name_bits, " ")
+        table.concat(name_bits, " ")
+    
+    run_macro: (tree, kind="Expression")=>
+        name = @fn_name_from_tree(tree)
         unless @defs[name] and @defs[name].is_macro
             error("Macro not found: #{name}")
         {:fn, :arg_names} = @defs[name]
@@ -350,37 +348,34 @@ class Game
         switch tree.type
             when "File"
                 coroutine.yield(ind"File:")
-                self\_yield_tree(tree.value.body, indent_level+1)
+                @_yield_tree(tree.value.body, indent_level+1)
 
             when "Errors"
                 coroutine.yield(ind"Error:\n#{tree.value}")
 
             when "Block"
                 for chunk in *tree.value
-                    self\_yield_tree(chunk, indent_level)
+                    @_yield_tree(chunk, indent_level)
         
             when "Thunk"
                 coroutine.yield(ind"Thunk:")
-                self\_yield_tree(tree.value, indent_level+1)
+                @_yield_tree(tree.value, indent_level+1)
 
             when "Statement"
-                self\_yield_tree(tree.value, indent_level)
+                @_yield_tree(tree.value, indent_level)
 
             when "Expression"
-                self\_yield_tree(tree.value, indent_level)
+                @_yield_tree(tree.value, indent_level)
 
             when "FunctionCall"
-                name_bits = {}
-                for token in *tree.value
-                    table.insert name_bits, if token.type == "Word" then token.value else "%"
-                name = table.concat(name_bits, " ")
-                if #[a for a in *tree.value when a.type != "Word"] == 0
+                name = @fn_name_from_tree(tree)
+                args = [a for a in *tree.value when a.type != "Word"]
+                if #args == 0
                     coroutine.yield(ind"Call [#{name}]!")
                 else
                     coroutine.yield(ind"Call [#{name}]:")
-                    for a in *tree.value
-                        if a.type != "Word"
-                            self\_yield_tree(a, indent_level+1)
+                    for a in *args
+                        @_yield_tree(a, indent_level+1)
 
             when "String"
                 -- TODO: Better implement
@@ -399,7 +394,7 @@ class Game
                 else
                     coroutine.yield(ind"List:")
                     for item in *tree.value
-                        self\_yield_tree(item, indent_level+1)
+                        @_yield_tree(item, indent_level+1)
 
             when "Var"
                 coroutine.yield ind"Var[#{utils.repr(tree.value)}]"
@@ -409,19 +404,19 @@ class Game
         return nil -- to prevent tail calls
 
     print_tree:(tree)=>
-        for line in coroutine.wrap(-> self\_yield_tree(tree))
+        for line in coroutine.wrap(-> @_yield_tree(tree))
             print(line)
 
     stringify_tree:(tree)=>
         result = {}
-        for line in coroutine.wrap(-> self\_yield_tree(tree))
+        for line in coroutine.wrap(-> @_yield_tree(tree))
             table.insert(result, line)
         return table.concat result, "\n"
 
     compile: (src)=>
-        tree = self\parse(src)
+        tree = @parse(src)
         assert tree, "Tree failed to compile: #{src}"
-        code = self\tree_to_lua(tree)
+        code = @tree_to_lua(tree)
         return code
 
     test: (src, expected)=>
@@ -436,8 +431,8 @@ class Game
                 error("WHERE'S THE ===? in:\n#{test}")
             test_src, expected = test\sub(1,start-1), test\sub(stop+1,-1)
             expected = expected\match'[\n]*(.*[^\n])'
-            tree = self\parse(test_src)
-            got = self\stringify_tree(tree.value.body)
+            tree = @parse(test_src)
+            got = @stringify_tree(tree.value.body)
             if got != expected
                 error"TEST FAILED!\nSource:\n#{test_src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
 

@@ -18,14 +18,18 @@ utils = {
                 if not add_quotes
                     x
                 elseif not x\find[["]] and not x\find"\n"
-                    "\"#{x}\""
+                    "\""..x.."\""
                 elseif not x\find[[']] and not x\find"\n"
-                    "\'#{x}\'"
+                    "\'"..x.."\'"
                 else
                     for i=0,math.huge
                         eq = ("=")\rep(i)
                         if not x\find"%[#{eq}%[" and not x\find"%]#{eq}%]"
-                            return "[#{eq}[#{x}]#{eq}]"
+                            -- Stupid bullshit add an extra newline because lua discards first one if it exists
+                            if x\sub(1,1) == "\n"
+                                return "[#{eq}[\n"..x.."]#{eq}]"
+                            else
+                                return "[#{eq}["..x.."]#{eq}]"
             else
                 tostring(x)
     
@@ -47,7 +51,7 @@ utils = {
         return setmetatable({:start,:stop,:step}, {
             __ipairs: =>
                 iter = (i)=>
-                    if i < (@stop-@start)/@step
+                    if i <= (@stop-@start)/@step
                         return i+1, @start+i*@step
                 return iter, @, 0
         })
