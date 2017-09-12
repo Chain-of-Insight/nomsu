@@ -13,7 +13,7 @@ utils = {
                 if utils.is_list x
                     "{#{table.concat([utils.repr(i, true) for i in *x], ", ")}}"
                 else
-                    "{#{table.concat(["[#{utils.repr(k, true)}]: #{utils.repr(v, true)}" for k,v in pairs x], ", ")}}"
+                    "{#{table.concat(["[#{utils.repr(k, true)}]= #{utils.repr(v, true)}" for k,v in pairs x], ", ")}}"
             when 'string'
                 if not add_quotes
                     x

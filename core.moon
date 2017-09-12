@@ -71,7 +71,7 @@ g\def {"restrict %fn to %whitelist"}, (vars)=>
         unless self\check_permission(fn)
             print "You do not have permission to restrict function: #{fn}"
             continue
-        @defs[fn] = whitelist
+        @defs[fn].whitelist = whitelist
 
 g\def {"allow %whitelist to %fn"}, (vars)=>
     fns = if type(vars.fn) == 'string' then {vars.fn} else vars.fn

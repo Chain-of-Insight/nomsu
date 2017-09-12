@@ -93,6 +93,8 @@ class Game
         fn_info = @defs[fn_name]
         if fn_info == nil
             error "Attempt to call undefined function: #{fn_name}"
+        if fn_info.is_macro
+            error "Attempt to call macro at runtime: #{fn_name}"
         {:fn, :arg_names} = fn_info
         args = {name, select(i,...) for i,name in ipairs(arg_names)}
         if @debug
@@ -119,32 +121,11 @@ class Game
             else arg_names = _arg_names
         return invocations, arg_names
 
-    defmacro: (spec, fn)=>
+    defmacro: (spec, lua_gen_fn)=>
         invocations,arg_names = self\get_invocations spec
-        fn_info = {:fn, :arg_names, :invocations, is_macro:true}
+        fn_info = {fn:lua_gen_fn, :arg_names, :invocations, is_macro:true}
         for invocation in *invocations
             @defs[invocation] = fn_info
-
-    simplemacro: (spec, replacement)=>
-        spec = spec\gsub("\r", "")
-        replacement = replacement\gsub("\r", "")
-        replace_grammar = [=[
-            stuff <- {~ (var / longstring / string / .)+ ~}
-            var <- ("%" {%wordchar+}) -> replacer
-            string <- '"' (("\" .) / [^"])* '"'
-            longstring <- ('".."' %ws? %indent {(%new_line "|" [^%nl]*)+} %dedent (%new_line '..')?)
-        ]=]
-        fn = (vars, kind)=>
-            replacer = (varname)->
-                ret = vars[varname].src
-                return ret
-            replacement_grammar = make_parser replace_grammar, {:replacer}
-            code = replacement_grammar\match(replacement)
-            tree = self\parse(code)
-            -- Ugh, this is magic code.
-            return @tree_to_lua(tree.value.body.value[1].value.value.value, kind), true
-
-        self\defmacro spec, fn
     
     run: (text)=>
         if @debug
@@ -227,6 +208,13 @@ class Game
             self\print_tree(tree)
         assert tree, "Failed to parse: #{str}"
         return tree
+
+    tree_to_value: (tree)=>
+        code = "return (function(game, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
+        lua_thunk, err = loadstring(code)
+        if not lua_thunk
+            error("Failed to compile generated code:\n#{code}\n\n#{err}")
+        return (lua_thunk!)(self, {})
 
     tree_to_lua: (tree, kind="Expression")=>
         assert tree, "No tree provided."
