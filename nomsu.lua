@@ -805,7 +805,7 @@ do
   end
   Compiler = _class_0
 end
-if arg[1] then
+if arg and arg[1] then
   local c = Compiler()
   local input = io.open(arg[1]):read("*a")
   local _print = print
@@ -831,7 +831,7 @@ if arg[1] then
     end
     local utils = require('utils')
     local Compiler = require('nomsu')
-    local c = Compiler(require('core'))
+    local c = Compiler()
     load()(c, {})
     ]])
   end

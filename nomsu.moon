@@ -532,7 +532,7 @@ class Compiler
 
 -- Run on the command line via "./nomsu.moon input_file.nom" to execute
 -- and "./nomsu.moon input_file.nom output_file.lua" to compile (use "-" to compile to stdout)
-if arg[1]
+if arg and arg[1]
     c = Compiler()
     input = io.open(arg[1])\read("*a")
     -- Kinda hacky, if run via "./nomsu.moon file.nom -", then silence print and io.write
@@ -560,7 +560,7 @@ if arg[1]
     end
     local utils = require('utils')
     local Compiler = require('nomsu')
-    local c = Compiler(require('core'))
+    local c = Compiler()
     load()(c, {})
     ]]
 
