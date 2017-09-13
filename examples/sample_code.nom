@@ -1,0 +1,134 @@
+(# This is just a comment #)
+(# Nested comments (# like this #) work fine #)
+run file "core.nom"
+
+say "foo"
+
+say (4)
+
+(# "rule" is just a function that takes a function call spec and a block of code to run,
+    and stores the function definition #)
+rule "fart": say "poot"
+
+fart
+
+(# multi-line strings: #)
+say ".."
+    |    Once upon a time
+    |there was a very
+
+
+    |long string
+    |
+    |    with
+    |       rather
+    |   silly
+    |  indentation
+
+    |   and "quotes"
+    |.." (even fakeouts like that) "
+    |(done)
+    |
+
+rule "doublefart": (# this farts twice #)
+    say "poot"
+    say "poot"
+
+doublefart
+
+rule "subex work": return "subexpressions work"
+
+say (subex work)
+
+say (..)
+    subex work
+
+say ["lists", "work"]
+
+say []
+
+say [..]
+    1, 2
+    3
+
+rule "say both %one and %two":
+    say %one
+    say %two
+
+say both [..]
+    1,2
+..and [..]
+    3,4
+
+
+say both..
+    "hello"
+    and "world"
+
+rule "three": return 3
+say both ..
+    "a list:"
+    and [..]
+        1,2,(three),(4)
+
+if 1: yes
+..else: no
+
+if 1: yes ..else: no
+
+say (do: return 5)
+
+rule "do %one also %two":
+    do %one
+    do %two
+
+do: say "one liner"
+..also: say "another one liner"
+
+say (do: return "wow")
+
+say (1 + (-(2 * 3)))
+
+say (2 + (..)
+    3 * 4
+..)
+
+if %x:
+    say "one"
+..else: if %y:
+    say "two"
+..else:
+    say "three"
+
+
+printf [..]
+    ".."
+        |this is a longstring
+        |
+    .., "with", ".."
+        | multiple lines
+
+rule "%n bottles":
+    lua block [..]
+        ".."
+            |do
+            |    print("running raw lua code...")
+            |    local n = 
+        .., %n, ".."
+            |
+            |    for i=n,1,-1 do
+            |        print(tostring(i).." bottles of beer on the wall. Take one down, pass it around,")
+            |    end
+            |    print("no more bottles of beer on the wall.")
+            |end
+    nil
+9 bottles
+
+rule "dumsum %nums":
+    let "sum" = 0
+    for "n" in %nums:
+        let "sum" = (%sum + %n)
+    return %sum
+
+say (dumsum [1,2,3])
+
