@@ -119,7 +119,7 @@ make_parser = function(lingo, extra_definitions)
   })
   return re.compile(lingo, defs)
 end
-local Compiler
+local NomsuCompiler
 do
   local _class_0
   local _base_0 = {
@@ -771,7 +771,7 @@ do
       return self:initialize_core()
     end,
     __base = _base_0,
-    __name = "Compiler"
+    __name = "NomsuCompiler"
   }, {
     __index = _base_0,
     __call = function(cls, ...)
@@ -803,10 +803,10 @@ do
       return coroutine.yield(buffer)
     end)
   end
-  Compiler = _class_0
+  NomsuCompiler = _class_0
 end
 if arg and arg[1] then
-  local c = Compiler()
+  local c = NomsuCompiler()
   local input = io.open(arg[1]):read("*a")
   local _print = print
   local _io_write = io.write
@@ -829,11 +829,10 @@ if arg and arg[1] then
     output:write(code)
     output:write([[
     end
-    local utils = require('utils')
-    local Compiler = require('nomsu')
-    local c = Compiler()
+    local NomsuCompiler = require('nomsu')
+    local c = NomsuCompiler()
     load()(c, {})
     ]])
   end
 end
-return Compiler
+return NomsuCompiler

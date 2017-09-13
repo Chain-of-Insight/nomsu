@@ -5,6 +5,8 @@ utils = require 'utils'
 
 -- TODO:
 -- string interpolation
+-- improve indentation of generated lua code
+-- provide way to run precompiled nomsu -> lua code
 -- comprehensions?
 -- dicts?
 -- better scoping?
@@ -85,7 +87,7 @@ make_parser = (lingo, extra_definitions)->
     })
     return re.compile lingo, defs
 
-class Compiler
+class NomsuCompiler
     new:(parent)=>
         @defs = setmetatable({}, {__index:parent and parent.defs})
         @callstack = {}
@@ -535,7 +537,7 @@ class Compiler
 -- Run on the command line via "./nomsu.moon input_file.nom" to execute
 -- and "./nomsu.moon input_file.nom output_file.lua" to compile (use "-" to compile to stdout)
 if arg and arg[1]
-    c = Compiler()
+    c = NomsuCompiler()
     input = io.open(arg[1])\read("*a")
     -- Kinda hacky, if run via "./nomsu.moon file.nom -", then silence print and io.write
     -- during execution and re-enable them to print out the generated source code
@@ -560,10 +562,9 @@ if arg and arg[1]
         output\write [[
 
     end
-    local utils = require('utils')
-    local Compiler = require('nomsu')
-    local c = Compiler()
+    local NomsuCompiler = require('nomsu')
+    local c = NomsuCompiler()
     load()(c, {})
     ]]
 
-return Compiler
+return NomsuCompiler
