@@ -1,4 +1,4 @@
-Nomsub (named after *Nom*ic, and its creator, Peter *Sub*er) is a programming language
+Nomsub (named after **Nom**ic, and its creator, Peter **Sub**er) is a programming language
 designed to be used for playing games of Nomic, or engaging in other similar activities
 revolving around natural language rule-making and self modification.
 
