@@ -64,6 +64,10 @@ utils = {
         with tot = 0
             for _,x in pairs(t) do tot += x
 
+    product: (t)->
+        with prod = 1
+            for _,x in pairs(t) do prod *= x
+
     all: (t)->
         for _,x in pairs t
             if not x then return false

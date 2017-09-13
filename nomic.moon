@@ -50,7 +50,7 @@ make_parser = (lingo, extra_definitions)->
     defs =
         :wordchar, :nl, ws:whitespace, :comment
         eol: #nl + (P("")-P(1))
-        word_boundary: S(" \t")^1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #P("..")
+        word_boundary: whitespace + B(P("..")) + B(S("\";)]")) + #S("\":([") + #((whitespace + nl)^0 * P(".."))
         indent: #(nl * blank_line^0 * Cmt(whitespace^-1, check_indent))
         dedent: #(nl * blank_line^0 * Cmt(whitespace^-1, check_dedent))
         new_line: nl * blank_line^0 * Cmt(whitespace^-1, check_nodent)
@@ -152,7 +152,7 @@ class Game
         if @debug
             print("PARSING:\n#{str}")
         lingo = [=[
-            file <- ({ {| %new_line? {:body: block :} %new_line? (errors)? |} }) -> File
+            file <- ({ {| %ws? %new_line? {:body: block :} %new_line? %ws? (errors)? |} }) -> File
             errors <- (({.+}) => error_handler)
             block <- ({ {| statement (%new_line statement)* |} }) -> Block
             statement <- ({ (functioncall / expression) }) -> Statement
@@ -169,7 +169,7 @@ class Game
             fn_bit <- (expression / word)
             fn_bits <-
                 ((".." %ws? (%indent %new_line indented_fn_bits %dedent) (%new_line ".." %ws? fn_bits)?)
-                 / (%new_line ".." fn_bit fn_bits)
+                 / (%new_line ".." fn_bit (%word_boundary fn_bits)?)
                  / (fn_bit (%word_boundary fn_bits)?))
             indented_fn_bits <-
                 fn_bit ((%new_line / %word_boundary) indented_fn_bits)?
@@ -195,10 +195,10 @@ class Game
                 ("[..]" %ws? %indent %new_line indented_list ","? ((%dedent (%new_line "..")?) / errors))
                 / ("[" %ws? (list_items ","?)?  %ws?"]")
               |} }) -> List
-            list_items <- (expression (list_sep list_items)?)
+            list_items <- ((functioncall / expression) (list_sep list_items)?)
             list_sep <- %ws? "," %ws?
             indented_list <-
-                expression (((list_sep %new_line?) / %new_line) indented_list)?
+                (functioncall / expression) (((list_sep %new_line?) / %new_line) indented_list)?
         ]=]
         lingo = make_parser lingo
 
