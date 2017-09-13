@@ -148,19 +148,11 @@ class Compiler
     run: (text)=>
         if @debug
             print "RUNNING TEXT:\n#{text}"
+        -- This will execute each chunk as it goes along
         code = @compile(text)
         if @debug
             print "\nGENERATED LUA CODE:\n#{code}"
-        [==[
-        lua_thunk, err = loadstring(code)
-        if not lua_thunk
-            error("Failed to compile generated code:\n#{code}\n\n#{err}")
-        action = lua_thunk!
-        if @debug
-            print("Running...")
-        return action(self, {})
-        ]==]
-        code
+        return code
     
     parse: (str)=>
         if @debug

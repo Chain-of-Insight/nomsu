@@ -238,14 +238,6 @@ do
       if self.debug then
         print("\nGENERATED LUA CODE:\n" .. tostring(code))
       end
-      local _ = [==[        lua_thunk, err = loadstring(code)
-        if not lua_thunk
-            error("Failed to compile generated code:\n#{code}\n\n#{err}")
-        action = lua_thunk!
-        if @debug
-            print("Running...")
-        return action(self, {})
-        ]==]
       return code
     end,
     parse = function(self, str)
