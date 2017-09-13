@@ -830,7 +830,7 @@ if arg[1] then
     output:write([[
     end
     local utils = require('utils')
-    local Compiler = require('nomic')
+    local Compiler = require('nomsu')
     local c = Compiler(require('core'))
     load()(c, {})
     ]])
