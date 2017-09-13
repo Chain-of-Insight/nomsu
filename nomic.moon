@@ -93,11 +93,11 @@ class Compiler
     call: (fn_name,...)=>
         fn_info = @defs[fn_name]
         if fn_info == nil
-            error "Attempt to call undefined function: #{fn_name}"
+            @error "Attempt to call undefined function: #{fn_name}"
         if fn_info.is_macro
-            error "Attempt to call macro at runtime: #{fn_name}"
+            @error "Attempt to call macro at runtime: #{fn_name}"
         unless @check_permission(fn_name)
-            error "You do not have the authority to call: #{fn_name}"
+            @error "You do not have the authority to call: #{fn_name}"
         table.insert @callstack, fn_name
         {:fn, :arg_names} = fn_info
         args = {name, select(i,...) for i,name in ipairs(arg_names)}
@@ -110,7 +110,7 @@ class Compiler
     check_permission: (fn_name)=>
         fn_info = @defs[fn_name]
         if fn_info == nil
-            error "Undefined function: #{fn_name}"
+            @error "Undefined function: #{fn_name}"
         if fn_info.whiteset == nil then return true
         for caller in *@callstack
             if fn_info.whiteset[caller]
@@ -135,7 +135,7 @@ class Compiler
             table.insert(invocations, invocation)
             if arg_names
                 if not utils.equivalent(utils.set(arg_names), utils.set(_arg_names))
-                    error("Conflicting argument names #{utils.repr(arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
+                    @error("Conflicting argument names #{utils.repr(arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
             else arg_names = _arg_names
         return invocations, arg_names
 
@@ -249,10 +249,13 @@ class Compiler
                 for statement in *tree.value.body.value
                     code = to_lua(statement)
                     -- Run the fuckers as we go
-                    lua_thunk, err = loadstring("return (function(compiler, vars)\n#{code}\nend)")
+                    lua_thunk, err = load("return (function(compiler, vars)\n#{code}\nend)")
                     if not lua_thunk
                         error("Failed to compile generated code:\n#{code}\n\n#{err}")
-                    lua_thunk!(self, vars)
+                    ok,err = pcall(lua_thunk)
+                    if not ok then error(err)
+                    ok,err = pcall(err, self, vars)
+                    if not ok then @error(err)
                     add code
                 add [[
                         return ret
@@ -354,9 +357,9 @@ class Compiler
     run_macro: (tree, kind="Expression")=>
         name = @fn_name_from_tree(tree)
         unless @defs[name] and @defs[name].is_macro
-            error("Macro not found: #{name}")
+            @error("Macro not found: #{name}")
         unless @check_permission(name)
-            error "You do not have the authority to call: #{name}"
+            @error "You do not have the authority to call: #{name}"
         {:fn, :arg_names} = @defs[name]
         args = [a for a in *tree.value when a.type != "Word"]
         args = {name,args[i] for i,name in ipairs(arg_names)}
@@ -364,7 +367,7 @@ class Compiler
         ret, manual_mode = fn(self, args, kind)
         table.remove @callstack
         if not ret
-            error("No return value for macro: #{name}")
+            @error("No return value for macro: #{name}")
         if kind == "Statement" and not manual_mode
             ret = "ret = "..ret
         return ret
@@ -450,6 +453,13 @@ class Compiler
             output\write(code)
         return code
 
+    error: (...)=>
+        print(...)
+        print("Callstack:")
+        for i=#@callstack,1,-1
+            print "    #{@callstack[i]}"
+        error!
+
     test: (src, expected)=>
         i = 1
         while i != nil
@@ -459,13 +469,13 @@ class Compiler
             i = stop
             start,stop = test\find"==="
             if not start or not stop then
-                error("WHERE'S THE ===? in:\n#{test}")
+                @error("WHERE'S THE ===? in:\n#{test}")
             test_src, expected = test\sub(1,start-1), test\sub(stop+1,-1)
             expected = expected\match'[\n]*(.*[^\n])'
             tree = @parse(test_src)
             got = @stringify_tree(tree.value.body)
             if got != expected
-                error"TEST FAILED!\nSource:\n#{test_src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
+                @error"TEST FAILED!\nSource:\n#{test_src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
 
 
     initialize_core: =>

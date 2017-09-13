@@ -17,7 +17,7 @@ rule "macro block %spec %body":
         |    local spec, body = vars.spec, vars.body
         |    local wrapper = function(compiler, vars, kind)
         |        if kind == "Expression" then
-        |            error("Macro: "..spec.." was defined to be a block, but is being used as an expression.")
+        |            compiler:error("Macro: "..spec.." was defined to be a block, but is being used as an expression.")
         |        end
         |        return body(compiler, vars, kind), true
         |    end
@@ -127,7 +127,7 @@ rule "do %action":
 macro block "if %condition %if_body":
     concat [..]
         "if ",%condition as lua expr," then"
-        "\n    ",lua expr "vars.if_body.value.value" as lua block
+        "\n    ",(lua expr "vars.if_body.value.value") as lua block
         "\nend"
 
 macro block "if %condition %if_body else %else_body":
@@ -195,7 +195,7 @@ macro ["%index st in %list", "%index nd in %list", "%index rd in %list", "%index
 macro ["%item is in %list", "%list contains %item"]:
     concat ["(",%list as lua expr,"[",%index as lua expr,"] ~= nil)"]
 
-macro ["length of %list", "size of %list"]:
+macro ["length of %list", "size of %list", "number of %list"]:
     concat ["#(",%list as lua expr,")"]
 
 rule "restrict %fn to within %whitelist":
@@ -203,11 +203,16 @@ rule "restrict %fn to within %whitelist":
         |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
         |local whitelist = (type(vars.whitelist) == 'string') and {vars.whitelist} or vars.whitelist
         |local whiteset = {}
-        |for _,w in ipairs(whitelist) do whiteset[w] = true end
+        |for _,w in ipairs(whitelist) do
+        |    if not compiler.defs[w] then
+        |        compiler:error("Undefined function: "..tostring(w))
+        |    else whiteset[w] = true
+        |    end
+        |end
         |for _,fn in ipairs(fns) do
         |    local fn_info = compiler.defs[fn]
         |    if fn_info == nil then
-        |        print("Undefined function: "..tostring(fn))
+        |        compiler:error("Undefined function: "..tostring(fn))
         |    elseif not compiler:check_permission(fn) then
         |        print("You do not have permission to restrict function: "..tostring(fn))
         |    else
@@ -219,16 +224,23 @@ rule "allow %whitelist to use %fn":
     lua block ".."
         |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
         |local whitelist = (type(vars.whitelist) == 'string') and {vars.whitelist} or vars.whitelist
+        |for _,w in ipairs(whitelist) do
+        |    if not compiler.defs[w] then
+        |        compiler:error("Undefined function: "..tostring(w))
+        |    end
+        |end
         |for _,fn in ipairs(fns) do
         |    local fn_info = compiler.defs[fn]
         |    if fn_info == nil then
-        |        print("Undefined function: "..tostring(fn))
+        |        compiler:error("Undefined function: "..tostring(fn))
         |    elseif fn_info.whiteset == nil then
         |        print("Function is already allowed by everyone: "..tostring(fn))
         |    elseif not compiler:check_permission(fn) then
         |        print("You do not have permission to grant permissions for function: "..tostring(fn))
         |    else
-        |        for _,w in ipairs(whitelist) do fn_info.whiteset[w] = true end
+        |        for _,w in ipairs(whitelist) do
+        |            fn_info.whiteset[w] = true
+        |        end
         |    end
         |end
 
@@ -236,10 +248,15 @@ rule "forbid %blacklist to use %fn":
     lua block ".."
         |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
         |local blacklist = (type(vars.blacklist) == 'string') and {vars.blacklist} or vars.blacklist
+        |for _,b in ipairs(blacklist) do
+        |    if not compiler.defs[b] then
+        |        compiler:error("Undefined function: "..tostring(b))
+        |    end
+        |end
         |for _,fn in ipairs(fns) do
         |    local fn_info = compiler.defs[fn]
         |    if fn_info == nil then
-        |        print("Undefined function: "..tostring(fn))
+        |        compiler:error("Undefined function: "..tostring(fn))
         |    elseif fn_info.whiteset == nil then
         |        print("Cannot remove items from a whitelist when there is no whitelist on function: "..tostring(fn))
         |    elseif not compiler:check_permission(fn) then
@@ -248,3 +265,9 @@ rule "forbid %blacklist to use %fn":
         |        for _,b in ipairs(blacklist) do fn_info.whiteset[b] = nil end
         |    end
         |end
+
+rule "error!":
+    lua block "compiler:error()"
+
+rule "error %msg":
+    lua block "compiler:error(vars.msg)"
