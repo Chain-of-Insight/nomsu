@@ -530,12 +530,12 @@ class Compiler
             return @run(file\read('*a'))
 
 
--- Run on the command line via "./nomic.moon input_file.nom" to execute
--- and "./nomic.moon input_file.nom output_file.lua" to compile (use "-" to compile to stdout)
+-- Run on the command line via "./nomsu.moon input_file.nom" to execute
+-- and "./nomsu.moon input_file.nom output_file.lua" to compile (use "-" to compile to stdout)
 if arg[1]
     c = Compiler()
     input = io.open(arg[1])\read("*a")
-    -- Kinda hacky, if run via "./nomic.moon file.nom -", then silence print and io.write
+    -- Kinda hacky, if run via "./nomsu.moon file.nom -", then silence print and io.write
     -- during execution and re-enable them to print out the generated source code
     _print = print
     _io_write = io.write
@@ -559,7 +559,7 @@ if arg[1]
 
     end
     local utils = require('utils')
-    local Compiler = require('nomic')
+    local Compiler = require('nomsu')
     local c = Compiler(require('core'))
     load()(c, {})
     ]]
