@@ -184,8 +184,8 @@ rule "say time":
         |io.write(tostring(os.time()).."\n")
 say time
 printf ["Math expression: ", lua expr "(1 + 2*3 + 3*4)^2"]
-(# In the lua environment, "vars" can be used to get local variables/function args, and "game"
-    can be used to access the compiler, function defs, and other things #)
+(# In the lua environment, "vars" can be used to get local variables/function args, and
+    "compiler" can be used to access the compiler, function defs, and other things #)
 rule "square root of %n":
     return (lua expr "math.sqrt(vars.n)")
 printf ["the square root of 2 is ", square root of 2]
