@@ -1,0 +1,188 @@
+run file "core.nom"
+lua block ".."
+    |do -- Use a closure to hide this behind the accessor rules
+    |    local relations = setmetatable({}, {__index=function(self,key)
+    |        local t = {}
+    |        self[key] = t
+    |        return t
+    |    end})
+    |    compiler:def("%key %relation ?", function(_,vars)
+    |        return relations[vars.relation][vars.key]
+    |    end)
+    |    compiler:def("%key %relation = %value", function(_,vars)
+    |        relations[vars.relation][vars.key] = vars.value
+    |    end)
+    |    compiler:def("* %relation = %value", function(_,vars)
+    |        local result = {}
+    |        for k,v in pairs(relations) do
+    |            if utils.equivalent(v, vars.value) then
+    |                table.insert(result, k)
+    |            end
+    |        end
+    |        return result
+    |    end)
+    |end
+
+rule "set all * %relation = %value":
+    for "key" in (* %relation = %value):
+        %key %relation = %value
+
+rule "you":
+    lua expr "(you or 'Anonymous')"
+
+rule ["make %person %action", "make %person do %action"]:
+    lua block [..]
+        "do"
+        "\n    local old_you = you"
+        "\n    you = vars.person"
+        "\n    ret = compiler:call('do %', vars.action)"
+        "\n    you = old_you"
+        "\nend"
+
+say "===================================================="
+say "                    NEW GAME"
+say "===================================================="
+rule "everyone approves %action": yes
+
+rule "with everyone's approval %action":
+    if (everyone approves %action):
+        do %action
+    ..else:
+        say "You do not have the will of the people! >:("
+
+restrict "rule % %" to within "with everyone's approval %"
+restrict "make % %" to within "with everyone's approval %"
+restrict "set all * % = %" to within "with everyone's approval %"
+restrict "% % = %" to within "with everyone's approval %"
+restrict "restrict % to within %" to within "with everyone's approval %"
+
+with everyone's approval:
+    rule "propose %action":
+        if ("pending proposal" "is" ?):
+            say "Sorry, an action is already pending."
+        ..else:
+            say "Proposing..."
+            "pending proposal" "is" = %action
+
+    rule "unpropose":
+        let "pending" = ("pending proposal" "is" ?)
+        set all * %pending = (nil)
+        "pending proposal" "is" = (nil)
+
+
+    rule "mark %who as approving %action":
+        %who %action = "approved"
+
+    rule "mark %who as rejecting %action":
+        %who %action = "rejected"
+
+    rule ["approve", "vote yes", "vote yea"]:
+        let "pending" = ("pending proposal" "is" ?)
+        mark (you) as approving %pending
+        say "Voted yes."
+        if (everyone approves %pending):
+            with everyone's approval %pending
+            unpropose
+        ..else:
+            let "approvers" = (number of (* %pending = "approved"))
+            let "num-players" = (number of (players))
+            printf [%approvers, "/", %num-players, " players have approved"]
+
+    rule ["reject", "vote no", "vote nay", "veto", "disapprove"]:
+        let "pending" = ("pending proposal" "is" ?)
+        mark (you) as rejecting %pending
+        say "Voted no."
+        unpropose
+
+    rule ["players", "everyone", "everybody", "all players"]:
+        * "is a player" = (yes)
+
+    rule "join":
+        (you) "is a player" = (yes)
+        printf ["Welcome to the game, ", you,"!"]
+
+    allow "unpropose" to use "set all * % = %"
+    allow ["join", "mark % as approving %", "mark % as rejecting %", "propose %", "unpropose"] to use "% % = %"
+    restrict "unpropose" to within ["approve", "reject"]
+    restrict "mark % as approving %" to within ["propose %", "approve"]
+    restrict "mark % as rejecting %" to within ["propose %", "reject"]
+
+    rule "everyone approves %action":
+        (number of (players)) == (number of (* %action = "approved"))
+
+join
+
+propose:
+    say "fart"
+approve
+
+propose:
+    "democracy" "is possible" = (yes)
+    if ("democracy" "is possible" ?):
+        say "DEMOCRACY WORKS!!!"
+approve
+
+propose:
+    rule "fart":
+        say "poot"
+    say "fart should have been defined"
+approve
+say "doop"
+fart
+
+propose:
+    rule "open election %candidates":
+        if ("candidates" "are" ?):
+            say "An election is already in progress."
+        ..else:
+            "candidates" "are" = %candidates
+
+    rule "close the election":
+        set all * "votes for" = (nil)
+        "candidates" "are" = (nil)
+
+    rule "vote for %candidate":
+        (you) "votes for" = %candidate
+        let "vote-percent" = ((number of (* "votes for" = %candidate)) / (number of (players)))
+        printf ["Vote cast. ",%candidate," now has ",(100 * %vote-percent),"% of the votes."]
+        if (%vote-percent > 0.5):
+            printf ["The winner of the election is:", %candidate]
+            close the election
+
+    allow ["open election %", "close the election", "vote for %"] to use ["% % = %"]
+    allow ["close the election"] to use ["set all * % = %"]
+approve
+
+propose:
+    rule "as bill %action":
+        if ((you) == "Anonymous"):
+            make "bill" do %action
+        ..else:
+            printf ["Who do you think you are, ", you,"?"]
+    allow ["as bill %"] to use ["make % %"]
+approve
+as bill: join
+
+propose:
+    rule "as dave %action":
+        if ((you) == "Anonymous"):
+            make "dave" do %action
+        ..else:
+            printf ["Who do you think you are, ", you,"?"]
+    allow ["as dave %"] to use ["make % %"]
+approve
+as bill: approve
+as dave: join
+
+open election ["tom", "dick", "harry"]
+vote for "dick"
+as bill: vote for "dick"
+
+propose:
+    rule "take a shit": say "shit taken."
+
+approve
+as bill: approve
+as dave: approve
+
+
