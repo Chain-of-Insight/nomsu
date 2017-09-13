@@ -11,3 +11,7 @@ compilation phase when it runs. To compile, run `lua nomic.lua your_file.nom out
 which produces an output file which can be run with the command `lua output_file.lua`.
 
 Example code can be found in the examples folder.
+
+core.nom contains some *extremely* helpful and basic core functionality for the language,
+written in the language itself, so I recommend adding `run file "core.nom"` to the top of
+your files.
