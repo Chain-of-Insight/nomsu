@@ -178,12 +178,12 @@ any of [0,0,0,0,1,0,0]
 
 (# Macros: #)
 (# The "lua block %" and "lua expr %" macros can be used to write raw lua code: #)
-rule "say time":
+rule "say the time":
     lua block ".."
         |io.write("The OS time is: ")
         |io.write(tostring(os.time()).."\n")
-say time
-printf ["Math expression: ", lua expr "(1 + 2*3 + 3*4)^2"]
+say the time
+printf ["Math expression result is: ", lua expr "(1 + 2*3 + 3*4)^2"]
 (# In the lua environment, "vars" can be used to get local variables/function args, and
     "compiler" can be used to access the compiler, function defs, and other things #)
 rule "square root of %n":
