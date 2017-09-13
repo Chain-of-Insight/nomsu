@@ -1,0 +1,250 @@
+(# Global import #)
+lua block ".."
+    |utils = require('utils')
+
+lua block ".."
+    |compiler:def("rule %spec %body", function(compiler, vars)
+    |    return compiler:def(vars.spec, vars.body)
+    |end)
+
+rule "macro %spec %body":
+    lua block ".."
+        |compiler:defmacro(vars.spec, vars.body)
+
+rule "macro block %spec %body":
+    lua block ".."
+        |do
+        |    local spec, body = vars.spec, vars.body
+        |    local wrapper = function(compiler, vars, kind)
+        |        if kind == "Expression" then
+        |            error("Macro: "..spec.." was defined to be a block, but is being used as an expression.")
+        |        end
+        |        return body(compiler, vars, kind), true
+        |    end
+        |    compiler:defmacro(spec, wrapper)
+        |    return nil
+        |end
+
+rule ["eval %code", "run %code"]:
+    lua expr "compiler:run(vars.code)"
+
+macro "source code %code":
+    lua expr "utils.repr(vars.code.src, true)"
+
+rule "run file %filename":
+    lua block [..]
+        "do"
+        "\n    local file = io.open(vars.filename)"
+        "\n    return compiler:run(file:read('*a'))"
+        "\nend"
+
+rule "%tree as lua block":
+    lua block [..]
+        "do return compiler:tree_to_lua(", %tree, ", 'Statement'), true end"
+
+rule "%tree as lua expr":
+    lua expr [..]
+        "compiler:tree_to_lua(", %tree, ", 'Expression')"
+
+rule "concat %strs":
+    lua block [..]
+        "local str_bits = {}"
+        "\nfor i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end"
+        "\ndo return table.concat(str_bits) end"
+
+rule "concat %strs with glue %glue":
+    lua block [..]
+        "local str_bits = {}"
+        "\nfor i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end"
+        "\ndo return table.concat(str_bits, vars.glue) end"
+
+macro block "return %return-value":
+    concat ["do return ",%return-value as lua expr," end"]
+
+macro block "let %varname = %value":
+    concat ["vars[",%varname as lua expr,"] = ",%value as lua expr]
+
+macro ["true","yes"]: "true"
+macro ["false","no"]: "false"
+macro ["nil","null"]: "nil"
+macro block ["nop", "pass"]: ""
+macro "%a + %b": concat ["(",%a as lua expr," + ",%b as lua expr,")"]
+macro "%a + %b + %c": concat ["(",%a as lua expr," + ",%b as lua expr," + ",%c as lua expr,")"]
+macro "%a + %b + %c + %d": concat ["(",%a as lua expr," + ",%b as lua expr," + ",%c as lua expr," + ",%d as lua expr,")"]
+macro "%a - %b": concat ["(",%a as lua expr," - ",%b as lua expr,")"]
+macro "%a * %b": concat ["(",%a as lua expr," * ",%b as lua expr,")"]
+macro "%a * %b * %c": concat ["(",%a as lua expr," * ",%b as lua expr," * ",%c as lua expr,")"]
+macro "%a * %b * %c * %d": concat ["(",%a as lua expr," * ",%b as lua expr," * ",%c as lua expr," * ",%d as lua expr,")"]
+macro "%a / %b": concat ["(",%a as lua expr," / ",%b as lua expr,")"]
+macro "%a === %b": concat ["(",%a as lua expr," == ",%b as lua expr,")"]
+macro "%a !== %b": concat ["(",%a as lua expr," ~= ",%b as lua expr,")"]
+macro "%a < %b": concat ["(",%a as lua expr," < ",%b as lua expr,")"]
+macro "%a < %b < %c": concat ["((",%a as lua expr," < ",%b as lua expr,") and (",%b as lua expr," < ",%c as lua expr,"))"]
+macro "%a <= %b < %c": concat ["((",%a as lua expr," <= ",%b as lua expr,") and (",%b as lua expr," < ",%c as lua expr,"))"]
+macro "%a <= %b <= %c": concat ["((",%a as lua expr," <= ",%b as lua expr,") and (",%b as lua expr," <= ",%c as lua expr,"))"]
+macro "%a < %b <= %c": concat ["((",%a as lua expr," < ",%b as lua expr,") and (",%b as lua expr," <= ",%c as lua expr,"))"]
+macro "%a > %b > %c": concat ["((",%a as lua expr," > ",%b as lua expr,") and (",%b as lua expr," > ",%c as lua expr,"))"]
+macro "%a >= %b > %c": concat ["((",%a as lua expr," >= ",%b as lua expr,") and (",%b as lua expr," > ",%c as lua expr,"))"]
+macro "%a >= %b >= %c": concat ["((",%a as lua expr," >= ",%b as lua expr,") and (",%b as lua expr," >= ",%c as lua expr,"))"]
+macro "%a > %b >= %c": concat ["((",%a as lua expr," > ",%b as lua expr,") and (",%b as lua expr," >= ",%c as lua expr,"))"]
+macro "%a <= %b": concat ["(",%a as lua expr," <= ",%b as lua expr,")"]
+macro "%a > %b": concat ["(",%a as lua expr," > ",%b as lua expr,")"]
+macro "%a >= %b": concat ["(",%a as lua expr," >= ",%b as lua expr,")"]
+macro "%a ^ %b": concat ["(",%a as lua expr," ^ ",%b as lua expr,")"]
+macro "%a and %b": concat ["(",%a as lua expr," and ",%b as lua expr,")"]
+macro "%a and %b and %c":
+    concat ["(",%a as lua expr," and ",%b as lua expr," and ",%c as lua expr,")"]
+macro "%a and %b and %c and %d":
+    concat ["(",%a as lua expr," and ",%b as lua expr," and ",%c as lua expr," and ",%d as lua expr,")"]
+macro "%a or %b": concat ["(",%a as lua expr," or ",%b as lua expr,")"]
+macro "%a or %b or %c":
+    concat ["(",%a as lua expr," or ",%b as lua expr," or ",%c as lua expr,")"]
+macro "%a or %b or %c or %d":
+    concat ["(",%a as lua expr," or ",%b as lua expr," or ",%c as lua expr," or ",%d as lua expr,")"]
+macro "%a mod %b": concat ["(",%a as lua expr," mod ",%b as lua expr,")"]
+macro "- %a": concat ["-(",%a as lua expr,")"]
+macro "not %a": concat ["not (",%a as lua expr,")"]
+macro "# %a": concat ["#(",%a as lua expr,")"]
+
+(# This does equivalence checking instead of identity checking. #)
+rule "%a == %b":
+    lua expr "utils.equivalent(vars.a, vars.b)"
+macro "%a != %b": concat ["not (",%a as lua expr," == ",%b as lua expr,")"]
+
+rule "say %str":
+    lua block ["print(", %str, ")"]
+
+rule "printf %str":
+    lua block ".."
+        |for _,s in ipairs(vars.str) do
+        |    io.write(utils.repr(s))
+        |end
+        |io.write("\n")
+
+rule "do %action":
+    lua expr "vars.action(compiler, setmetatable({}, {__index=vars}))"
+
+macro block "if %condition %if_body":
+    concat [..]
+        "if ",%condition as lua expr," then"
+        "\n    ",lua expr "vars.if_body.value.value" as lua block
+        "\nend"
+
+macro block "if %condition %if_body else %else_body":
+    concat [..]
+        "if ",%condition as lua expr," then"
+        "\n    ",(lua expr "vars.if_body.value.value") as lua block
+        "\nelse"
+        "\n    ",(lua expr "vars.else_body.value.value") as lua block
+        "\nend"
+
+macro "%if_expr if %condition else %else_expr":
+    concat [..]
+        "(function(compiler, vars)"
+        "\n    if ",%condition as lua expr," then"
+        "\n        return ",%if_expr as lua expr
+        "\n    else"
+        "\n        return ",%else_expr as lua expr
+        "\n    end"
+        "\nend)(compiler, vars)"
+
+macro block "for %varname in %iterable %body":
+    let "varname" = (%varname as lua expr)
+    concat [..]
+        "do"
+        "\n    local old_loopval = vars[", %varname, "]"
+        "\n    for i,value in ipairs(", %iterable as lua expr, ") do"
+        "\n        vars[", %varname, "] = value"
+        "\n        ",(lua expr "vars.body.value.value") as lua block
+        "\n    end"
+        "\n    vars[", %varname, "] = old_loopval"
+        "\nend"
+
+rule "%start up to %stop":
+    lua expr "utils.range(vars.start,vars.stop-1)"
+
+rule ["%start thru %stop", "%start through %stop"]:
+    lua expr "utils.range(vars.start,vars.stop)"
+
+rule "%start down to %stop":
+    lua expr "utils.range(vars.start,vars.stop+1,-1)"
+
+rule ["%start down thru %stop", "%start down through %stop"]:
+    lua expr "utils.range(vars.start,vars.stop,-1)"
+
+
+rule ["random number"]: lua expr "math.random()"
+rule ["sum of %items"]: lua expr "utils.sum(vars.items)"
+rule ["product of %items"]: lua expr "utils.product(vars.items)"
+rule ["all of %items"]: lua expr "utils.all(vars.items)"
+rule ["any of %items"]: lua expr "utils.any(vars.items)"
+rule ["avg of %items", "average of %items"]: lua expr "(utils.sum(vars.items)/#vars.items)"
+rule ["min of %items", "smallest of %items", "lowest of %items"]:
+    lua expr "utils.min(vars.items)"
+rule ["max of %items", "biggest of %items", "largest of %items", "highest of %items"]:
+    lua expr "utils.min(vars.items)"
+
+rule ["min of %items with respect to %keys"]:
+    lua expr "utils.min(vars.items, vars.keys)"
+rule ["max of %items with respect to %keys"]:
+    lua expr "utils.max(vars.items, vars.keys)"
+
+macro ["%index st in %list", "%index nd in %list", "%index rd in %list", "%index th in %list"]:
+    concat [(%list as lua expr), "[", (%index as lua expr), "]"]
+
+macro ["%item is in %list", "%list contains %item"]:
+    concat ["(",%list as lua expr,"[",%index as lua expr,"] ~= nil)"]
+
+macro ["length of %list", "size of %list"]:
+    concat ["#(",%list as lua expr,")"]
+
+rule "restrict %fn to within %whitelist":
+    lua block ".."
+        |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
+        |local whitelist = (type(vars.whitelist) == 'string') and {vars.whitelist} or vars.whitelist
+        |local whiteset = {}
+        |for _,w in ipairs(whitelist) do whiteset[w] = true end
+        |for _,fn in ipairs(fns) do
+        |    local fn_info = compiler.defs[fn]
+        |    if fn_info == nil then
+        |        print("Undefined function: "..tostring(fn))
+        |    elseif not compiler:check_permission(fn) then
+        |        print("You do not have permission to restrict function: "..tostring(fn))
+        |    else
+        |        compiler.defs[fn].whiteset = whiteset
+        |    end
+        |end
+
+rule "allow %whitelist to use %fn":
+    lua block ".."
+        |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
+        |local whitelist = (type(vars.whitelist) == 'string') and {vars.whitelist} or vars.whitelist
+        |for _,fn in ipairs(fns) do
+        |    local fn_info = compiler.defs[fn]
+        |    if fn_info == nil then
+        |        print("Undefined function: "..tostring(fn))
+        |    elseif fn_info.whiteset == nil then
+        |        print("Function is already allowed by everyone: "..tostring(fn))
+        |    elseif not compiler:check_permission(fn) then
+        |        print("You do not have permission to grant permissions for function: "..tostring(fn))
+        |    else
+        |        for _,w in ipairs(whitelist) do fn_info.whiteset[w] = true end
+        |    end
+        |end
+
+rule "forbid %blacklist to use %fn":
+    lua block ".."
+        |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
+        |local blacklist = (type(vars.blacklist) == 'string') and {vars.blacklist} or vars.blacklist
+        |for _,fn in ipairs(fns) do
+        |    local fn_info = compiler.defs[fn]
+        |    if fn_info == nil then
+        |        print("Undefined function: "..tostring(fn))
+        |    elseif fn_info.whiteset == nil then
+        |        print("Cannot remove items from a whitelist when there is no whitelist on function: "..tostring(fn))
+        |    elseif not compiler:check_permission(fn) then
+        |        print("You do not have permission to restrict function: "..tostring(fn))
+        |    else
+        |        for _,b in ipairs(blacklist) do fn_info.whiteset[b] = nil end
+        |    end
+        |end

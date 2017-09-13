@@ -2,7 +2,6 @@
 re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
-moon = require 'moon'
 
 -- TODO:
 -- string interpolation
@@ -84,10 +83,12 @@ make_parser = (lingo, extra_definitions)->
     })
     return re.compile lingo, defs
 
-class Game
+class Compiler
     new:(parent)=>
         @defs = setmetatable({}, {__index:parent and parent.defs})
+        @callstack = {}
         @debug = false
+        @initialize_core!
 
     call: (fn_name,...)=>
         fn_info = @defs[fn_name]
@@ -95,13 +96,30 @@ class Game
             error "Attempt to call undefined function: #{fn_name}"
         if fn_info.is_macro
             error "Attempt to call macro at runtime: #{fn_name}"
+        unless @check_permission(fn_name)
+            error "You do not have the authority to call: #{fn_name}"
+        table.insert @callstack, fn_name
         {:fn, :arg_names} = fn_info
         args = {name, select(i,...) for i,name in ipairs(arg_names)}
         if @debug
             print "Calling #{fn_name} with args: #{utils.repr(args)}"
-        return fn(self, args)
+        ret = fn(self, args)
+        table.remove @callstack
+        return ret
+
+    check_permission: (fn_name)=>
+        fn_info = @defs[fn_name]
+        if fn_info == nil
+            error "Undefined function: #{fn_name}"
+        if fn_info.whiteset == nil then return true
+        for caller in *@callstack
+            if fn_info.whiteset[caller]
+                return true
+        return false
 
     def: (spec, fn)=>
+        if @debug
+            print "Defining rule: #{spec}"
         invocations,arg_names = @get_invocations spec
         fn_info = {:fn, :arg_names, :invocations, is_macro:false}
         for invocation in *invocations
@@ -133,6 +151,7 @@ class Game
         code = @compile(text)
         if @debug
             print "\nGENERATED LUA CODE:\n#{code}"
+        [==[
         lua_thunk, err = loadstring(code)
         if not lua_thunk
             error("Failed to compile generated code:\n#{code}\n\n#{err}")
@@ -140,14 +159,9 @@ class Game
         if @debug
             print("Running...")
         return action(self, {})
+        ]==]
+        code
     
-    run_debug:(text)=>
-        old_debug = @debug
-        @debug = true
-        ret = @run(text)
-        @debug = old_debug
-        return ret
-
     parse: (str)=>
         if @debug
             print("PARSING:\n#{str}")
@@ -210,8 +224,8 @@ class Game
         return tree
 
     tree_to_value: (tree)=>
-        code = "return (function(game, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
-        lua_thunk, err = loadstring(code)
+        code = "return (function(compiler, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
+        lua_thunk, err = load(code)
         if not lua_thunk
             error("Failed to compile generated code:\n#{code}\n\n#{err}")
         return (lua_thunk!)(self, {})
@@ -229,22 +243,30 @@ class Game
 
         switch tree.type
             when "File"
-                add [[return (function(game, vars)
+                add [[return (function(compiler, vars)
                         local ret]]
-                add to_lua(tree.value.body)
+                vars = {}
+                for statement in *tree.value.body.value
+                    code = to_lua(statement)
+                    -- Run the fuckers as we go
+                    lua_thunk, err = loadstring("return (function(compiler, vars)\n#{code}\nend)")
+                    if not lua_thunk
+                        error("Failed to compile generated code:\n#{code}\n\n#{err}")
+                    lua_thunk!(self, vars)
+                    add code
                 add [[
                         return ret
                     end)
                 ]]
 
             when "Block"
-                for chunk in *tree.value
-                    add to_lua(chunk)
+                for statement in *tree.value
+                    add to_lua(statement)
         
             when "Thunk"
                 assert tree.value.type == "Block", "Non-block value in Thunk"
                 add [[
-                    (function(game, vars)
+                    (function(compiler, vars)
                         local ret]]
                 add to_lua(tree.value)
                 add [[
@@ -273,7 +295,7 @@ class Game
                 else
                     args = [to_lua(a) for a in *tree.value when a.type != "Word"]
                     table.insert args, 1, utils.repr(name, true)
-                    add @@comma_separated_items("game:call(", args, ")")
+                    add @@comma_separated_items("compiler:call(", args, ")")
 
             when "String"
                 escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
@@ -333,10 +355,14 @@ class Game
         name = @fn_name_from_tree(tree)
         unless @defs[name] and @defs[name].is_macro
             error("Macro not found: #{name}")
+        unless @check_permission(name)
+            error "You do not have the authority to call: #{name}"
         {:fn, :arg_names} = @defs[name]
         args = [a for a in *tree.value when a.type != "Word"]
         args = {name,args[i] for i,name in ipairs(arg_names)}
+        table.insert @callstack, name
         ret, manual_mode = fn(self, args, kind)
+        table.remove @callstack
         if not ret
             error("No return value for macro: #{name}")
         if kind == "Statement" and not manual_mode
@@ -413,10 +439,15 @@ class Game
             table.insert(result, line)
         return table.concat result, "\n"
 
-    compile: (src)=>
+    compile: (src, output_file=nil)=>
+        if @debug
+            print "COMPILING:\n#{src}"
         tree = @parse(src)
         assert tree, "Tree failed to compile: #{src}"
         code = @tree_to_lua(tree)
+        if output_file
+            output = io.open(output_file, "w")
+            output\write(code)
         return code
 
     test: (src, expected)=>
@@ -437,4 +468,98 @@ class Game
                 error"TEST FAILED!\nSource:\n#{test_src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
 
 
-return Game
+    initialize_core: =>
+        -- Sets up some core functionality
+        as_lua_code = (str)=>
+            switch str.type
+                when "String"
+                    escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
+                    unescaped = str.value\gsub("\\(.)", ((c)-> escapes[c] or c))
+                    return unescaped
+
+                when "Longstring"
+                    -- TODO: handle comments?
+                    result = [line for line in str.value\gmatch("[ \t]*|([^\n]*)")]
+                    return table.concat(result, "\n")
+                else
+                    return @tree_to_lua(str)
+
+        @defmacro [[lua block %lua_code]], (vars, kind)=>
+            if kind == "Expression" then error("Expected to be in statement.")
+            lua_code = vars.lua_code.value
+            switch lua_code.type
+                when "List"
+                    -- TODO: handle subexpressions
+                    return table.concat([as_lua_code(@, i.value) for i in *lua_code.value]), true
+                else
+                    return as_lua_code(@, lua_code), true
+
+        @defmacro [[lua expr %lua_code]], (vars, kind)=>
+            lua_code = vars.lua_code.value
+            switch lua_code.type
+                when "List"
+                    -- TODO: handle subexpressions
+                    return table.concat([as_lua_code(@, i.value) for i in *lua_code.value])
+                else
+                    return as_lua_code(@, lua_code)
+
+        @def "rule %spec %body", (vars)=>
+            @def vars.spec, vars.body
+
+        @defmacro [[macro %spec %body]], (vars, kind)=>
+            if kind == "Expression"
+                error("Macro definitions cannot be used as expressions.")
+            @defmacro @tree_to_value(vars.spec), @tree_to_value(vars.body)
+            return "", true
+
+        @defmacro [[macro block %spec %body]], (vars, kind)=>
+            if kind == "Expression"
+                error("Macro definitions cannot be used as expressions.")
+            invocation = @tree_to_value(vars.spec)
+            fn = @tree_to_value(vars.body)
+            @defmacro invocation, ((vars,kind)=>
+                if kind == "Expression"
+                    error("Macro: #{invocation} was defined to be a block, not an expression.")
+                return fn(@,vars,kind), true)
+            return "", true
+
+        @def "run file %filename", (vars)=>
+            file = io.open(vars.filename)
+            return @run(file\read('*a'))
+
+
+-- Run on the command line via "./nomic.moon input_file.nom" to execute
+-- and "./nomic.moon input_file.nom output_file.lua" to compile (use "-" to compile to stdout)
+if arg[1]
+    c = Compiler()
+    input = io.open(arg[1])\read("*a")
+    -- Kinda hacky, if run via "./nomic.moon file.nom -", then silence print and io.write
+    -- during execution and re-enable them to print out the generated source code
+    _print = print
+    _io_write = io.write
+    if arg[2] == "-"
+        export print
+        nop = ->
+        print, io.write = nop, nop
+    code = c\run(input)
+    if arg[2]
+        output = if arg[2] == "-"
+            export print
+            print, io.write = _print, _io_write
+            io.output()
+        else io.open(arg[2], 'w')
+
+        output\write [[
+    local load = function()
+    ]]
+        output\write(code)
+        output\write [[
+
+    end
+    local utils = require('utils')
+    local Compiler = require('nomic')
+    local c = Compiler(require('core'))
+    load()(c, {})
+    ]]
+
+return Compiler
