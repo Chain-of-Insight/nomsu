@@ -17,3 +17,5 @@ Example code can be found in the examples folder.
 core.nom contains some *extremely* helpful and basic core functionality for the language,
 written in the language itself, so I recommend adding `run file "core.nom"` to the top of
 your files.
+
+There is a vim plugin for the language available in the [Vim Nomsu repository](https://bitbucket.org/squidarms/vim-nomsu/src).
