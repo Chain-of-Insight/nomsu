@@ -1,9 +1,10 @@
 This is a programming language designed to be used for playing games of Nomic, or engaging
 in other similar activities revolving around natural language rule-making and self modification.
 
-The language compiler was written in [moonscript](http://moonscript.org/), using the
-[lpeg library](http://www.inf.puc-rio.br/~roberto/lpeg/) for parsing. All of the moon files
-have been compiled into lua for convenience.
+The language compiler was written in [Moonscript](http://moonscript.org/), using the
+[LPEG library](http://www.inf.puc-rio.br/~roberto/lpeg/) for parsing. LPEG is a dependency,
+so you need to install it in order to run the compiler. All of the moon files have been
+compiled into lua for convenience, so Moonscript is not a dependency.
 
 In order to run a .nom file, run `lua nomic.lua your_file.nom`. Code can also be compiled
 into lua code directly, which still requires nomic.lua as a dependency, but bypasses the
