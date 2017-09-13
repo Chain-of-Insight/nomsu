@@ -9,6 +9,8 @@ utils = require 'utils'
 -- dicts?
 -- better scoping?
 -- first-class functions
+-- better error reporting
+-- type checking?
 
 INDENT = "    "
 lpeg.setmaxstack 10000 -- whoa
