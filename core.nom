@@ -115,7 +115,7 @@ rule "%a == %b":
 macro "%a != %b": concat ["not (",%a as lua expr," == ",%b as lua expr,")"]
 
 rule "say %str":
-    lua block ["print(", %str, ")"]
+    lua block ["print(utils.repr(", %str, "))"]
 
 rule "printf %str":
     lua block ".."
@@ -274,3 +274,17 @@ rule "error!":
 
 rule "error %msg":
     lua block "compiler:error(vars.msg)"
+
+macro block "test %code yields %expected":
+    let "generated" = (lua expr "utils.repr(compiler:stringify_tree(vars.code.value.value), true)")
+    let "expected" = (%expected as lua expr)
+    if (%generated != %expected):
+        say "Test failed!"
+        say "Expected:"
+        say %expected
+        say "But got:"
+        say %generated
+        error!
+    return ""
+
+

@@ -1,0 +1,197 @@
+run file "core.nom"
+
+test: say "foo" ..yields ".."
+    |Call [say %]:
+    |    "foo"
+
+test: say (4) ..yields ".."
+    |Call [say %]:
+    |    4
+
+test:
+    rule "fart": say "poot"
+..yields ".."
+    |Call [rule % %]:
+    |    "fart"
+    |    Thunk:
+    |        Call [say %]:
+    |            "poot"
+
+test:
+    rule "doublefart":
+        say "poot"
+        say "poot"
+..yields ".."
+    |Call [rule % %]:
+    |    "doublefart"
+    |    Thunk:
+    |        Call [say %]:
+    |            "poot"
+    |        Call [say %]:
+    |            "poot"
+
+test: say (subexpressions work) ..yields ".."
+    |Call [say %]:
+    |    Call [subexpressions work]!
+
+test: say ["lists", "work"] ..yields ".."
+    |Call [say %]:
+    |    List:
+    |        "lists"
+    |        "work"
+
+test: say [] ..yields ".."
+    |Call [say %]:
+    |    <Empty List>
+
+test:
+    say [..]
+        1, 2
+        3
+..yields ".."
+    |Call [say %]:
+    |    List:
+    |        1
+    |        2
+    |        3
+
+test:
+    say both [..]
+        1,2
+    ..and [..]
+        3,4
+..yields ".."
+    |Call [say both % and %]:
+    |    List:
+    |        1
+    |        2
+    |    List:
+    |        3
+    |        4
+
+test:
+    say both..
+        "hello"
+        and "world"
+..yields ".."
+    |Call [say both % and %]:
+    |    "hello"
+    |    "world"
+
+test:
+    say both ..
+        "a list:"
+        and [..]
+            1,2,(three),(4)
+..yields ".."
+    |Call [say both % and %]:
+    |    "a list:"
+    |    List:
+    |        1
+    |        2
+    |        Call [three]!
+    |        4
+
+test:
+    if 1: yes
+    ..else: no
+..yields ".."
+    |Call [if % % else %]:
+    |    1
+    |    Thunk:
+    |        Call [yes]!
+    |    Thunk:
+    |        Call [no]!
+
+test:
+    if 1: yes ..else: no
+..yields ".."
+    |Call [if % % else %]:
+    |    1
+    |    Thunk:
+    |        Call [yes]!
+    |    Thunk:
+    |        Call [no]!
+
+test: say (do: return 5)
+..yields ".."
+    |Call [say %]:
+    |    Call [do %]:
+    |        Thunk:
+    |            Call [return %]:
+    |                5
+
+test:
+    say (..)
+      fn call
+..yields ".."
+    |Call [say %]:
+    |    Call [fn call]!
+
+test:
+    do: say "one liner"
+    ..also: say "another one liner"
+..yields ".."
+    |Call [do % also %]:
+    |    Thunk:
+    |        Call [say %]:
+    |            "one liner"
+    |    Thunk:
+    |        Call [say %]:
+    |            "another one liner"
+
+test:
+    say (..)
+        do:
+            say "hi"
+            return 5
+            say "bye"
+..yields ".."
+    |Call [say %]:
+    |    Call [do %]:
+    |        Thunk:
+    |            Call [say %]:
+    |                "hi"
+    |            Call [return %]:
+    |                5
+    |            Call [say %]:
+    |                "bye"
+
+
+test: say (1 + (-(2 * 3)))
+..yields ".."
+    |Call [say %]:
+    |    Call [% + %]:
+    |        1
+    |        Call [- %]:
+    |            Call [% * %]:
+    |                2
+    |                3
+
+test:
+    if %x:
+        x
+    ..else: if %y:
+        y
+    ..else:
+        z
+..yields ".."
+    |Call [if % % else %]:
+    |    Var[x]
+    |    Thunk:
+    |        Call [x]!
+    |    Thunk:
+    |        Call [if % % else %]:
+    |            Var[y]
+    |            Thunk:
+    |                Call [y]!
+    |            Thunk:
+    |                Call [z]!
+
+
+test:
+    don't fuck this up
+..yields ".."
+    |Call [don't fuck this up]!
+
+say "All tests passed!"
