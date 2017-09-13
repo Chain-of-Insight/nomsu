@@ -14,7 +14,7 @@ lua block ".."
     |    end)
     |    compiler:def("* %relation = %value", function(_,vars)
     |        local result = {}
-    |        for k,v in pairs(relations) do
+    |        for k,v in pairs(relations[vars.relation]) do
     |            if utils.equivalent(v, vars.value) then
     |                table.insert(result, k)
     |            end
@@ -78,9 +78,12 @@ with everyone's approval:
 
     rule ["approve", "vote yes", "vote yea"]:
         let "pending" = ("pending proposal" "is" ?)
+        if (%pending == (nil)):
+            say "Nothing is currently pending!"
+            return
         mark (you) as approving %pending
-        say "Voted yes."
         if (everyone approves %pending):
+            say "The motion passes!"
             with everyone's approval %pending
             unpropose
         ..else:
@@ -90,8 +93,10 @@ with everyone's approval:
 
     rule ["reject", "vote no", "vote nay", "veto", "disapprove"]:
         let "pending" = ("pending proposal" "is" ?)
+        if (%pending == (nil)):
+            say "Nothing is currently pending!"
+            return
         mark (you) as rejecting %pending
-        say "Voted no."
         unpropose
 
     rule ["players", "everyone", "everybody", "all players"]:
@@ -184,5 +189,6 @@ propose:
 approve
 as bill: approve
 as dave: approve
-
+take a shit
+say "Done."
 

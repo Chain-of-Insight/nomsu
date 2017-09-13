@@ -61,6 +61,9 @@ rule "concat %strs with glue %glue":
 macro block "return %return-value":
     concat ["do return ",%return-value as lua expr," end"]
 
+macro block "return":
+    "do return nil end"
+
 macro block "let %varname = %value":
     concat ["vars[",%varname as lua expr,"] = ",%value as lua expr]
 
