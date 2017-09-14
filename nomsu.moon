@@ -4,7 +4,6 @@ lpeg = require 'lpeg'
 utils = require 'utils'
 
 -- TODO:
--- string interpolation
 -- improve indentation of generated lua code
 -- provide way to run precompiled nomsu -> lua code
 -- comprehensions?
@@ -44,7 +43,7 @@ make_parser = (lingo, extra_definitions)->
         if num_spaces != indent_stack[#indent_stack] then return nil
         return end_pos
 
-    wordchar = P(1)-S(' \t\n\r%#:;,.{}[]()"')
+    wordchar = P(1)-S(' \t\n\r%#:;,.{}[]()"\\')
     nl = P("\n")
     whitespace = S(" \t")^1
     blank_line = whitespace^-1 * nl
@@ -199,7 +198,17 @@ class NomsuCompiler
             expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
 
             string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
-            longstring <- ({ '".."' %ws? %line_comment? %indent {(%new_line "|" [^%nl]*)+} ((%dedent (%new_line '..')?) / errors) }) -> Longstring
+            longstring <- ({ '".."' %ws?
+                {|
+                    (("|" {| ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)* |})
+                     / %line_comment)?
+                    (%indent
+                        (%new_line "|" {|
+                            ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)*
+                        |})+
+                    ((%dedent (%new_line '..')?) / errors))?
+                |}}) -> Longstring
+            string_interpolation <- "\" %ws? (functioncall / expression) %ws? "\"
             number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
             variable <- ({ ("%" {%wordchar+}) }) -> Var
 
@@ -225,12 +234,15 @@ class NomsuCompiler
         assert tree, "Failed to parse: #{str}"
         return tree
 
-    tree_to_value: (tree)=>
-        code = "return (function(compiler, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
+    tree_to_value: (tree, vars)=>
+        -- TODO: clean up require utils
+        code = "
+        local utils = require('utils')
+        return (function(compiler, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
         lua_thunk, err = load(code)
         if not lua_thunk
             error("Failed to compile generated code:\n#{code}\n\n#{err}")
-        return (lua_thunk!)(self, {})
+        return (lua_thunk!)(self, vars or {})
 
     tree_to_lua: (tree, kind="Expression")=>
         assert tree, "No tree provided."
@@ -251,9 +263,12 @@ class NomsuCompiler
                 for statement in *tree.value.body.value
                     code = to_lua(statement)
                     -- Run the fuckers as we go
-                    lua_thunk, err = load("return (function(compiler, vars)\n#{code}\nend)")
+                    -- TODO: clean up repeated loading of utils?
+                    lua_thunk, err = load("
+                    local utils = require('utils')
+                    return (function(compiler, vars)\n#{code}\nend)")
                     if not lua_thunk
-                        error("Failed to compile generated code:\n#{code}\n\n#{err}")
+                        error("Failed to compile generated code:\n#{code}\n\n#{err}\n\nProduced by statement:\n#{utils.repr(statement)}")
                     ok,err = pcall(lua_thunk)
                     if not ok then error(err)
                     ok,err = pcall(err, self, vars)
@@ -308,9 +323,28 @@ class NomsuCompiler
                 add utils.repr(unescaped, true)
 
             when "Longstring"
-                -- TODO: handle comments here?
-                result = [line for line in tree.value\gmatch("[ \t]*|([^\n]*)")]
-                add utils.repr(table.concat(result, "\n"), true)
+                concat_parts = {}
+                string_buffer = ""
+                for i,line in ipairs(tree.value)
+                    if i > 1 then string_buffer ..= "\n"
+                    for bit in *line
+                        if type(bit) == "string"
+                            string_buffer ..= bit\gsub("\\\\","\\")
+                        else
+                            if string_buffer ~= ""
+                                table.insert concat_parts, utils.repr(string_buffer, true)
+                                string_buffer = ""
+                            table.insert concat_parts, "utils.repr(#{to_lua(bit)})"
+
+                if string_buffer ~= ""
+                    table.insert concat_parts, utils.repr(string_buffer, true)
+
+                if #concat_parts == 0
+                    add "''"
+                elseif #concat_parts == 1
+                    add concat_parts[1]
+                else
+                    add "(#{table.concat(concat_parts, "..")})"
 
             when "Number"
                 add tree.value
@@ -482,17 +516,12 @@ class NomsuCompiler
 
     initialize_core: =>
         -- Sets up some core functionality
-        as_lua_code = (str)=>
+        as_lua_code = (str, vars)=>
             switch str.type
                 when "String"
-                    escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-                    unescaped = str.value\gsub("\\(.)", ((c)-> escapes[c] or c))
-                    return unescaped
-
+                    return @tree_to_value(str, vars)
                 when "Longstring"
-                    -- TODO: handle comments?
-                    result = [line for line in str.value\gmatch("[ \t]*|([^\n]*)")]
-                    return table.concat(result, "\n")
+                    return @tree_to_value(str, vars)
                 else
                     return @tree_to_lua(str)
 
@@ -502,18 +531,18 @@ class NomsuCompiler
             switch lua_code.type
                 when "List"
                     -- TODO: handle subexpressions
-                    return table.concat([as_lua_code(@, i.value) for i in *lua_code.value]), true
+                    return table.concat([as_lua_code(@, i.value, vars) for i in *lua_code.value]), true
                 else
-                    return as_lua_code(@, lua_code), true
+                    return as_lua_code(@, lua_code, vars), true
 
         @defmacro [[lua expr %lua_code]], (vars, kind)=>
             lua_code = vars.lua_code.value
             switch lua_code.type
                 when "List"
                     -- TODO: handle subexpressions
-                    return table.concat([as_lua_code(@, i.value) for i in *lua_code.value])
+                    return table.concat([as_lua_code(@, i.value, vars) for i in *lua_code.value])
                 else
-                    return as_lua_code(@, lua_code)
+                    return as_lua_code(@, lua_code, vars)
 
         @def "rule %spec %body", (vars)=>
             @def vars.spec, vars.body
@@ -521,14 +550,14 @@ class NomsuCompiler
         @defmacro [[macro %spec %body]], (vars, kind)=>
             if kind == "Expression"
                 error("Macro definitions cannot be used as expressions.")
-            @defmacro @tree_to_value(vars.spec), @tree_to_value(vars.body)
+            @defmacro @tree_to_value(vars.spec, vars), @tree_to_value(vars.body, vars)
             return "", true
 
         @defmacro [[macro block %spec %body]], (vars, kind)=>
             if kind == "Expression"
                 error("Macro definitions cannot be used as expressions.")
-            invocation = @tree_to_value(vars.spec)
-            fn = @tree_to_value(vars.body)
+            invocation = @tree_to_value(vars.spec, vars)
+            fn = @tree_to_value(vars.body, vars)
             @defmacro invocation, ((vars,kind)=>
                 if kind == "Expression"
                     error("Macro: #{invocation} was defined to be a block, not an expression.")
@@ -544,6 +573,7 @@ class NomsuCompiler
 -- and "./nomsu.moon input_file.nom output_file.lua" to compile (use "-" to compile to stdout)
 if arg and arg[1]
     c = NomsuCompiler()
+    --c.debug = true
     input = io.open(arg[1])\read("*a")
     -- Kinda hacky, if run via "./nomsu.moon file.nom -", then silence print and io.write
     -- during execution and re-enable them to print out the generated source code
@@ -562,6 +592,7 @@ if arg and arg[1]
         else io.open(arg[2], 'w')
 
         output\write [[
+    local utils = require('utils')
     local load = function()
     ]]
         output\write(code)

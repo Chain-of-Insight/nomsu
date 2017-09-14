@@ -104,12 +104,11 @@ if %x:
     say "three"
 
 
-printf [..]
-    ".."
-        |this is a longstring
-        |
-    .., "with", ".."
-        | multiple lines
+say ".."
+    |this is a longstring
+    |
+    |   with multiple lines
+    |   and an interpolated expression: \2 + 5\
 
 rule "%n bottles":
     lua block [..]

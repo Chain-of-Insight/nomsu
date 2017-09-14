@@ -89,7 +89,8 @@ with everyone's approval:
         ..else:
             let "approvers" = (number of (* %pending = "approved"))
             let "num-players" = (number of (players))
-            printf [%approvers, "/", %num-players, " players have approved"]
+            say ".."
+                |\number of (* %pending = "approved")\/\number of (players)\ players have approved.
 
     rule ["reject", "vote no", "vote nay", "veto", "disapprove"]:
         let "pending" = ("pending proposal" "is" ?)
@@ -104,7 +105,8 @@ with everyone's approval:
 
     rule "join":
         (you) "is a player" = (yes)
-        printf ["Welcome to the game, ", you,"!"]
+        say ".."
+            |Welcome to the game, \you\!
 
     allow "unpropose" to use "set all * % = %"
     allow ["join", "mark % as approving %", "mark % as rejecting %", "propose %", "unpropose"] to use "% % = %"
@@ -149,9 +151,11 @@ propose:
     rule "vote for %candidate":
         (you) "votes for" = %candidate
         let "vote-percent" = ((number of (* "votes for" = %candidate)) / (number of (players)))
-        printf ["Vote cast. ",%candidate," now has ",(100 * %vote-percent),"% of the votes."]
+        say ".."
+            |Vote cast. \%candidate\ now has \100 * %vote-percent\% of the votes.
         if (%vote-percent > 0.5):
-            printf ["The winner of the election is:", %candidate]
+            say ".."
+                |The winner of the election is: \%candidate\
             close the election
 
     allow ["open election %", "close the election", "vote for %"] to use ["% % = %"]
@@ -163,7 +167,8 @@ propose:
         if ((you) == "Anonymous"):
             make "bill" do %action
         ..else:
-            printf ["Who do you think you are, ", you,"?"]
+            say ".."
+                |Who do you think you are, \you\?
     allow ["as bill %"] to use ["make % %"]
 approve
 as bill: join
@@ -173,7 +178,8 @@ propose:
         if ((you) == "Anonymous"):
             make "dave" do %action
         ..else:
-            printf ["Who do you think you are, ", you,"?"]
+            say ".."
+                |Who do you think you are, \you\?
     allow ["as dave %"] to use ["make % %"]
 approve
 as bill: approve

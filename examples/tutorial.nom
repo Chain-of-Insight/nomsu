@@ -13,8 +13,7 @@ run file "core.nom"
 
 # Strings:
 "asdf"
-".."
-    |This is a multi-line string with a #.. fake comment
+".."|This is a multi-line string with a #.. fake comment
     |that starts with ".." and includes each indented line that starts with a "|"
     |until the indentation ends
 
@@ -101,14 +100,22 @@ say both ".."
     "-- Abraham Lincoln"
 
 rule "my favorite number": return 23
+
 # Subexpressions are wrapped in parentheses:
-# printf takes a list of bits that are converted to strings and concatenated together, and printed
-printf ["My favorite number is ", my favorite number]
+say (my favorite number)
 # There's a multi-line indented block form for subexpressions too:
-printf [..]
-    "My favorite number is still ", (..)
+say (..)
+    my favorite
+    number
+
+# Block strings can interpolate values by enclosing an expression in a pair of \s
+say ".."|My favorite number is \my favorite number\!
+
+say ".."
+    |My favorite number is still \(..)
         my favorite
         number
+    ..\, but this time it uses an indented subexpression!
 
 #.. There's a few macros in the language for things like conditional branches and logic/math
     operations, but they can be thought of as basically the same as functions.
@@ -146,17 +153,15 @@ if (1 > 10):
 let "numbers" = [5,6,7]
 
 # Looping: 
-printf ["Looping over: ",%numbers,"!"]
+say ".."|Looping over \%numbers\:
 for "number" in %numbers:
     say (%number + 100)
 
 rule "sing %starting-bottles bottles of beer":
     for "n" in (%starting-bottles down through 0):
-        printf [..]
-            (%n if (%n > 0) else "No more")
-            (" bottle" if (%n == 1) else " bottles")
-            " of beer on the wall."
-            ("" if (%n == 0) else " Take one down, pass it around...")
+        say ".."
+            |\%n if (%n > 0) else "No more"\ \"bottle" if (%n == 1) else "bottles"\ of beer on the wall.
+            |\"" if (%n == 0) else "    Take one down, pass it around..."\
 
 sing 9 bottles of beer
 
@@ -182,25 +187,23 @@ any of [0,0,0,0,1,0,0]
 rule "say the time":
     lua block ".."
         |io.write("The OS time is: ")
-        |io.write(tostring(os.time()).."\n")
+        |io.write(tostring(os.time()).."\\n")
 say the time
-printf ["Math expression result is: ", lua expr "(1 + 2*3 + 3*4)^2"]
+say ".."|Math expression result is: \lua expr "(1 + 2*3 + 3*4)^2"\
 
 #.. In the lua environment, "vars" can be used to get local variables/function args, and
     "compiler" can be used to access the compiler, function defs, and other things
 rule "square root of %n":
     return (lua expr "math.sqrt(vars.n)")
-printf ["the square root of 2 is ", square root of 2]
+say ".."|The square root of 2 is \square root of 2\
 
 # Macros can be defined as functions that take unprocessed syntax trees and return lua code 
 # "macro block %" is for defining macros that produce blocks of code, not values 
 macro block "unless %condition %body":
-    concat [..]
-        # "% as lua expr" and "% as lua block" are two useful helper functions here. 
-        "if not (", %condition as lua expr, ") then"
-        # Extract the inner part of the code block's body and insert it: 
-        "\n    ", (lua expr "vars.body.value.value") as lua block
-        "\nend"
+    ".."
+        |if not (\%condition as lua expr\) then
+        |    \(lua expr "vars.body.value.value") as lua block\
+        |end
 
 unless (1 > 10):
     say "Macros work!"
@@ -208,6 +211,6 @@ unless (1 > 10):
 
 # and "macro %" is for defining macros that produce an expression 
 macro "%value as a boolean":
-    concat ["(not not (", %value as lua expr, "))"]
+    ".."|(not not (\%value as lua expr\))
 macro "yep": "true"
 

@@ -115,13 +115,6 @@ rule "%a != %b":
 rule "say %str":
     lua block ["print(utils.repr(", %str, "))"]
 
-rule "printf %str":
-    lua block ".."
-        |for _,s in ipairs(vars.str) do
-        |    io.write(utils.repr(s))
-        |end
-        |io.write("\n")
-
 rule "do %action":
     lua expr "vars.action(compiler, setmetatable({}, {__index=vars}))"
 
@@ -160,6 +153,7 @@ macro block "for %varname in %iterable %body":
         "\n    end"
         "\n    vars[", %varname, "] = old_loopval"
         "\nend"
+
 
 rule "%start up to %stop":
     lua expr "utils.range(vars.start,vars.stop-1)"

@@ -59,7 +59,7 @@ make_parser = function(lingo, extra_definitions)
     end
     return end_pos
   end
-  local wordchar = P(1) - S(' \t\n\r%#:;,.{}[]()"')
+  local wordchar = P(1) - S(' \t\n\r%#:;,.{}[]()"\\')
   local nl = P("\n")
   local whitespace = S(" \t") ^ 1
   local blank_line = whitespace ^ -1 * nl
@@ -288,7 +288,17 @@ do
             expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
 
             string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
-            longstring <- ({ '".."' %ws? %line_comment? %indent {(%new_line "|" [^%nl]*)+} ((%dedent (%new_line '..')?) / errors) }) -> Longstring
+            longstring <- ({ '".."' %ws?
+                {|
+                    (("|" {| ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)* |})
+                     / %line_comment)?
+                    (%indent
+                        (%new_line "|" {|
+                            ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)*
+                        |})+
+                    ((%dedent (%new_line '..')?) / errors))?
+                |}}) -> Longstring
+            string_interpolation <- "\" %ws? (functioncall / expression) %ws? "\"
             number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
             variable <- ({ ("%" {%wordchar+}) }) -> Var
 
@@ -314,13 +324,13 @@ do
       assert(tree, "Failed to parse: " .. tostring(str))
       return tree
     end,
-    tree_to_value = function(self, tree)
-      local code = "return (function(compiler, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
+    tree_to_value = function(self, tree, vars)
+      local code = "\n        local utils = require('utils')\n        return (function(compiler, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
       local lua_thunk, err = load(code)
       if not lua_thunk then
         error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err))
       end
-      return (lua_thunk())(self, { })
+      return (lua_thunk())(self, vars or { })
     end,
     tree_to_lua = function(self, tree, kind)
       if kind == nil then
@@ -347,9 +357,9 @@ do
         for _index_0 = 1, #_list_0 do
           local statement = _list_0[_index_0]
           local code = to_lua(statement)
-          local lua_thunk, err = load("return (function(compiler, vars)\n" .. tostring(code) .. "\nend)")
+          local lua_thunk, err = load("\n                    local utils = require('utils')\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)")
           if not lua_thunk then
-            error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err))
+            error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(utils.repr(statement)))
           end
           local ok
           ok, err = pcall(lua_thunk)
@@ -429,17 +439,35 @@ do
         end))
         add(utils.repr(unescaped, true))
       elseif "Longstring" == _exp_0 then
-        local result
-        do
-          local _accum_0 = { }
-          local _len_0 = 1
-          for line in tree.value:gmatch("[ \t]*|([^\n]*)") do
-            _accum_0[_len_0] = line
-            _len_0 = _len_0 + 1
+        local concat_parts = { }
+        local string_buffer = ""
+        for i, line in ipairs(tree.value) do
+          if i > 1 then
+            string_buffer = string_buffer .. "\n"
           end
-          result = _accum_0
+          for _index_0 = 1, #line do
+            local bit = line[_index_0]
+            if type(bit) == "string" then
+              string_buffer = string_buffer .. bit:gsub("\\\\", "\\")
+            else
+              if string_buffer ~= "" then
+                table.insert(concat_parts, utils.repr(string_buffer, true))
+                string_buffer = ""
+              end
+              table.insert(concat_parts, "utils.repr(" .. tostring(to_lua(bit)) .. ")")
+            end
+          end
         end
-        add(utils.repr(table.concat(result, "\n"), true))
+        if string_buffer ~= "" then
+          table.insert(concat_parts, utils.repr(string_buffer, true))
+        end
+        if #concat_parts == 0 then
+          add("''")
+        elseif #concat_parts == 1 then
+          add(concat_parts[1])
+        else
+          add("(" .. tostring(table.concat(concat_parts, "..")) .. ")")
+        end
       elseif "Number" == _exp_0 then
         add(tree.value)
       elseif "List" == _exp_0 then
@@ -670,34 +698,12 @@ do
     end,
     initialize_core = function(self)
       local as_lua_code
-      as_lua_code = function(self, str)
+      as_lua_code = function(self, str, vars)
         local _exp_0 = str.type
         if "String" == _exp_0 then
-          local escapes = {
-            n = "\n",
-            t = "\t",
-            b = "\b",
-            a = "\a",
-            v = "\v",
-            f = "\f",
-            r = "\r"
-          }
-          local unescaped = str.value:gsub("\\(.)", (function(c)
-            return escapes[c] or c
-          end))
-          return unescaped
+          return self:tree_to_value(str, vars)
         elseif "Longstring" == _exp_0 then
-          local result
-          do
-            local _accum_0 = { }
-            local _len_0 = 1
-            for line in str.value:gmatch("[ \t]*|([^\n]*)") do
-              _accum_0[_len_0] = line
-              _len_0 = _len_0 + 1
-            end
-            result = _accum_0
-          end
-          return table.concat(result, "\n")
+          return self:tree_to_value(str, vars)
         else
           return self:tree_to_lua(str)
         end
@@ -715,13 +721,13 @@ do
             local _list_0 = lua_code.value
             for _index_0 = 1, #_list_0 do
               local i = _list_0[_index_0]
-              _accum_0[_len_0] = as_lua_code(self, i.value)
+              _accum_0[_len_0] = as_lua_code(self, i.value, vars)
               _len_0 = _len_0 + 1
             end
             return _accum_0
           end)()), true
         else
-          return as_lua_code(self, lua_code), true
+          return as_lua_code(self, lua_code, vars), true
         end
       end)
       self:defmacro([[lua expr %lua_code]], function(self, vars, kind)
@@ -734,13 +740,13 @@ do
             local _list_0 = lua_code.value
             for _index_0 = 1, #_list_0 do
               local i = _list_0[_index_0]
-              _accum_0[_len_0] = as_lua_code(self, i.value)
+              _accum_0[_len_0] = as_lua_code(self, i.value, vars)
               _len_0 = _len_0 + 1
             end
             return _accum_0
           end)())
         else
-          return as_lua_code(self, lua_code)
+          return as_lua_code(self, lua_code, vars)
         end
       end)
       self:def("rule %spec %body", function(self, vars)
@@ -750,15 +756,15 @@ do
         if kind == "Expression" then
           error("Macro definitions cannot be used as expressions.")
         end
-        self:defmacro(self:tree_to_value(vars.spec), self:tree_to_value(vars.body))
+        self:defmacro(self:tree_to_value(vars.spec, vars), self:tree_to_value(vars.body, vars))
         return "", true
       end)
       self:defmacro([[macro block %spec %body]], function(self, vars, kind)
         if kind == "Expression" then
           error("Macro definitions cannot be used as expressions.")
         end
-        local invocation = self:tree_to_value(vars.spec)
-        local fn = self:tree_to_value(vars.body)
+        local invocation = self:tree_to_value(vars.spec, vars)
+        local fn = self:tree_to_value(vars.body, vars)
         self:defmacro(invocation, (function(self, vars, kind)
           if kind == "Expression" then
             error("Macro: " .. tostring(invocation) .. " was defined to be a block, not an expression.")
@@ -837,7 +843,8 @@ if arg and arg[1] then
     else
       output = io.open(arg[2], 'w')
     end
-    output:write([[    local load = function()
+    output:write([[    local utils = require('utils')
+    local load = function()
     ]])
     output:write(code)
     output:write([[
