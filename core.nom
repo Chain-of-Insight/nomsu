@@ -204,6 +204,9 @@ rule "dict %items":
         lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
     return %dict
 
+rule ["capitalize %str", "%str capitalized"]:
+    lua expr ".."|vars.str:gsub("%l", string.upper, 1)
+
 rule "restrict %fn to within %whitelist":
     lua block ".."
         |local fns = compiler:get_invocations(vars.fn)

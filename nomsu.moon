@@ -108,7 +108,7 @@ class NomsuCompiler
             @error "You do not have the authority to call: #{fn_name}"
         table.insert @callstack, fn_name
         {:fn, :arg_names} = fn_info
-        args = {name, select(i,...) for i,name in ipairs(arg_names)}
+        args = {name, select(i,...) for i,name in ipairs(arg_names[fn_name])}
         if @debug
             print "Calling #{fn_name} with args: #{utils.repr(args)}"
         ret = fn(self, args)
@@ -136,15 +136,17 @@ class NomsuCompiler
     get_invocations:(text)=>
         if type(text) == 'string' then text = {text}
         invocations = {}
-        local arg_names
+        arg_names = {}
+        prev_arg_names = nil
         for _text in *text
             invocation = _text\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
             _arg_names = [arg for arg in _text\gmatch("%%(%S[^%s']*)")]
             table.insert(invocations, invocation)
-            if arg_names
-                if not utils.equivalent(utils.set(arg_names), utils.set(_arg_names))
+            if prev_arg_names
+                if not utils.equivalent(utils.set(prev_arg_names), utils.set(_arg_names))
                     @error("Conflicting argument names #{utils.repr(arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
-            else arg_names = _arg_names
+            else prev_arg_names = _arg_names
+            arg_names[invocation] = _arg_names
         return invocations, arg_names
 
     defmacro: (spec, lua_gen_fn)=>
@@ -397,7 +399,7 @@ class NomsuCompiler
             @error "You do not have the authority to call: #{name}"
         {:fn, :arg_names} = @defs[name]
         args = [a for a in *tree.value when a.type != "Word"]
-        args = {name,args[i] for i,name in ipairs(arg_names)}
+        args = {name,args[i] for i,name in ipairs(arg_names[name])}
         table.insert @callstack, name
         ret, manual_mode = fn(self, args, kind)
         table.remove @callstack

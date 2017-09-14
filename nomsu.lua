@@ -153,7 +153,7 @@ do
       local args
       do
         local _tbl_0 = { }
-        for i, name in ipairs(arg_names) do
+        for i, name in ipairs(arg_names[fn_name]) do
           _tbl_0[name] = select(i, ...)
         end
         args = _tbl_0
@@ -205,7 +205,8 @@ do
         }
       end
       local invocations = { }
-      local arg_names
+      local arg_names = { }
+      local prev_arg_names = nil
       for _index_0 = 1, #text do
         local _text = text[_index_0]
         local invocation = _text:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
@@ -220,13 +221,14 @@ do
           _arg_names = _accum_0
         end
         table.insert(invocations, invocation)
-        if arg_names then
-          if not utils.equivalent(utils.set(arg_names), utils.set(_arg_names)) then
+        if prev_arg_names then
+          if not utils.equivalent(utils.set(prev_arg_names), utils.set(_arg_names)) then
             self:error("Conflicting argument names " .. tostring(utils.repr(arg_names)) .. " and " .. tostring(utils.repr(_arg_names)) .. " for " .. tostring(utils.repr(text)))
           end
         else
-          arg_names = _arg_names
+          prev_arg_names = _arg_names
         end
+        arg_names[invocation] = _arg_names
       end
       return invocations, arg_names
     end,
@@ -544,7 +546,7 @@ do
       end
       do
         local _tbl_0 = { }
-        for i, name in ipairs(arg_names) do
+        for i, name in ipairs(arg_names[name]) do
           _tbl_0[name] = args[i]
         end
         args = _tbl_0

@@ -45,6 +45,17 @@ rule "get x from %dict":
         is the return value.
     return (%dict's "x")
 
+# Functions can have aliases, which may or may not have the arguments in different order
+rule [..]
+    "I hate %worse-things more than %better-things", "I think %worse-things are worse than %better-things"
+    "I like %better-things more than %worse-things"
+..:
+    say ".."|\%better-things capitalized\ rule and \%worse-things\ drool!
+
+I like "dogs" more than "cats"
+I think "chihuahuas" are worse than "corgis"
+
+
 #.. Function calls can have parts of the function's name spread throughout.
     Everything that's not a literal value is treated as part of the function's name
 say both "Hello" and also "again!"
