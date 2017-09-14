@@ -161,7 +161,17 @@ macro block "for %varname in %iterable %body":
         |    vars[\%varname\] = old_loopval
         |end
 
-# Comprehension
+macro block "for all %iterable %body":
+    ".."|do
+        |    local old_loopval = vars.it
+        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |        vars.it = value
+        |        \(lua expr "vars.body.value.value") as lua block\
+        |    end
+        |    vars.it = old_loopval
+        |end
+
+# List Comprehension
 # TODO: maybe make this lazy, or a lazy version?
 macro "%expression for %varname in %iterable":
     ".."|(function(game, vars)
@@ -169,6 +179,37 @@ macro "%expression for %varname in %iterable":
         |    for i,value in ipairs(\%iterable as lua expr\) do
         |        vars[\%varname as lua expr\] = value
         |        comprehension[i] = \%expression as lua expr\
+        |    end
+        |    return comprehension
+        |end)(game, setmetatable({}, {__index=vars}))
+
+macro "%expression for all %iterable":
+    ".."|(function(game, vars)
+        |    local comprehension = {}
+        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |        vars.it = value
+        |        comprehension[i] = \%expression as lua expr\
+        |    end
+        |    return comprehension
+        |end)(game, setmetatable({}, {__index=vars}))
+
+# Dict comprehension
+macro "%key = %value for %varname in %iterable":
+    ".."|(function(game, vars)
+        |    local comprehension = {}
+        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |        vars[\%varname as lua expr\] = value
+        |        comprehension[\%key as lua expr\] = \%value as lua expr\
+        |    end
+        |    return comprehension
+        |end)(game, setmetatable({}, {__index=vars}))
+
+macro "%key = %value for all %iterable":
+    ".."|(function(game, vars)
+        |    local comprehension = {}
+        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |        vars.it = value
+        |        comprehension[\%key as lua expr\] = \%value as lua expr\
         |    end
         |    return comprehension
         |end)(game, setmetatable({}, {__index=vars}))
