@@ -186,11 +186,11 @@ macro [..]
 ..:
     ".."|\%list as lua expr\[\%index as lua expr\]
 
-macro [..]
+macro block [..]
     "%list 's %index = %value", "%index st in %list = %value", "%index nd in %list = %value"
     "%index rd in %list = %value", "%index th in %list = %value"
 ..:
-    ".."|\%list as lua expr\[\%index as lua expr\]
+    ".."|\%list as lua expr\[\%index as lua expr\] = \%value as lua expr\
 
 macro ["%item is in %list", "%list contains %item"]:
     ".."|(\%list as lua expr\[\%index as lua expr\] ~= nil)
