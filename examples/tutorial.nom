@@ -13,7 +13,7 @@ run file "core.nom"
 
 # Strings:
 "asdf"
-".."|This is a multi-line string with a #.. fake comment
+".."|This is a multi-line string
     |that starts with ".." and includes each indented line that starts with a "|"
     |until the indentation ends
 
@@ -24,6 +24,12 @@ run file "core.nom"
     "or just newlines to separate items"
     5
     6,7,8
+
+# Dicts:
+dict [["x", 99], ["y", 101]]
+dict [..]
+    ["z", 222]
+    [383, "howdy"]
 
 # Function calls:
 say "Hello world!"
