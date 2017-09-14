@@ -284,7 +284,7 @@ do
                    ((%indent %new_line block ((%dedent (%new_line "..")?) / errors))
                     / (one_liner (%ws? (%new_line? ".."))?)) }) -> Thunk
 
-            word <- ({ !number {%wordchar+} }) -> Word
+            word <- ({ !number {%wordchar (!"'" %wordchar)*} }) -> Word
             expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
 
             string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
@@ -300,7 +300,7 @@ do
                 |}}) -> Longstring
             string_interpolation <- "\" %ws? (functioncall / expression) %ws? "\"
             number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
-            variable <- ({ ("%" {%wordchar+}) }) -> Var
+            variable <- ({ ("%" {%wordchar (!"'" %wordchar)*}) }) -> Var
 
             subexpression <-
                 ("(" %ws? (functioncall / expression) %ws? ")")
