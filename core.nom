@@ -1,4 +1,3 @@
-(# Global import #)
 lua block ".."
     |utils = require('utils')
 
@@ -107,12 +106,11 @@ macro "%a or %b or %c or %d":
 macro "%a mod %b": concat ["(",%a as lua expr," mod ",%b as lua expr,")"]
 macro "- %a": concat ["-(",%a as lua expr,")"]
 macro "not %a": concat ["not (",%a as lua expr,")"]
-macro "# %a": concat ["#(",%a as lua expr,")"]
 
-(# This does equivalence checking instead of identity checking. #)
 rule "%a == %b":
-    lua expr "utils.equivalent(vars.a, vars.b)"
-macro "%a != %b": concat ["not (",%a as lua expr," == ",%b as lua expr,")"]
+    lua expr "((vars.a == vars.b) or utils.equivalent(vars.a, vars.b))"
+rule "%a != %b":
+    lua expr "((vars.a ~= vars.b) or not utils.equivalent(vars.a, vars.b))"
 
 rule "say %str":
     lua block ["print(utils.repr(", %str, "))"]

@@ -31,13 +31,13 @@ rule "you":
     lua expr "(you or 'Anonymous')"
 
 rule ["make %person %action", "make %person do %action"]:
-    lua block [..]
-        "do"
-        "\n    local old_you = you"
-        "\n    you = vars.person"
-        "\n    ret = compiler:call('do %', vars.action)"
-        "\n    you = old_you"
-        "\nend"
+    lua block ".."
+        |do
+        |    local old_you = you
+        |    you = vars.person
+        |    ret = compiler:call('do %', vars.action)
+        |    you = old_you
+        |end
 
 say "===================================================="
 say "                    NEW GAME"

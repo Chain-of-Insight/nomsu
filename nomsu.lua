@@ -5,11 +5,6 @@ local INDENT = "    "
 lpeg.setmaxstack(10000)
 local P, V, S, Cg, C, Cp, B, Cmt
 P, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
-local wordchar = P(1) - S(' \t\n\r%:;,.{}[]()"')
-local comment = re.compile([[comment <- "(#" (comment / ((! "#)") .))* "#)"]])
-local whitespace = (S(" \t") + comment) ^ 1
-local nl = P("\n")
-local blank_line = whitespace ^ -1 * nl
 local get_line_indentation
 get_line_indentation = function(line)
   local indent_amounts = {
@@ -18,7 +13,7 @@ get_line_indentation = function(line)
   }
   do
     local sum = 0
-    local leading_space = line:gsub("([\t ]*).*", "%1")
+    local leading_space = line:match("[\t ]*")
     for c in leading_space:gmatch("[\t ]") do
       sum = sum + indent_amounts[c]
     end
@@ -64,13 +59,31 @@ make_parser = function(lingo, extra_definitions)
     end
     return end_pos
   end
+  local wordchar = P(1) - S(' \t\n\r%#:;,.{}[]()"')
+  local nl = P("\n")
+  local whitespace = S(" \t") ^ 1
+  local blank_line = whitespace ^ -1 * nl
+  local line_comment = re.compile([=[ "#" [^%nl]* ]=], {
+    nl = nl
+  })
+  local block_comment = re.compile([=[        "#.." (!%nl .)* (%indent (!%dedent %nl [^%nl]*)*)
+    ]=], {
+    nl = nl,
+    whitespace = whitespace,
+    indent = #(nl * blank_line ^ 0 * Cmt(S(" \t") ^ 0, check_indent)),
+    dedent = #(nl * blank_line ^ 0 * Cmt(S(" \t") ^ 0, check_dedent)),
+    new_line = nl * blank_line ^ 0 * Cmt(S(" \t") ^ 0, check_nodent)
+  })
+  blank_line = ((Cmt(whitespace ^ -1, check_nodent) * (block_comment + line_comment)) ^ -1 + whitespace ^ -1) * nl
   local defs = {
     wordchar = wordchar,
     nl = nl,
     ws = whitespace,
-    comment = comment,
+    blank_line = blank_line,
+    block_comment = block_comment,
+    line_comment = line_comment,
     eol = #nl + (P("") - P(1)),
-    word_boundary = whitespace + B(P("..")) + B(S("\";)]")) + #S("\":([") + #((whitespace + nl) ^ 0 * P("..")),
+    word_boundary = whitespace ^ -1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #((whitespace + nl) ^ 0 * P("..")),
     indent = #(nl * blank_line ^ 0 * Cmt(whitespace ^ -1, check_indent)),
     dedent = #(nl * blank_line ^ 0 * Cmt(whitespace ^ -1, check_dedent)),
     new_line = nl * blank_line ^ 0 * Cmt(whitespace ^ -1, check_nodent),
@@ -244,7 +257,7 @@ do
       if self.debug then
         print("PARSING:\n" .. tostring(str))
       end
-      local lingo = [=[            file <- ({ {| %ws? %new_line? {:body: block :} %new_line? %ws? (errors)? |} }) -> File
+      local lingo = [=[            file <- ({ {| %blank_line* {:body: block :} %blank_line* (errors)? |} }) -> File
             errors <- (({.+}) => error_handler)
             block <- ({ {| statement (%new_line statement)* |} }) -> Block
             statement <- ({ (functioncall / expression) }) -> Statement
@@ -260,37 +273,37 @@ do
             functioncall <- ({ {| (expression %word_boundary fn_bits) / (word (%word_boundary fn_bits)?) |} }) -> FunctionCall
             fn_bit <- (expression / word)
             fn_bits <-
-                ((".." %ws? (%indent %new_line indented_fn_bits %dedent) (%new_line ".." %ws? fn_bits)?)
+                ((".." %ws? %line_comment? (%indent %new_line indented_fn_bits %dedent) (%new_line ".." %ws? fn_bits)?)
                  / (%new_line ".." fn_bit (%word_boundary fn_bits)?)
                  / (fn_bit (%word_boundary fn_bits)?))
             indented_fn_bits <-
                 fn_bit ((%new_line / %word_boundary) indented_fn_bits)?
             
             thunk <-
-                ({ ":" %ws?
+                ({ ":" %ws? %line_comment?
                    ((%indent %new_line block ((%dedent (%new_line "..")?) / errors))
                     / (one_liner (%ws? (%new_line? ".."))?)) }) -> Thunk
 
             word <- ({ !number {%wordchar+} }) -> Word
             expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
 
-            string <- ({ (!longstring) '"' {(("\" .) / [^"])*} '"' }) -> String
-            longstring <- ({ '".."' %ws? %indent {(%new_line "|" [^%nl]*)+} ((%dedent (%new_line '..')?) / errors) }) -> Longstring
+            string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
+            longstring <- ({ '".."' %ws? %line_comment? %indent {(%new_line "|" [^%nl]*)+} ((%dedent (%new_line '..')?) / errors) }) -> Longstring
             number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
             variable <- ({ ("%" {%wordchar+}) }) -> Var
 
             subexpression <-
-                (!%comment "(" %ws? (functioncall / expression) %ws? ")")
-                / ("(..)" %ws? %indent %new_line ((({ {| indented_fn_bits |} }) -> FunctionCall) / expression) %dedent (%new_line "..")?)
+                ("(" %ws? (functioncall / expression) %ws? ")")
+                / ("(..)" %ws? %line_comment? %indent %new_line ((({ {| indented_fn_bits |} }) -> FunctionCall) / expression) %dedent (%new_line "..")?)
 
             list <- ({ {|
-                ("[..]" %ws? %indent %new_line indented_list ","? ((%dedent (%new_line "..")?) / errors))
+                ("[..]" %ws? %line_comment? %indent %new_line indented_list ","? ((%dedent (%new_line "..")?) / errors))
                 / ("[" %ws? (list_items ","?)?  %ws?"]")
               |} }) -> List
             list_items <- ((functioncall / expression) (list_sep list_items)?)
             list_sep <- %ws? "," %ws?
             indented_list <-
-                (functioncall / expression) (((list_sep %new_line?) / %new_line) indented_list)?
+                (functioncall / expression) (((list_sep (%line_comment? %new_line)?) / (%line_comment? %new_line)) indented_list)?
         ]=]
       lingo = make_parser(lingo)
       local tree = lingo:match(str:gsub("\r", "") .. "\n")

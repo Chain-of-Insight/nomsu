@@ -18,16 +18,10 @@ INDENT = "    "
 lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
-wordchar = P(1)-S(' \t\n\r%:;,.{}[]()"')
-comment = re.compile [[comment <- "(#" (comment / ((! "#)") .))* "#)"]]
-whitespace = (S(" \t") + comment)^1
-nl = P("\n")
-blank_line = whitespace^-1 * nl
-
 get_line_indentation = (line)->
     indent_amounts = {[" "]:1, ["\t"]:4}
     with sum = 0
-        leading_space = line\gsub("([\t ]*).*", "%1")
+        leading_space = line\match("[\t ]*")
         for c in leading_space\gmatch "[\t ]"
             sum += indent_amounts[c]
 
@@ -50,10 +44,22 @@ make_parser = (lingo, extra_definitions)->
         if num_spaces != indent_stack[#indent_stack] then return nil
         return end_pos
 
+    wordchar = P(1)-S(' \t\n\r%#:;,.{}[]()"')
+    nl = P("\n")
+    whitespace = S(" \t")^1
+    blank_line = whitespace^-1 * nl
+    line_comment = re.compile([=[ "#" [^%nl]* ]=], {:nl})
+    block_comment = re.compile([=[
+        "#.." (!%nl .)* (%indent (!%dedent %nl [^%nl]*)*)
+    ]=], {:nl, :whitespace,
+            indent:#(nl * blank_line^0 * Cmt(S(" \t")^0, check_indent)),
+            dedent:#(nl * blank_line^0 * Cmt(S(" \t")^0, check_dedent)),
+            new_line:nl * blank_line^0 * Cmt(S(" \t")^0, check_nodent)})
+    blank_line = ((Cmt(whitespace^-1, check_nodent) * (block_comment + line_comment))^-1 + whitespace^-1) * nl
     defs =
-        :wordchar, :nl, ws:whitespace, :comment
+        :wordchar, :nl, ws:whitespace, :blank_line, :block_comment, :line_comment
         eol: #nl + (P("")-P(1))
-        word_boundary: whitespace + B(P("..")) + B(S("\";)]")) + #S("\":([") + #((whitespace + nl)^0 * P(".."))
+        word_boundary: whitespace^-1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #((whitespace + nl)^0 * P(".."))
         indent: #(nl * blank_line^0 * Cmt(whitespace^-1, check_indent))
         dedent: #(nl * blank_line^0 * Cmt(whitespace^-1, check_dedent))
         new_line: nl * blank_line^0 * Cmt(whitespace^-1, check_nodent)
@@ -162,7 +168,7 @@ class NomsuCompiler
         if @debug
             print("PARSING:\n#{str}")
         lingo = [=[
-            file <- ({ {| %ws? %new_line? {:body: block :} %new_line? %ws? (errors)? |} }) -> File
+            file <- ({ {| %blank_line* {:body: block :} %blank_line* (errors)? |} }) -> File
             errors <- (({.+}) => error_handler)
             block <- ({ {| statement (%new_line statement)* |} }) -> Block
             statement <- ({ (functioncall / expression) }) -> Statement
@@ -178,37 +184,37 @@ class NomsuCompiler
             functioncall <- ({ {| (expression %word_boundary fn_bits) / (word (%word_boundary fn_bits)?) |} }) -> FunctionCall
             fn_bit <- (expression / word)
             fn_bits <-
-                ((".." %ws? (%indent %new_line indented_fn_bits %dedent) (%new_line ".." %ws? fn_bits)?)
+                ((".." %ws? %line_comment? (%indent %new_line indented_fn_bits %dedent) (%new_line ".." %ws? fn_bits)?)
                  / (%new_line ".." fn_bit (%word_boundary fn_bits)?)
                  / (fn_bit (%word_boundary fn_bits)?))
             indented_fn_bits <-
                 fn_bit ((%new_line / %word_boundary) indented_fn_bits)?
             
             thunk <-
-                ({ ":" %ws?
+                ({ ":" %ws? %line_comment?
                    ((%indent %new_line block ((%dedent (%new_line "..")?) / errors))
                     / (one_liner (%ws? (%new_line? ".."))?)) }) -> Thunk
 
             word <- ({ !number {%wordchar+} }) -> Word
             expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
 
-            string <- ({ (!longstring) '"' {(("\" .) / [^"])*} '"' }) -> String
-            longstring <- ({ '".."' %ws? %indent {(%new_line "|" [^%nl]*)+} ((%dedent (%new_line '..')?) / errors) }) -> Longstring
+            string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
+            longstring <- ({ '".."' %ws? %line_comment? %indent {(%new_line "|" [^%nl]*)+} ((%dedent (%new_line '..')?) / errors) }) -> Longstring
             number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
             variable <- ({ ("%" {%wordchar+}) }) -> Var
 
             subexpression <-
-                (!%comment "(" %ws? (functioncall / expression) %ws? ")")
-                / ("(..)" %ws? %indent %new_line ((({ {| indented_fn_bits |} }) -> FunctionCall) / expression) %dedent (%new_line "..")?)
+                ("(" %ws? (functioncall / expression) %ws? ")")
+                / ("(..)" %ws? %line_comment? %indent %new_line ((({ {| indented_fn_bits |} }) -> FunctionCall) / expression) %dedent (%new_line "..")?)
 
             list <- ({ {|
-                ("[..]" %ws? %indent %new_line indented_list ","? ((%dedent (%new_line "..")?) / errors))
+                ("[..]" %ws? %line_comment? %indent %new_line indented_list ","? ((%dedent (%new_line "..")?) / errors))
                 / ("[" %ws? (list_items ","?)?  %ws?"]")
               |} }) -> List
             list_items <- ((functioncall / expression) (list_sep list_items)?)
             list_sep <- %ws? "," %ws?
             indented_list <-
-                (functioncall / expression) (((list_sep %new_line?) / %new_line) indented_list)?
+                (functioncall / expression) (((list_sep (%line_comment? %new_line)?) / (%line_comment? %new_line)) indented_list)?
         ]=]
         lingo = make_parser lingo
 

@@ -1,18 +1,21 @@
-(# This is just a comment #)
-(# Nested comments (# like this #) work fine #)
+# This is just a comment
+#.. Block comments
+    start with a #.. and
+    continue until dedent
+
 run file "core.nom"
 
 say "foo"
 
 say (4)
 
-(# "rule" is just a function that takes a function call spec and a block of code to run,
-    and stores the function definition #)
+#.. "rule" is just a function that takes a function call spec and a block of code to run,
+    and stores the function definition
 rule "fart": say "poot"
 
 fart
 
-(# multi-line strings: #)
+# multi-line strings:
 say ".."
     |    Once upon a time
     |there was a very
@@ -30,7 +33,7 @@ say ".."
     |(done)
     |
 
-rule "doublefart": (# this farts twice #)
+rule "doublefart": # this farts twice
     say "poot"
     say "poot"
 
