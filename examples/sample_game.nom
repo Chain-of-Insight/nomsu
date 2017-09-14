@@ -1,4 +1,5 @@
 run file "core.nom"
+# A basic key-value store that's only accessible through these functions:
 lua block ".."
     |do -- Use a closure to hide this behind the accessor rules
     |    local relations = setmetatable({}, {__index=function(self,key)
@@ -154,8 +155,7 @@ propose:
         say ".."
             |Vote cast. \%candidate\ now has \100 * %vote-percent\% of the votes.
         if (%vote-percent > 0.5):
-            say ".."
-                |The winner of the election is: \%candidate\
+            say ".."|The winner of the election is: \%candidate\
             close the election
 
     allow ["open election %", "close the election", "vote for %"] to use ["% % = %"]
@@ -167,8 +167,7 @@ propose:
         if ((you) == "Anonymous"):
             make "bill" do %action
         ..else:
-            say ".."
-                |Who do you think you are, \you\?
+            say ".."|Who do you think you are, \you\?
     allow ["as bill %"] to use ["make % %"]
 approve
 as bill: join
@@ -178,8 +177,7 @@ propose:
         if ((you) == "Anonymous"):
             make "dave" do %action
         ..else:
-            say ".."
-                |Who do you think you are, \you\?
+            say ".."|Who do you think you are, \you\?
     allow ["as dave %"] to use ["make % %"]
 approve
 as bill: approve
