@@ -1,11 +1,10 @@
-lua block ".."
-    |utils = require('utils')
-
+# Rule for making rules
 lua block ".."
     |compiler:def("rule %spec %body", function(compiler, vars)
     |    return compiler:def(vars.spec, vars.body)
     |end)
 
+# Macros
 rule "macro %spec %body":
     lua block ".."
         |compiler:defmacro(vars.spec, vars.body)
@@ -24,6 +23,7 @@ rule "macro block %spec %body":
         |    return nil
         |end
 
+# Compiler tools
 rule ["eval %code", "run %code"]:
     lua expr "compiler:run(vars.code)"
 
@@ -37,6 +37,7 @@ rule "run file %filename":
         |    return compiler:run(file:read("*a"))
         |end
 
+# Macro helper functions
 rule "%tree as lua block":
     lua block [..]
         "do return compiler:tree_to_lua(", %tree, ", 'Statement'), true end"
@@ -45,6 +46,7 @@ rule "%tree as lua expr":
     lua expr [..]
         "compiler:tree_to_lua(", %tree, ", 'Expression')"
 
+# String functions
 rule "join %strs":
     lua block ".."
         |local str_bits = {}
@@ -57,15 +59,14 @@ rule "join %strs with glue %glue":
         |for i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end
         |do return table.concat(str_bits, vars.glue) end
 
-macro block "return %return-value":
-    ".."|do return \%return-value as lua expr\ end
+rule ["capitalize %str", "%str capitalized"]:
+    lua expr ".."|vars.str:gsub("%l", string.upper, 1)
 
-macro block "return":
-    "do return nil end"
-
+# Variable assignment
 macro block "let %varname = %value":
     ".."|vars[\%varname as lua expr\] = \%value as lua expr\
 
+# Operators
 macro ["true","yes"]: "true"
 macro ["false","no"]: "false"
 macro ["nil","null"]: "nil"
@@ -115,9 +116,17 @@ rule "%a != %b":
 macro "say %str":
     ".."|print(utils.repr(\%str as lua expr\))
 
+# Control flow
 rule "do %action":
     lua expr "vars.action(compiler, setmetatable({}, {__index=vars}))"
 
+macro block "return %return-value":
+    ".."|do return \%return-value as lua expr\ end
+
+macro block "return":
+    "do return nil end"
+
+# Conditionals
 macro block "if %condition %if_body":
     ".."|if \%condition as lua expr\ then
         |    \(lua expr "vars.if_body.value.value") as lua block\
@@ -130,6 +139,7 @@ macro block "if %condition %if_body else %else_body":
         |    \(lua expr "vars.else_body.value.value") as lua block\
         |end
 
+# Ternary operator
 macro "%if_expr if %condition else %else_expr":
     ".."|(function(compiler, vars)
         |    if \%condition as lua expr\ then
@@ -139,6 +149,7 @@ macro "%if_expr if %condition else %else_expr":
         |    end
         |end)(compiler, vars)
 
+# For loop
 macro block "for %varname in %iterable %body":
     let "varname" = (%varname as lua expr)
     ".."|do
@@ -150,7 +161,19 @@ macro block "for %varname in %iterable %body":
         |    vars[\%varname\] = old_loopval
         |end
 
+# Comprehension
+# TODO: maybe make this lazy, or a lazy version?
+macro "%expression for %varname in %iterable":
+    ".."|(function(game, vars)
+        |    local comprehension = {}
+        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |        vars[\%varname as lua expr\] = value
+        |        comprehension[i] = \%expression as lua expr\
+        |    end
+        |    return comprehension
+        |end)(game, setmetatable({}, {__index=vars}))
 
+# Number ranges
 rule "%start up to %stop":
     lua expr "utils.range(vars.start,vars.stop-1)"
 
@@ -163,7 +186,19 @@ rule "%start down to %stop":
 rule ["%start down thru %stop", "%start down through %stop"]:
     lua expr "utils.range(vars.start,vars.stop,-1)"
 
+rule "%start up to %stop via %step":
+    lua expr "utils.range(vars.start,vars.stop-1,vars.step)"
 
+rule ["%start thru %stop via %step", "%start through %stop via %step"]:
+    lua expr "utils.range(vars.start,vars.stop,vars.step)"
+
+rule "%start down to %stop via %step":
+    lua expr "utils.range(vars.start,vars.stop+1,-vars.step)"
+
+rule ["%start down thru %stop via %step", "%start down through %stop via %step"]:
+    lua expr "utils.range(vars.start,vars.stop,-vars.step)"
+
+# Common utility functions
 rule ["random number"]: lua expr "math.random()"
 rule ["sum of %items"]: lua expr "utils.sum(vars.items)"
 rule ["product of %items"]: lua expr "utils.product(vars.items)"
@@ -180,6 +215,7 @@ rule ["min of %items with respect to %keys"]:
 rule ["max of %items with respect to %keys"]:
     lua expr "utils.max(vars.items, vars.keys)"
 
+# List/dict functions
 macro [..]
     "%list 's %index", "%index st in %list", "%index nd in %list", "%index rd in %list"
     "%index th in %list", "%index in %list"
@@ -204,9 +240,7 @@ rule "dict %items":
         lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
     return %dict
 
-rule ["capitalize %str", "%str capitalized"]:
-    lua expr ".."|vars.str:gsub("%l", string.upper, 1)
-
+# Permission functions
 rule "restrict %fn to within %whitelist":
     lua block ".."
         |local fns = compiler:get_invocations(vars.fn)
@@ -275,6 +309,7 @@ rule "forbid %blacklist to use %fn":
         |    end
         |end
 
+# Error functions
 rule "error!":
     lua block "compiler:error()"
 
