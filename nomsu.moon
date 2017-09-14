@@ -144,7 +144,7 @@ class NomsuCompiler
             table.insert(invocations, invocation)
             if prev_arg_names
                 if not utils.equivalent(utils.set(prev_arg_names), utils.set(_arg_names))
-                    @error("Conflicting argument names #{utils.repr(arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
+                    @error("Conflicting argument names #{utils.repr(prev_arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
             else prev_arg_names = _arg_names
             arg_names[invocation] = _arg_names
         return invocations, arg_names

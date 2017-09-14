@@ -182,13 +182,13 @@ rule ["max of %items with respect to %keys"]:
 
 macro [..]
     "%list 's %index", "%index st in %list", "%index nd in %list", "%index rd in %list"
-    "%index th in %list"
+    "%index th in %list", "%index in %list"
 ..:
     ".."|\%list as lua expr\[\%index as lua expr\]
 
 macro block [..]
     "%list 's %index = %value", "%index st in %list = %value", "%index nd in %list = %value"
-    "%index rd in %list = %value", "%index th in %list = %value"
+    "%index rd in %list = %value", "%index th in %list = %value", "%index in %list = %value"
 ..:
     ".."|\%list as lua expr\[\%index as lua expr\] = \%value as lua expr\
 

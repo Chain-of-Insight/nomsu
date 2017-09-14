@@ -223,7 +223,7 @@ do
         table.insert(invocations, invocation)
         if prev_arg_names then
           if not utils.equivalent(utils.set(prev_arg_names), utils.set(_arg_names)) then
-            self:error("Conflicting argument names " .. tostring(utils.repr(arg_names)) .. " and " .. tostring(utils.repr(_arg_names)) .. " for " .. tostring(utils.repr(text)))
+            self:error("Conflicting argument names " .. tostring(utils.repr(prev_arg_names)) .. " and " .. tostring(utils.repr(_arg_names)) .. " for " .. tostring(utils.repr(text)))
           end
         else
           prev_arg_names = _arg_names
