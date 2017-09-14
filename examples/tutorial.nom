@@ -40,6 +40,11 @@ rule "say both %first and also %second":
     say %first
     say %second
 
+rule "get x from %dict":
+    #.. Functions can return values explicitly, but if not, the last line in the function
+        is the return value.
+    return (%dict's "x")
+
 #.. Function calls can have parts of the function's name spread throughout.
     Everything that's not a literal value is treated as part of the function's name
 say both "Hello" and also "again!"
