@@ -7,7 +7,6 @@ utils = require 'utils'
 -- improve indentation of generated lua code
 -- provide way to run precompiled nomsu -> lua code
 -- comprehensions?
--- dicts?
 -- better scoping?
 -- first-class functions
 -- better error reporting

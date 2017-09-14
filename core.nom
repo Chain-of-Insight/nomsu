@@ -31,11 +31,11 @@ macro "source code %code":
     lua expr "utils.repr(vars.code.src, true)"
 
 rule "run file %filename":
-    lua block [..]
-        "do"
-        "\n    local file = io.open(vars.filename)"
-        "\n    return compiler:run(file:read('*a'))"
-        "\nend"
+    lua block ".."
+        |do
+        |    local file = io.open(vars.filename)
+        |    return compiler:run(file:read("*a"))
+        |end
 
 rule "%tree as lua block":
     lua block [..]
@@ -45,114 +45,110 @@ rule "%tree as lua expr":
     lua expr [..]
         "compiler:tree_to_lua(", %tree, ", 'Expression')"
 
-rule "concat %strs":
-    lua block [..]
-        "local str_bits = {}"
-        "\nfor i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end"
-        "\ndo return table.concat(str_bits) end"
+rule "join %strs":
+    lua block ".."
+        |local str_bits = {}
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end
+        |do return table.concat(str_bits) end
 
-rule "concat %strs with glue %glue":
-    lua block [..]
-        "local str_bits = {}"
-        "\nfor i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end"
-        "\ndo return table.concat(str_bits, vars.glue) end"
+rule "join %strs with glue %glue":
+    lua block ".."
+        |local str_bits = {}
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end
+        |do return table.concat(str_bits, vars.glue) end
 
 macro block "return %return-value":
-    concat ["do return ",%return-value as lua expr," end"]
+    ".."|do return \%return-value as lua expr\ end
 
 macro block "return":
     "do return nil end"
 
 macro block "let %varname = %value":
-    concat ["vars[",%varname as lua expr,"] = ",%value as lua expr]
+    ".."|vars[\%varname as lua expr\] = \%value as lua expr\
 
 macro ["true","yes"]: "true"
 macro ["false","no"]: "false"
 macro ["nil","null"]: "nil"
 macro block ["nop", "pass"]: ""
-macro "%a + %b": concat ["(",%a as lua expr," + ",%b as lua expr,")"]
-macro "%a + %b + %c": concat ["(",%a as lua expr," + ",%b as lua expr," + ",%c as lua expr,")"]
-macro "%a + %b + %c + %d": concat ["(",%a as lua expr," + ",%b as lua expr," + ",%c as lua expr," + ",%d as lua expr,")"]
-macro "%a - %b": concat ["(",%a as lua expr," - ",%b as lua expr,")"]
-macro "%a * %b": concat ["(",%a as lua expr," * ",%b as lua expr,")"]
-macro "%a * %b * %c": concat ["(",%a as lua expr," * ",%b as lua expr," * ",%c as lua expr,")"]
-macro "%a * %b * %c * %d": concat ["(",%a as lua expr," * ",%b as lua expr," * ",%c as lua expr," * ",%d as lua expr,")"]
-macro "%a / %b": concat ["(",%a as lua expr," / ",%b as lua expr,")"]
-macro "%a === %b": concat ["(",%a as lua expr," == ",%b as lua expr,")"]
-macro "%a !== %b": concat ["(",%a as lua expr," ~= ",%b as lua expr,")"]
-macro "%a < %b": concat ["(",%a as lua expr," < ",%b as lua expr,")"]
-macro "%a < %b < %c": concat ["((",%a as lua expr," < ",%b as lua expr,") and (",%b as lua expr," < ",%c as lua expr,"))"]
-macro "%a <= %b < %c": concat ["((",%a as lua expr," <= ",%b as lua expr,") and (",%b as lua expr," < ",%c as lua expr,"))"]
-macro "%a <= %b <= %c": concat ["((",%a as lua expr," <= ",%b as lua expr,") and (",%b as lua expr," <= ",%c as lua expr,"))"]
-macro "%a < %b <= %c": concat ["((",%a as lua expr," < ",%b as lua expr,") and (",%b as lua expr," <= ",%c as lua expr,"))"]
-macro "%a > %b > %c": concat ["((",%a as lua expr," > ",%b as lua expr,") and (",%b as lua expr," > ",%c as lua expr,"))"]
-macro "%a >= %b > %c": concat ["((",%a as lua expr," >= ",%b as lua expr,") and (",%b as lua expr," > ",%c as lua expr,"))"]
-macro "%a >= %b >= %c": concat ["((",%a as lua expr," >= ",%b as lua expr,") and (",%b as lua expr," >= ",%c as lua expr,"))"]
-macro "%a > %b >= %c": concat ["((",%a as lua expr," > ",%b as lua expr,") and (",%b as lua expr," >= ",%c as lua expr,"))"]
-macro "%a <= %b": concat ["(",%a as lua expr," <= ",%b as lua expr,")"]
-macro "%a > %b": concat ["(",%a as lua expr," > ",%b as lua expr,")"]
-macro "%a >= %b": concat ["(",%a as lua expr," >= ",%b as lua expr,")"]
-macro "%a ^ %b": concat ["(",%a as lua expr," ^ ",%b as lua expr,")"]
-macro "%a and %b": concat ["(",%a as lua expr," and ",%b as lua expr,")"]
+macro "%a + %b": ".."|(\%a as lua expr\ + \%b as lua expr\)
+macro "%a + %b + %c": ".."|(\%a as lua expr\ + \%b as lua expr\ + \%c as lua expr\)
+macro "%a + %b + %c + %d": ".."|(\%a as lua expr\ + \%b as lua expr\ + \%c as lua expr\ + \%d as lua expr\)
+macro "%a - %b": ".."|(\%a as lua expr\ - \%b as lua expr\)
+macro "%a * %b": ".."|(\%a as lua expr\ * \%b as lua expr\)
+macro "%a * %b * %c": ".."|(\%a as lua expr\ * \%b as lua expr\ * \%c as lua expr\)
+macro "%a * %b * %c * %d": ".."|(\%a as lua expr\ * \%b as lua expr\ * \%c as lua expr\ * \%d as lua expr\)
+macro "%a / %b": ".."|(\%a as lua expr\ / \%b as lua expr\)
+macro "%a === %b": ".."|(\%a as lua expr\ == \%b as lua expr\)
+macro "%a !== %b": ".."|(\%a as lua expr\ ~= \%b as lua expr\)
+macro "%a < %b": ".."|(\%a as lua expr\ < \%b as lua expr\)
+macro "%a < %b < %c": ".."|((\%a as lua expr\ < \%b as lua expr\) and (\%b as lua expr\ < \%c as lua expr\))
+macro "%a <= %b < %c": ".."|((\%a as lua expr\ <= \%b as lua expr\) and (\%b as lua expr\ < \%c as lua expr\))
+macro "%a <= %b <= %c": ".."|((\%a as lua expr\ <= \%b as lua expr\) and (\%b as lua expr\ <= \%c as lua expr\))
+macro "%a < %b <= %c": ".."|((\%a as lua expr\ < \%b as lua expr\) and (\%b as lua expr\ <= \%c as lua expr\))
+macro "%a > %b > %c": ".."|((\%a as lua expr\ > \%b as lua expr\) and (\%b as lua expr\ > \%c as lua expr\))
+macro "%a >= %b > %c": ".."|((\%a as lua expr\ >= \%b as lua expr\) and (\%b as lua expr\ > \%c as lua expr\))
+macro "%a >= %b >= %c": ".."|((\%a as lua expr\ >= \%b as lua expr\) and (\%b as lua expr\ >= \%c as lua expr\))
+macro "%a > %b >= %c": ".."|((\%a as lua expr\ > \%b as lua expr\) and (\%b as lua expr\ >= \%c as lua expr\))
+macro "%a <= %b": ".."|(\%a as lua expr\ <= \%b as lua expr\)
+macro "%a > %b": ".."|(\%a as lua expr\ > \%b as lua expr\)
+macro "%a >= %b": ".."|(\%a as lua expr\ >= \%b as lua expr\)
+macro "%a ^ %b": ".."|(\%a as lua expr\ ^ \%b as lua expr\)
+macro "%a and %b": ".."|(\%a as lua expr\ and \%b as lua expr\)
 macro "%a and %b and %c":
-    concat ["(",%a as lua expr," and ",%b as lua expr," and ",%c as lua expr,")"]
+    ".."|(\%a as lua expr\ and \%b as lua expr\ and \%c as lua expr\)
 macro "%a and %b and %c and %d":
-    concat ["(",%a as lua expr," and ",%b as lua expr," and ",%c as lua expr," and ",%d as lua expr,")"]
-macro "%a or %b": concat ["(",%a as lua expr," or ",%b as lua expr,")"]
+    ".."|(\%a as lua expr\ and \%b as lua expr\ and \%c as lua expr\ and \%d as lua expr\)
+macro "%a or %b": ".."|(\%a as lua expr\ or \%b as lua expr\)
 macro "%a or %b or %c":
-    concat ["(",%a as lua expr," or ",%b as lua expr," or ",%c as lua expr,")"]
+    ".."|(\%a as lua expr\ or \%b as lua expr\ or \%c as lua expr\)
 macro "%a or %b or %c or %d":
-    concat ["(",%a as lua expr," or ",%b as lua expr," or ",%c as lua expr," or ",%d as lua expr,")"]
-macro "%a mod %b": concat ["(",%a as lua expr," mod ",%b as lua expr,")"]
-macro "- %a": concat ["-(",%a as lua expr,")"]
-macro "not %a": concat ["not (",%a as lua expr,")"]
+    ".."|(\%a as lua expr\ or \%b as lua expr\ or \%c as lua expr\ or \%d as lua expr\)
+macro "%a mod %b": ".."|(\%a as lua expr\ mod \%b as lua expr\)
+macro "- %a": ".."|-(\%a as lua expr\)
+macro "not %a": ".."|not (\%a as lua expr\)
 
 rule "%a == %b":
     lua expr "((vars.a == vars.b) or utils.equivalent(vars.a, vars.b))"
 rule "%a != %b":
     lua expr "((vars.a ~= vars.b) or not utils.equivalent(vars.a, vars.b))"
 
-rule "say %str":
-    lua block ["print(utils.repr(", %str, "))"]
+macro "say %str":
+    ".."|print(utils.repr(\%str as lua expr\))
 
 rule "do %action":
     lua expr "vars.action(compiler, setmetatable({}, {__index=vars}))"
 
 macro block "if %condition %if_body":
-    concat [..]
-        "if ",%condition as lua expr," then"
-        "\n    ",(lua expr "vars.if_body.value.value") as lua block
-        "\nend"
+    ".."|if \%condition as lua expr\ then
+        |    \(lua expr "vars.if_body.value.value") as lua block\
+        |end
 
 macro block "if %condition %if_body else %else_body":
-    concat [..]
-        "if ",%condition as lua expr," then"
-        "\n    ",(lua expr "vars.if_body.value.value") as lua block
-        "\nelse"
-        "\n    ",(lua expr "vars.else_body.value.value") as lua block
-        "\nend"
+    ".."|if \%condition as lua expr\ then
+        |    \(lua expr "vars.if_body.value.value") as lua block\
+        |else
+        |    \(lua expr "vars.else_body.value.value") as lua block\
+        |end
 
 macro "%if_expr if %condition else %else_expr":
-    concat [..]
-        "(function(compiler, vars)"
-        "\n    if ",%condition as lua expr," then"
-        "\n        return ",%if_expr as lua expr
-        "\n    else"
-        "\n        return ",%else_expr as lua expr
-        "\n    end"
-        "\nend)(compiler, vars)"
+    ".."|(function(compiler, vars)
+        |    if \%condition as lua expr\ then
+        |        return \%if_expr as lua expr\
+        |    else
+        |        return \%else_expr as lua expr\
+        |    end
+        |end)(compiler, vars)
 
 macro block "for %varname in %iterable %body":
     let "varname" = (%varname as lua expr)
-    concat [..]
-        "do"
-        "\n    local old_loopval = vars[", %varname, "]"
-        "\n    for i,value in ipairs(", %iterable as lua expr, ") do"
-        "\n        vars[", %varname, "] = value"
-        "\n        ",(lua expr "vars.body.value.value") as lua block
-        "\n    end"
-        "\n    vars[", %varname, "] = old_loopval"
-        "\nend"
+    ".."|do
+        |    local old_loopval = vars[\%varname\]
+        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |        vars[\%varname\] = value
+        |        \(lua expr "vars.body.value.value") as lua block\
+        |    end
+        |    vars[\%varname\] = old_loopval
+        |end
 
 
 rule "%start up to %stop":
@@ -184,14 +180,29 @@ rule ["min of %items with respect to %keys"]:
 rule ["max of %items with respect to %keys"]:
     lua expr "utils.max(vars.items, vars.keys)"
 
-macro ["%index st in %list", "%index nd in %list", "%index rd in %list", "%index th in %list"]:
-    concat [(%list as lua expr), "[", (%index as lua expr), "]"]
+macro [..]
+    "%list 's %index", "%index st in %list", "%index nd in %list", "%index rd in %list"
+    "%index th in %list"
+..:
+    ".."|\%list as lua expr\[\%index as lua expr\]
+
+macro [..]
+    "%list 's %index = %value", "%index st in %list = %value", "%index nd in %list = %value"
+    "%index rd in %list = %value", "%index th in %list = %value"
+..:
+    ".."|\%list as lua expr\[\%index as lua expr\]
 
 macro ["%item is in %list", "%list contains %item"]:
-    concat ["(",%list as lua expr,"[",%index as lua expr,"] ~= nil)"]
+    ".."|(\%list as lua expr\[\%index as lua expr\] ~= nil)
 
 macro ["length of %list", "size of %list", "number of %list"]:
-    concat ["#(",%list as lua expr,")"]
+    ".."|#(\list as lua expr\)
+
+rule "dict %items":
+    let "dict" = []
+    for "pair" in %items:
+        lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
+    return %dict
 
 rule "restrict %fn to within %whitelist":
     lua block ".."
@@ -278,16 +289,4 @@ macro block "test %code yields %expected":
         say %generated
         error!
     return ""
-
-rule "dict %items":
-    let "dict" = []
-    for "pair" in %items:
-        lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
-    return %dict
-
-rule "%dict 's %key":
-    lua expr "vars.dict[vars.key]"
-
-rule "%dict 's %key = %value":
-    lua block "vars.dict[vars.key] = vars.value"
 
