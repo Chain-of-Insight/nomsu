@@ -279,4 +279,15 @@ macro block "test %code yields %expected":
         error!
     return ""
 
+rule "dict %items":
+    let "dict" = []
+    for "pair" in %items:
+        lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
+    return %dict
+
+rule "%dict -> %key":
+    lua expr "vars.dict[vars.key]"
+
+rule "%dict -> %key = %value":
+    lua block "vars.dict[vars.key] = vars.value"
 
