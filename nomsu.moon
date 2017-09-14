@@ -603,5 +603,19 @@ if arg and arg[1]
     local c = NomsuCompiler()
     load()(c, {})
     ]]
+elseif arg
+    -- REPL:
+    c = NomsuCompiler()
+    while true
+        buff = ""
+        while true
+            io.write(">> ")
+            line = io.read("*L")
+            if line == "\n" or not line
+                break
+            buff ..= line
+        if #buff == 0
+            break
+        c\run(buff)
 
 return NomsuCompiler

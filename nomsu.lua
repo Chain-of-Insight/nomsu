@@ -856,5 +856,22 @@ if arg and arg[1] then
     load()(c, {})
     ]])
   end
+elseif arg then
+  local c = NomsuCompiler()
+  while true do
+    local buff = ""
+    while true do
+      io.write(">> ")
+      local line = io.read("*L")
+      if line == "\n" or not line then
+        break
+      end
+      buff = buff .. line
+    end
+    if #buff == 0 then
+      break
+    end
+    c:run(buff)
+  end
 end
 return NomsuCompiler
