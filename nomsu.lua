@@ -208,12 +208,12 @@ do
       local arg_names
       for _index_0 = 1, #text do
         local _text = text[_index_0]
-        local invocation = _text:gsub("%%%S+", "%%")
+        local invocation = _text:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
         local _arg_names
         do
           local _accum_0 = { }
           local _len_0 = 1
-          for arg in _text:gmatch("%%(%S+)") do
+          for arg in _text:gmatch("%%(%S[^%s']*)") do
             _accum_0[_len_0] = arg
             _len_0 = _len_0 + 1
           end

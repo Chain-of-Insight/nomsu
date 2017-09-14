@@ -196,7 +196,7 @@ macro ["%item is in %list", "%list contains %item"]:
     ".."|(\%list as lua expr\[\%index as lua expr\] ~= nil)
 
 macro ["length of %list", "size of %list", "number of %list"]:
-    ".."|#(\list as lua expr\)
+    ".."|#(\%list as lua expr\)
 
 rule "dict %items":
     let "dict" = []
@@ -206,8 +206,8 @@ rule "dict %items":
 
 rule "restrict %fn to within %whitelist":
     lua block ".."
-        |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
-        |local whitelist = (type(vars.whitelist) == 'string') and {vars.whitelist} or vars.whitelist
+        |local fns = compiler:get_invocations(vars.fn)
+        |local whitelist = compiler:get_invocations(vars.whitelist)
         |local whiteset = {}
         |for _,w in ipairs(whitelist) do
         |    if not compiler.defs[w] then
@@ -228,8 +228,8 @@ rule "restrict %fn to within %whitelist":
 
 rule "allow %whitelist to use %fn":
     lua block ".."
-        |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
-        |local whitelist = (type(vars.whitelist) == 'string') and {vars.whitelist} or vars.whitelist
+        |local fns = compiler:get_invocations(vars.fn)
+        |local whitelist = compiler:get_invocations(vars.whitelist)
         |for _,w in ipairs(whitelist) do
         |    if not compiler.defs[w] then
         |        compiler:error("Undefined function: "..tostring(w))
@@ -252,8 +252,8 @@ rule "allow %whitelist to use %fn":
 
 rule "forbid %blacklist to use %fn":
     lua block ".."
-        |local fns = (type(vars.fn) == 'string') and {vars.fn} or vars.fn
-        |local blacklist = (type(vars.blacklist) == 'string') and {vars.blacklist} or vars.blacklist
+        |local fns = compiler:get_invocations(vars.fn)
+        |local blacklist = compiler:get_invocations(vars.blacklist)
         |for _,b in ipairs(blacklist) do
         |    if not compiler.defs[b] then
         |        compiler:error("Undefined function: "..tostring(b))

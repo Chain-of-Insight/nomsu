@@ -138,8 +138,8 @@ class NomsuCompiler
         invocations = {}
         local arg_names
         for _text in *text
-            invocation = _text\gsub("%%%S+","%%")
-            _arg_names = [arg for arg in _text\gmatch("%%(%S+)")]
+            invocation = _text\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
+            _arg_names = [arg for arg in _text\gmatch("%%(%S[^%s']*)")]
             table.insert(invocations, invocation)
             if arg_names
                 if not utils.equivalent(utils.set(arg_names), utils.set(_arg_names))
