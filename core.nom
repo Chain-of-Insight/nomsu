@@ -285,9 +285,9 @@ rule "dict %items":
         lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
     return %dict
 
-rule "%dict -> %key":
+rule "%dict 's %key":
     lua expr "vars.dict[vars.key]"
 
-rule "%dict -> %key = %value":
+rule "%dict 's %key = %value":
     lua block "vars.dict[vars.key] = vars.value"
 

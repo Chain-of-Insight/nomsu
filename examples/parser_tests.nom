@@ -192,6 +192,12 @@ test:
 test:
     don't fuck this up
 ..yields ".."
-    |Call [don't fuck this up]!
+    |Call [don 't fuck this up]!
+
+test:
+    %Brian's hat
+..yields ".."
+    |Call [% 's hat]:
+    |    Var[Brian]
 
 say "All tests passed!"
