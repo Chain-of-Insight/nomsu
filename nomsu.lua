@@ -136,6 +136,10 @@ local NomsuCompiler
 do
   local _class_0
   local _base_0 = {
+    writeln = function(self, ...)
+      self:write(...)
+      return self:write("\n")
+    end,
     call = function(self, fn_name, ...)
       local fn_info = self.defs[fn_name]
       if fn_info == nil then
@@ -159,7 +163,7 @@ do
         args = _tbl_0
       end
       if self.debug then
-        print("Calling " .. tostring(fn_name) .. " with args: " .. tostring(utils.repr(args)))
+        self:writeln("Calling " .. tostring(fn_name) .. " with args: " .. tostring(utils.repr(args)))
       end
       local ret = fn(self, args)
       table.remove(self.callstack)
@@ -184,7 +188,7 @@ do
     end,
     def = function(self, spec, fn)
       if self.debug then
-        print("Defining rule: " .. tostring(spec))
+        self:writeln("Defining rule: " .. tostring(spec))
       end
       local invocations, arg_names = self:get_invocations(spec)
       local fn_info = {
@@ -247,17 +251,17 @@ do
     end,
     run = function(self, text)
       if self.debug then
-        print("RUNNING TEXT:\n" .. tostring(text))
+        self:writeln("RUNNING TEXT:\n" .. tostring(text))
       end
       local code, retval = self:compile(text)
       if self.debug then
-        print("\nGENERATED LUA CODE:\n" .. tostring(code))
+        self:writeln("\nGENERATED LUA CODE:\n" .. tostring(code))
       end
       return retval
     end,
     parse = function(self, str)
       if self.debug then
-        print("PARSING:\n" .. tostring(str))
+        self:writeln("PARSING:\n" .. tostring(str))
       end
       local lingo = [=[            file <- ({ {| %blank_line* {:body: block :} %blank_line* (errors)? |} }) -> File
             errors <- (({.+}) => error_handler)
@@ -320,7 +324,7 @@ do
       lingo = make_parser(lingo)
       local tree = lingo:match(str:gsub("\r", "") .. "\n")
       if self.debug then
-        print("\nPARSE TREE:")
+        self:writeln("\nPARSE TREE:")
         self:print_tree(tree)
       end
       assert(tree, "Failed to parse: " .. tostring(str))
@@ -637,7 +641,7 @@ do
       for line in coroutine.wrap(function()
         return self:_yield_tree(tree)
       end) do
-        print(line)
+        self:writeln(line)
       end
     end,
     stringify_tree = function(self, tree)
@@ -654,7 +658,7 @@ do
         output_file = nil
       end
       if self.debug then
-        print("COMPILING:\n" .. tostring(src))
+        self:writeln("COMPILING:\n" .. tostring(src))
       end
       local tree = self:parse(src)
       assert(tree, "Tree failed to compile: " .. tostring(src))
@@ -666,13 +670,13 @@ do
       return code, retval
     end,
     error = function(self, ...)
-      print("ERROR!")
-      print(...)
-      print("Callstack:")
+      self:writeln("ERROR!")
+      self:writeln(...)
+      self:writeln("Callstack:")
       for i = #self.callstack, 1, -1 do
-        print("    " .. tostring(self.callstack[i]))
+        self:writeln("    " .. tostring(self.callstack[i]))
       end
-      print("    <top level>")
+      self:writeln("    <top level>")
       self.callstack = { }
       return error()
     end,
@@ -756,7 +760,10 @@ do
       })
       self.callstack = { }
       self.debug = false
-      return self:initialize_core()
+      self:initialize_core()
+      self.write = function(self, ...)
+        return io.write(...)
+      end
     end,
     __base = _base_0,
     __name = "NomsuCompiler"
@@ -796,18 +803,15 @@ end
 if arg and arg[1] then
   local c = NomsuCompiler()
   local input = io.open(arg[1]):read("*a")
-  local _print = print
-  local _io_write = io.write
+  local _write = c.write
   if arg[2] == "-" then
-    local nop
-    nop = function() end
-    print, io.write = nop, nop
+    c.write = function() end
   end
   local code, retval = c:compile(input)
+  c.write = _write
   if arg[2] then
     local output
     if arg[2] == "-" then
-      print, io.write = _print, _io_write
       output = io.output()
     else
       output = io.open(arg[2], 'w')

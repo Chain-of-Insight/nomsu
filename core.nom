@@ -147,7 +147,7 @@ rule "%a != %b":
     lua expr "((vars.a ~= vars.b) or not utils.equivalent(vars.a, vars.b))"
 
 macro "say %str":
-    ".."|print(utils.repr(\%str as lua expr\))
+    ".."|compiler:writeln(utils.repr(\%str as lua expr\))
 
 # Control flow
 rule "do %action":
@@ -331,7 +331,7 @@ rule "restrict %fn to within %whitelist":
         |    if fn_info == nil then
         |        compiler:error("Undefined function: "..tostring(fn))
         |    elseif not compiler:check_permission(fn) then
-        |        print("You do not have permission to restrict function: "..tostring(fn))
+        |        compiler:writeln("You do not have permission to restrict function: "..tostring(fn))
         |    else
         |        compiler.defs[fn].whiteset = whiteset
         |    end
@@ -351,9 +351,9 @@ rule "allow %whitelist to use %fn":
         |    if fn_info == nil then
         |        compiler:error("Undefined function: "..tostring(fn))
         |    elseif fn_info.whiteset == nil then
-        |        print("Function is already allowed by everyone: "..tostring(fn))
+        |        compiler:writeln("Function is already allowed by everyone: "..tostring(fn))
         |    elseif not compiler:check_permission(fn) then
-        |        print("You do not have permission to grant permissions for function: "..tostring(fn))
+        |        compiler:writeln("You do not have permission to grant permissions for function: "..tostring(fn))
         |    else
         |        for _,w in ipairs(whitelist) do
         |            fn_info.whiteset[w] = true
@@ -375,9 +375,9 @@ rule "forbid %blacklist to use %fn":
         |    if fn_info == nil then
         |        compiler:error("Undefined function: "..tostring(fn))
         |    elseif fn_info.whiteset == nil then
-        |        print("Cannot remove items from a whitelist when there is no whitelist on function: "..tostring(fn))
+        |        compiler:writeln("Cannot remove items from a whitelist when there is no whitelist on function: "..tostring(fn))
         |    elseif not compiler:check_permission(fn) then
-        |        print("You do not have permission to restrict function: "..tostring(fn))
+        |        compiler:writeln("You do not have permission to restrict function: "..tostring(fn))
         |    else
         |        for _,b in ipairs(blacklist) do fn_info.whiteset[b] = nil end
         |    end

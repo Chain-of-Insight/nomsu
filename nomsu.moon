@@ -96,6 +96,11 @@ class NomsuCompiler
         @callstack = {}
         @debug = false
         @initialize_core!
+        @write = (...)=> io.write(...)
+    
+    writeln:(...)=>
+        @write(...)
+        @write("\n")
 
     call: (fn_name,...)=>
         fn_info = @defs[fn_name]
@@ -109,7 +114,7 @@ class NomsuCompiler
         {:fn, :arg_names} = fn_info
         args = {name, select(i,...) for i,name in ipairs(arg_names[fn_name])}
         if @debug
-            print "Calling #{fn_name} with args: #{utils.repr(args)}"
+            @writeln "Calling #{fn_name} with args: #{utils.repr(args)}"
         ret = fn(self, args)
         table.remove @callstack
         return ret
@@ -126,7 +131,7 @@ class NomsuCompiler
 
     def: (spec, fn)=>
         if @debug
-            print "Defining rule: #{spec}"
+            @writeln "Defining rule: #{spec}"
         invocations,arg_names = @get_invocations spec
         fn_info = {:fn, :arg_names, :invocations, is_macro:false}
         for invocation in *invocations
@@ -156,16 +161,16 @@ class NomsuCompiler
     
     run: (text)=>
         if @debug
-            print "RUNNING TEXT:\n#{text}"
+            @writeln "RUNNING TEXT:\n#{text}"
         -- This will execute each chunk as it goes along
         code, retval = @compile(text)
         if @debug
-            print "\nGENERATED LUA CODE:\n#{code}"
+            @writeln "\nGENERATED LUA CODE:\n#{code}"
         return retval
     
     parse: (str)=>
         if @debug
-            print("PARSING:\n#{str}")
+            @writeln("PARSING:\n#{str}")
         lingo = [=[
             file <- ({ {| %blank_line* {:body: block :} %blank_line* (errors)? |} }) -> File
             errors <- (({.+}) => error_handler)
@@ -229,7 +234,7 @@ class NomsuCompiler
 
         tree = lingo\match(str\gsub("\r","").."\n")
         if @debug
-            print("\nPARSE TREE:")
+            @writeln("\nPARSE TREE:")
             @print_tree(tree)
         assert tree, "Failed to parse: #{str}"
         return tree
@@ -470,7 +475,7 @@ class NomsuCompiler
 
     print_tree:(tree)=>
         for line in coroutine.wrap(-> @_yield_tree(tree))
-            print(line)
+            @writeln(line)
 
     stringify_tree:(tree)=>
         result = {}
@@ -480,7 +485,7 @@ class NomsuCompiler
 
     compile: (src, output_file=nil)=>
         if @debug
-            print "COMPILING:\n#{src}"
+            @writeln "COMPILING:\n#{src}"
         tree = @parse(src)
         assert tree, "Tree failed to compile: #{src}"
         code, retval = @tree_to_lua(tree)
@@ -490,12 +495,12 @@ class NomsuCompiler
         return code, retval
 
     error: (...)=>
-        print "ERROR!"
-        print(...)
-        print("Callstack:")
+        @writeln "ERROR!"
+        @writeln(...)
+        @writeln("Callstack:")
         for i=#@callstack,1,-1
-            print "    #{@callstack[i]}"
-        print "    <top level>"
+            @writeln "    #{@callstack[i]}"
+        @writeln "    <top level>"
         @callstack = {}
         error!
 
@@ -567,19 +572,15 @@ if arg and arg[1]
     c = NomsuCompiler()
     --c.debug = true
     input = io.open(arg[1])\read("*a")
-    -- Kinda hacky, if run via "./nomsu.moon file.nom -", then silence print and io.write
-    -- during execution and re-enable them to print out the generated source code
-    _print = print
-    _io_write = io.write
+    -- If run via "./nomsu.moon file.nom -", then silence output and print generated
+    -- source code instead.
+    _write = c.write
     if arg[2] == "-"
-        export print
-        nop = ->
-        print, io.write = nop, nop
+        c.write = ->
     code, retval = c\compile(input)
+    c.write = _write -- put it back
     if arg[2]
         output = if arg[2] == "-"
-            export print
-            print, io.write = _print, _io_write
             io.output()
         else io.open(arg[2], 'w')
 
