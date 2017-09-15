@@ -48,7 +48,7 @@ utils = {
       else
         for i = 0, math.huge do
           local eq = ("="):rep(i)
-          if not x:find("%[" .. tostring(eq) .. "%[") and not x:find("%]" .. tostring(eq) .. "%]") then
+          if not x:find("%]" .. tostring(eq) .. "%]") and not x:match(".*]" .. tostring(eq) .. "$") then
             if x:sub(1, 1) == "\n" then
               return "[" .. tostring(eq) .. "[\n" .. x .. "]" .. tostring(eq) .. "]"
             else

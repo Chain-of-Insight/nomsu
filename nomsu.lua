@@ -360,19 +360,13 @@ do
         for _index_0 = 1, #_list_0 do
           local statement = _list_0[_index_0]
           local code = to_lua(statement, "Statement")
-          local lua_thunk, err = load("\n                    local utils = require('utils')\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)")
+          local lua_code = "\n                    local utils = require('utils')\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)"
+          local lua_thunk, err = load(lua_code)
           if not lua_thunk then
             error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(utils.repr(statement)))
           end
-          local ok, value = pcall(lua_thunk)
-          if not ok then
-            error(value)
-          end
-          ok, value = pcall(value, self, vars)
-          if not ok then
-            error()
-          end
-          return_value = value
+          local value = lua_thunk()
+          return_value = value(self, vars)
           add(code)
         end
         add([[                        return ret
@@ -672,6 +666,7 @@ do
       return code, retval
     end,
     error = function(self, ...)
+      print("ERROR!")
       print(...)
       print("Callstack:")
       for i = #self.callstack, 1, -1 do
@@ -717,42 +712,11 @@ do
         if kind == "Expression" then
           error("Expected to be in statement.")
         end
-        local lua_code = vars.lua_code.value
-        local _exp_0 = lua_code.type
-        if "List" == _exp_0 then
-          return table.concat((function()
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_0 = lua_code.value
-            for _index_0 = 1, #_list_0 do
-              local i = _list_0[_index_0]
-              _accum_0[_len_0] = as_lua_code(self, i.value, vars)
-              _len_0 = _len_0 + 1
-            end
-            return _accum_0
-          end)()), true
-        else
-          return as_lua_code(self, lua_code, vars), true
-        end
+        return self:tree_to_value(vars.lua_code, vars), true
       end)
       self:defmacro([[lua expr %lua_code]], function(self, vars, kind)
         local lua_code = vars.lua_code.value
-        local _exp_0 = lua_code.type
-        if "List" == _exp_0 then
-          return table.concat((function()
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_0 = lua_code.value
-            for _index_0 = 1, #_list_0 do
-              local i = _list_0[_index_0]
-              _accum_0[_len_0] = as_lua_code(self, i.value, vars)
-              _len_0 = _len_0 + 1
-            end
-            return _accum_0
-          end)())
-        else
-          return as_lua_code(self, lua_code, vars)
-        end
+        return self:tree_to_value(vars.lua_code, vars)
       end)
       self:def("rule %spec %body", function(self, vars)
         return self:def(vars.spec, vars.body)

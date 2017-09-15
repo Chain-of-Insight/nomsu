@@ -22,9 +22,9 @@ utils = {
                 elseif not x\find[[']] and not x\find"\n"
                     "\'"..x.."\'"
                 else
-                    for i=1,math.huge
+                    for i=0,math.huge
                         eq = ("=")\rep(i)
-                        if not x\find"%[#{eq}%[" and not x\find"%]#{eq}%]"
+                        if not x\find"%]#{eq}%]" and not x\match(".*]#{eq}$")
                             -- Stupid bullshit add an extra newline because lua discards first one if it exists
                             if x\sub(1,1) == "\n"
                                 return "[#{eq}[\n"..x.."]#{eq}]"
