@@ -158,10 +158,10 @@ class NomsuCompiler
         if @debug
             print "RUNNING TEXT:\n#{text}"
         -- This will execute each chunk as it goes along
-        code = @compile(text)
+        code, retval = @compile(text)
         if @debug
             print "\nGENERATED LUA CODE:\n#{code}"
-        return code
+        return retval
     
     parse: (str)=>
         if @debug
@@ -248,6 +248,7 @@ class NomsuCompiler
         assert tree, "No tree provided."
         indent = ""
         buffer = {}
+        return_value = nil
 
         to_lua = (t,kind)->
             ret = @tree_to_lua(t,kind)
@@ -261,7 +262,7 @@ class NomsuCompiler
                         local ret]]
                 vars = {}
                 for statement in *tree.value.body.value
-                    code = to_lua(statement)
+                    code = to_lua(statement, "Statement")
                     -- Run the fuckers as we go
                     -- TODO: clean up repeated loading of utils?
                     lua_thunk, err = load("
@@ -269,10 +270,11 @@ class NomsuCompiler
                     return (function(compiler, vars)\n#{code}\nend)")
                     if not lua_thunk
                         error("Failed to compile generated code:\n#{code}\n\n#{err}\n\nProduced by statement:\n#{utils.repr(statement)}")
-                    ok,err = pcall(lua_thunk)
-                    if not ok then error(err)
-                    ok,err = pcall(err, self, vars)
-                    if not ok then @error(err)
+                    ok,value = pcall(lua_thunk)
+                    if not ok then error(value)
+                    ok,value = pcall(value, self, vars)
+                    if not ok then error!
+                    return_value = value
                     add code
                 add [[
                         return ret
@@ -365,7 +367,7 @@ class NomsuCompiler
 
         -- TODO: make indentation clean
         buffer = table.concat(buffer, "\n")
-        return buffer
+        return buffer, return_value
 
     @comma_separated_items: (open, items, close)=>
         utils.accumulate "\n", ->
@@ -483,17 +485,19 @@ class NomsuCompiler
             print "COMPILING:\n#{src}"
         tree = @parse(src)
         assert tree, "Tree failed to compile: #{src}"
-        code = @tree_to_lua(tree)
+        code, retval = @tree_to_lua(tree)
         if output_file
             output = io.open(output_file, "w")
             output\write(code)
-        return code
+        return code, retval
 
     error: (...)=>
         print(...)
         print("Callstack:")
         for i=#@callstack,1,-1
             print "    #{@callstack[i]}"
+        print "    <top level>"
+        @callstack = {}
         error!
 
     test: (src, expected)=>
@@ -583,7 +587,7 @@ if arg and arg[1]
         export print
         nop = ->
         print, io.write = nop, nop
-    code = c\run(input)
+    code, retval = c\compile(input)
     if arg[2]
         output = if arg[2] == "-"
             export print
@@ -601,11 +605,12 @@ if arg and arg[1]
     end
     local NomsuCompiler = require('nomsu')
     local c = NomsuCompiler()
-    load()(c, {})
+    return load()(c, {})
     ]]
 elseif arg
     -- REPL:
     c = NomsuCompiler()
+    c\run('run file "core.nom"')
     while true
         buff = ""
         while true
@@ -616,6 +621,8 @@ elseif arg
             buff ..= line
         if #buff == 0
             break
-        c\run(buff)
+        ok, ret = pcall(-> c\run(buff))
+        if ok and ret != nil
+            print "= "..utils.repr(ret, true)
 
 return NomsuCompiler

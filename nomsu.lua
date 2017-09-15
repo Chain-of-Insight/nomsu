@@ -249,11 +249,11 @@ do
       if self.debug then
         print("RUNNING TEXT:\n" .. tostring(text))
       end
-      local code = self:compile(text)
+      local code, retval = self:compile(text)
       if self.debug then
         print("\nGENERATED LUA CODE:\n" .. tostring(code))
       end
-      return code
+      return retval
     end,
     parse = function(self, str)
       if self.debug then
@@ -341,6 +341,7 @@ do
       assert(tree, "No tree provided.")
       local indent = ""
       local buffer = { }
+      local return_value = nil
       local to_lua
       to_lua = function(t, kind)
         local ret = self:tree_to_lua(t, kind)
@@ -358,20 +359,20 @@ do
         local _list_0 = tree.value.body.value
         for _index_0 = 1, #_list_0 do
           local statement = _list_0[_index_0]
-          local code = to_lua(statement)
+          local code = to_lua(statement, "Statement")
           local lua_thunk, err = load("\n                    local utils = require('utils')\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)")
           if not lua_thunk then
             error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(utils.repr(statement)))
           end
-          local ok
-          ok, err = pcall(lua_thunk)
+          local ok, value = pcall(lua_thunk)
           if not ok then
-            error(err)
+            error(value)
           end
-          ok, err = pcall(err, self, vars)
+          ok, value = pcall(value, self, vars)
           if not ok then
-            self:error(err)
+            error()
           end
+          return_value = value
           add(code)
         end
         add([[                        return ret
@@ -496,7 +497,7 @@ do
         error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
       buffer = table.concat(buffer, "\n")
-      return buffer
+      return buffer, return_value
     end,
     fn_name_from_tree = function(self, tree)
       assert(tree.type == "FunctionCall", "Attempt to get fn name from non-functioncall tree: " .. tostring(tree.type))
@@ -663,12 +664,12 @@ do
       end
       local tree = self:parse(src)
       assert(tree, "Tree failed to compile: " .. tostring(src))
-      local code = self:tree_to_lua(tree)
+      local code, retval = self:tree_to_lua(tree)
       if output_file then
         local output = io.open(output_file, "w")
         output:write(code)
       end
-      return code
+      return code, retval
     end,
     error = function(self, ...)
       print(...)
@@ -676,6 +677,8 @@ do
       for i = #self.callstack, 1, -1 do
         print("    " .. tostring(self.callstack[i]))
       end
+      print("    <top level>")
+      self.callstack = { }
       return error()
     end,
     test = function(self, src, expected)
@@ -836,7 +839,7 @@ if arg and arg[1] then
     nop = function() end
     print, io.write = nop, nop
   end
-  local code = c:run(input)
+  local code, retval = c:compile(input)
   if arg[2] then
     local output
     if arg[2] == "-" then
@@ -853,11 +856,12 @@ if arg and arg[1] then
     end
     local NomsuCompiler = require('nomsu')
     local c = NomsuCompiler()
-    load()(c, {})
+    return load()(c, {})
     ]])
   end
 elseif arg then
   local c = NomsuCompiler()
+  c:run('run file "core.nom"')
   while true do
     local buff = ""
     while true do
@@ -871,7 +875,12 @@ elseif arg then
     if #buff == 0 then
       break
     end
-    c:run(buff)
+    local ok, ret = pcall(function()
+      return c:run(buff)
+    end)
+    if ok and ret ~= nil then
+      print("= " .. utils.repr(ret, true))
+    end
   end
 end
 return NomsuCompiler
