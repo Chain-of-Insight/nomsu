@@ -22,7 +22,7 @@ utils = {
                 elseif not x\find[[']] and not x\find"\n"
                     "\'"..x.."\'"
                 else
-                    for i=0,math.huge
+                    for i=1,math.huge
                         eq = ("=")\rep(i)
                         if not x\find"%[#{eq}%[" and not x\find"%]#{eq}%]"
                             -- Stupid bullshit add an extra newline because lua discards first one if it exists

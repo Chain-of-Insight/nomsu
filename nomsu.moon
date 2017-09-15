@@ -265,16 +265,14 @@ class NomsuCompiler
                     code = to_lua(statement, "Statement")
                     -- Run the fuckers as we go
                     -- TODO: clean up repeated loading of utils?
-                    lua_thunk, err = load("
+                    lua_code = "
                     local utils = require('utils')
-                    return (function(compiler, vars)\n#{code}\nend)")
+                    return (function(compiler, vars)\n#{code}\nend)"
+                    lua_thunk, err = load(lua_code)
                     if not lua_thunk
                         error("Failed to compile generated code:\n#{code}\n\n#{err}\n\nProduced by statement:\n#{utils.repr(statement)}")
-                    ok,value = pcall(lua_thunk)
-                    if not ok then error(value)
-                    ok,value = pcall(value, self, vars)
-                    if not ok then error!
-                    return_value = value
+                    value = lua_thunk!
+                    return_value = value(self, vars)
                     add code
                 add [[
                         return ret
@@ -492,6 +490,7 @@ class NomsuCompiler
         return code, retval
 
     error: (...)=>
+        print "ERROR!"
         print(...)
         print("Callstack:")
         for i=#@callstack,1,-1
@@ -531,22 +530,11 @@ class NomsuCompiler
 
         @defmacro [[lua block %lua_code]], (vars, kind)=>
             if kind == "Expression" then error("Expected to be in statement.")
-            lua_code = vars.lua_code.value
-            switch lua_code.type
-                when "List"
-                    -- TODO: handle subexpressions
-                    return table.concat([as_lua_code(@, i.value, vars) for i in *lua_code.value]), true
-                else
-                    return as_lua_code(@, lua_code, vars), true
+            return @tree_to_value(vars.lua_code, vars), true
 
         @defmacro [[lua expr %lua_code]], (vars, kind)=>
             lua_code = vars.lua_code.value
-            switch lua_code.type
-                when "List"
-                    -- TODO: handle subexpressions
-                    return table.concat([as_lua_code(@, i.value, vars) for i in *lua_code.value])
-                else
-                    return as_lua_code(@, lua_code, vars)
+            return @tree_to_value(vars.lua_code, vars)
 
         @def "rule %spec %body", (vars)=>
             @def vars.spec, vars.body

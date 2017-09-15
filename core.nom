@@ -39,12 +39,45 @@ rule "run file %filename":
 
 # Macro helper functions
 rule "%tree as lua block":
-    lua block [..]
-        "do return compiler:tree_to_lua(", %tree, ", 'Statement'), true end"
+    lua block ".."
+        |do return compiler:tree_to_lua(vars.tree, 'Statement'), true end
 
 rule "%tree as lua expr":
-    lua expr [..]
-        "compiler:tree_to_lua(", %tree, ", 'Expression')"
+    lua expr ".."
+        |compiler:tree_to_lua(vars.tree, 'Expression')
+
+# Moonscript!
+macro block "moonscript block %moonscript_code":
+    lua block ".."
+        |do
+        |    local parse, compile = require('moonscript.parse'), require('moonscript.compile')
+        |    local moon_code = compiler:tree_to_value(vars.moonscript_code, vars)
+        |    local tree, err = parse.string(moon_code)
+        |    if not tree then
+        |        compiler:error("Failed to parse moonscript: "..err)
+        |    end
+        |    local lua_code, err, pos = compile.tree(tree)
+        |    if not lua_code then
+        |        compiler:error(compile.format_error(err, pos, moon_code))
+        |    end
+        |    return "do\\n"..lua_code.."\\nend"
+        |end
+
+macro "moonscript %moonscript_code":
+    lua block ".."
+        |do
+        |    local parse, compile = require('moonscript.parse'), require('moonscript.compile')
+        |    local moon_code = compiler:tree_to_value(vars.moonscript_code, vars)
+        |    local tree, err = parse.string(moon_code)
+        |    if not tree then
+        |        compiler:error("Failed to parse moonscript: "..err)
+        |    end
+        |    local lua_code, err, pos = compile.tree(tree)
+        |    if not lua_code then
+        |        compiler:error(compile.format_error(err, pos, moon_code))
+        |    end
+        |    return "(function(compiler, vars)\\n"..lua_code.."\\nend)(compiler, vars)"
+        |end
 
 # String functions
 rule "join %strs":
