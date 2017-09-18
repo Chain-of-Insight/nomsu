@@ -108,7 +108,7 @@ class NomsuCompiler
         if fn_info == nil
             @error "Attempt to call undefined function: #{fn_name}"
         if fn_info.is_macro
-            @error "Attempt to call macro at runtime: #{fn_name}"
+            @error "Attempt to call macro at runtime: #{fn_name}\nThis can be caused by using a macro in a function that is defined before the macro."
         unless @check_permission(fn_name)
             @error "You do not have the authority to call: #{fn_name}"
         table.insert @callstack, fn_name
@@ -130,11 +130,11 @@ class NomsuCompiler
                 return true
         return false
 
-    def: (spec, fn)=>
+    def: (spec, fn, src)=>
         if @debug
             @writeln "Defining rule: #{spec}"
         invocations,arg_names = @get_invocations spec
-        fn_info = {:fn, :arg_names, :invocations, is_macro:false}
+        fn_info = {:fn, :arg_names, :invocations, :src, is_macro:false}
         for invocation in *invocations
             @defs[invocation] = fn_info
 
@@ -154,9 +154,9 @@ class NomsuCompiler
             arg_names[invocation] = _arg_names
         return invocations, arg_names
 
-    defmacro: (spec, lua_gen_fn)=>
+    defmacro: (spec, lua_gen_fn, src)=>
         invocations,arg_names = @get_invocations spec
-        fn_info = {fn:lua_gen_fn, :arg_names, :invocations, is_macro:true}
+        fn_info = {fn:lua_gen_fn, :arg_names, :invocations, :src, is_macro:true}
         for invocation in *invocations
             @defs[invocation] = fn_info
     
@@ -167,6 +167,7 @@ class NomsuCompiler
         code, retval = @compile(text)
         if @debug
             @writeln "\nGENERATED LUA CODE:\n#{code}"
+            @writeln "\nPRODUCED RETURN VALUE:\n#{retval}"
         return retval
 
     serialize: (obj)=>
@@ -192,7 +193,7 @@ class NomsuCompiler
         if not lua_thunk
             error("Failed to compile generated code:\n#{str}\n\n#{err}")
         return (lua_thunk!)(self, {})
-    
+
     parse: (str)=>
         if @debug
             @writeln("PARSING:\n#{str}")

@@ -26,7 +26,11 @@ rule ["eval %code", "run %code"]:
     lua expr "compiler:run(vars.code)"
 
 macro "source code %code":
-    lua expr "compiler.utils.repr(vars.code.src, true)"
+    lua block ".."
+        |if vars.code.value.type ~= "Thunk" then
+        |    compiler:error("'source code %' only takes code blocks, not "..vars.code.value.type)
+        |end
+    lua expr "compiler.utils.repr(vars.code.value.value.src, true)"
 
 rule "run file %filename":
     lua block ".."
@@ -137,6 +141,9 @@ rule "%a == %b":
     lua expr "((vars.a == vars.b) or compiler.utils.equivalent(vars.a, vars.b))"
 rule "%a != %b":
     lua expr "((vars.a ~= vars.b) or not compiler.utils.equivalent(vars.a, vars.b))"
+
+macro "repr %obj":
+    ".."|compiler.utils.repr(\%obj as lua expr\, true)
 
 macro "say %str":
     ".."|compiler:writeln(compiler.utils.repr(\%str as lua expr\))
