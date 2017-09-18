@@ -97,6 +97,7 @@ class NomsuCompiler
         @debug = false
         @initialize_core!
         @write = (...)=> io.write(...)
+        @utils = utils
     
     writeln:(...)=>
         @write(...)
@@ -167,6 +168,30 @@ class NomsuCompiler
         if @debug
             @writeln "\nGENERATED LUA CODE:\n#{code}"
         return retval
+
+    serialize: (obj)=>
+        switch type(obj)
+            when "function"
+                "assert(load("..utils.repr(string.dump(obj), true).."))"
+            when "table"
+                if utils.is_list obj
+                    "{#{table.concat([@serialize(i) for i in *obj], ", ")}}"
+                else
+                    "{#{table.concat(["[#{@serialize(k)}]= #{@serialize(v)}" for k,v in pairs(obj)], ", ")}}"
+            when "number"
+                utils.repr(obj, true)
+            when "string"
+                utils.repr(obj, true)
+            else
+                error "Serialization not implemented for: #{type(obj)}"
+
+    deserialize: (str)=>
+        lua_thunk, err = load("return (function(compiler,vars)
+        return "..str.."
+        end)")
+        if not lua_thunk
+            error("Failed to compile generated code:\n#{str}\n\n#{err}")
+        return (lua_thunk!)(self, {})
     
     parse: (str)=>
         if @debug
@@ -240,9 +265,7 @@ class NomsuCompiler
         return tree
 
     tree_to_value: (tree, vars)=>
-        -- TODO: clean up require utils
         code = "
-        local utils = require('utils')
         return (function(compiler, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
         lua_thunk, err = load(code)
         if not lua_thunk
@@ -269,9 +292,7 @@ class NomsuCompiler
                 for statement in *tree.value.body.value
                     code = to_lua(statement, "Statement")
                     -- Run the fuckers as we go
-                    -- TODO: clean up repeated loading of utils?
                     lua_code = "
-                    local utils = require('utils')
                     return (function(compiler, vars)\n#{code}\nend)"
                     lua_thunk, err = load(lua_code)
                     if not lua_thunk
@@ -292,9 +313,8 @@ class NomsuCompiler
                 assert tree.value.type == "Block", "Non-block value in Thunk"
                 add [[
                     (function(compiler, vars)
-                        local ret]]
-                add to_lua(tree.value)
-                add [[
+                        local ret
+                        ]]..to_lua(tree.value).."\n"..[[
                         return ret
                     end)
                 ]]
@@ -339,7 +359,7 @@ class NomsuCompiler
                             if string_buffer ~= ""
                                 table.insert concat_parts, utils.repr(string_buffer, true)
                                 string_buffer = ""
-                            table.insert concat_parts, "utils.repr(#{to_lua(bit)})"
+                            table.insert concat_parts, "compiler.utils.repr(#{to_lua(bit)})"
 
                 if string_buffer ~= ""
                     table.insert concat_parts, utils.repr(string_buffer, true)
@@ -535,31 +555,11 @@ class NomsuCompiler
 
         @defmacro [[lua block %lua_code]], (vars, kind)=>
             if kind == "Expression" then error("Expected to be in statement.")
-            return @tree_to_value(vars.lua_code, vars), true
+            return "do\n"..@tree_to_value(vars.lua_code, vars).."\nend", true
 
         @defmacro [[lua expr %lua_code]], (vars, kind)=>
             lua_code = vars.lua_code.value
             return @tree_to_value(vars.lua_code, vars)
-
-        @def "rule %spec %body", (vars)=>
-            @def vars.spec, vars.body
-
-        @defmacro [[macro %spec %body]], (vars, kind)=>
-            if kind == "Expression"
-                error("Macro definitions cannot be used as expressions.")
-            @defmacro @tree_to_value(vars.spec, vars), @tree_to_value(vars.body, vars)
-            return "", true
-
-        @defmacro [[macro block %spec %body]], (vars, kind)=>
-            if kind == "Expression"
-                error("Macro definitions cannot be used as expressions.")
-            invocation = @tree_to_value(vars.spec, vars)
-            fn = @tree_to_value(vars.body, vars)
-            @defmacro invocation, ((vars,kind)=>
-                if kind == "Expression"
-                    error("Macro: #{invocation} was defined to be a block, not an expression.")
-                return fn(@,vars,kind), true)
-            return "", true
 
         @def "run file %filename", (vars)=>
             file = io.open(vars.filename)
@@ -585,7 +585,6 @@ if arg and arg[1]
         else io.open(arg[2], 'w')
 
         output\write [[
-    local utils = require('utils')
     local load = function()
     ]]
         output\write(code)

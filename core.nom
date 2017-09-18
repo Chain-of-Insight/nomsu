@@ -11,36 +11,32 @@ rule "macro %spec %body":
 
 rule "macro block %spec %body":
     lua block ".."
-        |do
-        |    local spec, body = vars.spec, vars.body
-        |    local wrapper = function(compiler, vars, kind)
-        |        if kind == "Expression" then
-        |            compiler:error("Macro: "..spec.." was defined to be a block, but is being used as an expression.")
-        |        end
-        |        return body(compiler, vars, kind), true
+        |local spec, body = vars.spec, vars.body
+        |local wrapper = function(compiler, vars, kind)
+        |    if kind == "Expression" then
+        |        compiler:error("Macro: "..spec.." was defined to be a block, but is being used as an expression.")
         |    end
-        |    compiler:defmacro(spec, wrapper)
-        |    return nil
+        |    return ("do\\n"..body(compiler, vars, kind).."\\nend"), true
         |end
+        |compiler:defmacro(spec, wrapper)
+        |return nil
 
 # Compiler tools
 rule ["eval %code", "run %code"]:
     lua expr "compiler:run(vars.code)"
 
 macro "source code %code":
-    lua expr "utils.repr(vars.code.src, true)"
+    lua expr "compiler.utils.repr(vars.code.src, true)"
 
 rule "run file %filename":
     lua block ".."
-        |do
-        |    local file = io.open(vars.filename)
-        |    return compiler:run(file:read("*a"))
-        |end
+        |local file = io.open(vars.filename)
+        |return compiler:run(file:read("*a"))
 
 # Macro helper functions
 rule "%tree as lua block":
     lua block ".."
-        |do return compiler:tree_to_lua(vars.tree, 'Statement'), true end
+        |return compiler:tree_to_lua(vars.tree, 'Statement'), true
 
 rule "%tree as lua expr":
     lua expr ".."
@@ -49,48 +45,44 @@ rule "%tree as lua expr":
 # Moonscript!
 macro block "moonscript block %moonscript_code":
     lua block ".."
-        |do
-        |    local parse, compile = require('moonscript.parse'), require('moonscript.compile')
-        |    local moon_code = compiler:tree_to_value(vars.moonscript_code, vars)
-        |    local tree, err = parse.string(moon_code)
-        |    if not tree then
-        |        compiler:error("Failed to parse moonscript: "..err)
-        |    end
-        |    local lua_code, err, pos = compile.tree(tree)
-        |    if not lua_code then
-        |        compiler:error(compile.format_error(err, pos, moon_code))
-        |    end
-        |    return "do\\n"..lua_code.."\\nend"
+        |local parse, compile = require('moonscript.parse'), require('moonscript.compile')
+        |local moon_code = compiler:tree_to_value(vars.moonscript_code, vars)
+        |local tree, err = parse.string(moon_code)
+        |if not tree then
+        |    compiler:error("Failed to parse moonscript: "..err)
         |end
+        |local lua_code, err, pos = compile.tree(tree)
+        |if not lua_code then
+        |    compiler:error(compile.format_error(err, pos, moon_code))
+        |end
+        |return "do\\n"..lua_code.."\\nend"
 
 macro "moonscript %moonscript_code":
     lua block ".."
-        |do
-        |    local parse, compile = require('moonscript.parse'), require('moonscript.compile')
-        |    local moon_code = compiler:tree_to_value(vars.moonscript_code, vars)
-        |    local tree, err = parse.string(moon_code)
-        |    if not tree then
-        |        compiler:error("Failed to parse moonscript: "..err)
-        |    end
-        |    local lua_code, err, pos = compile.tree(tree)
-        |    if not lua_code then
-        |        compiler:error(compile.format_error(err, pos, moon_code))
-        |    end
-        |    return "(function(compiler, vars)\\n"..lua_code.."\\nend)(compiler, vars)"
+        |local parse, compile = require('moonscript.parse'), require('moonscript.compile')
+        |local moon_code = compiler:tree_to_value(vars.moonscript_code, vars)
+        |local tree, err = parse.string(moon_code)
+        |if not tree then
+        |    compiler:error("Failed to parse moonscript: "..err)
         |end
+        |local lua_code, err, pos = compile.tree(tree)
+        |if not lua_code then
+        |    compiler:error(compile.format_error(err, pos, moon_code))
+        |end
+        |return "(function(compiler, vars)\\n"..lua_code.."\\nend)(compiler, vars)"
 
 # String functions
 rule "join %strs":
     lua block ".."
         |local str_bits = {}
-        |for i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end
-        |do return table.concat(str_bits) end
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = compiler.utils.repr(bit) end
+        |return table.concat(str_bits)
 
 rule "join %strs with glue %glue":
     lua block ".."
         |local str_bits = {}
-        |for i,bit in ipairs(vars.strs) do str_bits[i] = utils.repr(bit) end
-        |do return table.concat(str_bits, vars.glue) end
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = compiler.utils.repr(bit) end
+        |return table.concat(str_bits, vars.glue)
 
 rule ["capitalize %str", "%str capitalized"]:
     lua expr ".."|vars.str:gsub("%l", string.upper, 1)
@@ -142,22 +134,22 @@ macro "- %a": ".."|-(\%a as lua expr\)
 macro "not %a": ".."|not (\%a as lua expr\)
 
 rule "%a == %b":
-    lua expr "((vars.a == vars.b) or utils.equivalent(vars.a, vars.b))"
+    lua expr "((vars.a == vars.b) or compiler.utils.equivalent(vars.a, vars.b))"
 rule "%a != %b":
-    lua expr "((vars.a ~= vars.b) or not utils.equivalent(vars.a, vars.b))"
+    lua expr "((vars.a ~= vars.b) or not compiler.utils.equivalent(vars.a, vars.b))"
 
 macro "say %str":
-    ".."|compiler:writeln(utils.repr(\%str as lua expr\))
+    ".."|compiler:writeln(compiler.utils.repr(\%str as lua expr\))
 
 # Control flow
 rule "do %action":
     lua expr "vars.action(compiler, setmetatable({}, {__index=vars}))"
 
 macro block "return %return-value":
-    ".."|do return \%return-value as lua expr\ end
+    ".."|return \%return-value as lua expr\
 
 macro block "return":
-    "do return nil end"
+    "return nil"
 
 # Conditionals
 macro block "if %condition %if_body":
@@ -185,24 +177,20 @@ macro "%if_expr if %condition else %else_expr":
 # For loop
 macro block "for %varname in %iterable %body":
     let "varname" = (%varname as lua expr)
-    ".."|do
-        |    local old_loopval = vars[\%varname\]
-        |    for i,value in ipairs(\%iterable as lua expr\) do
-        |        vars[\%varname\] = value
-        |        \(lua expr "vars.body.value.value") as lua block\
-        |    end
-        |    vars[\%varname\] = old_loopval
+    ".."|local old_loopval = vars[\%varname\]
+        |for i,value in ipairs(\%iterable as lua expr\) do
+        |    vars[\%varname\] = value
+        |    \(lua expr "vars.body.value.value") as lua block\
         |end
+        |vars[\%varname\] = old_loopval
 
 macro block "for all %iterable %body":
-    ".."|do
-        |    local old_loopval = vars.it
-        |    for i,value in ipairs(\%iterable as lua expr\) do
-        |        vars.it = value
-        |        \(lua expr "vars.body.value.value") as lua block\
-        |    end
-        |    vars.it = old_loopval
+    ".."|local old_loopval = vars.it
+        |for i,value in ipairs(\%iterable as lua expr\) do
+        |    vars.it = value
+        |    \(lua expr "vars.body.value.value") as lua block\
         |end
+        |vars.it = old_loopval
 
 # List Comprehension
 # TODO: maybe make this lazy, or a lazy version?
@@ -249,45 +237,45 @@ macro "%key = %value for all %iterable":
 
 # Number ranges
 rule "%start up to %stop":
-    lua expr "utils.range(vars.start,vars.stop-1)"
+    lua expr "compiler.utils.range(vars.start,vars.stop-1)"
 
 rule ["%start thru %stop", "%start through %stop"]:
-    lua expr "utils.range(vars.start,vars.stop)"
+    lua expr "compiler.utils.range(vars.start,vars.stop)"
 
 rule "%start down to %stop":
-    lua expr "utils.range(vars.start,vars.stop+1,-1)"
+    lua expr "compiler.utils.range(vars.start,vars.stop+1,-1)"
 
 rule ["%start down thru %stop", "%start down through %stop"]:
-    lua expr "utils.range(vars.start,vars.stop,-1)"
+    lua expr "compiler.utils.range(vars.start,vars.stop,-1)"
 
 rule "%start up to %stop via %step":
-    lua expr "utils.range(vars.start,vars.stop-1,vars.step)"
+    lua expr "compiler.utils.range(vars.start,vars.stop-1,vars.step)"
 
 rule ["%start thru %stop via %step", "%start through %stop via %step"]:
-    lua expr "utils.range(vars.start,vars.stop,vars.step)"
+    lua expr "compiler.utils.range(vars.start,vars.stop,vars.step)"
 
 rule "%start down to %stop via %step":
-    lua expr "utils.range(vars.start,vars.stop+1,-vars.step)"
+    lua expr "compiler.utils.range(vars.start,vars.stop+1,-vars.step)"
 
 rule ["%start down thru %stop via %step", "%start down through %stop via %step"]:
-    lua expr "utils.range(vars.start,vars.stop,-vars.step)"
+    lua expr "compiler.utils.range(vars.start,vars.stop,-vars.step)"
 
 # Common utility functions
 rule ["random number"]: lua expr "math.random()"
-rule ["sum of %items"]: lua expr "utils.sum(vars.items)"
-rule ["product of %items"]: lua expr "utils.product(vars.items)"
-rule ["all of %items"]: lua expr "utils.all(vars.items)"
-rule ["any of %items"]: lua expr "utils.any(vars.items)"
-rule ["avg of %items", "average of %items"]: lua expr "(utils.sum(vars.items)/#vars.items)"
+rule ["sum of %items"]: lua expr "compiler.utils.sum(vars.items)"
+rule ["product of %items"]: lua expr "compiler.utils.product(vars.items)"
+rule ["all of %items"]: lua expr "compiler.utils.all(vars.items)"
+rule ["any of %items"]: lua expr "compiler.utils.any(vars.items)"
+rule ["avg of %items", "average of %items"]: lua expr "(compiler.utils.sum(vars.items)/#vars.items)"
 rule ["min of %items", "smallest of %items", "lowest of %items"]:
-    lua expr "utils.min(vars.items)"
+    lua expr "compiler.utils.min(vars.items)"
 rule ["max of %items", "biggest of %items", "largest of %items", "highest of %items"]:
-    lua expr "utils.min(vars.items)"
+    lua expr "compiler.utils.min(vars.items)"
 
 rule ["min of %items with respect to %keys"]:
-    lua expr "utils.min(vars.items, vars.keys)"
+    lua expr "compiler.utils.min(vars.items, vars.keys)"
 rule ["max of %items with respect to %keys"]:
-    lua expr "utils.max(vars.items, vars.keys)"
+    lua expr "compiler.utils.max(vars.items, vars.keys)"
 
 # List/dict functions
 macro [..]
@@ -395,7 +383,7 @@ rule "error %msg":
         |compiler:error(vars.msg)
 
 macro block "test %code yields %expected":
-    let "generated" = (lua expr "utils.repr(compiler:stringify_tree(vars.code.value.value), true)")
+    let "generated" = (lua expr "compiler.utils.repr(compiler:stringify_tree(vars.code.value.value), true)")
     let "expected" = (%expected as lua expr)
     if (%generated != %expected):
         say "Test failed!"

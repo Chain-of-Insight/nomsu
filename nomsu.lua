@@ -259,6 +259,48 @@ do
       end
       return retval
     end,
+    serialize = function(self, obj)
+      local _exp_0 = type(obj)
+      if "function" == _exp_0 then
+        return "assert(load(" .. utils.repr(string.dump(obj), true) .. "))"
+      elseif "table" == _exp_0 then
+        if utils.is_list(obj) then
+          return "{" .. tostring(table.concat((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            for _index_0 = 1, #obj do
+              local i = obj[_index_0]
+              _accum_0[_len_0] = self:serialize(i)
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)(), ", ")) .. "}"
+        else
+          return "{" .. tostring(table.concat((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            for k, v in pairs(obj) do
+              _accum_0[_len_0] = "[" .. tostring(self:serialize(k)) .. "]= " .. tostring(self:serialize(v))
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)(), ", ")) .. "}"
+        end
+      elseif "number" == _exp_0 then
+        return utils.repr(obj, true)
+      elseif "string" == _exp_0 then
+        return utils.repr(obj, true)
+      else
+        return error("Serialization not implemented for: " .. tostring(type(obj)))
+      end
+    end,
+    deserialize = function(self, str)
+      local lua_thunk, err = load("return (function(compiler,vars)\n        return " .. str .. "\n        end)")
+      if not lua_thunk then
+        error("Failed to compile generated code:\n" .. tostring(str) .. "\n\n" .. tostring(err))
+      end
+      return (lua_thunk())(self, { })
+    end,
     parse = function(self, str)
       if self.debug then
         self:writeln("PARSING:\n" .. tostring(str))
@@ -331,7 +373,7 @@ do
       return tree
     end,
     tree_to_value = function(self, tree, vars)
-      local code = "\n        local utils = require('utils')\n        return (function(compiler, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
+      local code = "\n        return (function(compiler, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
       local lua_thunk, err = load(code)
       if not lua_thunk then
         error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err))
@@ -364,7 +406,7 @@ do
         for _index_0 = 1, #_list_0 do
           local statement = _list_0[_index_0]
           local code = to_lua(statement, "Statement")
-          local lua_code = "\n                    local utils = require('utils')\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)"
+          local lua_code = "\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)"
           local lua_thunk, err = load(lua_code)
           if not lua_thunk then
             error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(utils.repr(statement)))
@@ -385,9 +427,8 @@ do
       elseif "Thunk" == _exp_0 then
         assert(tree.value.type == "Block", "Non-block value in Thunk")
         add([[                    (function(compiler, vars)
-                        local ret]])
-        add(to_lua(tree.value))
-        add([[                        return ret
+                        local ret
+                        ]] .. to_lua(tree.value) .. "\n" .. [[                        return ret
                     end)
                 ]])
       elseif "Statement" == _exp_0 then
@@ -455,7 +496,7 @@ do
                 table.insert(concat_parts, utils.repr(string_buffer, true))
                 string_buffer = ""
               end
-              table.insert(concat_parts, "utils.repr(" .. tostring(to_lua(bit)) .. ")")
+              table.insert(concat_parts, "compiler.utils.repr(" .. tostring(to_lua(bit)) .. ")")
             end
           end
         end
@@ -716,35 +757,11 @@ do
         if kind == "Expression" then
           error("Expected to be in statement.")
         end
-        return self:tree_to_value(vars.lua_code, vars), true
+        return "do\n" .. self:tree_to_value(vars.lua_code, vars) .. "\nend", true
       end)
       self:defmacro([[lua expr %lua_code]], function(self, vars, kind)
         local lua_code = vars.lua_code.value
         return self:tree_to_value(vars.lua_code, vars)
-      end)
-      self:def("rule %spec %body", function(self, vars)
-        return self:def(vars.spec, vars.body)
-      end)
-      self:defmacro([[macro %spec %body]], function(self, vars, kind)
-        if kind == "Expression" then
-          error("Macro definitions cannot be used as expressions.")
-        end
-        self:defmacro(self:tree_to_value(vars.spec, vars), self:tree_to_value(vars.body, vars))
-        return "", true
-      end)
-      self:defmacro([[macro block %spec %body]], function(self, vars, kind)
-        if kind == "Expression" then
-          error("Macro definitions cannot be used as expressions.")
-        end
-        local invocation = self:tree_to_value(vars.spec, vars)
-        local fn = self:tree_to_value(vars.body, vars)
-        self:defmacro(invocation, (function(self, vars, kind)
-          if kind == "Expression" then
-            error("Macro: " .. tostring(invocation) .. " was defined to be a block, not an expression.")
-          end
-          return fn(self, vars, kind), true
-        end))
-        return "", true
       end)
       return self:def("run file %filename", function(self, vars)
         local file = io.open(vars.filename)
@@ -764,6 +781,7 @@ do
       self.write = function(self, ...)
         return io.write(...)
       end
+      self.utils = utils
     end,
     __base = _base_0,
     __name = "NomsuCompiler"
@@ -816,8 +834,7 @@ if arg and arg[1] then
     else
       output = io.open(arg[2], 'w')
     end
-    output:write([[    local utils = require('utils')
-    local load = function()
+    output:write([[    local load = function()
     ]])
     output:write(code)
     output:write([[
