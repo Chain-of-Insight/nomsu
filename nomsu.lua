@@ -146,7 +146,7 @@ do
         self:error("Attempt to call undefined function: " .. tostring(fn_name))
       end
       if fn_info.is_macro then
-        self:error("Attempt to call macro at runtime: " .. tostring(fn_name))
+        self:error("Attempt to call macro at runtime: " .. tostring(fn_name) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
       end
       if not (self:check_permission(fn_name)) then
         self:error("You do not have the authority to call: " .. tostring(fn_name))
@@ -186,7 +186,7 @@ do
       end
       return false
     end,
-    def = function(self, spec, fn)
+    def = function(self, spec, fn, src)
       if self.debug then
         self:writeln("Defining rule: " .. tostring(spec))
       end
@@ -195,6 +195,7 @@ do
         fn = fn,
         arg_names = arg_names,
         invocations = invocations,
+        src = src,
         is_macro = false
       }
       for _index_0 = 1, #invocations do
@@ -236,12 +237,16 @@ do
       end
       return invocations, arg_names
     end,
-    defmacro = function(self, spec, lua_gen_fn)
+    defmacro = function(self, spec, lua_gen_fn, src)
+      if self.debug then
+        self:writeln("DEFINING MACRO: " .. tostring(spec) .. tostring(src or ""))
+      end
       local invocations, arg_names = self:get_invocations(spec)
       local fn_info = {
         fn = lua_gen_fn,
         arg_names = arg_names,
         invocations = invocations,
+        src = src,
         is_macro = true
       }
       for _index_0 = 1, #invocations do
@@ -256,12 +261,14 @@ do
       local code, retval = self:compile(text)
       if self.debug then
         self:writeln("\nGENERATED LUA CODE:\n" .. tostring(code))
+        self:writeln("\nPRODUCED RETURN VALUE:\n" .. tostring(retval))
       end
       return retval
     end,
     serialize = function(self, obj)
       local _exp_0 = type(obj)
       if "function" == _exp_0 then
+        error("Function serialization is not yet implemented.")
         return "assert(load(" .. utils.repr(string.dump(obj), true) .. "))"
       elseif "table" == _exp_0 then
         if utils.is_list(obj) then

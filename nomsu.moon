@@ -155,6 +155,8 @@ class NomsuCompiler
         return invocations, arg_names
 
     defmacro: (spec, lua_gen_fn, src)=>
+        if @debug
+            @writeln("DEFINING MACRO: #{spec}#{src or ""}")
         invocations,arg_names = @get_invocations spec
         fn_info = {fn:lua_gen_fn, :arg_names, :invocations, :src, is_macro:true}
         for invocation in *invocations
@@ -173,6 +175,7 @@ class NomsuCompiler
     serialize: (obj)=>
         switch type(obj)
             when "function"
+                error("Function serialization is not yet implemented.")
                 "assert(load("..utils.repr(string.dump(obj), true).."))"
             when "table"
                 if utils.is_list obj
