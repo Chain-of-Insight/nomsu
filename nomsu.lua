@@ -576,7 +576,7 @@ do
       elseif "Var" == _exp_0 then
         add("vars[" .. tostring(utils.repr(tree.value, true)) .. "]")
       else
-        error("Unknown/unimplemented thingy: " .. tostring(tree.type))
+        self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
       buffer = table.concat(buffer, "\n")
       return buffer, return_value
