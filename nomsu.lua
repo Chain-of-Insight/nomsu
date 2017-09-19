@@ -203,7 +203,43 @@ do
         self.defs[invocation] = fn_info
       end
     end,
+    get_invocations_from_definition = function(self, def, vars)
+      if def.type == "String" or def.type == "List" then
+        return self:tree_to_value(def, vars)
+      end
+      if def.type ~= "Thunk" then
+        self:error("Trying to get invocations from " .. tostring(def.type) .. ", but expected Thunk.")
+      end
+      local invocations = { }
+      local _list_0 = def.value.value
+      for _index_0 = 1, #_list_0 do
+        local statement = _list_0[_index_0]
+        if statement.value.type ~= "FunctionCall" then
+          self:error("Invalid statement type: " .. tostring(statement.value.type) .. ", expected FunctionCall")
+        end
+        local name_bits = { }
+        local _list_1 = statement.value.value
+        for _index_1 = 1, #_list_1 do
+          local token = _list_1[_index_1]
+          if token.type == "Word" then
+            table.insert(name_bits, token.value)
+          elseif token.value.type == "Var" then
+            table.insert(name_bits, token.value.src)
+          else
+            self:error("Unexpected token type in definition: " .. tostring(token.value.type) .. " (expected Word or Var)")
+          end
+        end
+        table.insert(invocations, table.concat(name_bits, " "))
+      end
+      return invocations
+    end,
     get_invocations = function(self, text)
+      if not text then
+        self:error("No text provided!")
+      end
+      if type(text) == 'function' then
+        error("Function passed to get_invocations")
+      end
       if type(text) == 'string' then
         text = {
           text
@@ -764,11 +800,21 @@ do
         if kind == "Expression" then
           error("Expected to be in statement.")
         end
-        return "do\n" .. self:tree_to_value(vars.lua_code, vars) .. "\nend", true
+        local inner_vars = setmetatable({ }, {
+          __index = function(_, key)
+            return "vars[" .. tostring(utils.repr(key, true)) .. "]"
+          end
+        })
+        return "do\n" .. self:tree_to_value(vars.lua_code, inner_vars) .. "\nend", true
       end)
       self:defmacro([[lua expr %lua_code]], function(self, vars, kind)
         local lua_code = vars.lua_code.value
-        return self:tree_to_value(vars.lua_code, vars)
+        local inner_vars = setmetatable({ }, {
+          __index = function(_, key)
+            return "vars[" .. tostring(utils.repr(key, true)) .. "]"
+          end
+        })
+        return self:tree_to_value(vars.lua_code, inner_vars)
       end)
       return self:def("run file %filename", function(self, vars)
         local file = io.open(vars.filename)

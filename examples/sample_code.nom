@@ -11,7 +11,7 @@ say (4)
 
 #.. "rule" is just a function that takes a function call spec and a block of code to run,
     and stores the function definition
-rule "fart": say "poot"
+rule: fart ..=: say "poot"
 
 fart
 
@@ -33,13 +33,13 @@ say ".."
     |(done)
     |
 
-rule "doublefart": # this farts twice
+rule: doublefart ..=: # this farts twice
     say "poot"
     say "poot"
 
 doublefart
 
-rule "subex work": return "subexpressions work"
+rule: subex work ..=: "subexpressions work"
 
 say (subex work)
 
@@ -54,7 +54,7 @@ say [..]
     1, 2
     3
 
-rule "say both %one and %two":
+rule: say both %one and %two ..=:
     say %one
     say %two
 
@@ -68,7 +68,7 @@ say both..
     "hello"
     and "world"
 
-rule "three": return 3
+rule: three ..=: 3
 say both ..
     "a list:"
     and [..]
@@ -79,16 +79,16 @@ if 1: yes
 
 if 1: yes ..else: no
 
-say (do: return 5)
+say (do: return: 5)
 
-rule "do %one also %two":
+rule: do %one also %two ..=:
     do %one
     do %two
 
 do: say "one liner"
 ..also: say "another one liner"
 
-say (do: return "wow")
+say (do: return: "wow")
 
 say (1 + (-(2 * 3)))
 
@@ -110,27 +110,23 @@ say ".."
     |   with multiple lines
     |   and an interpolated expression: \2 + 5\
 
-rule "%n bottles":
-    lua block [..]
-        ".."
-            |do
-            |    print("running raw lua code...")
-            |    local n = 
-        .., %n, ".."
-            |
-            |    for i=n,1,-1 do
-            |        print(tostring(i).." bottles of beer on the wall. Take one down, pass it around,")
-            |    end
-            |    print("no more bottles of beer on the wall.")
-            |end
+rule: %n bottles ..=:
+    lua block ".."
+        |do
+        |    print("running raw lua code...")
+        |    for i=\%n\,1,-1 do
+        |        print(tostring(i).." bottles of beer on the wall. Take one down, pass it around,")
+        |    end
+        |    print("no more bottles of beer on the wall.")
+        |end
     nil
 9 bottles
 
-rule "dumsum %nums":
-    let "sum" = 0
-    for "n" in %nums:
-        let "sum" = (%sum + %n)
-    return %sum
+rule: dumsum %nums ..=:
+    %sum =: 0
+    for %n in %nums:
+        %sum +=: %n
+    return: %sum
 
 say (dumsum [1,2,3])
 

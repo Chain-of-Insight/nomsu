@@ -9,6 +9,7 @@ utils = require 'utils'
 -- better scoping?
 -- first-class functions
 -- better error reporting
+-- versions of rules with auto-supplied arguments
 -- type checking?
 
 INDENT = "    "
@@ -137,8 +138,33 @@ class NomsuCompiler
         fn_info = {:fn, :arg_names, :invocations, :src, is_macro:false}
         for invocation in *invocations
             @defs[invocation] = fn_info
+    
+    get_invocations_from_definition:(def, vars)=>
+        if def.type == "String" or def.type == "List"
+            return @tree_to_value(def, vars)
+
+        if def.type != "Thunk"
+            @error "Trying to get invocations from #{def.type}, but expected Thunk."
+        invocations = {}
+        for statement in *def.value.value
+            if statement.value.type != "FunctionCall"
+                @error "Invalid statement type: #{statement.value.type}, expected FunctionCall"
+            name_bits = {}
+            for token in *statement.value.value
+                if token.type == "Word"
+                    table.insert name_bits, token.value
+                elseif token.value.type == "Var"
+                    table.insert name_bits, token.value.src
+                else
+                    @error "Unexpected token type in definition: #{token.value.type} (expected Word or Var)"
+            table.insert invocations, table.concat(name_bits, " ")
+        return invocations
 
     get_invocations:(text)=>
+        if not text
+            @error "No text provided!"
+        if type(text) == 'function'
+            error "Function passed to get_invocations"
         if type(text) == 'string' then text = {text}
         invocations = {}
         arg_names = {}
@@ -559,11 +585,13 @@ class NomsuCompiler
 
         @defmacro [[lua block %lua_code]], (vars, kind)=>
             if kind == "Expression" then error("Expected to be in statement.")
-            return "do\n"..@tree_to_value(vars.lua_code, vars).."\nend", true
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key,true)}]"})
+            return "do\n"..@tree_to_value(vars.lua_code, inner_vars).."\nend", true
 
         @defmacro [[lua expr %lua_code]], (vars, kind)=>
             lua_code = vars.lua_code.value
-            return @tree_to_value(vars.lua_code, vars)
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key,true)}]"})
+            return @tree_to_value(vars.lua_code, inner_vars)
 
         @def "run file %filename", (vars)=>
             file = io.open(vars.filename)

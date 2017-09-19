@@ -9,21 +9,23 @@ test: say (4) ..yields ".."
     |    4
 
 test:
-    rule "fart" =: say "poot"
+    rule: fart ..=: say "poot"
 ..yields ".."
     |Call [rule % = %]:
-    |    "fart"
+    |    Thunk:
+    |        Call [fart]!
     |    Thunk:
     |        Call [say %]:
     |            "poot"
 
 test:
-    rule "doublefart":
+    rule: doublefart ..=:
         say "poot"
         say "poot"
 ..yields ".."
-    |Call [rule % %]:
-    |    "doublefart"
+    |Call [rule % = %]:
+    |    Thunk:
+    |        Call [doublefart]!
     |    Thunk:
     |        Call [say %]:
     |            "poot"

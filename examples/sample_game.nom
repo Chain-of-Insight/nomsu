@@ -1,4 +1,155 @@
 run file "core.nom"
+run file "lib/secrets.nom"
+
+
+with secrets:
+    rule: pending proposal ..=:
+        secret %pending
+
+    rule: propose source %src ..=:
+        secret %pending =: %src
+        say ".."
+            |Proposal\%src\
+
+    macro block: propose %action ..=: ".."
+        |compiler:call("propose source %", \repr (%action's "src")\)
+
+    rule: approve ..=:
+        if (pending proposal):
+            say ".."
+                |Running\pending proposal\
+            do (..)
+                eval ".."
+                    |return: \pending proposal\
+        ..else:
+            say "No action pending"
+
+propose:
+    say "motion passed."
+    rule: fart ..=:
+        say "poot"
+
+approve
+fart
+
+# Users:
+with secrets:
+    secret %users =: lua expr "require('users')"
+    rule: find user %name ..=:
+        lua expr "secrets.users.by_name(vars.name) or compiler:error('Failed to find user: '..tostring(vars.name))"
+    rule: add user %name ..=:
+        lua expr "secrets.users.add(vars.name)"
+    macro: @ %name_block ..=:
+        %name_str =: lua expr "vars.name_block.value.value.src"
+        ".."|compiler:call("find user %", \repr %name_str\)
+
+say ".."|A user looks like: \@:spill\
+say ".."|A user looks like: \@:spill\
+add user "dave"
+say ".."|A user looks like: \@:dave\
+add user "moloch"
+say ".."|A user looks like: \@:moloch\
+add user "bruce"
+
+# Inventory:
+with secrets:
+    secret %inventory =: lua expr ".."
+        |setmetatable({}, {__index=function(self,key)
+        |    local t = {}
+        |    self[key] = t
+        |    return t
+        |end})
+    with secrets:
+        lua block ".."
+            |local endings = setmetatable({x="es",c="es",s="es"}, {__index=function() return "s" end})
+            |secrets.plurals = setmetatable({}, {__index=function(self,key)
+            |    return key..endings[key:sub(-1)]
+            |end})
+            |secrets.singulars = setmetatable({}, {__index=function(self,key)
+            |    if key:sub(-2) == "es" and rawget(endings, key:sub(-3,-3)) then return key:sub(1,-3) end
+            |    if key:sub(-1) == "s" then return key:sub(1,-2) end
+            |    return key
+            |end})
+            |secrets.canonicals = setmetatable({}, {__index=function(self,key)
+            |    if key:sub(-1) == "s" then return secrets.singulars[key] end
+            |    return key
+            |end})
+
+        rule: the plural of %singular is %plural ..=:
+            (secret %plurals)->%singular =: %plural
+            (secret %singulars)->%plural =: %singular
+            (secret %canonicals)->%plural =: %singular
+
+        rule: singular %plural ..=:
+            %plural in (secret %singulars)
+
+        rule: plural %singular ..=:
+            %singular in (secret %plurals)
+
+        rule: canonicalize %item-name ..=:
+            %item-name in (secret %canonicals)
+
+    rule: %person's inventory ..=:
+        (secret %inventory)->%person
+
+    rule: %person's stock of %item ..=:
+        %item =: canonicalize %item
+        ((%person's inventory)->%item) or 0
+
+    rule: %person's stock of %item as str ..=:
+        %item =: canonicalize %item
+        %count =: %person's stock of %item
+        ".."
+           |\%count\ \(singular %item) if (%count == 1) else (plural %item)\
+
+    rule: give %person %count %item ..=:
+        %item =: canonicalize %item
+        (%person's inventory)-> %item =: (%person's stock of %item) + %count
+
+    rule: give %person %count %item from %donor ..=:
+        %item =: canonicalize %item
+        if ((%donor's stock of %item) < %count):
+            say ".."
+                |\%donor\ does not have enough \%item\ to transfer
+        ..else:
+            (%person's inventory)->%item =: (%person's stock of %item) + %count
+            (%donor's inventory)->%item =: (%donor's stock of %item) - %count
+
+    rule:
+        %person has %item
+        %person has a %item
+        %person has an %item
+    ..=:
+        (%person's stock of %item) > 0
+
+give (@:bruce) 3 "hats"
+give (@:bruce) 3 "hats"
+give (@:dave) 1 "hat" from (@:bruce)
+say ".."|Bruce has \(@:bruce)'s stock of "hats" as str\
+say ".."|Dave has \(@:dave)'s stock of "hats" as str\
+give (@:dave) 1 "box"
+say ".."|Dave has \(@:dave)'s stock of "boxes" as str\
+the plural of "goose" is "geese"
+give (@:dave) 1 "goose"
+say ".."|Dave has \(@:dave)'s stock of "geese" as str\
+give (@:dave) 1 "goose"
+say ".."|Dave has \(@:dave)'s stock of "geese" as str\
+
+do:
+    lua block "math.randomseed(os.time())"
+    repeat until ((random number) < 0.01):
+        say "tick"
+        say "tock"
+
+
+
+
+
+
+
+
+
+
 # A basic key-value store that's only accessible through these functions:
 lua block ".."
     |do -- Use a closure to hide this behind the accessor rules
