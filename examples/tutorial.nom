@@ -3,7 +3,7 @@
     continue until dedent
 
 # Import files like so:
-run file "core.nom"
+require "core.nom"
 
 # Numbers:
 23

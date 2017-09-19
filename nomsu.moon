@@ -99,6 +99,7 @@ class NomsuCompiler
         @initialize_core!
         @write = (...)=> io.write(...)
         @utils = utils
+        @loaded_files = {}
     
     writeln:(...)=>
         @write(...)
@@ -592,6 +593,12 @@ class NomsuCompiler
             lua_code = vars.lua_code.value
             inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key,true)}]"})
             return @tree_to_value(vars.lua_code, inner_vars)
+
+        @def "require %filename", (vars)=>
+            if not @loaded_files[vars.filename]
+                file = io.open(vars.filename)
+                @loaded_files[vars.filename] = @run(file\read('*a'))
+            return @loaded_files[vars.filename]
 
         @def "run file %filename", (vars)=>
             file = io.open(vars.filename)

@@ -1,4 +1,4 @@
-run file "lib/core.nom"
+require "lib/core.nom"
 
 test: say "foo" ..yields ".."
     |Call [say %]:

@@ -816,6 +816,13 @@ do
         })
         return self:tree_to_value(vars.lua_code, inner_vars)
       end)
+      self:def("require %filename", function(self, vars)
+        if not self.loaded_files[vars.filename] then
+          local file = io.open(vars.filename)
+          self.loaded_files[vars.filename] = self:run(file:read('*a'))
+        end
+        return self.loaded_files[vars.filename]
+      end)
       return self:def("run file %filename", function(self, vars)
         local file = io.open(vars.filename)
         return self:run(file:read('*a'))
@@ -835,6 +842,7 @@ do
         return io.write(...)
       end
       self.utils = utils
+      self.loaded_files = { }
     end,
     __base = _base_0,
     __name = "NomsuCompiler"

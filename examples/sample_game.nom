@@ -1,6 +1,6 @@
-run file "lib/core.nom"
-run file "lib/secrets.nom"
-run file "lib/plurals.nom"
+require "lib/core.nom"
+require "lib/secrets.nom"
+require "lib/plurals.nom"
 
 
 # Users:

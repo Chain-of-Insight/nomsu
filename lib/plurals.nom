@@ -1,4 +1,5 @@
-run file "lib/secrets.nom"
+require "lib/core.nom"
+require "lib/secrets.nom"
 
 # Plurals
 with secrets:
