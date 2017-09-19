@@ -48,12 +48,21 @@ rule:
 ..=:
     lua expr "compiler:run(vars.code)"
 
-macro: source code %code ..=:
+rule: source code from tree %tree ..=:
     lua block ".."
-        |if vars.code.value.type ~= "Thunk" then
-        |    compiler:error("'source code %' only takes code blocks, not "..vars.code.value.type)
+        |local _,_,leading_space = vars.tree.src:find("\\n(%s*)%S")
+        |if leading_space then
+        |    local chunk1, chunk2 = vars.tree.src:match(":%s*([^\\n]*)(\\n.*)")
+        |    chunk2 = chunk2:gsub("\\n"..leading_space, "\\n")
+        |    vars.source = chunk1..chunk2.."\\n"
+        |else
+        |    vars.source = vars.tree.src:match(":%s*(%S.*)").."\\n"
         |end
-    lua expr "compiler.utils.repr(vars.code.value.value.src, true)"
+
+    %source
+
+macro: source code %body ..=:
+    repr (source code from tree %body)
 
 rule: run file %filename ..=:
     lua block ".."
@@ -71,11 +80,12 @@ rule: error %msg ..=:
         |table.remove(compiler.callstack)
         |compiler:error(vars.msg)
 
+# TODO: Make useful
 macro: as lua %block ..=:
-    lua expr "compiler.utils.repr(compiler:tree_to_lua(vars.block.value.value, vars), true)"
+    lua expr "compiler.utils.repr(compiler:tree_to_lua(vars.block.value.value, 'Statement'), true)"
 
 macro block: show generated lua %block ..=:
-    ".."|compiler:writeln(\lua expr "compiler.utils.repr(compiler:tree_to_lua(vars.block.value.value, vars), true)"\)
+    ".."|compiler:writeln(\lua expr "compiler.utils.repr(compiler:tree_to_lua(vars.block.value.value, 'Statement'), true)"\)
 
 # Macro helper functions
 rule: %tree as value ..=:

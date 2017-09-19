@@ -90,7 +90,7 @@ rule:
         |do
         |    local old_you = compiler.you
         |    compiler.you = vars.person
-        |    ret = compiler:call('do %', vars.action)
+        |    ret = vars.action(compiler, vars)
         |    compiler.you = old_you
         |end
 
@@ -100,22 +100,25 @@ say "===================================================="
 
 # Unanimity for proposals
 with secrets:
-    secret %approvals =: []
     rule: pending proposal ..=:
         secret %pending
 
     rule: propose source %src ..=:
+        if (secret %pending):
+            error "A proposal is already pending."
         secret %pending =: %src
+        secret %approvals =: []
         say ".."
-            |Proposal\%src\
+            |Proposal:
+            |\%src\
 
-    macro block: propose %action ..=: ".."
-        |compiler:call("propose source %", \repr (%action's "src")\)
+    macro block: propose %action ..=:
+        %source =: source code from tree %action
+        ".."
+            |compiler:call("propose source %", \repr %source\)
 
     rule: with everyone's approval do %action ..=:
-        do (..)
-            eval ".."
-                |return: \%action\
+        run %action
 
     rule: mark %who as approving ..=:
         if (not (pending proposal)):
@@ -131,9 +134,12 @@ with secrets:
 
         # No one dissents
         with everyone's approval do (pending proposal)
+        secret %pending =: nil
+        secret %approvals =: nil
 
     rule: mark %who as rejecting ..=:
         secret %pending =: nil
+        secret %approvals =: nil
 
     rule:
         approve
@@ -173,13 +179,19 @@ say "Rule making is now restricted"
 join
 
 propose:
-    say "fart"
+    say "Hello world"
+approve
+
+propose:
+    say "Hello world again"
 approve
 
 propose:
     give "democracy" 1 "possibility"
     if ("democracy" has "possibility"):
         say "DEMOCRACY WORKS!!!"
+    ..else:
+        say "democracy has failed :("
 approve
 
 propose:
