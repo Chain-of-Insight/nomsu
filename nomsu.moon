@@ -416,7 +416,7 @@ class NomsuCompiler
                 add "vars[#{utils.repr(tree.value,true)}]"
 
             else
-                error("Unknown/unimplemented thingy: #{tree.type}")
+                @error("Unknown/unimplemented thingy: #{tree.type}")
 
         -- TODO: make indentation clean
         buffer = table.concat(buffer, "\n")

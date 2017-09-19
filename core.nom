@@ -503,6 +503,19 @@ macro block:
         |end
 
 macro:
+    append %item to %list
+    add %item to %list
+..=:
+    ".."|table.insert(\%list as lua expr\, \%item as lua expr\)
+
+rule: flatten %lists ..=:
+    %flat =: []
+    for %list in %lists:
+        for %item in %list:
+            add %item to %flat
+    %flat
+
+macro:
     %item is in %list
     %list contains %item
 ..=:
@@ -520,6 +533,14 @@ rule: dict %items ..=:
     for %pair in %items:
         lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
     return: %dict
+
+rule: entries in %dict ..=:
+    lua block ".."
+        |local items = {}
+        |for k,v in pairs(vars.dict) do
+        |    table.insert(items, {key=k,value=v})
+        |end
+        |return items
 
 # Permission functions
 rule: restrict %fn to within %whitelist ..=:

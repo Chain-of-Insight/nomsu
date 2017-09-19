@@ -1,55 +1,30 @@
 run file "core.nom"
 run file "lib/secrets.nom"
+run file "lib/plurals.nom"
 
-
-with secrets:
-    rule: pending proposal ..=:
-        secret %pending
-
-    rule: propose source %src ..=:
-        secret %pending =: %src
-        say ".."
-            |Proposal\%src\
-
-    macro block: propose %action ..=: ".."
-        |compiler:call("propose source %", \repr (%action's "src")\)
-
-    rule: approve ..=:
-        if (pending proposal):
-            say ".."
-                |Running\pending proposal\
-            do (..)
-                eval ".."
-                    |return: \pending proposal\
-        ..else:
-            say "No action pending"
-
-propose:
-    say "motion passed."
-    rule: fart ..=:
-        say "poot"
-
-approve
-fart
 
 # Users:
 with secrets:
-    secret %users =: lua expr "require('users')"
+    secret %users =: lua expr ".."
+        |setmetatable({}, {__index=
+        |    {by_name=function(self, key) return "User<"..key..">" end,
+        |     add=function(self, key) self[key] = self:by_name(key) end}
+        |})
     rule: find user %name ..=:
-        lua expr "secrets.users.by_name(vars.name) or compiler:error('Failed to find user: '..tostring(vars.name))"
+        lua expr "secrets.users:by_name(vars.name) or compiler:error('Failed to find user: '..tostring(vars.name))"
     rule: add user %name ..=:
-        lua expr "secrets.users.add(vars.name)"
+        lua expr "secrets.users:add(vars.name)"
     macro: @ %name_block ..=:
         %name_str =: lua expr "vars.name_block.value.value.src"
-        ".."|compiler:call("find user %", \repr %name_str\)
+        ".."
+            |compiler:call("find user %", \repr %name_str\)
+    rule:
+        everybody
+        everyone
+    ..=:
+        (%entry's "key") for %entry in (entries in (secret %users))
 
-say ".."|A user looks like: \@:spill\
-say ".."|A user looks like: \@:spill\
-add user "dave"
-say ".."|A user looks like: \@:dave\
-add user "moloch"
-say ".."|A user looks like: \@:moloch\
-add user "bruce"
+    rule: rules that change users ..=: ["add user %"]
 
 # Inventory:
 with secrets:
@@ -59,38 +34,14 @@ with secrets:
         |    self[key] = t
         |    return t
         |end})
-    with secrets:
-        lua block ".."
-            |local endings = setmetatable({x="es",c="es",s="es"}, {__index=function() return "s" end})
-            |secrets.plurals = setmetatable({}, {__index=function(self,key)
-            |    return key..endings[key:sub(-1)]
-            |end})
-            |secrets.singulars = setmetatable({}, {__index=function(self,key)
-            |    if key:sub(-2) == "es" and rawget(endings, key:sub(-3,-3)) then return key:sub(1,-3) end
-            |    if key:sub(-1) == "s" then return key:sub(1,-2) end
-            |    return key
-            |end})
-            |secrets.canonicals = setmetatable({}, {__index=function(self,key)
-            |    if key:sub(-1) == "s" then return secrets.singulars[key] end
-            |    return key
-            |end})
 
-        rule: the plural of %singular is %plural ..=:
-            (secret %plurals)->%singular =: %plural
-            (secret %singulars)->%plural =: %singular
-            (secret %canonicals)->%plural =: %singular
-
-        rule: singular %plural ..=:
-            %plural in (secret %singulars)
-
-        rule: plural %singular ..=:
-            %singular in (secret %plurals)
-
-        rule: canonicalize %item-name ..=:
-            %item-name in (secret %canonicals)
+    rule: inventory ..=:
+        dict (..)
+            [%inv's "key", dict (%entry for %entry in (entries in (%inv's "value")))]
+            for %inv in (entries in (secret %inventory))
 
     rule: %person's inventory ..=:
-        (secret %inventory)->%person
+        dict (%entry for %entry in (entries in ((secret %inventory)->%person)))
 
     rule: %person's stock of %item ..=:
         %item =: canonicalize %item
@@ -122,152 +73,102 @@ with secrets:
     ..=:
         (%person's stock of %item) > 0
 
-give (@:bruce) 3 "hats"
-give (@:bruce) 3 "hats"
-give (@:dave) 1 "hat" from (@:bruce)
-say ".."|Bruce has \(@:bruce)'s stock of "hats" as str\
-say ".."|Dave has \(@:dave)'s stock of "hats" as str\
-give (@:dave) 1 "box"
-say ".."|Dave has \(@:dave)'s stock of "boxes" as str\
-the plural of "goose" is "geese"
-give (@:dave) 1 "goose"
-say ".."|Dave has \(@:dave)'s stock of "geese" as str\
-give (@:dave) 1 "goose"
-say ".."|Dave has \(@:dave)'s stock of "geese" as str\
+    rule: rules that change the inventory ..=: [..]
+        "give % % %", "give % % % from %"
 
-do:
-    lua block "math.randomseed(os.time())"
-    repeat until ((random number) < 0.01):
-        say "tick"
-        say "tock"
+    rule: rules that view the inventory ..=: [..]
+        "inventory", "%'s inventory", "%'s stock of %", "%'s stock of % as str"
 
+rule: you ..=:
+    lua expr "(compiler.you or 'Anonymous')"
 
-
-
-
-
-
-
-
-
-# A basic key-value store that's only accessible through these functions:
-lua block ".."
-    |do -- Use a closure to hide this behind the accessor rules
-    |    local relations = setmetatable({}, {__index=function(self,key)
-    |        local t = {}
-    |        self[key] = t
-    |        return t
-    |    end})
-    |    compiler:def("%key %relation ?", function(_,vars)
-    |        return relations[vars.relation][vars.key]
-    |    end)
-    |    compiler:def("%key %relation = %value", function(_,vars)
-    |        relations[vars.relation][vars.key] = vars.value
-    |    end)
-    |    compiler:def("* %relation = %value", function(_,vars)
-    |        local result = {}
-    |        for k,v in pairs(relations[vars.relation]) do
-    |            if utils.equivalent(v, vars.value) then
-    |                table.insert(result, k)
-    |            end
-    |        end
-    |        return result
-    |    end)
-    |end
-
-rule "set all * %relation = %value":
-    for "key" in (* %relation = %value):
-        %key %relation = %value
-
-rule "you":
-    lua expr "(you or 'Anonymous')"
-
-rule ["make %person %action", "make %person do %action"]:
+rule:
+    make %person %action
+    make %person do %action
+..=:
     lua block ".."
         |do
-        |    local old_you = you
-        |    you = vars.person
+        |    local old_you = compiler.you
+        |    compiler.you = vars.person
         |    ret = compiler:call('do %', vars.action)
-        |    you = old_you
+        |    compiler.you = old_you
         |end
 
 say "===================================================="
 say "                    NEW GAME"
 say "===================================================="
-rule "everyone approves %action": yes
 
-rule "with everyone's approval %action":
-    if (everyone approves %action):
-        do %action
-    ..else:
-        say "You do not have the will of the people! >:("
+# Unanimity for proposals
+with secrets:
+    secret %approvals =: []
+    rule: pending proposal ..=:
+        secret %pending
 
-restrict "rule % %" to within "with everyone's approval %"
-restrict "make % %" to within "with everyone's approval %"
-restrict "set all * % = %" to within "with everyone's approval %"
-restrict "% % = %" to within "with everyone's approval %"
-restrict "restrict % to within %" to within "with everyone's approval %"
-
-with everyone's approval:
-    rule "propose %action":
-        if ("pending proposal" "is" ?):
-            say "Sorry, an action is already pending."
-        ..else:
-            say "Proposing..."
-            "pending proposal" "is" = %action
-
-    rule "unpropose":
-        let "pending" = ("pending proposal" "is" ?)
-        set all * %pending = (nil)
-        "pending proposal" "is" = (nil)
-
-
-    rule "mark %who as approving %action":
-        %who %action = "approved"
-
-    rule "mark %who as rejecting %action":
-        %who %action = "rejected"
-
-    rule ["approve", "vote yes", "vote yea"]:
-        let "pending" = ("pending proposal" "is" ?)
-        if (%pending == (nil)):
-            say "Nothing is currently pending!"
-            return
-        mark (you) as approving %pending
-        if (everyone approves %pending):
-            say "The motion passes!"
-            with everyone's approval %pending
-            unpropose
-        ..else:
-            let "approvers" = (number of (* %pending = "approved"))
-            let "num-players" = (number of (players))
-            say ".."
-                |\number of (* %pending = "approved")\/\number of (players)\ players have approved.
-
-    rule ["reject", "vote no", "vote nay", "veto", "disapprove"]:
-        let "pending" = ("pending proposal" "is" ?)
-        if (%pending == (nil)):
-            say "Nothing is currently pending!"
-            return
-        mark (you) as rejecting %pending
-        unpropose
-
-    rule ["players", "everyone", "everybody", "all players"]:
-        * "is a player" = (yes)
-
-    rule "join":
-        (you) "is a player" = (yes)
+    rule: propose source %src ..=:
+        secret %pending =: %src
         say ".."
-            |Welcome to the game, \you\!
+            |Proposal\%src\
 
-    allow "unpropose" to use "set all * % = %"
-    allow ["join", "mark % as approving %", "mark % as rejecting %", "propose %", "unpropose"] to use "% % = %"
-    restrict "unpropose" to within ["approve", "reject"]
-    restrict "mark % as approving %" to within ["propose %", "approve"]
-    restrict "mark % as rejecting %" to within ["propose %", "reject"]
+    macro block: propose %action ..=: ".."
+        |compiler:call("propose source %", \repr (%action's "src")\)
 
-    rule "everyone approves %action":
-        (number of (players)) == (number of (* %action = "approved"))
+    rule: with everyone's approval do %action ..=:
+        do (..)
+            eval ".."
+                |return: \%action\
+
+    rule: mark %who as approving ..=:
+        if (not (pending proposal)):
+            say "No action pending"
+            return
+
+        (secret %approvals)-> %who =: yes
+
+        # Check for uncounted votes:
+        for %user in (everybody):
+            if (not ((secret %approvals)->%user)):
+                return
+
+        # No one dissents
+        with everyone's approval do (pending proposal)
+
+    rule: mark %who as rejecting ..=:
+        secret %pending =: nil
+
+    rule:
+        approve
+        vote yes
+        vote yea
+    ..=:
+        mark (you) as approving
+
+    rule:
+        reject
+        vote no
+        vote nay
+        veto
+        disapprove
+    ..=:
+        mark (you) as rejecting
+
+    restrict "with everyone's approval do %" to within "mark % as approving"
+    restrict "mark % as approving" to within "approve"
+    restrict "mark % as rejecting" to within "reject"
+
+rule: join ..=:
+    add user (you)
+    say ".."
+        |Welcome to the game, \you\!
+
+restrict (rules that change users) to within "join"
+
+
+restrict (..)
+    flatten [..]
+        ["rule % = %", "make % %", "restrict % to within %"]
+        (rules that change the inventory)
+..to within "with everyone's approval do %"
+say "Rule making is now restricted"
 
 join
 
@@ -276,13 +177,13 @@ propose:
 approve
 
 propose:
-    "democracy" "is possible" = (yes)
-    if ("democracy" "is possible" ?):
+    give "democracy" 1 "possibility"
+    if ("democracy" has "possibility"):
         say "DEMOCRACY WORKS!!!"
 approve
 
 propose:
-    rule "fart":
+    rule: fart ..=:
         say "poot"
     say "fart should have been defined"
 approve
@@ -290,56 +191,107 @@ say "doop"
 fart
 
 propose:
-    rule "open election %candidates":
-        if ("candidates" "are" ?):
-            say "An election is already in progress."
-        ..else:
-            "candidates" "are" = %candidates
+    with secrets:
+        rule: open election %candidates %action ..=:
+            if (secret %candidates):
+                error "An election is already in progress."
+            ..else:
+                secret %candidates =: %candidates
+                secret %votes =: []
+                secret %action =: %action
+                secret %winner =: nil
 
-    rule "close the election":
-        set all * "votes for" = (nil)
-        "candidates" "are" = (nil)
+        rule: close the election ..=:
+            secret %candidates =: nil
+            secret %votes =: nil
+            secret %action =: nil
+            secret %winner =: nil
 
-    rule "vote for %candidate":
-        (you) "votes for" = %candidate
-        let "vote-percent" = ((number of (* "votes for" = %candidate)) / (number of (players)))
-        say ".."
-            |Vote cast. \%candidate\ now has \100 * %vote-percent\% of the votes.
-        if (%vote-percent > 0.5):
-            say ".."|The winner of the election is: \%candidate\
-            close the election
+        rule: votes for %candidate ..=:
+            %votes =: []
+            for %entry in (entries in (secret %votes)):
+                if ((%entry's "value") == %candidate):
+                    add (%entry's "key") to %votes
+            %votes
 
-    allow ["open election %", "close the election", "vote for %"] to use ["% % = %"]
-    allow ["close the election"] to use ["set all * % = %"]
+        rule: after winning a fair election do %action ..=:
+            do %action
+
+        rule: the winner ..=: secret %winner
+
+        rule: vote for %candidate ..=:
+            for %c in (secret %candidates):
+                if (%c == %candidate):
+                    go to %candidate-is-legit
+            error ".."
+                |Invalid candidate: \%candidate\
+            -> %candidate-is-legit
+
+            (secret %votes)->(you) =: %candidate
+            %vote-percent =: (number of (votes for %candidate)) / (number of (everyone))
+            say ".."
+                |Vote cast. \%candidate\ now has \100 * %vote-percent\% of the votes.
+            if (%vote-percent > 0.5):
+                secret %winner =: %candidate
+                after winning a fair election do (secret %action)
+                close the election
+
+        rule: rules that change the election ..=: [..]
+            "open election %", "close the election", "vote for %"
+
+        rule: rules that view the election ..=: [..]
+            "votes for %"
+
 approve
 
 propose:
-    rule "as bill %action":
+    rule: as bill %action ..=:
         if ((you) == "Anonymous"):
             make "bill" do %action
         ..else:
-            say ".."|Who do you think you are, \you\?
+            say ".."
+                |Who do you think you are, \you\?
     allow ["as bill %"] to use ["make % %"]
 approve
 as bill: join
 
 propose:
-    rule "as dave %action":
+    rule: as dave %action ..=:
         if ((you) == "Anonymous"):
             make "dave" do %action
         ..else:
-            say ".."|Who do you think you are, \you\?
+            say ".."
+                |Who do you think you are, \you\?
     allow ["as dave %"] to use ["make % %"]
 approve
 as bill: approve
 as dave: join
 
-open election ["tom", "dick", "harry"]
+propose:
+    rule: declare war ..=: say "WAR!!!"
+    with secrets:
+        secret %president =: nil
+        rule: elect president from %candidates ..=:
+            open election %candidates:
+                say ".."|Hail to the chief: \the winner\
+                secret %president =: the winner
+
+        rule: as the president do %action ..=: do %action
+
+        restrict "declare war" to within "as the president do %"
+approve
+as bill: approve
+as dave: approve
+
+elect president from ["tom", "dick", "harry"]
 vote for "dick"
 as bill: vote for "dick"
+as dave:
+    as the president do:
+        declare war
 
 propose:
-    rule "take a shit": say "shit taken."
+    rule: take a shit ..=: say "shit taken."
 
 approve
 as bill: approve
