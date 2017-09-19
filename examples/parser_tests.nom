@@ -9,9 +9,9 @@ test: say (4) ..yields ".."
     |    4
 
 test:
-    rule "fart": say "poot"
+    rule "fart" =: say "poot"
 ..yields ".."
-    |Call [rule % %]:
+    |Call [rule % = %]:
     |    "fart"
     |    Thunk:
     |        Call [say %]:

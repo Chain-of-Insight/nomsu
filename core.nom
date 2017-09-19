@@ -1,53 +1,90 @@
 # Rule for making rules
 lua block ".."
-    |compiler:def("rule %spec %body", function(compiler, vars)
+    |compiler:def("rule %spec = %body", function(compiler, vars)
     |    return compiler:def(vars.spec, vars.body)
     |end)
 
-# Macros
-rule "macro %spec %body":
+rule "help %invocation" =:
     lua block ".."
-        |compiler:defmacro(vars.spec, vars.body)
-
-rule "macro block %spec %body":
-    lua block ".."
-        |local spec, body = vars.spec, vars.body
-        |local wrapper = function(compiler, vars, kind)
-        |    if kind == "Expression" then
-        |        compiler:error("Macro: "..spec.." was defined to be a block, but is being used as an expression.")
-        |    end
-        |    return ("do\\n"..body(compiler, vars, kind).."\\nend"), true
+        |local fn_info = compiler.defs[vars.invocation]
+        |if not fn_info then
+        |    compiler:writeln("Function not found: "..compiler.utils.repr(vars.invocation, true))
+        |else
+        |    compiler:writeln("rule "..compiler.utils.repr(fn_info.invocations).." ="..(fn_info.src or ":\\n    <unknown source code>"))
         |end
-        |compiler:defmacro(spec, wrapper)
-        |return nil
+
+# Macros
+lua block ".."
+    |local add_macro = function(compiler, vars, kind)
+    |    local spec = compiler:tree_to_value(vars.spec, vars)
+    |    local fn = compiler:tree_to_value(vars.body, vars)
+    |    compiler:defmacro(spec, fn, vars.body.src)
+    |    return "", true
+    |end
+    |compiler:defmacro("macro %spec = %body", add_macro)
+    |
+    |local add_macro_block = function(compiler, vars, kind)
+    |    local spec = compiler:tree_to_value(vars.spec, vars)
+    |    local fn = compiler:tree_to_value(vars.body, vars)
+    |    local wrapper = function(compiler, vars, kind)
+    |        if kind == "Expression" then
+    |            compiler:error("Macro: "..spec.." was defined to be a block, but is being used as an expression.")
+    |        end
+    |        return ("do\\n"..fn(compiler, vars, kind).."\\nend"), true
+    |    end
+    |    compiler:defmacro(spec, wrapper, vars.body.src)
+    |    return "", true
+    |end
+    |compiler:defmacro("macro block %spec = %body", add_macro_block)
 
 # Compiler tools
-rule ["eval %code", "run %code"]:
+rule ["eval %code", "run %code"] =:
     lua expr "compiler:run(vars.code)"
 
-macro "source code %code":
+macro "source code %code" =:
     lua block ".."
         |if vars.code.value.type ~= "Thunk" then
         |    compiler:error("'source code %' only takes code blocks, not "..vars.code.value.type)
         |end
     lua expr "compiler.utils.repr(vars.code.value.value.src, true)"
 
-rule "run file %filename":
+rule "run file %filename" =:
     lua block ".."
         |local file = io.open(vars.filename)
         |return compiler:run(file:read("*a"))
 
+# Error functions
+rule "error!" =:
+    lua block ".."
+        |table.remove(compiler.callstack)
+        |compiler:error()
+
+rule "error %msg" =:
+    lua block ".."
+        |table.remove(compiler.callstack)
+        |compiler:error(vars.msg)
+
+macro "as lua %block" =:
+    lua expr "compiler.utils.repr(compiler:tree_to_lua(vars.block.value.value, vars), true)"
+
+macro block "show generated lua %block" =:
+    ".."|compiler:writeln(\lua expr "compiler.utils.repr(compiler:tree_to_lua(vars.block.value.value, vars), true)"\)
+
 # Macro helper functions
-rule "%tree as lua block":
+rule "%tree as value" =:
+    lua expr ".."
+        |compiler:tree_to_value(vars.tree, vars)
+
+rule "%tree as lua block" =:
     lua block ".."
         |return compiler:tree_to_lua(vars.tree, 'Statement'), true
 
-rule "%tree as lua expr":
+rule "%tree as lua expr" =:
     lua expr ".."
         |compiler:tree_to_lua(vars.tree, 'Expression')
 
 # Moonscript!
-macro block "moonscript block %moonscript_code":
+macro block "moonscript block %moonscript_code" =:
     lua block ".."
         |local parse, compile = require('moonscript.parse'), require('moonscript.compile')
         |local moon_code = compiler:tree_to_value(vars.moonscript_code, vars)
@@ -61,7 +98,7 @@ macro block "moonscript block %moonscript_code":
         |end
         |return "do\\n"..lua_code.."\\nend"
 
-macro "moonscript %moonscript_code":
+macro "moonscript %moonscript_code" =:
     lua block ".."
         |local parse, compile = require('moonscript.parse'), require('moonscript.compile')
         |local moon_code = compiler:tree_to_value(vars.moonscript_code, vars)
@@ -76,95 +113,127 @@ macro "moonscript %moonscript_code":
         |return "(function(compiler, vars)\\n"..lua_code.."\\nend)(compiler, vars)"
 
 # String functions
-rule "join %strs":
+rule "join %strs" =:
     lua block ".."
         |local str_bits = {}
         |for i,bit in ipairs(vars.strs) do str_bits[i] = compiler.utils.repr(bit) end
         |return table.concat(str_bits)
 
-rule "join %strs with glue %glue":
+rule "join %strs with glue %glue" =:
     lua block ".."
         |local str_bits = {}
         |for i,bit in ipairs(vars.strs) do str_bits[i] = compiler.utils.repr(bit) end
         |return table.concat(str_bits, vars.glue)
 
-rule ["capitalize %str", "%str capitalized"]:
+rule ["capitalize %str", "%str capitalized"] =:
     lua expr ".."|vars.str:gsub("%l", string.upper, 1)
 
 # Variable assignment
-macro block "let %varname = %value":
-    ".."|vars[\%varname as lua expr\] = \%value as lua expr\
+#..
+    macro block "%var = %value" =:
+        lua block ".."
+            |if vars.var.value.type ~= "Var" then
+            |    compiler:error("Assignment operation has the wrong type for the left hand side. "
+            |        .."Expected Var, but got: "..vars.var.value.type)
+            |end
+        ".."|\%var as lua expr\ = \%value as lua expr\
+
+macro block "%var = %value" =:
+    lua block ".."
+        |if vars.var.value.type ~= "Var" then
+        |    compiler:error("Assignment operation has the wrong type for the left hand side. "
+        |        .."Expected Var, but got: "..vars.var.value.type)
+        |end
+    lua block ".."
+        |if vars.value.value.type ~= "Thunk" then
+        |    compiler:error("Assignment operation has the wrong type for the right hand side. "
+        |        .."Expected Thunk, but got: "..vars.value.value.type.."\\nMaybe you used '=' instead of '=:'?")
+        |end
+    ".."|do
+        |    local ret
+        |    \lua expr "compiler:tree_to_lua(vars.value.value.value, 'Statement')"\
+        |    \%var as lua expr\ = ret
+        |end
 
 # Operators
-macro ["true","yes"]: "true"
-macro ["false","no"]: "false"
-macro ["nil","null"]: "nil"
-macro block ["nop", "pass"]: ""
-macro "%a + %b": ".."|(\%a as lua expr\ + \%b as lua expr\)
-macro "%a + %b + %c": ".."|(\%a as lua expr\ + \%b as lua expr\ + \%c as lua expr\)
-macro "%a + %b + %c + %d": ".."|(\%a as lua expr\ + \%b as lua expr\ + \%c as lua expr\ + \%d as lua expr\)
-macro "%a - %b": ".."|(\%a as lua expr\ - \%b as lua expr\)
-macro "%a * %b": ".."|(\%a as lua expr\ * \%b as lua expr\)
-macro "%a * %b * %c": ".."|(\%a as lua expr\ * \%b as lua expr\ * \%c as lua expr\)
-macro "%a * %b * %c * %d": ".."|(\%a as lua expr\ * \%b as lua expr\ * \%c as lua expr\ * \%d as lua expr\)
-macro "%a / %b": ".."|(\%a as lua expr\ / \%b as lua expr\)
-macro "%a === %b": ".."|(\%a as lua expr\ == \%b as lua expr\)
-macro "%a !== %b": ".."|(\%a as lua expr\ ~= \%b as lua expr\)
-macro "%a < %b": ".."|(\%a as lua expr\ < \%b as lua expr\)
-macro "%a < %b < %c": ".."|((\%a as lua expr\ < \%b as lua expr\) and (\%b as lua expr\ < \%c as lua expr\))
-macro "%a <= %b < %c": ".."|((\%a as lua expr\ <= \%b as lua expr\) and (\%b as lua expr\ < \%c as lua expr\))
-macro "%a <= %b <= %c": ".."|((\%a as lua expr\ <= \%b as lua expr\) and (\%b as lua expr\ <= \%c as lua expr\))
-macro "%a < %b <= %c": ".."|((\%a as lua expr\ < \%b as lua expr\) and (\%b as lua expr\ <= \%c as lua expr\))
-macro "%a > %b > %c": ".."|((\%a as lua expr\ > \%b as lua expr\) and (\%b as lua expr\ > \%c as lua expr\))
-macro "%a >= %b > %c": ".."|((\%a as lua expr\ >= \%b as lua expr\) and (\%b as lua expr\ > \%c as lua expr\))
-macro "%a >= %b >= %c": ".."|((\%a as lua expr\ >= \%b as lua expr\) and (\%b as lua expr\ >= \%c as lua expr\))
-macro "%a > %b >= %c": ".."|((\%a as lua expr\ > \%b as lua expr\) and (\%b as lua expr\ >= \%c as lua expr\))
-macro "%a <= %b": ".."|(\%a as lua expr\ <= \%b as lua expr\)
-macro "%a > %b": ".."|(\%a as lua expr\ > \%b as lua expr\)
-macro "%a >= %b": ".."|(\%a as lua expr\ >= \%b as lua expr\)
-macro "%a ^ %b": ".."|(\%a as lua expr\ ^ \%b as lua expr\)
-macro "%a and %b": ".."|(\%a as lua expr\ and \%b as lua expr\)
-macro "%a and %b and %c":
+macro ["true","yes"] =: "true"
+macro ["false","no"] =: "false"
+macro ["nil","null"] =: "nil"
+macro block ["nop", "pass"] =: ""
+macro "%a + %b" =: ".."|(\%a as lua expr\ + \%b as lua expr\)
+macro "%a + %b + %c" =: ".."|(\%a as lua expr\ + \%b as lua expr\ + \%c as lua expr\)
+macro "%a + %b + %c + %d" =: ".."|(\%a as lua expr\ + \%b as lua expr\ + \%c as lua expr\ + \%d as lua expr\)
+macro "%a - %b" =: ".."|(\%a as lua expr\ - \%b as lua expr\)
+macro "%a * %b" =: ".."|(\%a as lua expr\ * \%b as lua expr\)
+macro "%a * %b * %c" =: ".."|(\%a as lua expr\ * \%b as lua expr\ * \%c as lua expr\)
+macro "%a * %b * %c * %d" =: ".."|(\%a as lua expr\ * \%b as lua expr\ * \%c as lua expr\ * \%d as lua expr\)
+macro "%a / %b" =: ".."|(\%a as lua expr\ / \%b as lua expr\)
+macro "%a === %b" =: ".."|(\%a as lua expr\ == \%b as lua expr\)
+macro "%a !== %b" =: ".."|(\%a as lua expr\ ~= \%b as lua expr\)
+macro "%a < %b" =: ".."|(\%a as lua expr\ < \%b as lua expr\)
+macro "%a < %b < %c" =: ".."|((\%a as lua expr\ < \%b as lua expr\) and (\%b as lua expr\ < \%c as lua expr\))
+macro "%a <= %b < %c" =: ".."|((\%a as lua expr\ <= \%b as lua expr\) and (\%b as lua expr\ < \%c as lua expr\))
+macro "%a <= %b <= %c" =: ".."|((\%a as lua expr\ <= \%b as lua expr\) and (\%b as lua expr\ <= \%c as lua expr\))
+macro "%a < %b <= %c" =: ".."|((\%a as lua expr\ < \%b as lua expr\) and (\%b as lua expr\ <= \%c as lua expr\))
+macro "%a > %b > %c" =: ".."|((\%a as lua expr\ > \%b as lua expr\) and (\%b as lua expr\ > \%c as lua expr\))
+macro "%a >= %b > %c" =: ".."|((\%a as lua expr\ >= \%b as lua expr\) and (\%b as lua expr\ > \%c as lua expr\))
+macro "%a >= %b >= %c" =: ".."|((\%a as lua expr\ >= \%b as lua expr\) and (\%b as lua expr\ >= \%c as lua expr\))
+macro "%a > %b >= %c" =: ".."|((\%a as lua expr\ > \%b as lua expr\) and (\%b as lua expr\ >= \%c as lua expr\))
+macro "%a <= %b" =: ".."|(\%a as lua expr\ <= \%b as lua expr\)
+macro "%a > %b" =: ".."|(\%a as lua expr\ > \%b as lua expr\)
+macro "%a >= %b" =: ".."|(\%a as lua expr\ >= \%b as lua expr\)
+macro "%a ^ %b" =: ".."|(\%a as lua expr\ ^ \%b as lua expr\)
+macro "%a and %b" =: ".."|(\%a as lua expr\ and \%b as lua expr\)
+macro "%a and %b and %c" =:
     ".."|(\%a as lua expr\ and \%b as lua expr\ and \%c as lua expr\)
-macro "%a and %b and %c and %d":
+macro "%a and %b and %c and %d" =:
     ".."|(\%a as lua expr\ and \%b as lua expr\ and \%c as lua expr\ and \%d as lua expr\)
-macro "%a or %b": ".."|(\%a as lua expr\ or \%b as lua expr\)
-macro "%a or %b or %c":
+macro "%a or %b" =: ".."|(\%a as lua expr\ or \%b as lua expr\)
+macro "%a or %b or %c" =:
     ".."|(\%a as lua expr\ or \%b as lua expr\ or \%c as lua expr\)
-macro "%a or %b or %c or %d":
+macro "%a or %b or %c or %d" =:
     ".."|(\%a as lua expr\ or \%b as lua expr\ or \%c as lua expr\ or \%d as lua expr\)
-macro "%a mod %b": ".."|(\%a as lua expr\ mod \%b as lua expr\)
-macro "- %a": ".."|-(\%a as lua expr\)
-macro "not %a": ".."|not (\%a as lua expr\)
+macro "%a mod %b" =: ".."|(\%a as lua expr\ mod \%b as lua expr\)
+macro "- %a" =: ".."|-(\%a as lua expr\)
+macro "not %a" =: ".."|not (\%a as lua expr\)
 
-rule "%a == %b":
+rule "%a == %b" =:
     lua expr "((vars.a == vars.b) or compiler.utils.equivalent(vars.a, vars.b))"
-rule "%a != %b":
+rule "%a != %b" =:
     lua expr "((vars.a ~= vars.b) or not compiler.utils.equivalent(vars.a, vars.b))"
 
-macro "repr %obj":
+macro "repr %obj" =:
     ".."|compiler.utils.repr(\%obj as lua expr\, true)
 
-macro "say %str":
+macro "say %str" =:
     ".."|compiler:writeln(compiler.utils.repr(\%str as lua expr\))
 
 # Control flow
-rule "do %action":
+rule "do %action" =:
     lua expr "vars.action(compiler, setmetatable({}, {__index=vars}))"
 
-macro block "return %return-value":
-    ".."|return \%return-value as lua expr\
+macro block "return %return_value" =:
+    lua block ".."
+        |if vars.return_value.value.type ~= "Thunk" then
+        |    compiler:error("Assignment operation has the wrong type for the right hand side. "
+        |        .."Expected Thunk, but got: "..vars.return_value.value.type.."\\nMaybe you used '=' instead of '=:'?")
+        |end
+    ".."|do
+        |    local ret
+        |    \lua expr "compiler:tree_to_lua(vars.return_value.value.value, 'Statement')"\
+        |    return ret
+        |end
 
-macro block "return":
+macro block "return" =:
     "return nil"
 
 # Conditionals
-macro block "if %condition %if_body":
+macro block "if %condition %if_body" =:
     ".."|if \%condition as lua expr\ then
         |    \(lua expr "vars.if_body.value.value") as lua block\
         |end
 
-macro block "if %condition %if_body else %else_body":
+macro block "if %condition %if_body else %else_body" =:
     ".."|if \%condition as lua expr\ then
         |    \(lua expr "vars.if_body.value.value") as lua block\
         |else
@@ -172,7 +241,7 @@ macro block "if %condition %if_body else %else_body":
         |end
 
 # Ternary operator
-macro "%if_expr if %condition else %else_expr":
+macro "%if_expr if %condition else %else_expr" =:
     ".."|(function(compiler, vars)
         |    if \%condition as lua expr\ then
         |        return \%if_expr as lua expr\
@@ -182,16 +251,20 @@ macro "%if_expr if %condition else %else_expr":
         |end)(compiler, vars)
 
 # For loop
-macro block "for %varname in %iterable %body":
-    let "varname" = (%varname as lua expr)
-    ".."|local old_loopval = vars[\%varname\]
+macro block "for %var in %iterable %body" =:
+    %var-type =: lua expr "vars.var.value.type"
+    if (%var-type != "Var"):
+        error ".."
+            |For loop has the wrong type for the loop variable. Expected Var, but got: \%var-type\
+    %var-code =: %var as lua expr
+    ".."|local old_loopval = \%var-code\
         |for i,value in ipairs(\%iterable as lua expr\) do
-        |    vars[\%varname\] = value
+        |    \%var-code\ = value
         |    \(lua expr "vars.body.value.value") as lua block\
         |end
-        |vars[\%varname\] = old_loopval
+        |\%var-code\ = old_loopval
 
-macro block "for all %iterable %body":
+macro block "for all %iterable %body" =:
     ".."|local old_loopval = vars.it
         |for i,value in ipairs(\%iterable as lua expr\) do
         |    vars.it = value
@@ -201,17 +274,22 @@ macro block "for all %iterable %body":
 
 # List Comprehension
 # TODO: maybe make this lazy, or a lazy version?
-macro "%expression for %varname in %iterable":
+macro "%expression for %var in %iterable" =:
+    %var-type =: lua expr "vars.var.value.type"
+    if (%var-type != "Var"):
+        error ".."
+            |List comprehension has the wrong type for the loop variable. Expected Var, but got: \%var-type\
+    %var-code =: %var as lua expr
     ".."|(function(game, vars)
         |    local comprehension = {}
         |    for i,value in ipairs(\%iterable as lua expr\) do
-        |        vars[\%varname as lua expr\] = value
+        |        \%var-code\ = value
         |        comprehension[i] = \%expression as lua expr\
         |    end
         |    return comprehension
         |end)(game, setmetatable({}, {__index=vars}))
 
-macro "%expression for all %iterable":
+macro "%expression for all %iterable" =:
     ".."|(function(game, vars)
         |    local comprehension = {}
         |    for i,value in ipairs(\%iterable as lua expr\) do
@@ -222,17 +300,22 @@ macro "%expression for all %iterable":
         |end)(game, setmetatable({}, {__index=vars}))
 
 # Dict comprehension
-macro "%key = %value for %varname in %iterable":
+macro "%key -> %value for %var in %iterable" =:
+    %var-type =: lua expr "vars.var.value.type"
+    if (%var-type != "Var"):
+        error ".."
+            |Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \%var-type\
+    %var-code =: %var as lua expr
     ".."|(function(game, vars)
         |    local comprehension = {}
         |    for i,value in ipairs(\%iterable as lua expr\) do
-        |        vars[\%varname as lua expr\] = value
+        |        \%var-code\ = value
         |        comprehension[\%key as lua expr\] = \%value as lua expr\
         |    end
         |    return comprehension
         |end)(game, setmetatable({}, {__index=vars}))
 
-macro "%key = %value for all %iterable":
+macro "%key -> %value for all %iterable" =:
     ".."|(function(game, vars)
         |    local comprehension = {}
         |    for i,value in ipairs(\%iterable as lua expr\) do
@@ -243,74 +326,84 @@ macro "%key = %value for all %iterable":
         |end)(game, setmetatable({}, {__index=vars}))
 
 # Number ranges
-rule "%start up to %stop":
+rule "%start up to %stop" =:
     lua expr "compiler.utils.range(vars.start,vars.stop-1)"
 
-rule ["%start thru %stop", "%start through %stop"]:
+rule ["%start thru %stop", "%start through %stop"] =:
     lua expr "compiler.utils.range(vars.start,vars.stop)"
 
-rule "%start down to %stop":
+rule "%start down to %stop" =:
     lua expr "compiler.utils.range(vars.start,vars.stop+1,-1)"
 
-rule ["%start down thru %stop", "%start down through %stop"]:
+rule ["%start down thru %stop", "%start down through %stop"] =:
     lua expr "compiler.utils.range(vars.start,vars.stop,-1)"
 
-rule "%start up to %stop via %step":
+rule "%start up to %stop via %step" =:
     lua expr "compiler.utils.range(vars.start,vars.stop-1,vars.step)"
 
-rule ["%start thru %stop via %step", "%start through %stop via %step"]:
+rule ["%start thru %stop via %step", "%start through %stop via %step"] =:
     lua expr "compiler.utils.range(vars.start,vars.stop,vars.step)"
 
-rule "%start down to %stop via %step":
+rule "%start down to %stop via %step" =:
     lua expr "compiler.utils.range(vars.start,vars.stop+1,-vars.step)"
 
-rule ["%start down thru %stop via %step", "%start down through %stop via %step"]:
+rule ["%start down thru %stop via %step", "%start down through %stop via %step"] =:
     lua expr "compiler.utils.range(vars.start,vars.stop,-vars.step)"
 
 # Common utility functions
-rule ["random number"]: lua expr "math.random()"
-rule ["sum of %items"]: lua expr "compiler.utils.sum(vars.items)"
-rule ["product of %items"]: lua expr "compiler.utils.product(vars.items)"
-rule ["all of %items"]: lua expr "compiler.utils.all(vars.items)"
-rule ["any of %items"]: lua expr "compiler.utils.any(vars.items)"
-rule ["avg of %items", "average of %items"]: lua expr "(compiler.utils.sum(vars.items)/#vars.items)"
-rule ["min of %items", "smallest of %items", "lowest of %items"]:
+rule ["random number"] =: lua expr "math.random()"
+rule ["sum of %items"] =: lua expr "compiler.utils.sum(vars.items)"
+rule ["product of %items"] =: lua expr "compiler.utils.product(vars.items)"
+rule ["all of %items"] =: lua expr "compiler.utils.all(vars.items)"
+rule ["any of %items"] =: lua expr "compiler.utils.any(vars.items)"
+rule ["avg of %items", "average of %items"] =: lua expr "(compiler.utils.sum(vars.items)/#vars.items)"
+rule ["min of %items", "smallest of %items", "lowest of %items"] =:
     lua expr "compiler.utils.min(vars.items)"
-rule ["max of %items", "biggest of %items", "largest of %items", "highest of %items"]:
+rule ["max of %items", "biggest of %items", "largest of %items", "highest of %items"] =:
     lua expr "compiler.utils.min(vars.items)"
 
-rule ["min of %items with respect to %keys"]:
+rule ["min of %items with respect to %keys"] =:
     lua expr "compiler.utils.min(vars.items, vars.keys)"
-rule ["max of %items with respect to %keys"]:
+rule ["max of %items with respect to %keys"] =:
     lua expr "compiler.utils.max(vars.items, vars.keys)"
 
 # List/dict functions
 macro [..]
     "%list 's %index", "%index st in %list", "%index nd in %list", "%index rd in %list"
-    "%index th in %list", "%index in %list"
-..:
+    "%index th in %list", "%index in %list", "%list -> %index"
+..=:
     ".."|\%list as lua expr\[\%index as lua expr\]
 
 macro block [..]
     "%list 's %index = %value", "%index st in %list = %value", "%index nd in %list = %value"
     "%index rd in %list = %value", "%index th in %list = %value", "%index in %list = %value"
-..:
-    ".."|\%list as lua expr\[\%index as lua expr\] = \%value as lua expr\
+    "%index = %value in %list", "%list -> %index = %value"
+..=:
+    lua block ".."
+        |if vars.value.value.type ~= "Thunk" then
+        |    compiler:error("Dict assignment operation has the wrong type for the right hand side. "
+        |        .."Expected Thunk, but got: "..vars.value.value.type.."\\nMaybe you used '=' instead of '=:'?")
+        |end
+    ".."|do
+        |    local ret
+        |    \lua expr "compiler:tree_to_lua(vars.value.value.value, 'Statement')"\
+        |    \%list as lua expr\[\%index as lua expr\] = ret
+        |end
 
-macro ["%item is in %list", "%list contains %item"]:
+macro ["%item is in %list", "%list contains %item"] =:
     ".."|(\%list as lua expr\[\%index as lua expr\] ~= nil)
 
-macro ["length of %list", "size of %list", "number of %list"]:
+macro ["length of %list", "size of %list", "number of %list"] =:
     ".."|#(\%list as lua expr\)
 
-rule "dict %items":
-    let "dict" = []
-    for "pair" in %items:
+rule "dict %items" =:
+    %dict =: []
+    for %pair in %items:
         lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
-    return %dict
+    return: %dict
 
 # Permission functions
-rule "restrict %fn to within %whitelist":
+rule "restrict %fn to within %whitelist" =:
     lua block ".."
         |local fns = compiler:get_invocations(vars.fn)
         |local whitelist = compiler:get_invocations(vars.whitelist)
@@ -332,7 +425,7 @@ rule "restrict %fn to within %whitelist":
         |    end
         |end
 
-rule "allow %whitelist to use %fn":
+rule "allow %whitelist to use %fn" =:
     lua block ".."
         |local fns = compiler:get_invocations(vars.fn)
         |local whitelist = compiler:get_invocations(vars.whitelist)
@@ -356,7 +449,7 @@ rule "allow %whitelist to use %fn":
         |    end
         |end
 
-rule "forbid %blacklist to use %fn":
+rule "forbid %blacklist to use %fn" =:
     lua block ".."
         |local fns = compiler:get_invocations(vars.fn)
         |local blacklist = compiler:get_invocations(vars.blacklist)
@@ -378,20 +471,10 @@ rule "forbid %blacklist to use %fn":
         |    end
         |end
 
-# Error functions
-rule "error!":
-    lua block ".."
-        |table.remove(compiler.callstack)
-        |compiler:error()
-
-rule "error %msg":
-    lua block ".."
-        |table.remove(compiler.callstack)
-        |compiler:error(vars.msg)
-
-macro block "test %code yields %expected":
-    let "generated" = (lua expr "compiler.utils.repr(compiler:stringify_tree(vars.code.value.value), true)")
-    let "expected" = (%expected as lua expr)
+# For unit testing
+macro block "test %code yields %expected" =:
+    %generated =: lua expr "compiler.utils.repr(compiler:stringify_tree(vars.code.value.value), true)"
+    %expected =: %expected as lua expr
     if (%generated != %expected):
         say "Test failed!"
         say "Expected:"
@@ -399,5 +482,5 @@ macro block "test %code yields %expected":
         say "But got:"
         say %generated
         error!
-    return ""
+    return: ""
 
