@@ -10,7 +10,10 @@ utils = {
     repr: (x, add_quotes=false)->
         switch type(x)
             when 'table'
-                if utils.is_list x
+                mt = getmetatable(x)
+                if mt and mt.__tostring
+                    mt.__tostring(x)
+                elseif utils.is_list x
                     "{#{table.concat([utils.repr(i, true) for i in *x], ", ")}}"
                 else
                     "{#{table.concat(["[#{utils.repr(k, true)}]= #{utils.repr(v, true)}" for k,v in pairs x], ", ")}}"

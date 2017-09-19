@@ -16,7 +16,10 @@ utils = {
     end
     local _exp_0 = type(x)
     if 'table' == _exp_0 then
-      if utils.is_list(x) then
+      local mt = getmetatable(x)
+      if mt and mt.__tostring then
+        return mt.__tostring(x)
+      elseif utils.is_list(x) then
         return "{" .. tostring(table.concat((function()
           local _accum_0 = { }
           local _len_0 = 1
