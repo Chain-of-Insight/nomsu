@@ -91,6 +91,8 @@ utils = {
       start, stop, step = 1, start, 1
     elseif step == nil then
       step = 1
+    elseif step == 0 then
+      error("Range step cannot be zero.")
     end
     return setmetatable({
       start = start,
@@ -105,8 +107,30 @@ utils = {
           end
         end
         return iter, self, 0
+      end,
+      __index = function(self, i)
+        if type(i) ~= "Number" then
+          return nil
+        end
+        if i % 1 ~= 0 then
+          return nil
+        end
+        if i <= 0 or i - 1 > (self.stop - self.start) / self.step then
+          return nil
+        end
+        return self.start + (i - 1) * self.step
+      end,
+      __len = function(self)
+        local len = (self.stop - self.start) / self.step
+        if len < 0 then
+          len = 0
+        end
+        return len
       end
     })
+  end,
+  nth_to_last = function(list, n)
+    return list[#list - n + 1]
   end,
   keys = function(t)
     local _accum_0 = { }
