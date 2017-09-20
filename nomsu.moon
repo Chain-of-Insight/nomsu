@@ -231,7 +231,7 @@ class NomsuCompiler
             longstring_error <- (({.+} ("" -> "Error while parsing Longstring")) => error)
             string_interpolation <- "\" %ws? (inline_functioncall / expression) %ws? "\"
 
-            number <- ({ {'-'? ([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+) } }) -> Number
+            number <- ({ {"-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)) } }) -> Number
 
             -- Hack to allow %foo's to parse as "%foo" and "'s" separately
             variable <- ({ ("%" {%wordchar (!"'" %wordchar)*}) }) -> Var
