@@ -51,13 +51,27 @@ utils = {
             start,stop,step = 1,start,1
         elseif step == nil
             step = 1
+        elseif step == 0
+            error("Range step cannot be zero.")
         return setmetatable({:start,:stop,:step}, {
             __ipairs: =>
                 iter = (i)=>
                     if i <= (@stop-@start)/@step
                         return i+1, @start+i*@step
                 return iter, @, 0
+            __index: (i)=>
+                if type(i) != "Number" then return nil
+                if i % 1 != 0 then return nil
+                if i <= 0 or i-1 > (@stop-@start)/@step then return nil
+                return @start + (i-1)*@step
+            __len: =>
+                len = (@stop-@start)/@step
+                if len < 0 then len = 0
+                return len
+
         })
+    
+    nth_to_last: (list, n) -> list[#list-n+1]
 
     keys: (t)-> [k for k in pairs(t)]
     values: (t)-> [v for _,v in pairs(t)]

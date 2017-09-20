@@ -167,22 +167,27 @@ lua block ".."
     |            compiler:error("Assignment operation has the wrong type for the right hand side. "
     |                .."Expected Thunk, but got: "..vars.rhs.type.."\\nMaybe you used '=' instead of '=:'?")
     |        end
-    |        local ret = "do\\n    local ret"
-    |        ret = ret .. "\\n    "..compiler:tree_to_lua(vars.rhs.value, "Statement")
-    |        ret = ret .. "\\n    "..callback(compiler:tree_to_lua(vars.var, "Expression"))
-    |        return (ret.."\\nend"), true
+    |        if #vars.rhs.value.value == 1 then
+    |            return callback(compiler:tree_to_lua(vars.var, "Expression"),
+    |                compiler:tree_to_lua(vars.rhs.value.value[1].value, "Expression")), true
+    |        else
+    |            local ret = "do\\n    local ret"
+    |            ret = ret .. "\\n    "..compiler:tree_to_lua(vars.rhs.value, "Statement")
+    |            ret = ret .. "\\n    "..callback(compiler:tree_to_lua(vars.var, "Expression"), "ret")
+    |            return (ret.."\\nend"), true
+    |        end
     |    end
     |end
-    |compiler:defmacro("%var = %rhs", helper(function(var) return var.." = ret" end))
-    |compiler:defmacro("%var += %rhs", helper(function(var) return var.." = "..var.." + ret" end))
-    |compiler:defmacro("%var -= %rhs", helper(function(var) return var.." = "..var.." - ret" end))
-    |compiler:defmacro("%var *= %rhs", helper(function(var) return var.." = "..var.." * ret" end))
-    |compiler:defmacro("%var /= %rhs", helper(function(var) return var.." = "..var.." / ret" end))
-    |compiler:defmacro("%var ^= %rhs", helper(function(var) return var.." = "..var.." ^ ret" end))
-    |compiler:defmacro("%var and= %rhs", helper(function(var) return var.." = "..var.." and ret" end))
-    |compiler:defmacro("%var or= %rhs", helper(function(var) return var.." = "..var.." or ret" end))
-    |compiler:defmacro("%var concat= %rhs", helper(function(var) return var.." = "..var.." .. ret" end))
-    |compiler:defmacro("%var mod= %rhs", helper(function(var) return var.." = "..var.." % ret" end))
+    |compiler:defmacro("%var = %rhs", helper(function(var,result) return var.." = "..result end))
+    |compiler:defmacro("%var += %rhs", helper(function(var,result) return var.." = "..var.." + "..result end))
+    |compiler:defmacro("%var -= %rhs", helper(function(var,result) return var.." = "..var.." - "..result end))
+    |compiler:defmacro("%var *= %rhs", helper(function(var,result) return var.." = "..var.." * "..result end))
+    |compiler:defmacro("%var /= %rhs", helper(function(var,result) return var.." = "..var.." / "..result end))
+    |compiler:defmacro("%var ^= %rhs", helper(function(var,result) return var.." = "..var.." ^ "..result end))
+    |compiler:defmacro("%var and= %rhs", helper(function(var,result) return var.." = "..var.." and "..result end))
+    |compiler:defmacro("%var or= %rhs", helper(function(var,result) return var.." = "..var.." or "..result end))
+    |compiler:defmacro("%var concat= %rhs", helper(function(var,result) return var.." = "..var.." .. "..result end))
+    |compiler:defmacro("%var mod= %rhs", helper(function(var,result) return var.." = "..var.." % "..result end))
 
 # Operators
 macro [true, yes] =: "true"
@@ -279,11 +284,6 @@ macro [%if_expr if %condition else %else_expr] =:
         |    end
         |end)(compiler, vars)
 
-# Switch statement/multi-branch if
-macro block [when %body] =:
-    %result =: ""
-    %result
-
 
 # Loop control flow
 macro block [break] =: "break"
@@ -349,6 +349,45 @@ macro block [for all %iterable %body] =:
         |    \(lua expr "vars.body.value") as lua block\
         |end
         |vars.it = old_loopval
+
+# Switch statement/multi-branch if
+macro block [when %body] =:
+    %result =: ""
+    for %statement in (lua expr "vars.body.value.value"):
+        %func-call =: lua expr "vars.statement.value"
+        if ((lua expr "vars['func-call'].type") != "FunctionCall"):
+            error "Invalid format for 'when' statement"
+        %tokens =: lua expr "vars['func-call'].value"
+        %star =: lua expr "vars.tokens[1]"
+        if (((lua expr "vars.star.type") != "Word") or ((lua expr "vars.star.value") != "*")):
+            error "Invalid format for 'when' statement"
+        %thunk =: lua expr "vars.tokens[#vars.tokens]"
+        if ((lua expr "vars.thunk.type") != "Thunk"):
+            error "Invalid format for 'when' statement"
+        %condition-bits =: []
+        for %i in (2 up to (lua expr "#vars.tokens")):
+            lua block "table.insert(vars['condition-bits'], vars.tokens[vars.i])"
+        %condition =: dict [..]
+            ["type",lua expr "vars['func-call'].type"]
+            ["src",lua expr "vars['func-call'].src"]
+            ["value", %condition-bits]
+        if ((lua expr "#vars.condition.value") == 0):
+            %result concat=: ".."
+                |
+                |do
+                |    local ret
+                |    \(lua expr "vars.thunk.value") as lua block\
+                |    return ret
+                |end
+        ..else:
+            %result concat=: ".."
+                |
+                |if \%condition as lua expr\ then
+                |    local ret
+                |    \(lua expr "vars.thunk.value") as lua block\
+                |    return ret
+                |end
+    %result
 
 # List Comprehension
 # TODO: maybe make this lazy, or a lazy version?
@@ -452,6 +491,17 @@ macro [..]
     %index th in %list, %index in %list, %list -> %index
 ..=:
     ".."|\%list as lua expr\[\%index as lua expr\]
+    ".."|\%list as lua expr\[\%index as lua expr\]
+macro [first in %list] =:
+    ".."|\%list as lua expr\[1]
+
+macro [..]
+    %index st to last in %list, %index nd to last in %list, %index rd to last in %list
+    %index th to last in %list
+..=:
+    ".."|compiler.utils.nth_to_last(\%list as lua expr\, \%index as lua expr\)
+macro [last in %list] =:
+    ".."|compiler.utils.nth_to_last(\%list as lua expr\, 1)
 
 macro block [..]
     %list's %index = %new_value, %index st in %list = %new_value, %index nd in %list = %new_value

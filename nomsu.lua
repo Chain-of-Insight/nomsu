@@ -5,133 +5,6 @@ local INDENT = "    "
 lpeg.setmaxstack(10000)
 local P, V, S, Cg, C, Cp, B, Cmt
 P, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
-local get_line_indentation
-get_line_indentation = function(line)
-  local indent_amounts = {
-    [" "] = 1,
-    ["\t"] = 4
-  }
-  do
-    local sum = 0
-    local leading_space = line:match("[\t ]*")
-    for c in leading_space:gmatch("[\t ]") do
-      sum = sum + indent_amounts[c]
-    end
-    return sum
-  end
-end
-local make_parser
-make_parser = function(lingo, extra_definitions)
-  local indent_stack = {
-    0
-  }
-  local push
-  push = function(n)
-    return table.insert(indent_stack, n)
-  end
-  local pop
-  pop = function()
-    return table.remove(indent_stack)
-  end
-  local check_indent
-  check_indent = function(subject, end_pos, spaces)
-    local num_spaces = get_line_indentation(spaces)
-    if num_spaces <= indent_stack[#indent_stack] then
-      return nil
-    end
-    push(num_spaces)
-    return end_pos
-  end
-  local check_dedent
-  check_dedent = function(subject, end_pos, spaces)
-    local num_spaces = get_line_indentation(spaces)
-    if num_spaces >= indent_stack[#indent_stack] then
-      return nil
-    end
-    pop()
-    return end_pos
-  end
-  local check_nodent
-  check_nodent = function(subject, end_pos, spaces)
-    local num_spaces = get_line_indentation(spaces)
-    if num_spaces ~= indent_stack[#indent_stack] then
-      return nil
-    end
-    return end_pos
-  end
-  local wordchar = P(1) - S(' \t\n\r%#:;,.{}[]()"\\')
-  local nl = P("\n")
-  local whitespace = S(" \t") ^ 1
-  local blank_line = whitespace ^ -1 * nl
-  local line_comment = re.compile([=[ "#" [^%nl]* ]=], {
-    nl = nl
-  })
-  local block_comment = re.compile([=[        "#.." (!%nl .)* (%indent (!%dedent %nl [^%nl]*)*)
-    ]=], {
-    nl = nl,
-    whitespace = whitespace,
-    indent = #(nl * blank_line ^ 0 * Cmt(S(" \t") ^ 0, check_indent)),
-    dedent = #(nl * blank_line ^ 0 * Cmt(S(" \t") ^ 0, check_dedent)),
-    new_line = nl * blank_line ^ 0 * Cmt(S(" \t") ^ 0, check_nodent)
-  })
-  blank_line = ((Cmt(whitespace ^ -1, check_nodent) * (block_comment + line_comment)) ^ -1 + whitespace ^ -1) * nl
-  local defs = {
-    wordchar = wordchar,
-    nl = nl,
-    ws = whitespace,
-    blank_line = blank_line,
-    block_comment = block_comment,
-    line_comment = line_comment,
-    eol = #nl + (P("") - P(1)),
-    word_boundary = whitespace ^ -1 + B(P("..")) + B(S("\";)]")) + #S("\":([") + #((whitespace + nl) ^ 0 * P("..")),
-    indent = #(nl * blank_line ^ 0 * Cmt(whitespace ^ -1, check_indent)),
-    dedent = #(nl * blank_line ^ 0 * Cmt(whitespace ^ -1, check_dedent)),
-    new_line = nl * blank_line ^ 0 * Cmt(whitespace ^ -1, check_nodent),
-    error_handler = function(src, pos, errors)
-      local line_no = 1
-      for _ in src:sub(1, -#errors):gmatch("\n") do
-        line_no = line_no + 1
-      end
-      local err_pos = #src - #errors + 1
-      if errors:sub(1, 1) == "\n" then
-        err_pos = err_pos + #errors:match("[ \t]*", 2)
-      end
-      local start_of_err_line = err_pos
-      while src:sub(start_of_err_line, start_of_err_line) ~= "\n" do
-        start_of_err_line = start_of_err_line - 1
-      end
-      local start_of_prev_line = start_of_err_line - 1
-      while src:sub(start_of_prev_line, start_of_prev_line) ~= "\n" do
-        start_of_prev_line = start_of_prev_line - 1
-      end
-      local prev_line, err_line, next_line = src:match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line + 1)
-      local pointer = ("-"):rep(err_pos - start_of_err_line + 0) .. "^"
-      return error("\nParse error on line " .. tostring(line_no) .. ":\n\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n")
-    end
-  }
-  if extra_definitions then
-    for k, v in pairs(extra_definitions) do
-      defs[k] = v
-    end
-  end
-  setmetatable(defs, {
-    __index = function(t, key)
-      local fn
-      fn = function(src, value, errors)
-        local token = {
-          type = key,
-          src = src,
-          value = value,
-          errors = errors
-        }
-        return token
-      end
-      t[key] = fn
-      return fn
-    end
-  })
-  return re.compile(lingo, defs)
-end
 local NomsuCompiler
 do
   local _class_0
@@ -204,32 +77,45 @@ do
       end
     end,
     get_invocations_from_definition = function(self, def, vars)
-      if def.type == "String" or def.type == "List" then
+      if def.type == "String" then
         return self:tree_to_value(def, vars)
       end
-      if def.type ~= "Thunk" then
-        self:error("Trying to get invocations from " .. tostring(def.type) .. ", but expected Thunk.")
+      if def.type ~= "List" then
+        error("DEF IS: " .. tostring(utils.repr(def)))
+        self:error("Trying to get invocations from " .. tostring(def.type) .. ", but expected List or String.")
       end
       local invocations = { }
-      local _list_0 = def.value.value
+      local _list_0 = def.value
       for _index_0 = 1, #_list_0 do
-        local statement = _list_0[_index_0]
-        if statement.value.type ~= "FunctionCall" then
-          self:error("Invalid statement type: " .. tostring(statement.value.type) .. ", expected FunctionCall")
-        end
-        local name_bits = { }
-        local _list_1 = statement.value.value
-        for _index_1 = 1, #_list_1 do
-          local token = _list_1[_index_1]
-          if token.type == "Word" then
-            table.insert(name_bits, token.value)
-          elseif token.value.type == "Var" then
-            table.insert(name_bits, token.value.src)
-          else
-            self:error("Unexpected token type in definition: " .. tostring(token.value.type) .. " (expected Word or Var)")
+        local _continue_0 = false
+        repeat
+          local item = _list_0[_index_0]
+          if item.type == "String" then
+            table.insert(invocations, self:tree_to_value(item, vars))
+            _continue_0 = true
+            break
           end
+          if item.type ~= "FunctionCall" then
+            self:error("Invalid list item: " .. tostring(item.type) .. ", expected FunctionCall or String")
+          end
+          local name_bits = { }
+          local _list_1 = item.value
+          for _index_1 = 1, #_list_1 do
+            local token = _list_1[_index_1]
+            if token.type == "Word" then
+              table.insert(name_bits, token.value)
+            elseif token.type == "Var" then
+              table.insert(name_bits, token.src)
+            else
+              self:error("Unexpected token type in definition: " .. tostring(token.type) .. " (expected Word or Var)")
+            end
+          end
+          table.insert(invocations, table.concat(name_bits, " "))
+          _continue_0 = true
+        until true
+        if not _continue_0 then
+          break
         end
-        table.insert(invocations, table.concat(name_bits, " "))
       end
       return invocations
     end,
@@ -290,11 +176,11 @@ do
         self.defs[invocation] = fn_info
       end
     end,
-    run = function(self, text)
+    run = function(self, text, filename)
       if self.debug then
         self:writeln("RUNNING TEXT:\n" .. tostring(text))
       end
-      local code, retval = self:compile(text)
+      local code, retval = self:compile(text, filename)
       if self.debug then
         self:writeln("\nGENERATED LUA CODE:\n" .. tostring(code))
         self:writeln("\nPRODUCED RETURN VALUE:\n" .. tostring(retval))
@@ -344,69 +230,173 @@ do
       end
       return (lua_thunk())(self, { })
     end,
-    parse = function(self, str)
+    parse = function(self, str, filename)
       if self.debug then
         self:writeln("PARSING:\n" .. tostring(str))
       end
-      local lingo = [=[            file <- ({ {| %blank_line* {:body: block :} %blank_line* (errors)? |} }) -> File
-            errors <- (({.+}) => error_handler)
-            block <- ({ {| statement (%new_line statement)* |} }) -> Block
-            statement <- ({ (functioncall / expression) }) -> Statement
-            one_liner <- ({ {|
-                    (({ 
-                        (({ {|
-                            (expression (%word_boundary fn_bit)+) / (word (%word_boundary fn_bit)*)
-                        |} }) -> FunctionCall)
-                        / (expression)
-                     }) -> Statement)
-                |} }) -> Block
+      local get_line_indentation
+      get_line_indentation = function(line)
+        local indent_amounts = {
+          [" "] = 1,
+          ["\t"] = 4
+        }
+        do
+          local sum = 0
+          local leading_space = line:match("[\t ]*")
+          for c in leading_space:gmatch("[\t ]") do
+            sum = sum + indent_amounts[c]
+          end
+          return sum
+        end
+      end
+      local indent_stack = {
+        0
+      }
+      local check_indent
+      check_indent = function(subject, end_pos, spaces)
+        local num_spaces = get_line_indentation(spaces)
+        if num_spaces > indent_stack[#indent_stack] then
+          table.insert(indent_stack, num_spaces)
+          return end_pos
+        end
+      end
+      local check_dedent
+      check_dedent = function(subject, end_pos, spaces)
+        local num_spaces = get_line_indentation(spaces)
+        if num_spaces < indent_stack[#indent_stack] then
+          table.remove(indent_stack)
+          return end_pos
+        end
+      end
+      local check_nodent
+      check_nodent = function(subject, end_pos, spaces)
+        local num_spaces = get_line_indentation(spaces)
+        if num_spaces == indent_stack[#indent_stack] then
+          return end_pos
+        end
+      end
+      local lingo = [=[            file <- ({ {| shebang? {:body: block :} %nl* (({.+} ("" -> "Unexpected end of file")) => error)? |} }) -> File
 
-            functioncall <- ({ {| (expression %word_boundary fn_bits) / (word (%word_boundary fn_bits)?) |} }) -> FunctionCall
-            fn_bit <- (expression / word)
-            fn_bits <-
-                ((".." %ws? %line_comment? (%indent %new_line indented_fn_bits %dedent) (%new_line ".." %ws? fn_bits)?)
-                 / (%new_line ".." fn_bit (%word_boundary fn_bits)?)
-                 / (fn_bit (%word_boundary fn_bits)?))
-            indented_fn_bits <-
-                fn_bit ((%new_line / %word_boundary) indented_fn_bits)?
-            
-            thunk <-
-                ({ ":" %ws? %line_comment?
-                   ((%indent %new_line block ((%dedent (%new_line "..")?) / errors))
-                    / (one_liner (%ws? (%new_line? ".."))?)) }) -> Thunk
+            shebang <- "#!" [^%nl]* %nl
+
+            block <- ({ {|
+                (ignored_line %nl)*
+                line_of_statements (nodent line_of_statements)*
+                (%nl ignored_line)* |} }) -> Block
+            inline_block <- ({ {| inline_line_of_statements |} }) -> Block
+
+            line_of_statements <- statement (%ws? ";" %ws? statement)*
+            inline_line_of_statements <- inline_statement (%ws? ";" %ws? inline_statement)*
+
+            statement <- ({ functioncall / expression }) -> Statement
+            inline_statement <- ({ inline_functioncall / expression }) -> Statement
+
+            expression <- (
+                longstring / string / number / variable / list / thunk / block_functioncall
+                / ("(" %ws? (inline_thunk / inline_functioncall) %ws? ")"))
+
+            -- Function calls need at least one word in them
+            functioncall <- ({ {|
+                    (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
+                |} }) -> FunctionCall
+            inline_functioncall <- ({ {|
+                    (expression tok_gap)* word (tok_gap (expression / word))*
+                |} }) -> FunctionCall
+            block_functioncall <- "(..)" indent functioncall (dedent / (({.+} ("" -> "Error while parsing block function call")) => error))
 
             word <- ({ !number {%wordchar (!"'" %wordchar)*} }) -> Word
-            expression <- ({ (longstring / string / number / variable / list / thunk / subexpression) }) -> Expression
+            
+            thunk <- ({ ":" ((indent block (dedent / (({.+} ("" -> "Error while parsing thunk")) => error)))
+                / (%ws? inline_block)) }) -> Thunk
+            inline_thunk <- ({ ":" %ws? inline_block }) -> Thunk
 
             string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
+
             longstring <- ({ '".."' %ws?
-                {|
-                    (("|" {| ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)* |})
-                     / %line_comment)?
-                    (%indent
-                        (%new_line "|" {|
-                            ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)*
-                        |})+
-                    ((%dedent (%new_line '..')?) / errors))?
-                |}}) -> Longstring
-            string_interpolation <- "\" %ws? (functioncall / expression) %ws? "\"
-            number <- ({ {'-'? [0-9]+ ("." [0-9]+)?} }) -> Number
+                {| (longstring_line (indent
+                        longstring_line (nodent longstring_line)*
+                    (dedent / longstring_error))?)
+                  /(indent
+                        longstring_line (nodent longstring_line)*
+                    (dedent / longstring_error)) |} }) -> Longstring
+            longstring_line <- "|" {| ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)* |}
+            longstring_error <- (({.+} ("" -> "Error while parsing Longstring")) => error)
+            string_interpolation <- "\" %ws? (inline_functioncall / expression) %ws? "\"
+
+            number <- ({ {"-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)) } }) -> Number
+
+            -- Hack to allow %foo's to parse as "%foo" and "'s" separately
             variable <- ({ ("%" {%wordchar (!"'" %wordchar)*}) }) -> Var
 
-            subexpression <-
-                ("(" %ws? (functioncall / expression) %ws? ")")
-                / ("(..)" %ws? %line_comment? %indent %new_line ((({ {| indented_fn_bits |} }) -> FunctionCall) / expression) %dedent (%new_line "..")?)
-
             list <- ({ {|
-                ("[..]" %ws? %line_comment? %indent %new_line indented_list ","? ((%dedent (%new_line "..")?) / errors))
-                / ("[" %ws? (list_items ","?)?  %ws?"]")
+                 ("[..]" indent
+                        list_line (nodent list_line)*
+                  (dedent / (({.+} ("" -> "Error while parsing list")) => error)))
+                /("[" %ws? (list_line %ws?)? "]")
               |} }) -> List
-            list_items <- ((functioncall / expression) (list_sep list_items)?)
-            list_sep <- %ws? "," %ws?
-            indented_list <-
-                (functioncall / expression) (((list_sep (%line_comment? %new_line)?) / (%line_comment? %new_line)) indented_list)?
+            list_line <- list_bit (%ws? "," tok_gap list_bit)* (%ws? ",")?
+            list_bit <- inline_functioncall / expression
+
+            block_comment <- "#.." [^%nl]* indent [^%nl]* (%nl ((%ws? (!. / &%nl)) / (!%dedented [^%nl]*)))* 
+            line_comment  <- "#" [^%nl]*
+
+            eol <- %ws? line_comment? (!. / &%nl)
+            ignored_line <- (%nodented (block_comment / line_comment)) / (%ws? (!. / &%nl))
+            indent <- eol (%nl ignored_line)* %nl %indented
+            nodent <- eol (%nl ignored_line)* %nl %nodented
+            dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
+            tok_gap <- %ws / %prev_edge / &("[" / [.,:;{("#%'])
+            dotdot <- nodent ".." %ws?
         ]=]
-      lingo = make_parser(lingo)
+      local whitespace = S(" \t") ^ 1
+      local defs = {
+        ws = whitespace,
+        nl = P("\n"),
+        wordchar = P(1) - S(' \t\n\r%#:;,.{}[]()"\\'),
+        indented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_indent),
+        nodented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_nodent),
+        dedented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_dedent),
+        prev_edge = B(S(" \t\n.,:;}])\"")),
+        error = function(src, pos, errors, err_msg)
+          local line_no = 1
+          for _ in src:sub(1, -#errors):gmatch("\n") do
+            line_no = line_no + 1
+          end
+          local err_pos = #src - #errors + 1
+          if errors:sub(1, 1) == "\n" then
+            err_pos = err_pos + #errors:match("[ \t]*", 2)
+          end
+          local start_of_err_line = err_pos
+          while src:sub(start_of_err_line, start_of_err_line) ~= "\n" and start_of_err_line > 1 do
+            start_of_err_line = start_of_err_line - 1
+          end
+          local start_of_prev_line = start_of_err_line - 1
+          while src:sub(start_of_prev_line, start_of_prev_line) ~= "\n" and start_of_prev_line > 1 do
+            start_of_prev_line = start_of_prev_line - 1
+          end
+          local prev_line, err_line, next_line
+          prev_line, err_line, next_line = src:match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line + 1)
+          local pointer = ("-"):rep(err_pos - start_of_err_line + 0) .. "^"
+          return error("\n" .. tostring(err_msg or "Parse error") .. " in " .. tostring(filename) .. " on line " .. tostring(line_no) .. ":\n\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n")
+        end
+      }
+      setmetatable(defs, {
+        __index = function(t, key)
+          local fn
+          fn = function(src, value, errors)
+            local token = {
+              type = key,
+              src = src,
+              value = value,
+              errors = errors
+            }
+            return token
+          end
+          t[key] = fn
+          return fn
+        end
+      })
+      lingo = re.compile(lingo, defs)
       local tree = lingo:match(str:gsub("\r", "") .. "\n")
       if self.debug then
         self:writeln("\nPARSE TREE:")
@@ -428,6 +418,9 @@ do
         kind = "Expression"
       end
       assert(tree, "No tree provided.")
+      if not tree.type then
+        self:error("Invalid tree: " .. tostring(utils.repr(tree)))
+      end
       local indent = ""
       local buffer = { }
       local return_value = nil
@@ -485,8 +478,6 @@ do
         else
           add("ret = " .. (to_lua(tree.value):match("%s*(.*)")))
         end
-      elseif "Expression" == _exp_0 then
-        add(to_lua(tree.value))
       elseif "FunctionCall" == _exp_0 then
         local name = self:fn_name_from_tree(tree)
         if self.defs[name] and self.defs[name].is_macro then
@@ -670,8 +661,6 @@ do
         self:_yield_tree(tree.value, indent_level + 1)
       elseif "Statement" == _exp_0 then
         self:_yield_tree(tree.value, indent_level)
-      elseif "Expression" == _exp_0 then
-        self:_yield_tree(tree.value, indent_level)
       elseif "FunctionCall" == _exp_0 then
         local name = self:fn_name_from_tree(tree)
         local args
@@ -737,14 +726,14 @@ do
       end
       return table.concat(result, "\n")
     end,
-    compile = function(self, src, output_file)
+    compile = function(self, src, filename, output_file)
       if output_file == nil then
         output_file = nil
       end
       if self.debug then
         self:writeln("COMPILING:\n" .. tostring(src))
       end
-      local tree = self:parse(src)
+      local tree = self:parse(src, filename)
       assert(tree, "Tree failed to compile: " .. tostring(src))
       local code, retval = self:tree_to_lua(tree)
       if output_file then
@@ -764,7 +753,7 @@ do
       self.callstack = { }
       return error()
     end,
-    test = function(self, src, expected)
+    test = function(self, src, filename, expected)
       local i = 1
       while i ~= nil do
         local start, stop = src:find("\n\n", i)
@@ -777,7 +766,7 @@ do
         local test_src
         test_src, expected = test:sub(1, start - 1), test:sub(stop + 1, -1)
         expected = expected:match('[\n]*(.*[^\n])')
-        local tree = self:parse(test_src)
+        local tree = self:parse(test_src, filename)
         local got = self:stringify_tree(tree.value.body)
         if got ~= expected then
           self:error("TEST FAILED!\nSource:\n" .. tostring(test_src) .. "\nExpected:\n" .. tostring(expected) .. "\n\nGot:\n" .. tostring(got))
@@ -819,28 +808,34 @@ do
       self:def("require %filename", function(self, vars)
         if not self.loaded_files[vars.filename] then
           local file = io.open(vars.filename)
-          self.loaded_files[vars.filename] = self:run(file:read('*a'))
+          if not file then
+            self:error("File does not exist: " .. tostring(vars.filename))
+          end
+          self.loaded_files[vars.filename] = self:run(file:read('*a'), vars.filename)
         end
         return self.loaded_files[vars.filename]
       end)
       return self:def("run file %filename", function(self, vars)
         local file = io.open(vars.filename)
-        return self:run(file:read('*a'))
+        if not file then
+          self:error("File does not exist: " .. tostring(vars.filename))
+        end
+        return self:run(file:read('*a'), vars.filename)
       end)
     end
   }
   _base_0.__index = _base_0
   _class_0 = setmetatable({
     __init = function(self, parent)
+      self.write = function(self, ...)
+        return io.write(...)
+      end
       self.defs = setmetatable({ }, {
         __index = parent and parent.defs
       })
       self.callstack = { }
       self.debug = false
       self:initialize_core()
-      self.write = function(self, ...)
-        return io.write(...)
-      end
       self.utils = utils
       self.loaded_files = { }
     end,
@@ -886,7 +881,7 @@ if arg and arg[1] then
   if arg[2] == "-" then
     c.write = function() end
   end
-  local code, retval = c:compile(input)
+  local code, retval = c:compile(input, arg[1])
   c.write = _write
   if arg[2] then
     local output
@@ -907,7 +902,7 @@ if arg and arg[1] then
   end
 elseif arg then
   local c = NomsuCompiler()
-  c:run('run file "core.nom"')
+  c:run('require "lib/core.nom"')
   while true do
     local buff = ""
     while true do
