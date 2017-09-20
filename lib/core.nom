@@ -358,19 +358,19 @@ macro block [when %body] =:
         if ((lua expr "vars['func-call'].type") != "FunctionCall"):
             error "Invalid format for 'when' statement"
         %tokens =: lua expr "vars['func-call'].value"
-        %star =: lua expr "vars.tokens[1]"
-        if (((lua expr "vars.star.type") != "Word") or ((lua expr "vars.star.value") != "*")):
+        %q =: lua expr "vars.tokens[1]"
+        if (((lua expr "vars.q.type") != "Word") or ((lua expr "vars.q.value") != "?")):
             error "Invalid format for 'when' statement"
         %thunk =: lua expr "vars.tokens[#vars.tokens]"
         if ((lua expr "vars.thunk.type") != "Thunk"):
             error "Invalid format for 'when' statement"
-        %condition-bits =: []
+        %condition_bits =: []
         for %i in (2 up to (lua expr "#vars.tokens")):
-            lua block "table.insert(vars['condition-bits'], vars.tokens[vars.i])"
+            lua block "table.insert(vars['condition_bits'], vars.tokens[vars.i])"
         %condition =: dict [..]
             ["type",lua expr "vars['func-call'].type"]
             ["src",lua expr "vars['func-call'].src"]
-            ["value", %condition-bits]
+            ["value", %condition_bits]
         if ((lua expr "#vars.condition.value") == 0):
             %result concat=: ".."
                 |
@@ -387,6 +387,54 @@ macro block [when %body] =:
                 |    \(lua expr "vars.thunk.value") as lua block\
                 |    return ret
                 |end
+    %result
+
+# Switch statement
+macro block [when %branch-value %body] =:
+    %result =: ".."|local branch_value = \%branch-value as lua expr\
+    for %statement in (lua expr "vars.body.value.value"):
+        %func-call =: lua expr "vars.statement.value"
+        if ((lua expr "vars['func-call'].type") != "FunctionCall"):
+            error "Invalid format for 'when' statement"
+        %tokens =: lua expr "vars['func-call'].value"
+        %eq =: lua expr "vars.tokens[1]"
+        if (((lua expr "vars.eq.type") != "Word") or ((lua expr "vars.eq.value") != "==")):
+            error "Invalid format for 'when' statement"
+        %thunk =: lua expr "vars.tokens[#vars.tokens]"
+        if ((lua expr "vars.thunk.type") != "Thunk"):
+            error "Invalid format for 'when' statement"
+        %condition_bits =: []
+        for %i in (2 up to (lua expr "#vars.tokens")):
+            lua block "table.insert(vars.condition_bits, vars.tokens[vars.i])"
+        if (lua expr "#vars.condition_bits == 0"):
+            %result concat=: ".."
+                |
+                |do
+                |    local ret
+                |    \(lua expr "vars.thunk.value") as lua block\
+                |    return ret
+                |end
+        ..else:
+            if (lua expr "#vars.condition_bits == 1 and vars.condition_bits[1].type ~= 'Word'"):
+                %result concat=: ".."
+                    |
+                    |if compiler.utils.equivalent(branch_value, \(lua expr "vars.condition_bits[1]") as lua expr\) then
+                    |    local ret
+                    |    \(lua expr "vars.thunk.value") as lua block\
+                    |    return ret
+                    |end
+            ..else:
+                %condition =: dict [..]
+                    ["type",lua expr "vars['func-call'].type"]
+                    ["src",lua expr "vars['func-call'].src"]
+                    ["value", %condition_bits]
+                %result concat=: ".."
+                    |
+                    |if compiler.utils.equivalent(branch_value, \%condition as lua expr\) then
+                    |    local ret
+                    |    \(lua expr "vars.thunk.value") as lua block\
+                    |    return ret
+                    |end
     %result
 
 # List Comprehension
