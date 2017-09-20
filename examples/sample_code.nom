@@ -97,40 +97,31 @@ say (..)
         3 * 4
 
 when:
-    when %x == 1:
+    ? %x == 1:
         say "one"
-    when %x == 2:
+    ? %x == 2:
         say "two"
-    when %x:
+    ? %x:
         say "nonzero"
-    else:
+    ?:
         say "???"
 
-when:
-    * %x == 1:
+when %x:
+    == 1:
         say "one"
-    * %x == 2:
+    == 2:
         say "two"
-    * %x:
-        say "nonzero"
-    *:
-        say "???"
-
-when %x ==:
-    * 1:
-        say "one"
-    * 2:
-        say "two"
-    *:
+    ==:
         say "???"
 
 
 if %x:
     say "one"
-..else: if %y:
-    say "two"
 ..else:
-    say "three"
+    if %y:
+        say "two"
+    ..else:
+        say "three"
 
 
 say ".."

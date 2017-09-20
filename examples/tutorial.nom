@@ -3,7 +3,7 @@
     continue until dedent
 
 # Import files like so:
-require "core.nom"
+require "lib/core.nom"
 
 # Numbers:
 23
@@ -114,8 +114,8 @@ do:
 
 # Function definition:
 rule [say both %first and also %second] =:
-    # Function arguments are accessed just like variables
     say %first
+    # Function arguments are accessed just like variables
     say %second
 
 # The last line of a function is the return value
@@ -192,29 +192,16 @@ say (2 ++ 3)
     "say both %first and also %second", and a code block to a function called "rule % %"
     that takes two arguments.
 
-# Line continuations work by either ending a line with ".." and continuing with an indented block:
-say..
-    both "Tom" and
-    also
-    "Sawyer"
-
-# Or by starting the next line with ".."
+# Line continuations work by starting the next line with ".."
 say both "Bruce"
 ..and also "Lee"
 
-# This can be mixed and matched:
-say both..
-    "Rick"
-..and also..
-    "Moranis"
-
-# And combined with the block forms of literals:
+# This can be combined with the block forms of literals:
 say both ".."
     |Four score and seven years ago our fathers brought forth, upon this continent,
     |a new nation, conceived in liberty, and dedicated to the proposition that
     |"all men are created equal"
-..and also..
-    "-- Abraham Lincoln"
+..and also "-- Abraham Lincoln"
 
 rule [my favorite number] =: 21 + 2
 
@@ -223,7 +210,7 @@ say (my favorite number)
 # There's a multi-line indented block form for subexpressions too:
 say (..)
     my favorite
-    number
+    ..number
 
 # Block strings can interpolate values by enclosing an expression in a pair of \s
 say ".."|My favorite number is \my favorite number\!
@@ -231,7 +218,7 @@ say ".."|My favorite number is \my favorite number\!
 say ".."
     |My favorite number is still \(..)
         my favorite
-        number
+        ..number
     ..\, but this time it uses an indented subexpression!
 
 rule [sing %starting-bottles bottles of beer] =:
@@ -278,7 +265,7 @@ say ".."|The square root of 2 is \square root of 2\
 # "macro block %" is for defining macros that produce blocks of code, not values 
 macro block [unless %condition %body] =: ".."
     |if not (\%condition as lua expr\) then
-    |    \(lua expr "vars.body.value.value") as lua block\
+    |    \(lua expr "vars.body.value") as lua block\
     |end
 
 unless (1 > 10):

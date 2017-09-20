@@ -321,7 +321,7 @@ do
                     (dedent / longstring_error)) |} }) -> Longstring
             longstring_line <- "|" {| ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)* |}
             longstring_error <- (({.+} ("" -> "Error while parsing Longstring")) => error)
-            string_interpolation <- "\" %ws? (inline_functioncall / expression) %ws? "\"
+            string_interpolation <- "\" %ws? (((inline_functioncall / expression) dotdot?) / dotdot) %ws? "\"
 
             number <- ({ {"-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)) } }) -> Number
 

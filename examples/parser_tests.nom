@@ -1,48 +1,38 @@
 require "lib/core.nom"
 
-test: say "foo" ..yields ".."
+test: say "foo"
+..yields ".."
     |Call [say %]:
     |    "foo"
 
-test: say (4) ..yields ".."
+test: say (foo)
+..yields ".."
     |Call [say %]:
-    |    4
+    |    Call [foo]!
 
 test:
-    rule: fart ..=: say "poot"
+    rule [fart] =: say "poot"
 ..yields ".."
     |Call [rule % = %]:
-    |    Thunk:
+    |    List:
     |        Call [fart]!
     |    Thunk:
     |        Call [say %]:
     |            "poot"
 
-test:
-    rule: doublefart ..=:
-        say "poot"
-        say "poot"
+test: say (subexpressions work)
 ..yields ".."
-    |Call [rule % = %]:
-    |    Thunk:
-    |        Call [doublefart]!
-    |    Thunk:
-    |        Call [say %]:
-    |            "poot"
-    |        Call [say %]:
-    |            "poot"
-
-test: say (subexpressions work) ..yields ".."
     |Call [say %]:
     |    Call [subexpressions work]!
 
-test: say ["lists", "work"] ..yields ".."
+test: say ["lists", "work"]
+..yields ".."
     |Call [say %]:
     |    List:
     |        "lists"
     |        "work"
 
-test: say [] ..yields ".."
+test (: say []) yields ".."
     |Call [say %]:
     |    <Empty List>
 
@@ -71,28 +61,6 @@ test:
     |        3
     |        4
 
-test:
-    say both..
-        "hello"
-        and "world"
-..yields ".."
-    |Call [say both % and %]:
-    |    "hello"
-    |    "world"
-
-test:
-    say both ..
-        "a list:"
-        and [..]
-            1,2,(three),(4)
-..yields ".."
-    |Call [say both % and %]:
-    |    "a list:"
-    |    List:
-    |        1
-    |        2
-    |        Call [three]!
-    |        4
 
 test:
     if 1: yes
@@ -106,7 +74,7 @@ test:
     |        Call [no]!
 
 test:
-    if 1: yes ..else: no
+    if 1 (: yes) else: no
 ..yields ".."
     |Call [if % % else %]:
     |    1
@@ -173,10 +141,11 @@ test: say (1 + (-(2 * 3)))
 test:
     if %x:
         x
-    ..else: if %y:
-        y
     ..else:
-        z
+        if %y:
+            y
+        ..else:
+            z
 ..yields ".."
     |Call [if % % else %]:
     |    Var[x]
