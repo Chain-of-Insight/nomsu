@@ -18,18 +18,18 @@ with secrets:
         |    return key
         |end})
 
-    rule: the plural of %singular is %plural ..=:
+    rule [the plural of %singular is %plural] =:
         (secret %plurals)->%singular =: %plural
         (secret %singulars)->%plural =: %singular
         (secret %canonicals)->%plural =: %singular
 
-    rule: singular %plural ..=:
+    rule [singular %plural] =:
         %plural in (secret %singulars)
 
-    rule: plural %singular ..=:
+    rule [plural %singular] =:
         %singular in (secret %plurals)
 
-    rule: canonicalize %item-name ..=:
+    rule [canonicalize %item-name] =:
         %item-name in (secret %canonicals)
 
-    rule: rules that change plurals ..=: ["the plural of % is %"]
+    rule [rules that change plurals] =: ["the plural of % is %"]

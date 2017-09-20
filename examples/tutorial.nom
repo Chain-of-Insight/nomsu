@@ -98,24 +98,18 @@ do:
 
 
 # Function definition:
-rule:
-    say both %first and also %second
-..=:
+rule [say both %first and also %second] =:
     # Function arguments are accessed just like variables
     say %first
     say %second
 
 # The last line of a function is the return value
-rule:
-    add %x and %y
-..=:
+rule [add %x and %y] =:
     %result =: %x + %y
     %result
 
 # Functions can use "return" to return a value early
-rule:
-    first fibonacci above %n
-..=:
+rule [first fibonacci above %n] =:
     %f1 =: 0
     %f2 =: 1
     repeat:
@@ -128,7 +122,7 @@ rule:
 say (first fibonacci above 10)
 
 # Functions can have aliases, which may or may not have the arguments in different order
-rule:
+rule [..]
     I hate %worse-things more than %better-things
     I think %worse-things are worse than %better-things
     I like %better-things more than %worse-things
@@ -144,9 +138,7 @@ I think "chihuahuas" are worse than "corgis"
 say both "Hello" and also "again!"
 
 # Functions can even have their name at the end:
-rule:
-    %what-she-said is what she said
-..=:
+rule [%what-she-said is what she said] =:
     say %what-she-said
     say "-- she said"
 
@@ -154,9 +146,7 @@ rule:
 
 #.. The language only reserves []{}().,:;% as special characters, so functions and variables
     can have really funky names!
-rule:
-    >> %foo-bar$$$^ --> %@@& _~-^-~_~-^ %1 !
-..=:
+rule [>> %foo-bar$$$^ --> %@@& _~-^-~_~-^ %1 !] =:
     say %foo-bar$$$^
     say %@@&
     say %1
@@ -166,9 +156,7 @@ rule:
 # Math and logic operations are just treated the same as function calls in the syntax
 say (2 + 3)
 # So it's easy to define your own operators
-rule:
-    %a ++ %b
-..=:
+rule [%a ++ %b] =:
     2 * (%a + %b)
 
 say (2 ++ 3)
@@ -213,7 +201,7 @@ say both ".."
 ..and also..
     "-- Abraham Lincoln"
 
-rule: my favorite number ..=: 21 + 2
+rule [my favorite number] =: 21 + 2
 
 # Subexpressions are wrapped in parentheses:
 say (my favorite number)
@@ -231,9 +219,7 @@ say ".."
         number
     ..\, but this time it uses an indented subexpression!
 
-rule:
-    sing %starting-bottles bottles of beer
-..=:
+rule [sing %starting-bottles bottles of beer] =:
     for %n in (%starting-bottles down through 0):
         say ".."
             |\%n if (%n > 0) else "No more"\ \"bottle" if (%n == 1) else "bottles"\ of beer on the wall.
@@ -260,7 +246,7 @@ any of [0,0,0,0,1,0,0]
 
 # Macros: 
 # The "lua block %" and "lua expr %" macros can be used to write raw lua code: 
-rule: say the time ..=:
+rule [say the time] =:
     lua block ".."
         |io.write("The OS time is: ")
         |io.write(tostring(os.time()).."\\n")
@@ -269,13 +255,13 @@ say ".."|Math expression result is: \lua expr "(1 + 2*3 + 3*4)^2"\
 
 #.. In the lua environment, "vars" can be used to get local variables/function args, and
     "compiler" can be used to access the compiler, function defs, and other things
-rule: square root of %n ..=:
+rule [square root of %n] =:
     lua expr "math.sqrt(vars.n)"
 say ".."|The square root of 2 is \square root of 2\
 
 # Macros can be defined as functions that take unprocessed syntax trees and return lua code 
 # "macro block %" is for defining macros that produce blocks of code, not values 
-macro block: unless %condition %body ..=: ".."
+macro block [unless %condition %body] =: ".."
     |if not (\%condition as lua expr\) then
     |    \(lua expr "vars.body.value.value") as lua block\
     |end
@@ -285,7 +271,7 @@ unless (1 > 10):
     say "It looks like a keyword, but there's no magic here!"
 
 # and "macro %" is for defining macros that produce an expression 
-macro: %value as a boolean ..=: ".."
+macro [%value as a boolean] =: ".."
     |(not not (\%value as lua expr\))
-macro: yep ..=: "true"
+macro [yep] =: "true"
 
