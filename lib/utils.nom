@@ -1,0 +1,85 @@
+require "lib/metaprogramming.nom"
+
+# Error functions
+rule [error!, panic!, fail!, abort!] =:
+    compiler "error"[]
+rule [error %msg] =:
+    compiler "error"[%msg]
+macro block [assert %condition] =: ".."
+    |if not (\%condition as lua expr\) then
+    |    compiler:error()
+    |end
+macro block [assert %condition %msg] =: ".."
+    |if not (\%condition as lua expr\) then
+    |    compiler:error(\%msg as lua expr\)
+    |end
+
+macro block [show generated lua %block] =: ".."
+    |compiler:writeln(\lua expr "compiler.utils.repr(compiler:tree_to_lua(vars.block.value, 'Statement'))"\)
+
+
+# String functions
+rule [join %strs] =:
+    lua block ".."
+        |local str_bits = {}
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = compiler.utils.repr_if_not_string(bit) end
+        |return table.concat(str_bits)
+
+rule [join %strs with glue %glue] =:
+    lua block ".."
+        |local str_bits = {}
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = compiler.utils.repr_if_not_string(bit) end
+        |return table.concat(str_bits, vars.glue)
+
+macro [capitalize %str, %str capitalized] =: ".."
+    |(\%str as lua expr\):gsub("%l", string.upper, 1)
+
+macro [repr %obj] =:
+    ".."|compiler.utils.repr(\%obj as lua expr\)
+
+macro [%obj as string] =:
+    ".."|compiler.utils.repr_if_not_string(\%obj as lua expr\)
+
+macro [say %str] =:
+    ".."|compiler:writeln(compiler.utils.repr_if_not_string(\%str as lua expr\))
+
+# Number ranges
+macro [%start up to %stop] =: ".."
+    |compiler.utils.range(\%start as lua expr\, \%stop as lua expr\-1)
+macro [%start thru %stop, %start through %stop] =: ".."
+    |compiler.utils.range(\%start as lua expr\, \%stop as lua expr\)
+macro [%start down to %stop] =: ".."
+    |compiler.utils.range(\%start as lua expr\, \%stop as lua expr\+1,-1)
+macro [%start down thru %stop, %start down through %stop] =: ".."
+    |compiler.utils.range(\%start as lua expr\, \%stop as lua expr\,-1)
+macro [%start up to %stop via %step] =: ".."
+    |compiler.utils.range(\%start as lua expr\,\%stop as lua expr\-1,vars.step)
+macro [%start thru %stop via %step, %start through %stop via %step] =: ".."
+    |compiler.utils.range(\%start as lua expr\,\%stop as lua expr\,vars.step)
+macro [%start down to %stop via %step] =: ".."
+    |compiler.utils.range(\%start as lua expr\,\%stop as lua expr\+1,-vars.step)
+macro [%start down thru %stop via %step, %start down through %stop via %step] =: ".."
+    |compiler.utils.range(\%start as lua expr\,\%stop as lua expr\,-vars.step)
+
+# Common utility functions
+macro [random number, random, rand] =: "math.random()"
+macro [random int %n, random integer %n, randint %n] =: ".."|math.random(\%n as lua expr\)
+macro [random from %low to %high, random number from %low to %high, rand %low %high] =: ".."
+    |math.random(\%low as lua expr\, \%high as lua expr\)
+rule [random choice from %elements, random choice %elements, random %elements] =:
+    lua expr ".."|vars.elements[math.random(#vars.elements)]
+macro [sum of %items, sum %items] =: ".."|compiler.utils.sum(\%items as lua expr\)
+macro [product of %items, product %items] =: ".."|compiler.utils.product(\%items as lua expr\)
+macro [all of %items] =: ".."|compiler.utils.all(\%items as lua expr\)
+macro [any of %items] =: ".."|compiler.utils.any(\%items as lua expr\)
+# This is a rule, not a macro so we can use vars.items twice without running it twice.
+rule [avg of %items, average of %items] =:
+    lua expr ".."|(compiler.utils.sum(vars.items)/#vars.items)
+macro [min of %items, smallest of %items, lowest of %items] =:
+    ".."|compiler.utils.min(\%items as lua expr\)
+macro [max of %items, biggest of %items, largest of %items, highest of %items] =:
+    ".."|compiler.utils.min(\%items as lua expr\)
+macro [min of %items with respect to %keys] =:
+    ".."|compiler.utils.min(\%items as lua expr\, \%keys as lua expr\)
+macro [max of %items with respect to %keys] =:
+    ".."|compiler.utils.max(\%items as lua expr\, \%keys as lua expr\)

@@ -7,8 +7,9 @@ utils = require 'utils'
 -- improve indentation of generated lua code
 -- provide way to run precompiled nomsu -> lua code
 -- better scoping?
--- first-class functions
+-- first-class rules
 -- better error reporting
+-- add line numbers of function calls
 -- versions of rules with auto-supplied arguments
 -- type checking?
 
@@ -44,8 +45,10 @@ class NomsuCompiler
         args = {name, select(i,...) for i,name in ipairs(arg_names[fn_name])}
         if @debug
             @writeln "Calling #{fn_name} with args: #{utils.repr(args)}"
-        ret = fn(self, args)
+        ok,ret = pcall(fn, self, args)
         table.remove @callstack
+        if not ok
+            error(ret)
         return ret
 
     check_permission: (fn_name)=>
@@ -71,7 +74,6 @@ class NomsuCompiler
             return @tree_to_value(def, vars)
 
         if def.type != "List"
-            error "DEF IS: #{utils.repr(def)}"
             @error "Trying to get invocations from #{def.type}, but expected List or String."
 
         invocations = {}
@@ -134,16 +136,16 @@ class NomsuCompiler
         switch type(obj)
             when "function"
                 error("Function serialization is not yet implemented.")
-                "assert(load("..utils.repr(string.dump(obj), true).."))"
+                "assert(load("..utils.repr(string.dump(obj)).."))"
             when "table"
                 if utils.is_list obj
                     "{#{table.concat([@serialize(i) for i in *obj], ", ")}}"
                 else
                     "{#{table.concat(["[#{@serialize(k)}]= #{@serialize(v)}" for k,v in pairs(obj)], ", ")}}"
             when "number"
-                utils.repr(obj, true)
+                utils.repr(obj)
             when "string"
-                utils.repr(obj, true)
+                utils.repr(obj)
             else
                 error "Serialization not implemented for: #{type(obj)}"
 
@@ -329,7 +331,10 @@ class NomsuCompiler
                         local ret]]
                 vars = {}
                 for statement in *tree.value.body.value
-                    code = to_lua(statement, "Statement")
+                    ok,code = pcall(to_lua, statement, "Statement")
+                    if not ok
+                        @writeln "Error occurred in statement:\n#{statement.src}"
+                        error(code)
                     -- Run the fuckers as we go
                     lua_code = "
                     return (function(compiler, vars)\n#{code}\nend)"
@@ -337,7 +342,10 @@ class NomsuCompiler
                     if not lua_thunk
                         error("Failed to compile generated code:\n#{code}\n\n#{err}\n\nProduced by statement:\n#{utils.repr(statement)}")
                     value = lua_thunk!
-                    return_value = value(self, vars)
+                    ok,return_value = pcall(value, self, vars)
+                    if not ok
+                        @writeln "Error occurred in statement:\n#{statement.src}"
+                        error(return_value)
                     add code
                 add [[
                         return ret
@@ -375,13 +383,13 @@ class NomsuCompiler
                     add @run_macro(tree, "Expression")
                 else
                     args = [to_lua(a) for a in *tree.value when a.type != "Word"]
-                    table.insert args, 1, utils.repr(name, true)
+                    table.insert args, 1, utils.repr(name)
                     add @@comma_separated_items("compiler:call(", args, ")")
 
             when "String"
                 escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
                 unescaped = tree.value\gsub("\\(.)", ((c)-> escapes[c] or c))
-                add utils.repr(unescaped, true)
+                add utils.repr(unescaped)
 
             when "Longstring"
                 concat_parts = {}
@@ -393,12 +401,12 @@ class NomsuCompiler
                             string_buffer ..= bit\gsub("\\\\","\\")
                         else
                             if string_buffer ~= ""
-                                table.insert concat_parts, utils.repr(string_buffer, true)
+                                table.insert concat_parts, utils.repr(string_buffer)
                                 string_buffer = ""
-                            table.insert concat_parts, "compiler.utils.repr(#{to_lua(bit)})"
+                            table.insert concat_parts, "compiler.utils.repr_if_not_string(#{to_lua(bit)})"
 
                 if string_buffer ~= ""
-                    table.insert concat_parts, utils.repr(string_buffer, true)
+                    table.insert concat_parts, utils.repr(string_buffer)
 
                 if #concat_parts == 0
                     add "''"
@@ -419,7 +427,7 @@ class NomsuCompiler
                     add @@comma_separated_items("{", [to_lua(item) for item in *tree.value], "}")
 
             when "Var"
-                add "vars[#{utils.repr(tree.value,true)}]"
+                add "vars[#{utils.repr(tree.value)}]"
 
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
@@ -450,6 +458,14 @@ class NomsuCompiler
         for token in *tree.value
             table.insert name_bits, if token.type == "Word" then token.value else "%"
         table.concat(name_bits, " ")
+
+    var_to_lua_identifier: (var)=>
+        if var.type != "Var"
+            @error("Tried to convert something that wasn't a Var into a lua identifier: it was not a Var, it was: "..label.type)
+        identifier = "var_"
+        for i=1,#var.value
+            identifier ..= ("%x")\format(string.byte(var.value, i))
+        return identifier
     
     run_macro: (tree, kind="Expression")=>
         name = @fn_name_from_tree(tree)
@@ -502,11 +518,11 @@ class NomsuCompiler
 
             when "String"
                 -- TODO: Better implement
-                coroutine.yield(ind(utils.repr(tree.value, true)))
+                coroutine.yield(ind(utils.repr(tree.value)))
 
             when "Longstring"
                 -- TODO: Better implement
-                coroutine.yield(ind(utils.repr(tree.value, true)))
+                coroutine.yield(ind(utils.repr(tree.value)))
 
             when "Number"
                 coroutine.yield(ind(tree.value))
@@ -588,12 +604,12 @@ class NomsuCompiler
 
         @defmacro [[lua block %lua_code]], (vars, kind)=>
             if kind == "Expression" then error("Expected to be in statement.")
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key,true)}]"})
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key)}]"})
             return "do\n"..@tree_to_value(vars.lua_code, inner_vars).."\nend", true
 
         @defmacro [[lua expr %lua_code]], (vars, kind)=>
             lua_code = vars.lua_code.value
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key,true)}]"})
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key)}]"})
             return @tree_to_value(vars.lua_code, inner_vars)
 
         @def "require %filename", (vars)=>
@@ -655,6 +671,6 @@ elseif arg
             break
         ok, ret = pcall(-> c\run(buff))
         if ok and ret != nil
-            print "= "..utils.repr(ret, true)
+            print "= "..utils.repr(ret)
 
 return NomsuCompiler

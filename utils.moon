@@ -7,22 +7,20 @@ utils = {
             i += 1
         return true
 
-    repr: (x, add_quotes=false)->
+    repr: (x)->
         switch type(x)
             when 'table'
                 mt = getmetatable(x)
                 if mt and mt.__tostring
                     mt.__tostring(x)
                 elseif utils.is_list x
-                    "{#{table.concat([utils.repr(i, true) for i in *x], ", ")}}"
+                    "{#{table.concat([utils.repr(i) for i in *x], ", ")}}"
                 else
-                    "{#{table.concat(["[#{utils.repr(k, true)}]= #{utils.repr(v, true)}" for k,v in pairs x], ", ")}}"
+                    "{#{table.concat(["[#{utils.repr(k)}]= #{utils.repr(v)}" for k,v in pairs x], ", ")}}"
             when 'string'
-                if not add_quotes
-                    x
-                elseif not x\find[["]] and not x\find"\n"
+                if not x\find[["]] and not x\find"\n" and not x\find"\\"
                     "\""..x.."\""
-                elseif not x\find[[']] and not x\find"\n"
+                elseif not x\find[[']] and not x\find"\n" and not x\find"\\"
                     "\'"..x.."\'"
                 else
                     for i=0,math.huge
@@ -35,6 +33,10 @@ utils = {
                                 return "[#{eq}["..x.."]#{eq}]"
             else
                 tostring(x)
+    
+    repr_if_not_string: (x)->
+        if type(x) == 'string' then x
+        else utils.repr(x)
     
     split: (str, sep="%s")->
         [chunk for chunk in str\gmatch("[^#{sep}]+")]

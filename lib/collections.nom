@@ -1,0 +1,139 @@
+require "lib/metaprogramming.nom"
+require "lib/control_flow.nom"
+require "lib/operators.nom"
+
+# List/dict functions:
+
+# Indexing
+macro [..]
+    %list's %index, %index st in %list, %index nd in %list, %index rd in %list
+    %index th in %list, %index in %list, %list -> %index
+..=:
+    ".."|\%list as lua expr\[\%index as lua expr\]
+    ".."|\%list as lua expr\[\%index as lua expr\]
+macro [..]
+    %index st to last in %list, %index nd to last in %list, %index rd to last in %list
+    %index th to last in %list
+..=:
+    ".."|compiler.utils.nth_to_last(\%list as lua expr\, \%index as lua expr\)
+
+macro [first in %list, first %list] =:
+    ".."|\%list as lua expr\[1]
+macro [last in %list, last %list] =:
+    ".."|compiler.utils.nth_to_last(\%list as lua expr\, 1)
+
+# Dict iteration convenience function. This could also be accomplished with: for all (entries in %dict): ...
+macro block [for %key -> %value in %dict %body] =:
+    assert ((%key's "type") == "Var") ".."
+        |For loop has the wrong type for the key variable. Expected Var, but got: \%key's "type"\
+    assert ((%value's "type") == "Var") ".."
+        |For loop has the wrong type for the value variable. Expected Var, but got: \%value's "type"\
+    ".."
+        |do
+        |    local vars = setmetatable({}, {__index=vars})
+        |    for k, v in pairs(\%dict as lua expr\) do
+        |        \%key as lua expr\, \%value as lua expr\ = k, v
+        |        \%body as lua block\
+        |    end
+        |end
+
+# Membership testing
+rule [%item is in %list, %list contains %item, %list has %item] =:
+    for %key -> %value in %list:
+        if (%key == %item): return (yes)
+    return (no)
+macro [%list has key %index, %list has index %index] =: ".."
+    |(\%list as lua expr\[\%index as lua expr\] ~= nil)
+
+rule [..]
+    %item isn't in %list, %item is not in %list
+    %list doesn't contain %item, %list does not contain %item
+    %list doesn't have %item, %list does not have %item
+..=:
+    for %key -> %value in %list:
+        if (%key == %item): return (no)
+    return (yes)
+
+macro [..]
+    %list doesn't have key %index, %list does not have key %index
+    %list doesn't have index %index, %list does not have index %index
+..=: ".."|(\%list as lua expr\[\%index as lua expr\] ~= nil)
+
+macro [length of %list, size of %list, number of %list, len %list] =:
+    ".."|#(\%list as lua expr\)
+
+# Chained lookup
+macro [%list ->* %indices] =:
+    %ret =: %list as lua expr
+    for %index in %indices:
+        %ret join=: ".."|[\%index as lua expr\]
+    %ret
+
+# Assignment
+macro block [..]
+    %list's %index = %new_value, %index st in %list = %new_value, %index nd in %list = %new_value
+    %index rd in %list = %new_value, %index th in %list = %new_value, %index in %list = %new_value
+    %list -> %index = %new_value
+..=:
+    assert ((%new_value's "type") == "Thunk") ".."
+        |Dict assignment operation has the wrong type for the right hand side.
+        |Expected Thunk, but got \%new_value's "type"\.
+        |Maybe you used "=" instead of "=:"?
+    if ((size of (%new_value ->*["value","value"])) > 1):
+        error ".."|Dict assignment operation has too many values on the right hand side.
+    ".."|\%list as lua expr\[\%index as lua expr\] = \(%new_value ->*["value","value",1]) as lua expr\
+
+macro [append %item to %list, add %item to %list] =:
+    ".."|table.insert(\%list as lua expr\, \%item as lua expr\)
+
+rule [flatten %lists] =:
+    %flat =: []
+    for %list in %lists:
+        for %item in %list:
+            add %item to %flat
+    %flat
+
+rule [dict %items] =:
+    %dict =: []
+    for %pair in %items:
+        lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
+    return %dict
+
+rule [entries in %dict] =:
+    lua block ".."
+        |local items = {}
+        |for k,v in pairs(vars.dict) do
+        |    table.insert(items, {key=k,value=v})
+        |end
+        |return items
+
+# List Comprehension
+macro [%expression for %var in %iterable] =:
+    assert ((%var's "type") == "Var") ".."
+        |List comprehension has the wrong type for the loop variable. Expected Var, but got: \%var's "type"\
+    ".."
+        |(function(game, vars)
+        |    local comprehension = {}
+        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |        \%var as lua expr\ = value
+        |        comprehension[i] = \%expression as lua expr\
+        |    end
+        |    return comprehension
+        |end)(game, setmetatable({}, {__index=vars}))
+macro [%expression for all %iterable] =:
+    ".."|(function(game, vars)
+        |    local comprehension = {}
+        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |        vars.it = value
+        |        comprehension[i] = \%expression as lua expr\
+        |    end
+        |    return comprehension
+        |end)(game, setmetatable({}, {__index=vars}))
+
+# TODO: maybe make a generator/coroutine?
+
+#.. Dict comprehensions can be accomplished okay by doing:
+    dict ([new_key using (%it's "key"), new_value using (%it's "value")] for all (entries in %dict))
+    or something similar
+# TODO: fix compiler bugs
+pass

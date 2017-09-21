@@ -1,0 +1,125 @@
+require "lib/metaprogramming.nom"
+
+# Literals
+macro [true, yes] =: "true"
+macro [false, no] =: "false"
+macro [nil, null] =: "nil"
+macro block [nop, pass] =: ""
+
+# Ternary operator
+macro [%if_expr if %condition else %else_expr] =:
+    pass # TODO: Fix compiler bug that doesn't parse right here
+    #.. Note: this uses a function instead of (condition and if_expr or else_expr)
+        because that breaks if %if_expr is falsey.
+    ".."|(function(compiler, vars)
+        |    if \%condition as lua expr\ then
+        |        return \%if_expr as lua expr\
+        |    else
+        |        return \%else_expr as lua expr\
+        |    end
+        |end)(compiler, vars)
+
+# Variable assignment operator, and += type versions
+lua block ".."
+    |local function helper(callback)
+    |    return function(compiler, vars, kind)
+    |        if kind == "Expression" then
+    |            compiler:error("Cannot use an assignment operation as an expression value.")
+    |        end
+    |        if vars.var.type ~= "Var" then
+    |            compiler:error("Assignment operation has the wrong type for the left hand side. "
+    |                .."Expected Var, but got: "..vars.var.type.."\\nMaybe you forgot a percent sign on the variable name?")
+    |        end
+    |        if vars.rhs.type ~= "Thunk" then
+    |            compiler:error("Assignment operation has the wrong type for the right hand side. "
+    |                .."Expected Thunk, but got: "..vars.rhs.type.."\\nMaybe you used '=' instead of '=:'?")
+    |        end
+    |        if #vars.rhs.value.value > 1 then
+    |            compiler:error("Assignment operation should not have more than one value on the right hand side.")
+    |        end
+    |        return callback(compiler:tree_to_lua(vars.var, "Expression"),
+    |            compiler:tree_to_lua(vars.rhs.value.value[1].value, "Expression")), true
+    |    end
+    |end
+    |compiler:defmacro("%var = %rhs", helper(function(var,result) return var.." = "..result end))
+    |compiler:defmacro("%var += %rhs", helper(function(var,result) return var.." = "..var.." + "..result end))
+    |compiler:defmacro("%var -= %rhs", helper(function(var,result) return var.." = "..var.." - "..result end))
+    |compiler:defmacro("%var *= %rhs", helper(function(var,result) return var.." = "..var.." * "..result end))
+    |compiler:defmacro("%var /= %rhs", helper(function(var,result) return var.." = "..var.." / "..result end))
+    |compiler:defmacro("%var ^= %rhs", helper(function(var,result) return var.." = "..var.." ^ "..result end))
+    |compiler:defmacro("%var and= %rhs", helper(function(var,result) return var.." = "..var.." and "..result end))
+    |compiler:defmacro("%var or= %rhs", helper(function(var,result) return var.." = "..var.." or "..result end))
+    |compiler:defmacro("%var join= %rhs", helper(function(var,result) return var.." = "..var.." .. "..result end))
+    |compiler:defmacro("%var mod= %rhs", helper(function(var,result) return var.." = "..var.." % "..result end))
+
+# Binary Operators
+lua block ".."
+    |local binops = {"+","-","*","/","<","<=",">",">=","^",{"===","=="},{"!==","~="},"and","or",{"mod","%"}}
+    |for _,op in ipairs(binops) do
+    |    local nomsu_alias = op
+    |    if type(op) == 'table' then
+    |        nomsu_alias, op = unpack(op)
+    |    end
+    |    compiler:defmacro("%a "..nomsu_alias.." %b", (function(compiler, vars, kind)
+    |        return "("..compiler:tree_to_lua(vars.a).." "..op.." "..compiler:tree_to_lua(vars.b)..")"
+    |    end), [[".."|(\\%a as lua expr\\ ]]..op..[[ \\%b as lua expr\\)]])
+    |end
+# == and != do equivalence checking, rather than identity checking
+macro [%a == %b] =: ".."|compiler.utils.equivalent(\%a as lua expr\, \%b as lua expr\)
+macro [%a != %b] =: ".."|(not compiler.utils.equivalent(\%a as lua expr\, \%b as lua expr\))
+
+# Commutative Operators defined for up to 10 operands
+lua block ".."
+    |local comops = {"+","*","and","or"}
+    |for _,_op in ipairs(comops) do
+    |    local op = _op
+    |    local spec = "%1 "..op.." %2"
+    |    for i=3,10 do
+    |        spec = spec .. " %"..tostring(i)
+    |        compiler:defmacro(spec, (function(compiler, vars, kind)
+    |            local bits = {}
+    |            for _,v in ipairs(vars) do
+    |                table.insert(bits, compiler:tree_to_lua(v))
+    |            end
+    |            return "("..table.concat(bits, " "..op.." ")..")"
+    |        end))
+    |    end
+    |end
+
+# Chained compairsions (e.g. x < y <= z < w) are defined up to 10 operands
+lua block ".."
+    |for _,chainers in ipairs{{"<","<="},{">",">="}} do
+    |    local function recurse(chain)
+    # The 1-op versions are already more efficiently defined, and a 0-op version doesnt make sense
+    |        if #chain >= 2 then
+    |            local spec = "%1"
+    |            for i,op in ipairs(chain) do
+    |                spec = spec .. " "..op.." %"..tostring(i+1)
+    |            end
+    # Chained comparisons need to be functions to avoid re-evaluating their arguments :\
+    |            compiler:def(spec, function(compiler, vars)
+    |                for i,op in ipairs(chain) do
+    |                    local a, b, result = vars[i], vars[i+1]
+    |                    if     op == "<"  then result = a < b
+    |                    elseif op == "<=" then result = a <= b
+    |                    elseif op == ">"  then result = a > b
+    |                    elseif op == ">=" then result = a >= b end
+    # Short circuit
+    |                    if not result then return false end
+    |                end
+    |            end)
+    |        end
+    # 9 operators == 10 operands, so don't continue any further
+    |        if #chain >= 9 then return end
+    |        for _,c in ipairs(chainers) do
+    |            table.insert(chain, c)
+    |            recurse(chain)
+    |            table.remove(chain)
+    |        end
+    |    end
+    |    recurse({})
+    |end
+
+# Unary operators
+macro [- %a] =: ".."|-(\%a as lua expr\)
+macro [not %a] =: ".."|not (\%a as lua expr\)

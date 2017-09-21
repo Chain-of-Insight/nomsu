@@ -1,0 +1,105 @@
+
+#..
+    This File contains rules for making rules and macros and some helper functions to make
+    that easier.
+
+# Macros:
+
+# macro block [macro block %spec = %user_macro] =: ..
+lua block ".."
+    |compiler:defmacro("macro block %spec = %user_macro", (function(compiler, vars, kind)
+    # Do a minimal amount of pre-processing (get the spec and the source)
+    |    local spec = compiler:get_invocations_from_definition(vars.spec, vars)
+    |    spec = compiler.utils.repr(spec)
+    |    local src = compiler.utils.repr(vars.user_macro.src)
+    |    local user_macro = compiler:tree_to_lua(vars.user_macro)
+    # Then produce a block of code that creates the macro at runtime
+    |    local lua = [[
+    |compiler:defmacro(%s, (function(compiler, vars, kind)
+    |    if kind == "Expression" then
+    |        compiler:error("Macro "..%s.." was defined to be a block, but is being used as an expression")
+    |    end
+    |    local user_macro = %s
+    |    return ("do\\n"..user_macro(compiler, vars).."\\nend"), true
+    |end), %s)
+    |]]
+    |    lua = lua:format(spec, compiler.utils.repr(spec), user_macro, src)
+    |    return lua, true
+    |end), "N/A")
+
+macro block [macro %spec = %user_macro] =:
+    ".."|compiler:defmacro(
+        |    \lua expr "compiler:get_invocations_from_definition(vars.spec, vars)"\,
+        |    \lua expr "compiler:tree_to_lua(vars.user_macro, 'Expression')"\,
+        |    \lua expr "compiler.utils.repr(vars.user_macro.src)"\)
+
+macro [compiler] =: "compiler"
+macro [compiler's %key] =: ".."|compiler[\%key as lua expr\]
+macro [compiler %method %args] =:
+    lua block ".."
+        |local args = {}
+        |for i,arg in ipairs(vars.args.value) do
+        |    args[i] = compiler:tree_to_lua(arg)
+        |end
+        |return "compiler:"..compiler:tree_to_value(vars.method, vars).."("..table.concat(args, ", ")..")"
+macro [compiler utils %method %args] =:
+    lua block ".."
+        |local args = {}
+        |for i,arg in ipairs(vars.args.value) do
+        |    args[i] = compiler:tree_to_lua(arg)
+        |end
+        |return "compiler.utils."..compiler:tree_to_value(vars.method, vars).."("..table.concat(args, ", ")..")"
+
+# Macro that lets you make new rules
+#..
+    This is a macro instead of a rule because it needs to pre-empt processing the list of
+    invocations and convert it into a list of strings (rather than call a function that
+    is currently in the middle of being defined). Being a macro also allows us to snatch
+    the source code and store that
+macro block [rule %spec = %body] =: ".."
+    |compiler:def(
+    |    \compiler utils "repr" [compiler "get_invocations_from_definition" [%spec, lua expr "vars"]]\,
+    |    \compiler "tree_to_lua" [%body, lua expr "vars"]\,
+    |    \compiler utils "repr" [lua expr "vars.body.src"]\)
+
+# Get the source code for a function
+rule [help %invocation] =:
+    lua block ".."
+        |local fn_info = compiler.defs[vars.invocation]
+        |if not fn_info then
+        |    compiler:writeln("Function not found: "..compiler.utils.repr(vars.invocation))
+        |else
+        |    compiler:writeln("rule "..compiler.utils.repr(fn_info.invocations).." ="..(fn_info.src or ":\\n    <unknown source code>"))
+        |end
+
+
+# Macro helper functions
+rule [%tree as value] =:
+    lua expr "compiler:tree_to_value(vars.tree, vars)"
+
+rule [%tree as lua block] =:
+    lua expr "compiler:tree_to_lua(vars.tree, 'Statement')"
+
+rule [%tree as lua expr] =:
+    lua expr "compiler:tree_to_lua(vars.tree, 'Expression')"
+
+# Compiler tools
+rule [eval %code, run %code] =: compiler "run" [%code]
+
+rule [source code from tree %tree] =:
+    lua block ".."
+        |local _,_,leading_space = vars.tree.src:find("\\n(%s*)%S")
+        |if leading_space then
+        |    local chunk1, chunk2 = vars.tree.src:match(":%s*([^\\n]*)(\\n.*)")
+        |    chunk2 = chunk2:gsub("\\n"..leading_space, "\\n")
+        |    return chunk1..chunk2.."\\n"
+        |else
+        |    return vars.tree.src:match(":%s*(%S.*)").."\\n"
+        |end
+
+macro [source code %body] =:
+    compiler utils "repr" [compiler "call" ["source code from tree %", %body]]
+
+macro [parse tree %code] =:
+    compiler utils "repr" [compiler "stringify_tree" [lua expr "vars.code.value"]]
+

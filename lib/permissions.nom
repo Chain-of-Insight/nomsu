@@ -1,0 +1,42 @@
+require "lib/metaprogramming.nom"
+require "lib/control_flow.nom"
+require "lib/operators.nom"
+require "lib/collections.nom"
+
+# Permission functions
+rule [restrict %rules to within %elite-rules] =:
+    %rules =: compiler "get_invocations" [%rules]
+    %elite-rules =: compiler "get_invocations" [%elite-rules]
+    for all (flatten [%elite-rules, %rules]):
+        assert ((compiler's "defs") has %it) ".."|Undefined function: \%it\
+    for all %rules:
+        assert (not (compiler "check_permission" [%it])) ".."
+            |You do not have permission to restrict permissions for function: \%it\
+        ((compiler's "defs")'s %it)'s "whiteset" =: dict (..)
+            [%it, (yes)] for %it in %elite-rules
+
+rule [allow %elite-rules to use %rules] =:
+    %rules =: compiler "get_invocations" [%rules]
+    %elite-rules =: compiler "get_invocations" [%elite-rules]
+    for all (flatten [%elite-rules, %rules]):
+        assert ((compiler's "defs") has %it) ".."|Undefined function: \%it\
+    for %fn in %rules:
+        assert (not (compiler "check_permission" [%fn])) ".."
+            |You do not have permission to grant permissions for function: \%fn\
+        %whiteset =: ((compiler's "defs")'s %fn)'s "whiteset"
+        if (not %whiteset): on to the next %fn
+        for all %elite-rules: %whiteset's %it =: yes
+
+rule [forbid %pleb-rules to use %rules] =:
+    %rules =: compiler "get_invocations" [%rules]
+    %pleb-rules =: compiler "get_invocations" [%pleb-rules]
+    for all (flatten [%pleb-rules, %used]):
+        assert ((compiler's "defs") has %it) ".."|Undefined function: \%it\
+    for all %rules:
+        assert (not (compiler "check_permission" [%it])) ".."
+            |You do not have permission to grant permissions for function: \%it\
+        %whiteset =: ((compiler's "defs")'s %it)'s "whiteset"
+        assert %whiteset ".."
+            |Cannot individually restrict permissions for \%it\ because it is currently
+            |available to everyone. Perhaps you meant to use "restrict % to within %" instead?
+        for all %pleb-rules: %whiteset's %it =: nil

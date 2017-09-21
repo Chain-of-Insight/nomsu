@@ -38,8 +38,11 @@ do
       if self.debug then
         self:writeln("Calling " .. tostring(fn_name) .. " with args: " .. tostring(utils.repr(args)))
       end
-      local ret = fn(self, args)
+      local ok, ret = pcall(fn, self, args)
       table.remove(self.callstack)
+      if not ok then
+        error(ret)
+      end
       return ret
     end,
     check_permission = function(self, fn_name)
@@ -81,7 +84,6 @@ do
         return self:tree_to_value(def, vars)
       end
       if def.type ~= "List" then
-        error("DEF IS: " .. tostring(utils.repr(def)))
         self:error("Trying to get invocations from " .. tostring(def.type) .. ", but expected List or String.")
       end
       local invocations = { }
@@ -191,7 +193,7 @@ do
       local _exp_0 = type(obj)
       if "function" == _exp_0 then
         error("Function serialization is not yet implemented.")
-        return "assert(load(" .. utils.repr(string.dump(obj), true) .. "))"
+        return "assert(load(" .. utils.repr(string.dump(obj)) .. "))"
       elseif "table" == _exp_0 then
         if utils.is_list(obj) then
           return "{" .. tostring(table.concat((function()
@@ -216,9 +218,9 @@ do
           end)(), ", ")) .. "}"
         end
       elseif "number" == _exp_0 then
-        return utils.repr(obj, true)
+        return utils.repr(obj)
       elseif "string" == _exp_0 then
-        return utils.repr(obj, true)
+        return utils.repr(obj)
       else
         return error("Serialization not implemented for: " .. tostring(type(obj)))
       end
@@ -441,14 +443,22 @@ do
         local _list_0 = tree.value.body.value
         for _index_0 = 1, #_list_0 do
           local statement = _list_0[_index_0]
-          local code = to_lua(statement, "Statement")
+          local ok, code = pcall(to_lua, statement, "Statement")
+          if not ok then
+            self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
+            error(code)
+          end
           local lua_code = "\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)"
           local lua_thunk, err = load(lua_code)
           if not lua_thunk then
             error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(utils.repr(statement)))
           end
           local value = lua_thunk()
-          return_value = value(self, vars)
+          ok, return_value = pcall(value, self, vars)
+          if not ok then
+            self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
+            error(return_value)
+          end
           add(code)
         end
         add([[                        return ret
@@ -497,7 +507,7 @@ do
             end
             args = _accum_0
           end
-          table.insert(args, 1, utils.repr(name, true))
+          table.insert(args, 1, utils.repr(name))
           add(self.__class:comma_separated_items("compiler:call(", args, ")"))
         end
       elseif "String" == _exp_0 then
@@ -513,7 +523,7 @@ do
         local unescaped = tree.value:gsub("\\(.)", (function(c)
           return escapes[c] or c
         end))
-        add(utils.repr(unescaped, true))
+        add(utils.repr(unescaped))
       elseif "Longstring" == _exp_0 then
         local concat_parts = { }
         local string_buffer = ""
@@ -527,15 +537,15 @@ do
               string_buffer = string_buffer .. bit:gsub("\\\\", "\\")
             else
               if string_buffer ~= "" then
-                table.insert(concat_parts, utils.repr(string_buffer, true))
+                table.insert(concat_parts, utils.repr(string_buffer))
                 string_buffer = ""
               end
-              table.insert(concat_parts, "compiler.utils.repr(" .. tostring(to_lua(bit)) .. ")")
+              table.insert(concat_parts, "compiler.utils.repr_if_not_string(" .. tostring(to_lua(bit)) .. ")")
             end
           end
         end
         if string_buffer ~= "" then
-          table.insert(concat_parts, utils.repr(string_buffer, true))
+          table.insert(concat_parts, utils.repr(string_buffer))
         end
         if #concat_parts == 0 then
           add("''")
@@ -565,7 +575,7 @@ do
           end)(), "}"))
         end
       elseif "Var" == _exp_0 then
-        add("vars[" .. tostring(utils.repr(tree.value, true)) .. "]")
+        add("vars[" .. tostring(utils.repr(tree.value)) .. "]")
       else
         self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
@@ -587,6 +597,16 @@ do
         end)())
       end
       return table.concat(name_bits, " ")
+    end,
+    var_to_lua_identifier = function(self, var)
+      if var.type ~= "Var" then
+        self:error("Tried to convert something that wasn't a Var into a lua identifier: it was not a Var, it was: " .. label.type)
+      end
+      local identifier = "var_"
+      for i = 1, #var.value do
+        identifier = identifier .. ("%x"):format(string.byte(var.value, i))
+      end
+      return identifier
     end,
     run_macro = function(self, tree, kind)
       if kind == nil then
@@ -687,9 +707,9 @@ do
           end
         end
       elseif "String" == _exp_0 then
-        coroutine.yield(ind(utils.repr(tree.value, true)))
+        coroutine.yield(ind(utils.repr(tree.value)))
       elseif "Longstring" == _exp_0 then
-        coroutine.yield(ind(utils.repr(tree.value, true)))
+        coroutine.yield(ind(utils.repr(tree.value)))
       elseif "Number" == _exp_0 then
         coroutine.yield(ind(tree.value))
       elseif "List" == _exp_0 then
@@ -791,7 +811,7 @@ do
         end
         local inner_vars = setmetatable({ }, {
           __index = function(_, key)
-            return "vars[" .. tostring(utils.repr(key, true)) .. "]"
+            return "vars[" .. tostring(utils.repr(key)) .. "]"
           end
         })
         return "do\n" .. self:tree_to_value(vars.lua_code, inner_vars) .. "\nend", true
@@ -800,7 +820,7 @@ do
         local lua_code = vars.lua_code.value
         local inner_vars = setmetatable({ }, {
           __index = function(_, key)
-            return "vars[" .. tostring(utils.repr(key, true)) .. "]"
+            return "vars[" .. tostring(utils.repr(key)) .. "]"
           end
         })
         return self:tree_to_value(vars.lua_code, inner_vars)
@@ -920,7 +940,7 @@ elseif arg then
       return c:run(buff)
     end)
     if ok and ret ~= nil then
-      print("= " .. utils.repr(ret, true))
+      print("= " .. utils.repr(ret))
     end
   end
 end

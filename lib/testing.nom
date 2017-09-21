@@ -1,0 +1,14 @@
+require "lib/metaprogramming.nom"
+
+# For unit testing
+macro block [test %code yields %expected] =:
+    %generated =: lua expr "compiler.utils.repr(compiler:stringify_tree(vars.code.value))"
+    %expected =: %expected as lua expr
+    if (%generated != %expected):
+        say "Test failed!"
+        say "Expected:"
+        say %expected
+        say "But got:"
+        say %generated
+        error!
+    return ""

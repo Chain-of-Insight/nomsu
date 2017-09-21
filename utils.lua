@@ -10,10 +10,7 @@ utils = {
     end
     return true
   end,
-  repr = function(x, add_quotes)
-    if add_quotes == nil then
-      add_quotes = false
-    end
+  repr = function(x)
     local _exp_0 = type(x)
     if 'table' == _exp_0 then
       local mt = getmetatable(x)
@@ -25,7 +22,7 @@ utils = {
           local _len_0 = 1
           for _index_0 = 1, #x do
             local i = x[_index_0]
-            _accum_0[_len_0] = utils.repr(i, true)
+            _accum_0[_len_0] = utils.repr(i)
             _len_0 = _len_0 + 1
           end
           return _accum_0
@@ -35,18 +32,16 @@ utils = {
           local _accum_0 = { }
           local _len_0 = 1
           for k, v in pairs(x) do
-            _accum_0[_len_0] = "[" .. tostring(utils.repr(k, true)) .. "]= " .. tostring(utils.repr(v, true))
+            _accum_0[_len_0] = "[" .. tostring(utils.repr(k)) .. "]= " .. tostring(utils.repr(v))
             _len_0 = _len_0 + 1
           end
           return _accum_0
         end)(), ", ")) .. "}"
       end
     elseif 'string' == _exp_0 then
-      if not add_quotes then
-        return x
-      elseif not x:find([["]]) and not x:find("\n") then
+      if not x:find([["]]) and not x:find("\n") and not x:find("\\") then
         return "\"" .. x .. "\""
-      elseif not x:find([[']]) and not x:find("\n") then
+      elseif not x:find([[']]) and not x:find("\n") and not x:find("\\") then
         return "\'" .. x .. "\'"
       else
         for i = 0, math.huge do
@@ -62,6 +57,13 @@ utils = {
       end
     else
       return tostring(x)
+    end
+  end,
+  repr_if_not_string = function(x)
+    if type(x) == 'string' then
+      return x
+    else
+      return utils.repr(x)
     end
   end,
   split = function(str, sep)
