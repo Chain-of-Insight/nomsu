@@ -56,6 +56,7 @@ class NomsuCompiler
         if fn_info == nil
             @error "Undefined function: #{fn_name}"
         if fn_info.whiteset == nil then return true
+        -- TODO: optimize this, maybe by making the callstack a Counter and having a move-to-front optimization on the whitelist
         for caller in *@callstack
             if fn_info.whiteset[caller]
                 return true
@@ -65,13 +66,16 @@ class NomsuCompiler
         if @debug
             @writeln "Defining rule: #{spec}"
         invocations,arg_names = @get_invocations spec
+        for i=2,#invocations
+            if not utils.equivalent(utils.set(arg_names[invocations[1]]), utils.set(arg_names[invocations[i]]))
+                @error("Conflicting argument names #{utils.repr(invocations[1])} and #{utils.repr(invocations[i])} for #{utils.repr(spec)}")
         fn_info = {:fn, :arg_names, :invocations, :src, is_macro:false}
         for invocation in *invocations
             @defs[invocation] = fn_info
     
     get_invocations_from_definition:(def, vars)=>
         if def.type == "String"
-            return @tree_to_value(def, vars)
+            return @@unescape_string(def.value)
 
         if def.type != "List"
             @error "Trying to get invocations from #{def.type}, but expected List or String."
@@ -79,7 +83,7 @@ class NomsuCompiler
         invocations = {}
         for item in *def.value
             if item.type == "String"
-                insert invocations, @tree_to_value(item, vars)
+                insert invocations, item.value
                 continue
             if item.type != "FunctionCall"
                 @error "Invalid list item: #{item.type}, expected FunctionCall or String"
@@ -102,15 +106,10 @@ class NomsuCompiler
         if type(text) == 'string' then text = {text}
         invocations = {}
         arg_names = {}
-        prev_arg_names = nil
         for _text in *text
             invocation = _text\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
             _arg_names = [arg for arg in _text\gmatch("%%(%S[^%s']*)")]
-            insert(invocations, invocation)
-            if prev_arg_names
-                if not utils.equivalent(utils.set(prev_arg_names), utils.set(_arg_names))
-                    @error("Conflicting argument names #{utils.repr(prev_arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
-            else prev_arg_names = _arg_names
+            insert invocations, invocation
             arg_names[invocation] = _arg_names
         return invocations, arg_names
 
@@ -118,39 +117,18 @@ class NomsuCompiler
         if @debug
             @writeln("DEFINING MACRO: #{spec}#{src or ""}")
         invocations,arg_names = @get_invocations spec
+        for i=2,#invocations
+            if not utils.equivalent(utils.set(arg_names[invocations[1]]), utils.set(arg_names[invocations[i]]))
+                @error("Conflicting argument names #{utils.repr(invocations[1])} and #{utils.repr(invocations[i])} for #{utils.repr(spec)}")
         fn_info = {fn:lua_gen_fn, :arg_names, :invocations, :src, is_macro:true}
         for invocation in *invocations
             @defs[invocation] = fn_info
-
-    serialize: (obj)=>
-        switch type(obj)
-            when "function"
-                error("Function serialization is not yet implemented.")
-                "assert(load("..utils.repr(string.dump(obj)).."))"
-            when "table"
-                if utils.is_list obj
-                    "{#{table.concat([@serialize(i) for i in *obj], ", ")}}"
-                else
-                    "{#{table.concat(["[#{@serialize(k)}]= #{@serialize(v)}" for k,v in pairs(obj)], ", ")}}"
-            when "number"
-                utils.repr(obj)
-            when "string"
-                utils.repr(obj)
-            else
-                error "Serialization not implemented for: #{type(obj)}"
-
-    deserialize: (str)=>
-        lua_thunk, err = load("return (function(compiler,vars)
-        return "..str.."
-        end)")
-        if not lua_thunk
-            error("Failed to compile generated code:\n#{str}\n\n#{err}")
-        return (lua_thunk!)(self, {})
 
     parse: (str, filename)=>
         if @debug
             @writeln("PARSING:\n#{str}")
 
+        -- NOTE: this treats tabs as equivalent to 1 space
         indent_stack = {0}
         check_indent = (subject,end_pos,spaces)->
             if #spaces > indent_stack[#indent_stack]
@@ -357,8 +335,7 @@ class NomsuCompiler
                     return @@comma_separated_items("compiler:call(", args, ")")
 
             when "String"
-                unescaped = tree.value\gsub("\\(.)", ((c)-> STRING_ESCAPES[c] or c))
-                return utils.repr(unescaped)
+                return utils.repr(@@unescape_string(tree.value))
 
             when "Longstring"
                 concat_parts = {}
@@ -401,21 +378,21 @@ class NomsuCompiler
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
 
+    @unescape_string: (str)=>
+        str\gsub("\\(.)", ((c)-> STRING_ESCAPES[c] or c))
+
     @comma_separated_items: (open, items, close)=>
-        utils.accumulate "\n", ->
-            buffer = open
-            so_far = 0
-            for i,item in ipairs(items)
-                if i < #items then item ..= ", "
-                if so_far + #item >= 80 and #buffer > 0
-                    coroutine.yield buffer
-                    so_far -= #buffer
-                    buffer = item
-                else
-                    so_far += #item
-                    buffer ..= item
-            buffer ..= close
-            coroutine.yield buffer
+        bits = {open}
+        so_far = 0
+        for i,item in ipairs(items)
+            if i < #items then item ..= ", "
+            insert bits, item
+            so_far += #item
+            if so_far >= 80
+                insert bits, "\n"
+                so_far = 0
+        insert bits, close
+        return table.concat(bits)
     
     fn_name_from_tree: (tree)=>
         assert(tree.type == "FunctionCall", "Attempt to get fn name from non-functioncall tree: #{tree.type}")
@@ -556,23 +533,14 @@ class NomsuCompiler
 
     initialize_core: =>
         -- Sets up some core functionality
-        as_lua_code = (str, vars)=>
-            switch str.type
-                when "String"
-                    return @tree_to_value(str, vars)
-                when "Longstring"
-                    return @tree_to_value(str, vars)
-                else
-                    return @tree_to_lua(str)
-
         @defmacro [[lua block %lua_code]], (vars, kind)=>
             if kind == "Expression" then error("Expected to be in statement.")
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key)}]"})
+            inner_vars = setmetatable({}, {__index:(_,key)-> error"vars[#{utils.repr(key)}]"})
             return "do\n"..@tree_to_value(vars.lua_code, inner_vars).."\nend", true
 
         @defmacro [[lua expr %lua_code]], (vars, kind)=>
             lua_code = vars.lua_code.value
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{utils.repr(key)}]"})
+            inner_vars = setmetatable({}, {__index:(_,key)-> error"vars[#{utils.repr(key)}]"})
             return @tree_to_value(vars.lua_code, inner_vars)
 
         @def "require %filename", (vars)=>

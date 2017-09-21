@@ -86,6 +86,8 @@ rule [%tree as value] =:
 rule [%tree as lua] =:
     lua expr "compiler:tree_to_lua(vars.tree)"
 
+rule [test, foobar] =: lua expr "print('yup')"
+
 # Compiler tools
 rule [eval %code, run %code] =: compiler "run" [%code]
 
