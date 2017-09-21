@@ -78,7 +78,7 @@ if 1: yes
 
 if 1 (:yes) else (:no)
 
-say (do: return: 5)
+say (do: return 5)
 
 # Some variables
 rule [do %one also %two] =:
@@ -88,7 +88,7 @@ rule [do %one also %two] =:
 do: say "one liner"
 ..also: say "another one liner"
 
-say (do: return: "wow")
+say (do: return "wow")
 
 say (1 + (-(2 * 3)))
 
@@ -146,7 +146,7 @@ rule [dumsum %nums] =:
     %sum =: 0
     for %n in %nums:
         %sum +=: %n
-    return: %sum
+    return %sum
 
 say (dumsum [1,2,3])
 

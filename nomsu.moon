@@ -311,7 +311,7 @@ class NomsuCompiler
             error("Failed to compile generated code:\n#{code}\n\n#{err}")
         return (lua_thunk!)(self, vars or {})
 
-    tree_to_lua: (tree, kind="Expression")=>
+    tree_to_lua: (tree)=>
         assert tree, "No tree provided."
         if not tree.type
             @error "Invalid tree: #{utils.repr(tree)}"
@@ -319,8 +319,8 @@ class NomsuCompiler
         buffer = {}
         return_value = nil
 
-        to_lua = (t,kind)->
-            ret = @tree_to_lua(t,kind)
+        to_lua = (t)->
+            ret = @tree_to_lua(t)
             return ret
 
         add = (code)-> table.insert(buffer, code)
@@ -462,10 +462,8 @@ class NomsuCompiler
     var_to_lua_identifier: (var)=>
         if var.type != "Var"
             @error("Tried to convert something that wasn't a Var into a lua identifier: it was not a Var, it was: "..label.type)
-        identifier = "var_"
-        for i=1,#var.value
-            identifier ..= ("%x")\format(string.byte(var.value, i))
-        return identifier
+        "var"..(var.value\gsub "%W", (verboten)->
+            if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
     
     run_macro: (tree, kind="Expression")=>
         name = @fn_name_from_tree(tree)

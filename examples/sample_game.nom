@@ -1,4 +1,5 @@
 require "lib/core.nom"
+require "lib/permissions.nom"
 require "lib/secrets.nom"
 require "lib/plurals.nom"
 
@@ -101,8 +102,6 @@ with secrets:
         say ".."
             |Proposal:
             |\%src\
-        say "foo"
-        
 
     macro block [propose %action] =:
         %source =: source code from tree %action

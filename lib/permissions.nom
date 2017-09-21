@@ -5,35 +5,40 @@ require "lib/collections.nom"
 
 # Permission functions
 rule [restrict %rules to within %elite-rules] =:
+    say ".."|Restricting \%rules\ to within \%elite-rules\
     %rules =: compiler "get_invocations" [%rules]
     %elite-rules =: compiler "get_invocations" [%elite-rules]
     for all (flatten [%elite-rules, %rules]):
-        assert ((compiler's "defs") has %it) ".."|Undefined function: \%it\
+        assert ((compiler's "defs") has key %it) ".."|Undefined function: \%it\
     for all %rules:
-        assert (not (compiler "check_permission" [%it])) ".."
+        assert (compiler "check_permission" [%it]) ".."
             |You do not have permission to restrict permissions for function: \%it\
-        ((compiler's "defs")'s %it)'s "whiteset" =: dict (..)
-            [%it, (yes)] for %it in %elite-rules
+        %foo =: dict (..)
+            [%it, yes] for %it in %elite-rules
+        say ".."|FFS: \%foo\
+        ((compiler's "defs")'s %it)'s "whiteset" =: %foo
 
 rule [allow %elite-rules to use %rules] =:
+    say ".."|Allowing \%elite-rules\ to use \%rules\
     %rules =: compiler "get_invocations" [%rules]
     %elite-rules =: compiler "get_invocations" [%elite-rules]
     for all (flatten [%elite-rules, %rules]):
-        assert ((compiler's "defs") has %it) ".."|Undefined function: \%it\
+        assert ((compiler's "defs") has key %it) ".."|Undefined function: \%it\
     for %fn in %rules:
-        assert (not (compiler "check_permission" [%fn])) ".."
+        assert (compiler "check_permission" [%fn]) ".."
             |You do not have permission to grant permissions for function: \%fn\
         %whiteset =: ((compiler's "defs")'s %fn)'s "whiteset"
         if (not %whiteset): on to the next %fn
         for all %elite-rules: %whiteset's %it =: yes
 
 rule [forbid %pleb-rules to use %rules] =:
+    say ".."|Forbidding \%pleb-rules\ to use \%rules\
     %rules =: compiler "get_invocations" [%rules]
     %pleb-rules =: compiler "get_invocations" [%pleb-rules]
     for all (flatten [%pleb-rules, %used]):
-        assert ((compiler's "defs") has %it) ".."|Undefined function: \%it\
+        assert ((compiler's "defs") has key %it) ".."|Undefined function: \%it\
     for all %rules:
-        assert (not (compiler "check_permission" [%it])) ".."
+        assert (compiler "check_permission" [%it]) ".."
             |You do not have permission to grant permissions for function: \%it\
         %whiteset =: ((compiler's "defs")'s %it)'s "whiteset"
         assert %whiteset ".."

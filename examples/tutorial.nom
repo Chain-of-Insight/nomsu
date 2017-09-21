@@ -234,6 +234,7 @@ sing 9 bottles of beer
 say (5 + (4 * (- (1 + (6 + 2)))))
 # For convenience, +,*,"and", and "or" have been hand defined to work with up to 4 operands: 
 1 + 2 + 3 + 4
+say "Done with math."
 1 * 2 * 3 * 4
 1 and 2 and 3 and 4
 1 or 2 or 3 or 4
@@ -244,6 +245,8 @@ all of [1,1,1,1,0,1,1]
 any of [0,0,0,0,1,0,0]
 # And 3-operand chained inequality comparisons have been defined: 
 1 < 2 <= 3
+
+say "Done with math."
 
 
 # Macros: 
@@ -264,8 +267,8 @@ say ".."|The square root of 2 is \square root of 2\
 # Macros can be defined as functions that take unprocessed syntax trees and return lua code 
 # "macro block %" is for defining macros that produce blocks of code, not values 
 macro block [unless %condition %body] =: ".."
-    |if not (\%condition as lua expr\) then
-    |    \(lua expr "vars.body.value") as lua block\
+    |if not (\%condition as lua\) then
+    |    \(lua expr "vars.body.value") as lua\
     |end
 
 unless (1 > 10):
@@ -274,6 +277,6 @@ unless (1 > 10):
 
 # and "macro %" is for defining macros that produce an expression 
 macro [%value as a boolean] =: ".."
-    |(not not (\%value as lua expr\))
+    |(not not (\%value as lua\))
 macro [yep] =: "true"
 

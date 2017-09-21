@@ -12,10 +12,10 @@ macro [%if_expr if %condition else %else_expr] =:
     #.. Note: this uses a function instead of (condition and if_expr or else_expr)
         because that breaks if %if_expr is falsey.
     ".."|(function(compiler, vars)
-        |    if \%condition as lua expr\ then
-        |        return \%if_expr as lua expr\
+        |    if \%condition as lua\ then
+        |        return \%if_expr as lua\
         |    else
-        |        return \%else_expr as lua expr\
+        |        return \%else_expr as lua\
         |    end
         |end)(compiler, vars)
 
@@ -37,8 +37,8 @@ lua block ".."
     |        if #vars.rhs.value.value > 1 then
     |            compiler:error("Assignment operation should not have more than one value on the right hand side.")
     |        end
-    |        return callback(compiler:tree_to_lua(vars.var, "Expression"),
-    |            compiler:tree_to_lua(vars.rhs.value.value[1].value, "Expression")), true
+    |        return callback(compiler:tree_to_lua(vars.var),
+    |            compiler:tree_to_lua(vars.rhs.value.value[1].value)), true
     |    end
     |end
     |compiler:defmacro("%var = %rhs", helper(function(var,result) return var.." = "..result end))
@@ -62,31 +62,31 @@ lua block ".."
     |    end
     |    compiler:defmacro("%a "..nomsu_alias.." %b", (function(compiler, vars, kind)
     |        return "("..compiler:tree_to_lua(vars.a).." "..op.." "..compiler:tree_to_lua(vars.b)..")"
-    |    end), [[".."|(\\%a as lua expr\\ ]]..op..[[ \\%b as lua expr\\)]])
+    |    end), [[".."|(\\%a as lua\\ ]]..op..[[ \\%b as lua\\)]])
     |end
 # == and != do equivalence checking, rather than identity checking
-macro [%a == %b] =: ".."|compiler.utils.equivalent(\%a as lua expr\, \%b as lua expr\)
-macro [%a != %b] =: ".."|(not compiler.utils.equivalent(\%a as lua expr\, \%b as lua expr\))
+macro [%a == %b] =: ".."|compiler.utils.equivalent(\%a as lua\, \%b as lua\)
+macro [%a != %b] =: ".."|(not compiler.utils.equivalent(\%a as lua\, \%b as lua\))
 
-# Commutative Operators defined for up to 10 operands
+# Commutative Operators defined for up to 8 operands
 lua block ".."
     |local comops = {"+","*","and","or"}
     |for _,_op in ipairs(comops) do
     |    local op = _op
     |    local spec = "%1 "..op.." %2"
-    |    for i=3,10 do
-    |        spec = spec .. " %"..tostring(i)
+    |    for n=3,8 do
+    |        spec = spec .." "..op.." %"..tostring(n)
     |        compiler:defmacro(spec, (function(compiler, vars, kind)
     |            local bits = {}
-    |            for _,v in ipairs(vars) do
-    |                table.insert(bits, compiler:tree_to_lua(v))
+    |            for i=1,n do
+    |                table.insert(bits, (compiler:tree_to_lua(vars[tostring(i)])))
     |            end
     |            return "("..table.concat(bits, " "..op.." ")..")"
     |        end))
     |    end
     |end
 
-# Chained compairsions (e.g. x < y <= z < w) are defined up to 10 operands
+# Chained compairsions (e.g. x < y <= z < w) are defined up to 8 operands
 lua block ".."
     |for _,chainers in ipairs{{"<","<="},{">",">="}} do
     |    local function recurse(chain)
@@ -109,8 +109,8 @@ lua block ".."
     |                end
     |            end)
     |        end
-    # 9 operators == 10 operands, so don't continue any further
-    |        if #chain >= 9 then return end
+    # 7 operators == 8 operands, so don't continue any further
+    |        if #chain >= 7 then return end
     |        for _,c in ipairs(chainers) do
     |            table.insert(chain, c)
     |            recurse(chain)
@@ -121,5 +121,5 @@ lua block ".."
     |end
 
 # Unary operators
-macro [- %a] =: ".."|-(\%a as lua expr\)
-macro [not %a] =: ".."|not (\%a as lua expr\)
+macro [- %a] =: ".."|-(\%a as lua\)
+macro [not %a] =: ".."|not (\%a as lua\)

@@ -5,36 +5,42 @@
 
 # Macros:
 
-# macro block [macro block %spec = %user_macro] =: ..
 lua block ".."
-    |compiler:defmacro("macro block %spec = %user_macro", (function(compiler, vars, kind)
+    |local function make_fn(wrap_in_block)
+    |    return function(compiler, vars, kind)
     # Do a minimal amount of pre-processing (get the spec and the source)
-    |    local spec = compiler:get_invocations_from_definition(vars.spec, vars)
-    |    spec = compiler.utils.repr(spec)
-    |    local src = compiler.utils.repr(vars.user_macro.src)
-    |    local user_macro = compiler:tree_to_lua(vars.user_macro)
+    |        local spec = compiler:get_invocations_from_definition(vars.spec, vars)
+    |        spec = compiler.utils.repr(spec)
+    |        local src = compiler.utils.repr(vars.user_macro.src)
+    |        local user_macro = compiler:tree_to_lua(vars.user_macro)
     # Then produce a block of code that creates the macro at runtime
-    |    local lua = [[
-    |compiler:defmacro(%s, (function(compiler, vars, kind)
-    |    if kind == "Expression" then
-    |        compiler:error("Macro "..%s.." was defined to be a block, but is being used as an expression")
+    |        local lua = [[
+    |    compiler:defmacro(%s, (function(compiler, vars, kind)
+    |        if kind == "Expression" then
+    |            compiler:error("Macro "..%s.." was defined to be a block, but is being used as an expression")
+    |        end
+    |        local user_macro = %s
+    |        local lua = user_macro(compiler, vars)
+    |        %s
+    |        return lua, true
+    |    end), %s)
+    |    ]]
+    |        lua = lua:format(spec, compiler.utils.repr(spec), user_macro,
+    |            wrap_in_block and [[lua = "do\\n    "..lua.."\\nend"]] or "", src)
+    |        return lua, true
     |    end
-    |    local user_macro = %s
-    |    return ("do\\n"..user_macro(compiler, vars).."\\nend"), true
-    |end), %s)
-    |]]
-    |    lua = lua:format(spec, compiler.utils.repr(spec), user_macro, src)
-    |    return lua, true
-    |end), "N/A")
+    |end
+    |compiler:defmacro("macro statement %spec = %user_macro", make_fn(false), "N/A")
+    |compiler:defmacro("macro block %spec = %user_macro", make_fn(true), "N/A")
 
 macro block [macro %spec = %user_macro] =:
     ".."|compiler:defmacro(
         |    \lua expr "compiler:get_invocations_from_definition(vars.spec, vars)"\,
-        |    \lua expr "compiler:tree_to_lua(vars.user_macro, 'Expression')"\,
+        |    \lua expr "compiler:tree_to_lua(vars.user_macro)"\,
         |    \lua expr "compiler.utils.repr(vars.user_macro.src)"\)
 
 macro [compiler] =: "compiler"
-macro [compiler's %key] =: ".."|compiler[\%key as lua expr\]
+macro [compiler's %key] =: ".."|compiler[\%key as lua\]
 macro [compiler %method %args] =:
     lua block ".."
         |local args = {}
@@ -59,7 +65,7 @@ macro [compiler utils %method %args] =:
 macro block [rule %spec = %body] =: ".."
     |compiler:def(
     |    \compiler utils "repr" [compiler "get_invocations_from_definition" [%spec, lua expr "vars"]]\,
-    |    \compiler "tree_to_lua" [%body, lua expr "vars"]\,
+    |    \compiler "tree_to_lua" [%body]\,
     |    \compiler utils "repr" [lua expr "vars.body.src"]\)
 
 # Get the source code for a function
@@ -77,11 +83,8 @@ rule [help %invocation] =:
 rule [%tree as value] =:
     lua expr "compiler:tree_to_value(vars.tree, vars)"
 
-rule [%tree as lua block] =:
-    lua expr "compiler:tree_to_lua(vars.tree, 'Statement')"
-
-rule [%tree as lua expr] =:
-    lua expr "compiler:tree_to_lua(vars.tree, 'Expression')"
+rule [%tree as lua] =:
+    lua expr "compiler:tree_to_lua(vars.tree)"
 
 # Compiler tools
 rule [eval %code, run %code] =: compiler "run" [%code]

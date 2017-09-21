@@ -1,4 +1,5 @@
 require "lib/core.nom"
+require "lib/testing.nom"
 
 test: say "foo"
 ..yields ".."
@@ -148,12 +149,12 @@ test:
             z
 ..yields ".."
     |Call [if % % else %]:
-    |    Var[x]
+    |    Var["x"]
     |    Thunk:
     |        Call [x]!
     |    Thunk:
     |        Call [if % % else %]:
-    |            Var[y]
+    |            Var["y"]
     |            Thunk:
     |                Call [y]!
     |            Thunk:
@@ -169,6 +170,6 @@ test:
     %Brian's hat
 ..yields ".."
     |Call [% 's hat]:
-    |    Var[Brian]
+    |    Var["Brian"]
 
 say "All tests passed!"

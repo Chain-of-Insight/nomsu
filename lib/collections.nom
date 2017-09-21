@@ -9,18 +9,18 @@ macro [..]
     %list's %index, %index st in %list, %index nd in %list, %index rd in %list
     %index th in %list, %index in %list, %list -> %index
 ..=:
-    ".."|\%list as lua expr\[\%index as lua expr\]
-    ".."|\%list as lua expr\[\%index as lua expr\]
+    ".."|\%list as lua\[\%index as lua\]
+    ".."|\%list as lua\[\%index as lua\]
 macro [..]
     %index st to last in %list, %index nd to last in %list, %index rd to last in %list
     %index th to last in %list
 ..=:
-    ".."|compiler.utils.nth_to_last(\%list as lua expr\, \%index as lua expr\)
+    ".."|compiler.utils.nth_to_last(\%list as lua\, \%index as lua\)
 
 macro [first in %list, first %list] =:
-    ".."|\%list as lua expr\[1]
+    ".."|\%list as lua\[1]
 macro [last in %list, last %list] =:
-    ".."|compiler.utils.nth_to_last(\%list as lua expr\, 1)
+    ".."|compiler.utils.nth_to_last(\%list as lua\, 1)
 
 # Dict iteration convenience function. This could also be accomplished with: for all (entries in %dict): ...
 macro block [for %key -> %value in %dict %body] =:
@@ -31,9 +31,9 @@ macro block [for %key -> %value in %dict %body] =:
     ".."
         |do
         |    local vars = setmetatable({}, {__index=vars})
-        |    for k, v in pairs(\%dict as lua expr\) do
-        |        \%key as lua expr\, \%value as lua expr\ = k, v
-        |        \%body as lua block\
+        |    for k, v in pairs(\%dict as lua\) do
+        |        \%key as lua\, \%value as lua\ = k, v
+        |        \%body as lua\
         |    end
         |end
 
@@ -43,7 +43,7 @@ rule [%item is in %list, %list contains %item, %list has %item] =:
         if (%key == %item): return (yes)
     return (no)
 macro [%list has key %index, %list has index %index] =: ".."
-    |(\%list as lua expr\[\%index as lua expr\] ~= nil)
+    |(\%list as lua\[\%index as lua\] ~= nil)
 
 rule [..]
     %item isn't in %list, %item is not in %list
@@ -57,17 +57,19 @@ rule [..]
 macro [..]
     %list doesn't have key %index, %list does not have key %index
     %list doesn't have index %index, %list does not have index %index
-..=: ".."|(\%list as lua expr\[\%index as lua expr\] ~= nil)
+..=: ".."|(\%list as lua\[\%index as lua\] ~= nil)
 
 macro [length of %list, size of %list, number of %list, len %list] =:
-    ".."|#(\%list as lua expr\)
+    ".."|#(\%list as lua\)
 
 # Chained lookup
 macro [%list ->* %indices] =:
-    %ret =: %list as lua expr
-    for %index in %indices:
-        %ret join=: ".."|[\%index as lua expr\]
-    %ret
+    assert ((%indices's "type") == "List") ".."
+        |Expected List for chained lookup, not \%indices's "type"\
+    %ret =: ".."|(\%list as lua\)
+    for %index in (%indices's "value"):
+        %ret join=: ".."|[\%index as lua\]
+    ".."|(\%ret\)
 
 # Assignment
 macro block [..]
@@ -79,12 +81,15 @@ macro block [..]
         |Dict assignment operation has the wrong type for the right hand side.
         |Expected Thunk, but got \%new_value's "type"\.
         |Maybe you used "=" instead of "=:"?
-    if ((size of (%new_value ->*["value","value"])) > 1):
-        error ".."|Dict assignment operation has too many values on the right hand side.
-    ".."|\%list as lua expr\[\%index as lua expr\] = \(%new_value ->*["value","value",1]) as lua expr\
+    assert ((size of (%new_value ->*["value","value"])) == 1) ".."
+        |Dict assignment operation has the wrong number of values on the right hand side.
+        |Expected 1 value, but got \repr %new_value\
+    %new_value =: %new_value ->*["value","value",1]
+    if ((%new_value's "type") == "Statement"): %new_value =: %new_value's "value"
+    ".."|\%list as lua\[\%index as lua\] = \%new_value as lua\
 
 macro [append %item to %list, add %item to %list] =:
-    ".."|table.insert(\%list as lua expr\, \%item as lua expr\)
+    ".."|table.insert(\%list as lua\, \%item as lua\)
 
 rule [flatten %lists] =:
     %flat =: []
@@ -96,8 +101,8 @@ rule [flatten %lists] =:
 rule [dict %items] =:
     %dict =: []
     for %pair in %items:
-        lua block "vars.dict[vars.pair[1]] = vars.pair[2]"
-    return %dict
+        %dict -> (first in %pair) =: last in %pair
+    %dict
 
 rule [entries in %dict] =:
     lua block ".."
@@ -114,18 +119,18 @@ macro [%expression for %var in %iterable] =:
     ".."
         |(function(game, vars)
         |    local comprehension = {}
-        |    for i,value in ipairs(\%iterable as lua expr\) do
-        |        \%var as lua expr\ = value
-        |        comprehension[i] = \%expression as lua expr\
+        |    for i,value in ipairs(\%iterable as lua\) do
+        |        \%var as lua\ = value
+        |        comprehension[i] = \%expression as lua\
         |    end
         |    return comprehension
         |end)(game, setmetatable({}, {__index=vars}))
 macro [%expression for all %iterable] =:
     ".."|(function(game, vars)
         |    local comprehension = {}
-        |    for i,value in ipairs(\%iterable as lua expr\) do
+        |    for i,value in ipairs(\%iterable as lua\) do
         |        vars.it = value
-        |        comprehension[i] = \%expression as lua expr\
+        |        comprehension[i] = \%expression as lua\
         |    end
         |    return comprehension
         |end)(game, setmetatable({}, {__index=vars}))
