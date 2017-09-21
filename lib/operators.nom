@@ -74,12 +74,12 @@ macro [%a != %b] =: ".."|(not compiler.utils.equivalent(\%a as lua\, \%b as lua\
 # Commutative Operators defined for up to 8 operands
 # TODO: work out solution for commutative operators using more clever macros
 lua block ".."
-    |local function make_comops()
+    |local function make_comops(max_operands)
     |local comops = {"+","*","and","or"}
     |for _,_op in ipairs(comops) do
     |    local op = _op
     |    local spec = "%1 "..op.." %2"
-    |    for n=3,8 do
+    |    for n=3,max_operands do
     |        spec = spec .." "..op.." %"..tostring(n)
     |        compiler:defmacro(spec, (function(compiler, vars, kind)
     |            local bits = {}
@@ -91,9 +91,9 @@ lua block ".."
     |    end
     |end
     |end
-    |make_comops()
+    |make_comops(8)
 
-# Chained compairsions (e.g. x < y <= z < w) are defined up to 3 operands
+# Chained compairsions (e.g. x < y <= z) are defined up to 3 operands
 lua block ".."
     |local function chained_comparisons(max_operands)
     |for _,chainers in ipairs({{"<","<="},{">",">="}}) do
