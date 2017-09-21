@@ -548,7 +548,7 @@ class NomsuCompiler
                 file = io.open(vars.filename)
                 if not file
                     @error "File does not exist: #{vars.filename}"
-                @loaded_files[vars.filename] = @run(file\read('*a'), vars.filename)
+                @loaded_files[vars.filename] = (@run(file\read('*a'), vars.filename)) or true
             return @loaded_files[vars.filename]
 
         @def "run file %filename", (vars)=>
@@ -561,6 +561,8 @@ class NomsuCompiler
 -- Run on the command line via "./nomsu.moon input_file.nom" to execute
 -- and "./nomsu.moon input_file.nom output_file.lua" to compile (use "-" to compile to stdout)
 if arg and arg[1]
+    --ProFi = require 'ProFi'
+    --ProFi\start()
     c = NomsuCompiler()
     input = io.open(arg[1])\read("*a")
     -- If run via "./nomsu.moon file.nom -", then silence output and print generated
@@ -586,6 +588,8 @@ if arg and arg[1]
     local c = NomsuCompiler()
     return load()(c, {})
     ]]
+    --ProFi\stop()
+    --ProFi\writeReport( 'MyProfilingReport.txt' )
 
 elseif arg
     -- REPL:

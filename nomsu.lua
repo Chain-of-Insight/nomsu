@@ -733,7 +733,7 @@ do
           if not file then
             self:error("File does not exist: " .. tostring(vars.filename))
           end
-          self.loaded_files[vars.filename] = self:run(file:read('*a'), vars.filename)
+          self.loaded_files[vars.filename] = (self:run(file:read('*a'), vars.filename)) or true
         end
         return self.loaded_files[vars.filename]
       end)

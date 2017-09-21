@@ -21,7 +21,7 @@ macro [%if_expr if %condition else %else_expr] =:
 
 # Variable assignment operator, and += type versions
 lua block ".."
-    |local function helper(callback)
+    |local function assign(callback)
     |    return function(compiler, vars, kind)
     |        if kind == "Expression" then
     |            compiler:error("Cannot use an assignment operation as an expression value.")
@@ -41,19 +41,20 @@ lua block ".."
     |            compiler:tree_to_lua(vars.rhs.value.value[1].value)), true
     |    end
     |end
-    |compiler:defmacro("%var = %rhs", helper(function(var,result) return var.." = "..result end))
-    |compiler:defmacro("%var += %rhs", helper(function(var,result) return var.." = "..var.." + "..result end))
-    |compiler:defmacro("%var -= %rhs", helper(function(var,result) return var.." = "..var.." - "..result end))
-    |compiler:defmacro("%var *= %rhs", helper(function(var,result) return var.." = "..var.." * "..result end))
-    |compiler:defmacro("%var /= %rhs", helper(function(var,result) return var.." = "..var.." / "..result end))
-    |compiler:defmacro("%var ^= %rhs", helper(function(var,result) return var.." = "..var.." ^ "..result end))
-    |compiler:defmacro("%var and= %rhs", helper(function(var,result) return var.." = "..var.." and "..result end))
-    |compiler:defmacro("%var or= %rhs", helper(function(var,result) return var.." = "..var.." or "..result end))
-    |compiler:defmacro("%var join= %rhs", helper(function(var,result) return var.." = "..var.." .. "..result end))
-    |compiler:defmacro("%var mod= %rhs", helper(function(var,result) return var.." = "..var.." % "..result end))
+    |compiler:defmacro("%var = %rhs", assign(function(var,result) return var.." = "..result end))
+    |compiler:defmacro("%var += %rhs", assign(function(var,result) return var.." = "..var.." + "..result end))
+    |compiler:defmacro("%var -= %rhs", assign(function(var,result) return var.." = "..var.." - "..result end))
+    |compiler:defmacro("%var *= %rhs", assign(function(var,result) return var.." = "..var.." * "..result end))
+    |compiler:defmacro("%var /= %rhs", assign(function(var,result) return var.." = "..var.." / "..result end))
+    |compiler:defmacro("%var ^= %rhs", assign(function(var,result) return var.." = "..var.." ^ "..result end))
+    |compiler:defmacro("%var and= %rhs", assign(function(var,result) return var.." = "..var.." and "..result end))
+    |compiler:defmacro("%var or= %rhs", assign(function(var,result) return var.." = "..var.." or "..result end))
+    |compiler:defmacro("%var join= %rhs", assign(function(var,result) return var.." = "..var.." .. "..result end))
+    |compiler:defmacro("%var mod= %rhs", assign(function(var,result) return var.." = "..var.." % "..result end))
 
 # Binary Operators
 lua block ".."
+    |local function make_binops()
     |local binops = {"+","-","*","/","<","<=",">",">=","^",{"===","=="},{"!==","~="},"and","or",{"mod","%"}}
     |for _,op in ipairs(binops) do
     |    local nomsu_alias = op
@@ -64,12 +65,16 @@ lua block ".."
     |        return "("..compiler:tree_to_lua(vars.a).." "..op.." "..compiler:tree_to_lua(vars.b)..")"
     |    end), [[".."|(\\%a as lua\\ ]]..op..[[ \\%b as lua\\)]])
     |end
+    |end
+    |make_binops()
 # == and != do equivalence checking, rather than identity checking
 macro [%a == %b] =: ".."|compiler.utils.equivalent(\%a as lua\, \%b as lua\)
 macro [%a != %b] =: ".."|(not compiler.utils.equivalent(\%a as lua\, \%b as lua\))
 
 # Commutative Operators defined for up to 8 operands
+# TODO: work out solution for commutative operators using more clever macros
 lua block ".."
+    |local function make_comops()
     |local comops = {"+","*","and","or"}
     |for _,_op in ipairs(comops) do
     |    local op = _op
@@ -85,11 +90,14 @@ lua block ".."
     |        end))
     |    end
     |end
+    |end
+    |make_comops()
 
-# Chained compairsions (e.g. x < y <= z < w) are defined up to 8 operands
+# Chained compairsions (e.g. x < y <= z < w) are defined up to 3 operands
 lua block ".."
-    |for _,chainers in ipairs{{"<","<="},{">",">="}} do
-    |    local function recurse(chain)
+    |local function chained_comparisons(max_operands)
+    |for _,chainers in ipairs({{"<","<="},{">",">="}}) do
+    |    local function recurse(chainers, chain)
     # The 1-op versions are already more efficiently defined, and a 0-op version doesnt make sense
     |        if #chain >= 2 then
     |            local spec = "%1"
@@ -109,16 +117,17 @@ lua block ".."
     |                end
     |            end)
     |        end
-    # 7 operators == 8 operands, so don't continue any further
-    |        if #chain >= 7 then return end
+    |        if #chain + 1 >= max_operands then return end
     |        for _,c in ipairs(chainers) do
     |            table.insert(chain, c)
-    |            recurse(chain)
+    |            recurse(chainers, chain)
     |            table.remove(chain)
     |        end
     |    end
-    |    recurse({})
+    |    recurse(chainers, {})
     |end
+    |end
+    |chained_comparisons(3)
 
 # Unary operators
 macro [- %a] =: ".."|-(\%a as lua\)
