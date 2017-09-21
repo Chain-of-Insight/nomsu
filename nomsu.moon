@@ -2,6 +2,7 @@
 re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
+insert = table.insert
 
 -- TODO:
 -- improve indentation of generated lua code
@@ -16,6 +17,7 @@ utils = require 'utils'
 INDENT = "    "
 lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
+STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
 
 
 class NomsuCompiler
@@ -40,15 +42,13 @@ class NomsuCompiler
             @error "Attempt to call macro at runtime: #{fn_name}\nThis can be caused by using a macro in a function that is defined before the macro."
         unless @check_permission(fn_name)
             @error "You do not have the authority to call: #{fn_name}"
-        table.insert @callstack, fn_name
+        insert @callstack, fn_name
         {:fn, :arg_names} = fn_info
         args = {name, select(i,...) for i,name in ipairs(arg_names[fn_name])}
         if @debug
             @writeln "Calling #{fn_name} with args: #{utils.repr(args)}"
-        ok,ret = pcall(fn, self, args)
+        ret = fn(self, args)
         table.remove @callstack
-        if not ok
-            error(ret)
         return ret
 
     check_permission: (fn_name)=>
@@ -79,19 +79,19 @@ class NomsuCompiler
         invocations = {}
         for item in *def.value
             if item.type == "String"
-                table.insert invocations, @tree_to_value(item, vars)
+                insert invocations, @tree_to_value(item, vars)
                 continue
             if item.type != "FunctionCall"
                 @error "Invalid list item: #{item.type}, expected FunctionCall or String"
             name_bits = {}
             for token in *item.value
                 if token.type == "Word"
-                    table.insert name_bits, token.value
+                    insert name_bits, token.value
                 elseif token.type == "Var"
-                    table.insert name_bits, token.src
+                    insert name_bits, token.src
                 else
                     @error "Unexpected token type in definition: #{token.type} (expected Word or Var)"
-            table.insert invocations, table.concat(name_bits, " ")
+            insert invocations, table.concat(name_bits, " ")
         return invocations
 
     get_invocations:(text)=>
@@ -106,7 +106,7 @@ class NomsuCompiler
         for _text in *text
             invocation = _text\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
             _arg_names = [arg for arg in _text\gmatch("%%(%S[^%s']*)")]
-            table.insert(invocations, invocation)
+            insert(invocations, invocation)
             if prev_arg_names
                 if not utils.equivalent(utils.set(prev_arg_names), utils.set(_arg_names))
                     @error("Conflicting argument names #{utils.repr(prev_arg_names)} and #{utils.repr(_arg_names)} for #{utils.repr(text)}")
@@ -121,16 +121,6 @@ class NomsuCompiler
         fn_info = {fn:lua_gen_fn, :arg_names, :invocations, :src, is_macro:true}
         for invocation in *invocations
             @defs[invocation] = fn_info
-    
-    run: (text, filename)=>
-        if @debug
-            @writeln "RUNNING TEXT:\n#{text}"
-        -- This will execute each chunk as it goes along
-        code, retval = @compile(text, filename)
-        if @debug
-            @writeln "\nGENERATED LUA CODE:\n#{code}"
-            @writeln "\nPRODUCED RETURN VALUE:\n#{retval}"
-        return retval
 
     serialize: (obj)=>
         switch type(obj)
@@ -161,27 +151,17 @@ class NomsuCompiler
         if @debug
             @writeln("PARSING:\n#{str}")
 
-        get_line_indentation = (line)->
-            indent_amounts = {[" "]:1, ["\t"]:4}
-            with sum = 0
-                leading_space = line\match("[\t ]*")
-                for c in leading_space\gmatch "[\t ]"
-                    sum += indent_amounts[c]
-
         indent_stack = {0}
         check_indent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces > indent_stack[#indent_stack]
-                table.insert(indent_stack, num_spaces)
+            if #spaces > indent_stack[#indent_stack]
+                insert(indent_stack, #spaces)
                 return end_pos
         check_dedent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces < indent_stack[#indent_stack]
+            if #spaces < indent_stack[#indent_stack]
                 table.remove(indent_stack)
                 return end_pos
         check_nodent = (subject,end_pos,spaces)->
-            num_spaces = get_line_indentation(spaces)
-            if num_spaces == indent_stack[#indent_stack]
+            if #spaces == indent_stack[#indent_stack]
                 return end_pos
 
         lingo = [=[
@@ -315,23 +295,13 @@ class NomsuCompiler
         assert tree, "No tree provided."
         if not tree.type
             @error "Invalid tree: #{utils.repr(tree)}"
-        indent = ""
-        buffer = {}
-        return_value = nil
-
-        to_lua = (t)->
-            ret = @tree_to_lua(t)
-            return ret
-
-        add = (code)-> table.insert(buffer, code)
-
         switch tree.type
             when "File"
-                add [[return (function(compiler, vars)
-                        local ret]]
+                buffer = {[[return (function(compiler, vars)
+                        local ret]]}
                 vars = {}
                 for statement in *tree.value.body.value
-                    ok,code = pcall(to_lua, statement, "Statement")
+                    ok,code = pcall(@tree_to_lua, self, statement)
                     if not ok
                         @writeln "Error occurred in statement:\n#{statement.src}"
                         error(code)
@@ -346,22 +316,25 @@ class NomsuCompiler
                     if not ok
                         @writeln "Error occurred in statement:\n#{statement.src}"
                         error(return_value)
-                    add code
-                add [[
+                    insert buffer, code
+                insert buffer, [[
                         return ret
                     end)
                 ]]
+                return table.concat(buffer, "\n"), return_value
 
             when "Block"
+                buffer = {}
                 for statement in *tree.value
-                    add to_lua(statement)
+                    insert buffer, @tree_to_lua(statement)
+                return table.concat(buffer, "\n")
         
             when "Thunk"
                 assert tree.value.type == "Block", "Non-block value in Thunk"
-                add [[
+                return [[
                     (function(compiler, vars)
                         local ret
-                        ]]..to_lua(tree.value).."\n"..[[
+                        ]]..@tree_to_lua(tree.value).."\n"..[[
                         return ret
                     end)
                 ]]
@@ -371,25 +344,21 @@ class NomsuCompiler
                 if tree.value.type == "FunctionCall"
                     name = @fn_name_from_tree(tree.value)
                     if @defs[name] and @defs[name].is_macro
-                        add @run_macro(tree.value, "Statement")
-                    else
-                        add "ret = "..(to_lua(tree.value)\match("%s*(.*)"))
-                else
-                    add "ret = "..(to_lua(tree.value)\match("%s*(.*)"))
+                        return @run_macro(tree.value, "Statement")
+                return "ret = "..(@tree_to_lua(tree.value))
 
             when "FunctionCall"
                 name = @fn_name_from_tree(tree)
                 if @defs[name] and @defs[name].is_macro
-                    add @run_macro(tree, "Expression")
+                    return @run_macro(tree, "Expression")
                 else
-                    args = [to_lua(a) for a in *tree.value when a.type != "Word"]
-                    table.insert args, 1, utils.repr(name)
-                    add @@comma_separated_items("compiler:call(", args, ")")
+                    args = [@tree_to_lua(a) for a in *tree.value when a.type != "Word"]
+                    insert args, 1, utils.repr(name)
+                    return @@comma_separated_items("compiler:call(", args, ")")
 
             when "String"
-                escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-                unescaped = tree.value\gsub("\\(.)", ((c)-> escapes[c] or c))
-                add utils.repr(unescaped)
+                unescaped = tree.value\gsub("\\(.)", ((c)-> STRING_ESCAPES[c] or c))
+                return utils.repr(unescaped)
 
             when "Longstring"
                 concat_parts = {}
@@ -401,40 +370,36 @@ class NomsuCompiler
                             string_buffer ..= bit\gsub("\\\\","\\")
                         else
                             if string_buffer ~= ""
-                                table.insert concat_parts, utils.repr(string_buffer)
+                                insert concat_parts, utils.repr(string_buffer)
                                 string_buffer = ""
-                            table.insert concat_parts, "compiler.utils.repr_if_not_string(#{to_lua(bit)})"
+                            insert concat_parts, "compiler.utils.repr_if_not_string(#{@tree_to_lua(bit)})"
 
                 if string_buffer ~= ""
-                    table.insert concat_parts, utils.repr(string_buffer)
+                    insert concat_parts, utils.repr(string_buffer)
 
                 if #concat_parts == 0
-                    add "''"
+                    return "''"
                 elseif #concat_parts == 1
-                    add concat_parts[1]
+                    return concat_parts[1]
                 else
-                    add "(#{table.concat(concat_parts, "..")})"
+                    return "(#{table.concat(concat_parts, "..")})"
 
             when "Number"
-                add tree.value
+                return tree.value
 
             when "List"
                 if #tree.value == 0
-                    add "{}"
+                    return "{}"
                 elseif #tree.value == 1
-                    add "{#{to_lua(tree.value[1])}}"
+                    return "{#{@tree_to_lua(tree.value[1])}}"
                 else
-                    add @@comma_separated_items("{", [to_lua(item) for item in *tree.value], "}")
+                    return @@comma_separated_items("{", [@tree_to_lua(item) for item in *tree.value], "}")
 
             when "Var"
-                add "vars[#{utils.repr(tree.value)}]"
+                return "vars[#{utils.repr(tree.value)}]"
 
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
-
-        -- TODO: make indentation clean
-        buffer = table.concat(buffer, "\n")
-        return buffer, return_value
 
     @comma_separated_items: (open, items, close)=>
         utils.accumulate "\n", ->
@@ -456,7 +421,7 @@ class NomsuCompiler
         assert(tree.type == "FunctionCall", "Attempt to get fn name from non-functioncall tree: #{tree.type}")
         name_bits = {}
         for token in *tree.value
-            table.insert name_bits, if token.type == "Word" then token.value else "%"
+            insert name_bits, if token.type == "Word" then token.value else "%"
         table.concat(name_bits, " ")
 
     var_to_lua_identifier: (var)=>
@@ -474,7 +439,7 @@ class NomsuCompiler
         {:fn, :arg_names} = @defs[name]
         args = [a for a in *tree.value when a.type != "Word"]
         args = {name,args[i] for i,name in ipairs(arg_names[name])}
-        table.insert @callstack, name
+        insert @callstack, name
         ret, manual_mode = fn(self, args, kind)
         table.remove @callstack
         if not ret
@@ -547,10 +512,10 @@ class NomsuCompiler
     stringify_tree:(tree)=>
         result = {}
         for line in coroutine.wrap(-> @_yield_tree(tree))
-            table.insert(result, line)
+            insert(result, line)
         return table.concat result, "\n"
 
-    compile: (src, filename, output_file=nil)=>
+    run: (src, filename, output_file=nil)=>
         if @debug
             @writeln "COMPILING:\n#{src}"
         tree = @parse(src, filename)
@@ -559,7 +524,7 @@ class NomsuCompiler
         if output_file
             output = io.open(output_file, "w")
             output\write(code)
-        return code, retval
+        return retval, code
 
     error: (...)=>
         @writeln "ERROR!"
@@ -635,7 +600,7 @@ if arg and arg[1]
     _write = c.write
     if arg[2] == "-"
         c.write = ->
-    code, retval = c\compile(input, arg[1])
+    retval, code = c\run(input, arg[1])
     c.write = _write -- put it back
     if arg[2]
         output = if arg[2] == "-"
@@ -653,6 +618,7 @@ if arg and arg[1]
     local c = NomsuCompiler()
     return load()(c, {})
     ]]
+
 elseif arg
     -- REPL:
     c = NomsuCompiler()

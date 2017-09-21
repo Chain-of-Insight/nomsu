@@ -1,10 +1,20 @@
 local re = require('re')
 local lpeg = require('lpeg')
 local utils = require('utils')
+local insert = table.insert
 local INDENT = "    "
 lpeg.setmaxstack(10000)
 local P, V, S, Cg, C, Cp, B, Cmt
 P, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
+local STRING_ESCAPES = {
+  n = "\n",
+  t = "\t",
+  b = "\b",
+  a = "\a",
+  v = "\v",
+  f = "\f",
+  r = "\r"
+}
 local NomsuCompiler
 do
   local _class_0
@@ -24,7 +34,7 @@ do
       if not (self:check_permission(fn_name)) then
         self:error("You do not have the authority to call: " .. tostring(fn_name))
       end
-      table.insert(self.callstack, fn_name)
+      insert(self.callstack, fn_name)
       local fn, arg_names
       fn, arg_names = fn_info.fn, fn_info.arg_names
       local args
@@ -38,11 +48,8 @@ do
       if self.debug then
         self:writeln("Calling " .. tostring(fn_name) .. " with args: " .. tostring(utils.repr(args)))
       end
-      local ok, ret = pcall(fn, self, args)
+      local ret = fn(self, args)
       table.remove(self.callstack)
-      if not ok then
-        error(ret)
-      end
       return ret
     end,
     check_permission = function(self, fn_name)
@@ -93,7 +100,7 @@ do
         repeat
           local item = _list_0[_index_0]
           if item.type == "String" then
-            table.insert(invocations, self:tree_to_value(item, vars))
+            insert(invocations, self:tree_to_value(item, vars))
             _continue_0 = true
             break
           end
@@ -105,14 +112,14 @@ do
           for _index_1 = 1, #_list_1 do
             local token = _list_1[_index_1]
             if token.type == "Word" then
-              table.insert(name_bits, token.value)
+              insert(name_bits, token.value)
             elseif token.type == "Var" then
-              table.insert(name_bits, token.src)
+              insert(name_bits, token.src)
             else
               self:error("Unexpected token type in definition: " .. tostring(token.type) .. " (expected Word or Var)")
             end
           end
-          table.insert(invocations, table.concat(name_bits, " "))
+          insert(invocations, table.concat(name_bits, " "))
           _continue_0 = true
         until true
         if not _continue_0 then
@@ -149,7 +156,7 @@ do
           end
           _arg_names = _accum_0
         end
-        table.insert(invocations, invocation)
+        insert(invocations, invocation)
         if prev_arg_names then
           if not utils.equivalent(utils.set(prev_arg_names), utils.set(_arg_names)) then
             self:error("Conflicting argument names " .. tostring(utils.repr(prev_arg_names)) .. " and " .. tostring(utils.repr(_arg_names)) .. " for " .. tostring(utils.repr(text)))
@@ -177,17 +184,6 @@ do
         local invocation = invocations[_index_0]
         self.defs[invocation] = fn_info
       end
-    end,
-    run = function(self, text, filename)
-      if self.debug then
-        self:writeln("RUNNING TEXT:\n" .. tostring(text))
-      end
-      local code, retval = self:compile(text, filename)
-      if self.debug then
-        self:writeln("\nGENERATED LUA CODE:\n" .. tostring(code))
-        self:writeln("\nPRODUCED RETURN VALUE:\n" .. tostring(retval))
-      end
-      return retval
     end,
     serialize = function(self, obj)
       local _exp_0 = type(obj)
@@ -236,44 +232,26 @@ do
       if self.debug then
         self:writeln("PARSING:\n" .. tostring(str))
       end
-      local get_line_indentation
-      get_line_indentation = function(line)
-        local indent_amounts = {
-          [" "] = 1,
-          ["\t"] = 4
-        }
-        do
-          local sum = 0
-          local leading_space = line:match("[\t ]*")
-          for c in leading_space:gmatch("[\t ]") do
-            sum = sum + indent_amounts[c]
-          end
-          return sum
-        end
-      end
       local indent_stack = {
         0
       }
       local check_indent
       check_indent = function(subject, end_pos, spaces)
-        local num_spaces = get_line_indentation(spaces)
-        if num_spaces > indent_stack[#indent_stack] then
-          table.insert(indent_stack, num_spaces)
+        if #spaces > indent_stack[#indent_stack] then
+          insert(indent_stack, #spaces)
           return end_pos
         end
       end
       local check_dedent
       check_dedent = function(subject, end_pos, spaces)
-        local num_spaces = get_line_indentation(spaces)
-        if num_spaces < indent_stack[#indent_stack] then
+        if #spaces < indent_stack[#indent_stack] then
           table.remove(indent_stack)
           return end_pos
         end
       end
       local check_nodent
       check_nodent = function(subject, end_pos, spaces)
-        local num_spaces = get_line_indentation(spaces)
-        if num_spaces == indent_stack[#indent_stack] then
+        if #spaces == indent_stack[#indent_stack] then
           return end_pos
         end
       end
@@ -420,27 +398,17 @@ do
       if not tree.type then
         self:error("Invalid tree: " .. tostring(utils.repr(tree)))
       end
-      local indent = ""
-      local buffer = { }
-      local return_value = nil
-      local to_lua
-      to_lua = function(t)
-        local ret = self:tree_to_lua(t)
-        return ret
-      end
-      local add
-      add = function(code)
-        return table.insert(buffer, code)
-      end
       local _exp_0 = tree.type
       if "File" == _exp_0 then
-        add([[return (function(compiler, vars)
-                        local ret]])
+        local buffer = {
+          [[return (function(compiler, vars)
+                        local ret]]
+        }
         local vars = { }
         local _list_0 = tree.value.body.value
         for _index_0 = 1, #_list_0 do
           local statement = _list_0[_index_0]
-          local ok, code = pcall(to_lua, statement, "Statement")
+          local ok, code = pcall(self.tree_to_lua, self, statement)
           if not ok then
             self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
             error(code)
@@ -451,44 +419,45 @@ do
             error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(utils.repr(statement)))
           end
           local value = lua_thunk()
+          local return_value
           ok, return_value = pcall(value, self, vars)
           if not ok then
             self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
             error(return_value)
           end
-          add(code)
+          insert(buffer, code)
         end
-        add([[                        return ret
+        insert(buffer, [[                        return ret
                     end)
                 ]])
+        return table.concat(buffer, "\n"), return_value
       elseif "Block" == _exp_0 then
+        local buffer = { }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local statement = _list_0[_index_0]
-          add(to_lua(statement))
+          insert(buffer, self:tree_to_lua(statement))
         end
+        return table.concat(buffer, "\n")
       elseif "Thunk" == _exp_0 then
         assert(tree.value.type == "Block", "Non-block value in Thunk")
-        add([[                    (function(compiler, vars)
+        return [[                    (function(compiler, vars)
                         local ret
-                        ]] .. to_lua(tree.value) .. "\n" .. [[                        return ret
+                        ]] .. self:tree_to_lua(tree.value) .. "\n" .. [[                        return ret
                     end)
-                ]])
+                ]]
       elseif "Statement" == _exp_0 then
         if tree.value.type == "FunctionCall" then
           local name = self:fn_name_from_tree(tree.value)
           if self.defs[name] and self.defs[name].is_macro then
-            add(self:run_macro(tree.value, "Statement"))
-          else
-            add("ret = " .. (to_lua(tree.value):match("%s*(.*)")))
+            return self:run_macro(tree.value, "Statement")
           end
-        else
-          add("ret = " .. (to_lua(tree.value):match("%s*(.*)")))
         end
+        return "ret = " .. (self:tree_to_lua(tree.value))
       elseif "FunctionCall" == _exp_0 then
         local name = self:fn_name_from_tree(tree)
         if self.defs[name] and self.defs[name].is_macro then
-          add(self:run_macro(tree, "Expression"))
+          return self:run_macro(tree, "Expression")
         else
           local args
           do
@@ -498,29 +467,20 @@ do
             for _index_0 = 1, #_list_0 do
               local a = _list_0[_index_0]
               if a.type ~= "Word" then
-                _accum_0[_len_0] = to_lua(a)
+                _accum_0[_len_0] = self:tree_to_lua(a)
                 _len_0 = _len_0 + 1
               end
             end
             args = _accum_0
           end
-          table.insert(args, 1, utils.repr(name))
-          add(self.__class:comma_separated_items("compiler:call(", args, ")"))
+          insert(args, 1, utils.repr(name))
+          return self.__class:comma_separated_items("compiler:call(", args, ")")
         end
       elseif "String" == _exp_0 then
-        local escapes = {
-          n = "\n",
-          t = "\t",
-          b = "\b",
-          a = "\a",
-          v = "\v",
-          f = "\f",
-          r = "\r"
-        }
         local unescaped = tree.value:gsub("\\(.)", (function(c)
-          return escapes[c] or c
+          return STRING_ESCAPES[c] or c
         end))
-        add(utils.repr(unescaped))
+        return utils.repr(unescaped)
       elseif "Longstring" == _exp_0 then
         local concat_parts = { }
         local string_buffer = ""
@@ -534,50 +494,48 @@ do
               string_buffer = string_buffer .. bit:gsub("\\\\", "\\")
             else
               if string_buffer ~= "" then
-                table.insert(concat_parts, utils.repr(string_buffer))
+                insert(concat_parts, utils.repr(string_buffer))
                 string_buffer = ""
               end
-              table.insert(concat_parts, "compiler.utils.repr_if_not_string(" .. tostring(to_lua(bit)) .. ")")
+              insert(concat_parts, "compiler.utils.repr_if_not_string(" .. tostring(self:tree_to_lua(bit)) .. ")")
             end
           end
         end
         if string_buffer ~= "" then
-          table.insert(concat_parts, utils.repr(string_buffer))
+          insert(concat_parts, utils.repr(string_buffer))
         end
         if #concat_parts == 0 then
-          add("''")
+          return "''"
         elseif #concat_parts == 1 then
-          add(concat_parts[1])
+          return concat_parts[1]
         else
-          add("(" .. tostring(table.concat(concat_parts, "..")) .. ")")
+          return "(" .. tostring(table.concat(concat_parts, "..")) .. ")"
         end
       elseif "Number" == _exp_0 then
-        add(tree.value)
+        return tree.value
       elseif "List" == _exp_0 then
         if #tree.value == 0 then
-          add("{}")
+          return "{}"
         elseif #tree.value == 1 then
-          add("{" .. tostring(to_lua(tree.value[1])) .. "}")
+          return "{" .. tostring(self:tree_to_lua(tree.value[1])) .. "}"
         else
-          add(self.__class:comma_separated_items("{", (function()
+          return self.__class:comma_separated_items("{", (function()
             local _accum_0 = { }
             local _len_0 = 1
             local _list_0 = tree.value
             for _index_0 = 1, #_list_0 do
               local item = _list_0[_index_0]
-              _accum_0[_len_0] = to_lua(item)
+              _accum_0[_len_0] = self:tree_to_lua(item)
               _len_0 = _len_0 + 1
             end
             return _accum_0
-          end)(), "}"))
+          end)(), "}")
         end
       elseif "Var" == _exp_0 then
-        add("vars[" .. tostring(utils.repr(tree.value)) .. "]")
+        return "vars[" .. tostring(utils.repr(tree.value)) .. "]"
       else
-        self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
+        return self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
-      buffer = table.concat(buffer, "\n")
-      return buffer, return_value
     end,
     fn_name_from_tree = function(self, tree)
       assert(tree.type == "FunctionCall", "Attempt to get fn name from non-functioncall tree: " .. tostring(tree.type))
@@ -585,7 +543,7 @@ do
       local _list_0 = tree.value
       for _index_0 = 1, #_list_0 do
         local token = _list_0[_index_0]
-        table.insert(name_bits, (function()
+        insert(name_bits, (function()
           if token.type == "Word" then
             return token.value
           else
@@ -644,7 +602,7 @@ do
         end
         args = _tbl_0
       end
-      table.insert(self.callstack, name)
+      insert(self.callstack, name)
       local ret, manual_mode = fn(self, args, kind)
       table.remove(self.callstack)
       if not ret then
@@ -741,11 +699,11 @@ do
       for line in coroutine.wrap(function()
         return self:_yield_tree(tree)
       end) do
-        table.insert(result, line)
+        insert(result, line)
       end
       return table.concat(result, "\n")
     end,
-    compile = function(self, src, filename, output_file)
+    run = function(self, src, filename, output_file)
       if output_file == nil then
         output_file = nil
       end
@@ -759,7 +717,7 @@ do
         local output = io.open(output_file, "w")
         output:write(code)
       end
-      return code, retval
+      return retval, code
     end,
     error = function(self, ...)
       self:writeln("ERROR!")
@@ -900,7 +858,7 @@ if arg and arg[1] then
   if arg[2] == "-" then
     c.write = function() end
   end
-  local code, retval = c:compile(input, arg[1])
+  local retval, code = c:run(input, arg[1])
   c.write = _write
   if arg[2] then
     local output
