@@ -415,10 +415,7 @@ do
       end
       return (lua_thunk())(self, vars or { })
     end,
-    tree_to_lua = function(self, tree, kind)
-      if kind == nil then
-        kind = "Expression"
-      end
+    tree_to_lua = function(self, tree)
       assert(tree, "No tree provided.")
       if not tree.type then
         self:error("Invalid tree: " .. tostring(utils.repr(tree)))
@@ -427,8 +424,8 @@ do
       local buffer = { }
       local return_value = nil
       local to_lua
-      to_lua = function(t, kind)
-        local ret = self:tree_to_lua(t, kind)
+      to_lua = function(t)
+        local ret = self:tree_to_lua(t)
         return ret
       end
       local add
@@ -602,11 +599,13 @@ do
       if var.type ~= "Var" then
         self:error("Tried to convert something that wasn't a Var into a lua identifier: it was not a Var, it was: " .. label.type)
       end
-      local identifier = "var_"
-      for i = 1, #var.value do
-        identifier = identifier .. ("%x"):format(string.byte(var.value, i))
-      end
-      return identifier
+      return "var" .. (var.value:gsub("%W", function(verboten)
+        if verboten == "_" then
+          return "__"
+        else
+          return ("_%x"):format(verboten:byte())
+        end
+      end))
     end,
     run_macro = function(self, tree, kind)
       if kind == nil then
