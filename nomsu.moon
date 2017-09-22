@@ -405,7 +405,6 @@ class NomsuCompiler
         -- Returns a single alias ("say %"), and list of args ({msg}) from a single rule def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
-            -- TODO
             alias = x\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
             args = [arg for arg in x\gmatch("%%(%S[^%s']*)")]
             return alias, args
