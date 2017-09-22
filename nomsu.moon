@@ -318,13 +318,19 @@ class NomsuCompiler
         
             when "Thunk"
                 assert tree.value.type == "Block", "Non-block value in Thunk"
-                return [[
+                lua = @tree_to_lua(tree.value)
+                if #tree.value.value == 1
+                    if ret_value = lua\match("^%s*ret = (.*)")
+                        return ([[
+                            (function(compiler, vars)
+                                return %s
+                            end)]])\format(ret_value)
+                return ([[
                     (function(compiler, vars)
                         local ret
-                        ]]..@tree_to_lua(tree.value).."\n"..[[
+                        %s
                         return ret
-                    end)
-                ]]
+                    end)]])\format(lua)
 
             when "Statement"
                 -- This case here is to prevent "ret =" from getting prepended when the macro might not want it
@@ -543,7 +549,9 @@ class NomsuCompiler
             if kind == "Expression" then error("Expected to be in statement.")
             inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
             lua = @tree_to_value(vars.lua_code, inner_vars)
-            return "do\n#{lua}\nend", true
+            if not lua\match("^do\n.*\nend$")
+                lua = "do\n#{lua}\nend"
+            return lua, true
 
         @defmacro "lua expr %lua_code", (vars, kind)=>
             lua_code = vars.lua_code.value

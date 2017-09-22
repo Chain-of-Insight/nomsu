@@ -5,16 +5,16 @@ rule [error!, panic!, fail!, abort!] =:
     compiler "error"[]
 rule [error %msg] =:
     compiler "error"[%msg]
-macro block [assert %condition] =: ".."
+macro statement [assert %condition] =: ".."
     |if not (\%condition as lua\) then
     |    compiler:error()
     |end
-macro block [assert %condition %msg] =: ".."
+macro statement [assert %condition %msg] =: ".."
     |if not (\%condition as lua\) then
     |    compiler:error(\%msg as lua\)
     |end
 
-macro block [show generated lua %block] =: ".."
+macro statement [show generated lua %block] =: ".."
     |compiler:writeln(\lua expr "compiler:repr(compiler:tree_to_lua(vars.block.value))"\)
 
 

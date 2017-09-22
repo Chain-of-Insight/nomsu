@@ -29,12 +29,10 @@ macro block [for %key -> %value in %dict %body] =:
     assert ((%value's "type") == "Var") ".."
         |For loop has the wrong type for the value variable. Expected Var, but got: \%value's "type"\
     ".."
-        |do
-        |    local vars = setmetatable({}, {__index=vars})
-        |    for k, v in pairs(\%dict as lua\) do
-        |        \%key as lua\, \%value as lua\ = k, v
-        |        \%body as lua\
-        |    end
+        |local vars = setmetatable({}, {__index=vars})
+        |for k, v in pairs(\%dict as lua\) do
+        |    \%key as lua\, \%value as lua\ = k, v
+        |    \%body as lua\
         |end
 
 # Membership testing
@@ -72,7 +70,7 @@ macro [%list ->* %indices] =:
     ".."|(\%ret\)
 
 # Assignment
-macro block [..]
+macro statement [..]
     %list's %index = %new_value, %index st in %list = %new_value, %index nd in %list = %new_value
     %index rd in %list = %new_value, %index th in %list = %new_value, %index in %list = %new_value
     %list -> %index = %new_value

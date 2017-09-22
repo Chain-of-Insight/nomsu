@@ -427,11 +427,22 @@ do
         return concat(buffer, "\n")
       elseif "Thunk" == _exp_0 then
         assert(tree.value.type == "Block", "Non-block value in Thunk")
-        return [[                    (function(compiler, vars)
+        local lua = self:tree_to_lua(tree.value)
+        if #tree.value.value == 1 then
+          do
+            local ret_value = lua:match("^%s*ret = (.*)")
+            if ret_value then
+              return ([[                            (function(compiler, vars)
+                                return %s
+                            end)]]):format(ret_value)
+            end
+          end
+        end
+        return ([[                    (function(compiler, vars)
                         local ret
-                        ]] .. self:tree_to_lua(tree.value) .. "\n" .. [[                        return ret
-                    end)
-                ]]
+                        %s
+                        return ret
+                    end)]]):format(lua)
       elseif "Statement" == _exp_0 then
         if tree.value.type == "FunctionCall" then
           local alias = self:get_alias(tree.value)
@@ -759,7 +770,10 @@ do
           end
         })
         local lua = self:tree_to_value(vars.lua_code, inner_vars)
-        return "do\n" .. tostring(lua) .. "\nend", true
+        if not lua:match("^do\n.*\nend$") then
+          lua = "do\n" .. tostring(lua) .. "\nend"
+        end
+        return lua, true
       end)
       self:defmacro("lua expr %lua_code", function(self, vars, kind)
         local lua_code = vars.lua_code.value

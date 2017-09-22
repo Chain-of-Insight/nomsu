@@ -31,7 +31,7 @@ lua block ".."
     |compiler:defmacro("macro statement %macro_def = %user_macro", make_fn(false), "see:lib/metaprogramming.nom")
     |compiler:defmacro("macro block %macro_def = %user_macro", make_fn(true), "see:lib/metaprogramming.nom")
 
-macro block [macro %macro_def = %user_macro] =:
+macro statement [macro %macro_def = %user_macro] =:
     ".."|compiler:defmacro(
         |    \lua expr "compiler:get_aliases(vars.macro_def)"\,
         |    \lua expr "compiler:tree_to_lua(vars.user_macro)"\,
@@ -60,7 +60,7 @@ macro [compiler utils %method %args] =:
     function calls and convert it into a list of strings (rather than call a function that
     is currently in the middle of being defined). Being a macro also allows us to snatch
     the source code and store that
-macro block [rule %rule_def = %body] =: ".."
+macro statement [rule %rule_def = %body] =: ".."
     |compiler:def(
     |    \compiler "repr" [compiler "get_aliases" [%rule_def]]\,
     |    \compiler "tree_to_lua" [%body]\,

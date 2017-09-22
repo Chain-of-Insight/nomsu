@@ -16,7 +16,7 @@ macro statement [if %condition %if_body else %else_body] =:
         |end
 
 # Return
-macro block [return] =: "return nil"
+macro statement [return] =: "do return end"
 macro block [return %return-value] =: ".."
     |return \%return-value as lua\
 
@@ -117,9 +117,8 @@ macro block [when %body] =:
             %result join=: ".."
                 |
                 |do
-                |    local ret
                 |    \(lua expr "vars.thunk.value") as lua\
-                |    return ret
+                |    goto finished_when
                 |end
         ..else:
             if (lua expr "#vars.condition_bits == 1 and vars.condition_bits[1].type ~= 'Word'"):
@@ -132,11 +131,10 @@ macro block [when %body] =:
             %result join=: ".."
                 |
                 |if \%condition as lua\ then
-                |    local ret
                 |    \(lua expr "vars.thunk.value") as lua\
-                |    return ret
+                |    goto finished_when
                 |end
-
+    %result join=: "\n::finished_when::"
     %result
 
 # Switch statement
@@ -160,9 +158,8 @@ macro block [when %branch-value %body] =:
             %result join=: ".."
                 |
                 |do
-                |    local ret
                 |    \(lua expr "vars.thunk.value") as lua\
-                |    return ret
+                |    goto finished_when
                 |end
         ..else:
             if (lua expr "#vars.condition_bits == 1 and vars.condition_bits[1].type ~= 'Word'"):
@@ -175,9 +172,9 @@ macro block [when %branch-value %body] =:
             %result join=: ".."
                 |
                 |if compiler.utils.equivalent(branch_condition, \%condition as lua\) then
-                |    local ret
                 |    \(lua expr "vars.thunk.value") as lua\
-                |    return ret
+                |    goto finished_when
                 |end
+    %result join=: "\n::finished_when::"
     %result
 

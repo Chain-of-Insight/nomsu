@@ -4,7 +4,7 @@ require "lib/metaprogramming.nom"
 macro [true, yes] =: "true"
 macro [false, no] =: "false"
 macro [nil, null] =: "nil"
-macro block [nop, pass] =: ""
+macro statement [nop, pass] =: ""
 
 # Ternary operator
 macro [%if_expr if %condition else %else_expr] =:
@@ -54,7 +54,6 @@ lua block ".."
 
 # Binary Operators
 lua block ".."
-    |local function make_binops()
     |local binops = {"+","-","*","/","<","<=",">",">=","^",{"===","=="},{"!==","~="},"and","or",{"mod","%"}}
     |for _,op in ipairs(binops) do
     |    local nomsu_alias = op
@@ -65,8 +64,6 @@ lua block ".."
     |        return "("..compiler:tree_to_lua(vars.a).." "..op.." "..compiler:tree_to_lua(vars.b)..")"
     |    end), [[".."|(\\%a as lua\\ ]]..op..[[ \\%b as lua\\)]])
     |end
-    |end
-    |make_binops()
 # == and != do equivalence checking, rather than identity checking
 macro [%a == %b] =: ".."|compiler.utils.equivalent(\%a as lua\, \%b as lua\)
 macro [%a != %b] =: ".."|(not compiler.utils.equivalent(\%a as lua\, \%b as lua\))
@@ -74,7 +71,7 @@ macro [%a != %b] =: ".."|(not compiler.utils.equivalent(\%a as lua\, \%b as lua\
 # Commutative Operators defined for up to 8 operands
 # TODO: work out solution for commutative operators using more clever macros
 lua block ".."
-    |local function make_comops(max_operands)
+    |local max_operands = 8
     |local comops = {"+","*","and","or"}
     |for _,_op in ipairs(comops) do
     |    local op = _op
@@ -90,12 +87,10 @@ lua block ".."
     |        end))
     |    end
     |end
-    |end
-    |make_comops(8)
 
 # Chained compairsions (e.g. x < y <= z) are defined up to 3 operands
 lua block ".."
-    |local function chained_comparisons(max_operands)
+    |local max_operands = 3
     |for _,chainers in ipairs({{"<","<="},{">",">="}}) do
     |    local function recurse(chainers, chain)
     # The 1-op versions are already more efficiently defined, and a 0-op version doesnt make sense
@@ -126,8 +121,6 @@ lua block ".."
     |    end
     |    recurse(chainers, {})
     |end
-    |end
-    |chained_comparisons(3)
 
 # Unary operators
 macro [- %a] =: ".."|-(\%a as lua\)
