@@ -273,10 +273,9 @@ do
       if fn_def.is_macro and self.callstack[#self.callstack] ~= "__macro__" then
         self:error("Attempt to call macro at runtime: " .. tostring(alias) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
       end
-      if not (self:check_permission(alias)) then
+      if not (self:check_permission(fn_def)) then
         self:error("You do not have the authority to call: " .. tostring(alias))
       end
-      insert(self.callstack, alias)
       local fn, aliases
       fn, aliases = fn_def.fn, fn_def.aliases
       local args
@@ -290,6 +289,7 @@ do
       if self.debug then
         self:writeln("Calling " .. tostring(alias) .. " with args: " .. tostring(repr(args)))
       end
+      insert(self.callstack, alias)
       local rets = {
         fn(self, args)
       }
@@ -329,18 +329,22 @@ do
       end
       return ret
     end,
-    check_permission = function(self, fn_name)
-      local fn_def = self.defs[fn_name]
-      if fn_def == nil then
-        self:error("Undefined function: " .. tostring(fn_name))
+    check_permission = function(self, fn_def)
+      if getmetatable(fn_def) ~= functiondef_mt then
+        local fn_name = fn_def
+        fn_def = self.defs[fn_name]
+        if fn_def == nil then
+          self:error("Undefined function: " .. tostring(fn_name))
+        end
       end
-      if fn_def.whiteset == nil then
+      local whiteset = fn_def.whiteset
+      if whiteset == nil then
         return true
       end
       local _list_0 = self.callstack
       for _index_0 = 1, #_list_0 do
         local caller = _list_0[_index_0]
-        if fn_def.whiteset[caller] then
+        if whiteset[caller] then
           return true
         end
       end
