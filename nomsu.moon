@@ -256,10 +256,11 @@ class NomsuCompiler
         if @debug
             @writeln("PARSING:\n#{str}")
 
-        export indent_stack
-        indent_stack = {0}
         str = str\gsub("\r","").."\n"
+        export indent_stack
+        old_indent_stack, indent_stack = indent_stack, {0}
         tree = nomsu\match(str)
+        indent_stack = old_indent_stack -- Put it back, just in case.
         if @debug
             @writeln("\nPARSE TREE:")
             @print_tree(tree)
