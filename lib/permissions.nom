@@ -15,7 +15,6 @@ rule [restrict %rules to within %elite-rules] =:
             |You do not have permission to restrict permissions for function: \%it\
         %foo =: dict (..)
             [%it, yes] for %it in %elite-rules
-        say ".."|FFS: \%foo\
         ((compiler's "defs")'s %it)'s "whiteset" =: %foo
 
 rule [allow %elite-rules to use %rules] =:
