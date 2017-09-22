@@ -30,6 +30,133 @@ functiondef_mt = {__tostring:=> "FunctionDef(#{repr(@aliases)}"}
 FunctionDef = (fn, aliases, src, is_macro)->
     setmetatable({:fn, :aliases, :src, :is_macro}, functiondef_mt)
 
+-- NOTE: this treats tabs as equivalent to 1 space
+indent_stack = {0}
+check_indent = (subject,end_pos,spaces)->
+    if #spaces > indent_stack[#indent_stack]
+        insert(indent_stack, #spaces)
+        return end_pos
+check_dedent = (subject,end_pos,spaces)->
+    if #spaces < indent_stack[#indent_stack]
+        remove(indent_stack)
+        return end_pos
+check_nodent = (subject,end_pos,spaces)->
+    if #spaces == indent_stack[#indent_stack]
+        return end_pos
+
+nomsu = [=[
+    file <- ({ {| shebang? {:body: block :} %nl* (({.+} ("" -> "Unexpected end of file")) => error)? |} }) -> File
+
+    shebang <- "#!" [^%nl]* %nl
+
+    block <- ({ {|
+        (ignored_line %nl)*
+        line_of_statements (nodent line_of_statements)*
+        (%nl ignored_line)* |} }) -> Block
+    inline_block <- ({ {| inline_line_of_statements |} }) -> Block
+
+    line_of_statements <- statement (%ws? ";" %ws? statement)*
+    inline_line_of_statements <- inline_statement (%ws? ";" %ws? inline_statement)*
+
+    statement <- ({ functioncall / expression }) -> Statement
+    inline_statement <- ({ inline_functioncall / expression }) -> Statement
+
+    expression <- (
+        longstring / string / number / variable / list / thunk / block_functioncall
+        / ("(" %ws? (inline_thunk / inline_functioncall) %ws? ")"))
+
+    -- Function calls need at least one word in them
+    functioncall <- ({ {|
+            (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
+        |} }) -> FunctionCall
+    inline_functioncall <- ({ {|
+            (expression tok_gap)* word (tok_gap (expression / word))*
+        |} }) -> FunctionCall
+    block_functioncall <- "(..)" indent
+            functioncall
+        (dedent / (({.+} ("" -> "Error while parsing block function call")) => error))
+
+    word <- ({ !number {%wordchar (!"'" %wordchar)*} }) -> Word
+    
+    thunk <- ({ ":" ((indent block (dedent / (({.+} ("" -> "Error while parsing thunk")) => error)))
+        / (%ws? inline_block)) }) -> Thunk
+    inline_thunk <- ({ ":" %ws? inline_block }) -> Thunk
+
+    string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
+
+    longstring <- ({ '".."' %ws?
+        {| (longstring_line (indent
+                longstring_line (nodent longstring_line)*
+            (dedent / longstring_error))?)
+          /(indent
+                longstring_line (nodent longstring_line)*
+            (dedent / longstring_error)) |} }) -> Longstring
+    longstring_line <- "|" {| ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)* |}
+    longstring_error <- (({.+} ("" -> "Error while parsing Longstring")) => error)
+    string_interpolation <- "\" %ws? (((inline_functioncall / expression) dotdot?) / dotdot) %ws? "\"
+
+    number <- ({ {"-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)) } }) -> Number
+
+    -- Hack to allow %foo's to parse as "%foo" and "'s" separately
+    variable <- ({ ("%" {%wordchar (!"'" %wordchar)*}) }) -> Var
+
+    list <- ({ {|
+         ("[..]" indent
+                list_line (nodent list_line)*
+          (dedent / (({.+} ("" -> "Error while parsing list")) => error)))
+        /("[" %ws? (list_line %ws?)? "]")
+      |} }) -> List
+    list_line <- list_bit (%ws? "," tok_gap list_bit)* (%ws? ",")?
+    list_bit <- inline_functioncall / expression
+
+    block_comment <- "#.." [^%nl]* indent [^%nl]* (%nl ((%ws? (!. / &%nl)) / (!%dedented [^%nl]*)))* 
+    line_comment  <- "#" [^%nl]*
+
+    eol <- %ws? line_comment? (!. / &%nl)
+    ignored_line <- (%nodented (block_comment / line_comment)) / (%ws? (!. / &%nl))
+    indent <- eol (%nl ignored_line)* %nl %indented
+    nodent <- eol (%nl ignored_line)* %nl %nodented
+    dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
+    tok_gap <- %ws / %prev_edge / &("[" / [.,:;{("#%'])
+    dotdot <- nodent ".." %ws?
+]=]
+
+whitespace = S(" \t")^1
+defs =
+    ws:whitespace, nl: P("\n")
+    wordchar: P(1)-S(' \t\n\r%#:;,.{}[]()"\\')
+    indented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_indent)
+    nodented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_nodent)
+    dedented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_dedent)
+    prev_edge: B(S(" \t\n.,:;}])\""))
+    error: (src,pos,errors,err_msg)->
+        line_no = 1
+        for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
+        err_pos = #src - #errors + 1
+        if errors\sub(1,1) == "\n"
+            -- Indentation error
+            err_pos += #errors\match("[ \t]*", 2)
+        start_of_err_line = err_pos
+        while src\sub(start_of_err_line, start_of_err_line) != "\n" and start_of_err_line > 1
+            start_of_err_line -= 1
+        start_of_prev_line = start_of_err_line - 1
+        while src\sub(start_of_prev_line, start_of_prev_line) != "\n" and start_of_prev_line > 1
+            start_of_prev_line -= 1
+        
+        local prev_line,err_line,next_line
+        prev_line,err_line,next_line = src\match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line+1)
+
+        pointer = ("-")\rep(err_pos - start_of_err_line + 0) .. "^"
+        error("\n#{err_msg or "Parse error"} in #{filename} on line #{line_no}:\n\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n")
+
+setmetatable(defs, {
+    __index: (t,key)->
+        fn = (src, value, errors)-> ParseTree(key, src, value, errors)
+        t[key] = fn
+        return fn
+})
+nomsu = re.compile(nomsu, defs)
+
 class NomsuCompiler
     new:(parent)=>
         @write = (...)=> io.write(...)
@@ -129,132 +256,10 @@ class NomsuCompiler
         if @debug
             @writeln("PARSING:\n#{str}")
 
-        -- NOTE: this treats tabs as equivalent to 1 space
+        export indent_stack
         indent_stack = {0}
-        check_indent = (subject,end_pos,spaces)->
-            if #spaces > indent_stack[#indent_stack]
-                insert(indent_stack, #spaces)
-                return end_pos
-        check_dedent = (subject,end_pos,spaces)->
-            if #spaces < indent_stack[#indent_stack]
-                remove(indent_stack)
-                return end_pos
-        check_nodent = (subject,end_pos,spaces)->
-            if #spaces == indent_stack[#indent_stack]
-                return end_pos
-
-        lingo = [=[
-            file <- ({ {| shebang? {:body: block :} %nl* (({.+} ("" -> "Unexpected end of file")) => error)? |} }) -> File
-
-            shebang <- "#!" [^%nl]* %nl
-
-            block <- ({ {|
-                (ignored_line %nl)*
-                line_of_statements (nodent line_of_statements)*
-                (%nl ignored_line)* |} }) -> Block
-            inline_block <- ({ {| inline_line_of_statements |} }) -> Block
-
-            line_of_statements <- statement (%ws? ";" %ws? statement)*
-            inline_line_of_statements <- inline_statement (%ws? ";" %ws? inline_statement)*
-
-            statement <- ({ functioncall / expression }) -> Statement
-            inline_statement <- ({ inline_functioncall / expression }) -> Statement
-
-            expression <- (
-                longstring / string / number / variable / list / thunk / block_functioncall
-                / ("(" %ws? (inline_thunk / inline_functioncall) %ws? ")"))
-
-            -- Function calls need at least one word in them
-            functioncall <- ({ {|
-                    (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
-                |} }) -> FunctionCall
-            inline_functioncall <- ({ {|
-                    (expression tok_gap)* word (tok_gap (expression / word))*
-                |} }) -> FunctionCall
-            block_functioncall <- "(..)" indent functioncall (dedent / (({.+} ("" -> "Error while parsing block function call")) => error))
-
-            word <- ({ !number {%wordchar (!"'" %wordchar)*} }) -> Word
-            
-            thunk <- ({ ":" ((indent block (dedent / (({.+} ("" -> "Error while parsing thunk")) => error)))
-                / (%ws? inline_block)) }) -> Thunk
-            inline_thunk <- ({ ":" %ws? inline_block }) -> Thunk
-
-            string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
-
-            longstring <- ({ '".."' %ws?
-                {| (longstring_line (indent
-                        longstring_line (nodent longstring_line)*
-                    (dedent / longstring_error))?)
-                  /(indent
-                        longstring_line (nodent longstring_line)*
-                    (dedent / longstring_error)) |} }) -> Longstring
-            longstring_line <- "|" {| ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)* |}
-            longstring_error <- (({.+} ("" -> "Error while parsing Longstring")) => error)
-            string_interpolation <- "\" %ws? (((inline_functioncall / expression) dotdot?) / dotdot) %ws? "\"
-
-            number <- ({ {"-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)) } }) -> Number
-
-            -- Hack to allow %foo's to parse as "%foo" and "'s" separately
-            variable <- ({ ("%" {%wordchar (!"'" %wordchar)*}) }) -> Var
-
-            list <- ({ {|
-                 ("[..]" indent
-                        list_line (nodent list_line)*
-                  (dedent / (({.+} ("" -> "Error while parsing list")) => error)))
-                /("[" %ws? (list_line %ws?)? "]")
-              |} }) -> List
-            list_line <- list_bit (%ws? "," tok_gap list_bit)* (%ws? ",")?
-            list_bit <- inline_functioncall / expression
-
-            block_comment <- "#.." [^%nl]* indent [^%nl]* (%nl ((%ws? (!. / &%nl)) / (!%dedented [^%nl]*)))* 
-            line_comment  <- "#" [^%nl]*
-
-            eol <- %ws? line_comment? (!. / &%nl)
-            ignored_line <- (%nodented (block_comment / line_comment)) / (%ws? (!. / &%nl))
-            indent <- eol (%nl ignored_line)* %nl %indented
-            nodent <- eol (%nl ignored_line)* %nl %nodented
-            dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-            tok_gap <- %ws / %prev_edge / &("[" / [.,:;{("#%'])
-            dotdot <- nodent ".." %ws?
-        ]=]
-
-        whitespace = S(" \t")^1
-        defs =
-            ws:whitespace, nl: P("\n")
-            wordchar: P(1)-S(' \t\n\r%#:;,.{}[]()"\\')
-            indented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_indent)
-            nodented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_nodent)
-            dedented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_dedent)
-            prev_edge: B(S(" \t\n.,:;}])\""))
-            error: (src,pos,errors,err_msg)->
-                line_no = 1
-                for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
-                err_pos = #src - #errors + 1
-                if errors\sub(1,1) == "\n"
-                    -- Indentation error
-                    err_pos += #errors\match("[ \t]*", 2)
-                start_of_err_line = err_pos
-                while src\sub(start_of_err_line, start_of_err_line) != "\n" and start_of_err_line > 1
-                    start_of_err_line -= 1
-                start_of_prev_line = start_of_err_line - 1
-                while src\sub(start_of_prev_line, start_of_prev_line) != "\n" and start_of_prev_line > 1
-                    start_of_prev_line -= 1
-                
-                local prev_line,err_line,next_line
-                prev_line,err_line,next_line = src\match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line+1)
-
-                pointer = ("-")\rep(err_pos - start_of_err_line + 0) .. "^"
-                error("\n#{err_msg or "Parse error"} in #{filename} on line #{line_no}:\n\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n")
-
-        tree_mt = {__tostring:=> "#{@type}(#{repr(@value)})"}
-        setmetatable(defs, {
-            __index: (t,key)->
-                fn = (src, value, errors)-> setmetatable({type: key, :src, :value, :errors}, tree_mt)
-                t[key] = fn
-                return fn
-        })
-        lingo = re.compile(lingo, defs)
-        tree = lingo\match(str\gsub("\r","").."\n")
+        str = str\gsub("\r","").."\n"
+        tree = nomsu\match(str)
         if @debug
             @writeln("\nPARSE TREE:")
             @print_tree(tree)
