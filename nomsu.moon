@@ -23,8 +23,7 @@ STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
 
 -- Helper "classes"
 parsetree_mt = {__tostring:=> "#{@type}(#{repr(@value)})"}
-ParseTree = (type, src, value, errors)->
-    setmetatable({:type, :src, :value, :errors}, parsetree_mt)
+ParseTree = (x)-> setmetatable(x, parsetree_mt)
 
 functiondef_mt = {__tostring:=> "FunctionDef(#{repr(@aliases)}"}
 FunctionDef = (fn, aliases, src, is_macro)->
@@ -151,9 +150,9 @@ defs =
 
 setmetatable(defs, {
     __index: (t,key)->
-        fn = (src, value, errors)-> ParseTree(key, src, value, errors)
-        t[key] = fn
-        return fn
+        -- Disabled for performance
+        --with t[key] = (src, value, errors)-> ParseTree({type: key, :src, :value, :errors}) do nil
+        with t[key] = (src, value, errors)-> {type: key, :src, :value, :errors} do nil
 })
 nomsu = re.compile(nomsu, defs)
 
@@ -176,7 +175,7 @@ class NomsuCompiler
         if type(aliases) == 'string'
             aliases = @get_aliases aliases
         if @debug
-            @writeln "Defining rule: #{aliases}"
+            @writeln "Defining rule: #{repr aliases}"
         fn_def = FunctionDef(fn, {}, src, is_macro)
         @add_aliases aliases, fn_def
 
@@ -221,7 +220,7 @@ class NomsuCompiler
         {:fn, :aliases} = fn_def
         args = {name, select(i,...) for i,name in ipairs(aliases[alias])}
         if @debug
-            @writeln "Calling #{alias} with args: #{repr(args)}"
+            @writeln "Calling #{repr alias} with args: #{repr(args)}"
         insert @callstack, alias
         -- TODO: optimize, but still allow multiple return values?
         rets = {fn(self,args)}
@@ -430,9 +429,6 @@ class NomsuCompiler
                 return concat(alias," "), args
 
     get_aliases:(x)=>
-        if self.value
-            print self
-            error "WTF"
         if not x then @error "Nothing to get aliases from"
         if type(x) == 'string'
             alias, args = @get_alias(x)

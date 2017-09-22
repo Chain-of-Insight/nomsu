@@ -30,13 +30,8 @@ local parsetree_mt = {
   end
 }
 local ParseTree
-ParseTree = function(type, src, value, errors)
-  return setmetatable({
-    type = type,
-    src = src,
-    value = value,
-    errors = errors
-  }, parsetree_mt)
+ParseTree = function(x)
+  return setmetatable(x, parsetree_mt)
 end
 local functiondef_mt = {
   __tostring = function(self)
@@ -184,12 +179,20 @@ local defs = {
 }
 setmetatable(defs, {
   __index = function(t, key)
-    local fn
-    fn = function(src, value, errors)
-      return ParseTree(key, src, value, errors)
+    do
+      local _with_0
+      _with_0 = function(src, value, errors)
+        return {
+          type = key,
+          src = src,
+          value = value,
+          errors = errors
+        }
+      end
+      t[key] = _with_0
+      local _ = nil
+      return _with_0
     end
-    t[key] = fn
-    return fn
   end
 })
 nomsu = re.compile(nomsu, defs)
@@ -209,7 +212,7 @@ do
         aliases = self:get_aliases(aliases)
       end
       if self.debug then
-        self:writeln("Defining rule: " .. tostring(aliases))
+        self:writeln("Defining rule: " .. tostring(repr(aliases)))
       end
       local fn_def = FunctionDef(fn, { }, src, is_macro)
       return self:add_aliases(aliases, fn_def)
@@ -287,7 +290,7 @@ do
         args = _tbl_0
       end
       if self.debug then
-        self:writeln("Calling " .. tostring(alias) .. " with args: " .. tostring(repr(args)))
+        self:writeln("Calling " .. tostring(repr(alias)) .. " with args: " .. tostring(repr(args)))
       end
       insert(self.callstack, alias)
       local rets = {
@@ -560,10 +563,6 @@ do
       end
     end,
     get_aliases = function(self, x)
-      if self.value then
-        print(self)
-        error("WTF")
-      end
       if not x then
         self:error("Nothing to get aliases from")
       end
