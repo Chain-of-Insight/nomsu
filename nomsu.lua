@@ -372,7 +372,7 @@ do
       return tree
     end,
     tree_to_value = function(self, tree, vars)
-      local code = "\n        return (function(compiler, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
+      local code = "\n        return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
       local lua_thunk, err = load(code)
       if not lua_thunk then
         error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err))
@@ -387,7 +387,7 @@ do
       local _exp_0 = tree.type
       if "File" == _exp_0 then
         local buffer = {
-          [[return (function(compiler, vars)
+          [[return (function(nomsu, vars)
                         local ret]]
         }
         local vars = { }
@@ -399,7 +399,7 @@ do
             self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
             error(code)
           end
-          local lua_code = "\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)"
+          local lua_code = "\n                    return (function(nomsu, vars)\n" .. tostring(code) .. "\nend)"
           local lua_thunk, err = load(lua_code)
           if not lua_thunk then
             error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(repr(statement)))
@@ -432,13 +432,13 @@ do
           do
             local ret_value = lua:match("^%s*ret = (.*)")
             if ret_value then
-              return ([[                            (function(compiler, vars)
+              return ([[                            (function(nomsu, vars)
                                 return %s
                             end)]]):format(ret_value)
             end
           end
         end
-        return ([[                    (function(compiler, vars)
+        return ([[                    (function(nomsu, vars)
                         local ret
                         %s
                         return ret
@@ -471,7 +471,7 @@ do
             args = _accum_0
           end
           insert(args, 1, repr(alias))
-          return self.__class:comma_separated_items("compiler:call(", args, ")")
+          return self.__class:comma_separated_items("nomsu:call(", args, ")")
         end
       elseif "String" == _exp_0 then
         return repr(self.__class:unescape_string(tree.value))
@@ -491,7 +491,7 @@ do
                 insert(concat_parts, repr(string_buffer))
                 string_buffer = ""
               end
-              insert(concat_parts, "compiler.utils.repr_if_not_string(" .. tostring(self:tree_to_lua(bit)) .. ")")
+              insert(concat_parts, "nomsu.utils.repr_if_not_string(" .. tostring(self:tree_to_lua(bit)) .. ")")
             end
           end
         end

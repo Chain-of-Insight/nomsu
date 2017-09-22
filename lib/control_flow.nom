@@ -21,14 +21,14 @@ macro block [return %return-value] =: ".."
     |return \%return-value as lua\
 
 macro [do %action] =: ".."
-    |(\%action as lua\)(compiler, setmetatable({}, {__index=vars}))
+    |(\%action as lua\)(nomsu, setmetatable({}, {__index=vars}))
 
 
 # GOTOs
 macro statement [-> %label] =: ".."
-    |::label_\compiler "var_to_lua_identifier" [%label]\::
+    |::label_\nomsu "var_to_lua_identifier" [%label]\::
 macro statement [go to %label] =: ".."
-    |goto label_\compiler "var_to_lua_identifier" [%label]\
+    |goto label_\nomsu "var_to_lua_identifier" [%label]\
 
 # Loop control flow
 macro statement [break] =: "break"
@@ -38,7 +38,7 @@ macro statement [break repeat] =: "goto break_repeat"
 macro statement [break repeat-until] =: "goto break_repeat_until"
 macro statement [break repeat-while] =: "goto break_repeat_while"
 macro statement [break %var, stop getting %var, no more %var] =: ".."
-    |goto break_\compiler "var_to_lua_identifier" [%var]\
+    |goto break_\nomsu "var_to_lua_identifier" [%var]\
 
 macro statement [continue] =: "continue"
 macro statement [continue for] =: "goto continue_for"
@@ -47,7 +47,7 @@ macro statement [continue repeat] =: "goto continue_repeat"
 macro statement [continue repeat-until] =: "goto continue_repeat_until"
 macro statement [continue repeat-while] =: "goto continue_repeat_while"
 macro statement [continue %var, go to next %var, on to the next %var] =: ".."
-    |goto continue_\compiler "var_to_lua_identifier" [%var]\
+    |goto continue_\nomsu "var_to_lua_identifier" [%var]\
 
 # While loops
 macro block [repeat %body] =:
@@ -80,10 +80,10 @@ macro block [for %var in %iterable %body] =:
         |    \%var as lua\ = value
         |    \(lua expr "vars.body.value") as lua\
         |    ::continue_for::
-        |    ::continue_\compiler "var_to_lua_identifier" [%var]\::
+        |    ::continue_\nomsu "var_to_lua_identifier" [%var]\::
         |end
         |::break_for::
-        |::break_\compiler "var_to_lua_identifier" [%var]\::
+        |::break_\nomsu "var_to_lua_identifier" [%var]\::
 
 macro block [for all %iterable %body] =:
     pass # TODO: fix compiler bug
@@ -171,7 +171,7 @@ macro block [when %branch-value %body] =:
                     ["value", %condition_bits]
             %result join=: ".."
                 |
-                |if compiler.utils.equivalent(branch_condition, \%condition as lua\) then
+                |if nomsu.utils.equivalent(branch_condition, \%condition as lua\) then
                 |    \(lua expr "vars.thunk.value") as lua\
                 |    goto finished_when
                 |end

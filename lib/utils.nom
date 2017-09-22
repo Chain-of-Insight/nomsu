@@ -2,64 +2,64 @@ require "lib/metaprogramming.nom"
 
 # Error functions
 rule [error!, panic!, fail!, abort!] =:
-    compiler "error"[]
+    nomsu "error"[]
 rule [error %msg] =:
-    compiler "error"[%msg]
+    nomsu "error"[%msg]
 macro statement [assert %condition] =: ".."
     |if not (\%condition as lua\) then
-    |    compiler:error()
+    |    nomsu:error()
     |end
 macro statement [assert %condition %msg] =: ".."
     |if not (\%condition as lua\) then
-    |    compiler:error(\%msg as lua\)
+    |    nomsu:error(\%msg as lua\)
     |end
 
 macro statement [show generated lua %block] =: ".."
-    |compiler:writeln(\lua expr "compiler:repr(compiler:tree_to_lua(vars.block.value))"\)
+    |nomsu:writeln(\lua expr "nomsu:repr(nomsu:tree_to_lua(vars.block.value))"\)
 
 
 # String functions
 rule [join %strs] =:
     lua block ".."
         |local str_bits = {}
-        |for i,bit in ipairs(vars.strs) do str_bits[i] = compiler.utils.repr_if_not_string(bit) end
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu.utils.repr_if_not_string(bit) end
         |return table.concat(str_bits)
 
 rule [join %strs with glue %glue] =:
     lua block ".."
         |local str_bits = {}
-        |for i,bit in ipairs(vars.strs) do str_bits[i] = compiler.utils.repr_if_not_string(bit) end
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu.utils.repr_if_not_string(bit) end
         |return table.concat(str_bits, vars.glue)
 
 macro [capitalize %str, %str capitalized] =: ".."
     |(\%str as lua\):gsub("%l", string.upper, 1)
 
 macro [repr %obj] =:
-    ".."|compiler:repr(\%obj as lua\)
+    ".."|nomsu:repr(\%obj as lua\)
 
 macro [%obj as string] =:
-    ".."|compiler.utils.repr_if_not_string(\%obj as lua\)
+    ".."|nomsu.utils.repr_if_not_string(\%obj as lua\)
 
 macro [say %str] =:
-    ".."|compiler:writeln(compiler.utils.repr_if_not_string(\%str as lua\))
+    ".."|nomsu:writeln(nomsu.utils.repr_if_not_string(\%str as lua\))
 
 # Number ranges
 macro [%start up to %stop] =: ".."
-    |compiler.utils.range(\%start as lua\, \%stop as lua\-1)
+    |nomsu.utils.range(\%start as lua\, \%stop as lua\-1)
 macro [%start thru %stop, %start through %stop] =: ".."
-    |compiler.utils.range(\%start as lua\, \%stop as lua\)
+    |nomsu.utils.range(\%start as lua\, \%stop as lua\)
 macro [%start down to %stop] =: ".."
-    |compiler.utils.range(\%start as lua\, \%stop as lua\+1,-1)
+    |nomsu.utils.range(\%start as lua\, \%stop as lua\+1,-1)
 macro [%start down thru %stop, %start down through %stop] =: ".."
-    |compiler.utils.range(\%start as lua\, \%stop as lua\,-1)
+    |nomsu.utils.range(\%start as lua\, \%stop as lua\,-1)
 macro [%start up to %stop via %step] =: ".."
-    |compiler.utils.range(\%start as lua\,\%stop as lua\-1,vars.step)
+    |nomsu.utils.range(\%start as lua\,\%stop as lua\-1,vars.step)
 macro [%start thru %stop via %step, %start through %stop via %step] =: ".."
-    |compiler.utils.range(\%start as lua\,\%stop as lua\,vars.step)
+    |nomsu.utils.range(\%start as lua\,\%stop as lua\,vars.step)
 macro [%start down to %stop via %step] =: ".."
-    |compiler.utils.range(\%start as lua\,\%stop as lua\+1,-vars.step)
+    |nomsu.utils.range(\%start as lua\,\%stop as lua\+1,-vars.step)
 macro [%start down thru %stop via %step, %start down through %stop via %step] =: ".."
-    |compiler.utils.range(\%start as lua\,\%stop as lua\,-vars.step)
+    |nomsu.utils.range(\%start as lua\,\%stop as lua\,-vars.step)
 
 # Common utility functions
 macro [random number, random, rand] =: "math.random()"
@@ -68,18 +68,18 @@ macro [random from %low to %high, random number from %low to %high, rand %low %h
     |math.random(\%low as lua\, \%high as lua\)
 rule [random choice from %elements, random choice %elements, random %elements] =:
     lua expr ".."|vars.elements[math.random(#vars.elements)]
-macro [sum of %items, sum %items] =: ".."|compiler.utils.sum(\%items as lua\)
-macro [product of %items, product %items] =: ".."|compiler.utils.product(\%items as lua\)
-macro [all of %items] =: ".."|compiler.utils.all(\%items as lua\)
-macro [any of %items] =: ".."|compiler.utils.any(\%items as lua\)
+macro [sum of %items, sum %items] =: ".."|nomsu.utils.sum(\%items as lua\)
+macro [product of %items, product %items] =: ".."|nomsu.utils.product(\%items as lua\)
+macro [all of %items] =: ".."|nomsu.utils.all(\%items as lua\)
+macro [any of %items] =: ".."|nomsu.utils.any(\%items as lua\)
 # This is a rule, not a macro so we can use vars.items twice without running it twice.
 rule [avg of %items, average of %items] =:
-    lua expr ".."|(compiler.utils.sum(vars.items)/#vars.items)
+    lua expr ".."|(nomsu.utils.sum(vars.items)/#vars.items)
 macro [min of %items, smallest of %items, lowest of %items] =:
-    ".."|compiler.utils.min(\%items as lua\)
+    ".."|nomsu.utils.min(\%items as lua\)
 macro [max of %items, biggest of %items, largest of %items, highest of %items] =:
-    ".."|compiler.utils.min(\%items as lua\)
+    ".."|nomsu.utils.min(\%items as lua\)
 macro [min of %items with respect to %keys] =:
-    ".."|compiler.utils.min(\%items as lua\, \%keys as lua\)
+    ".."|nomsu.utils.min(\%items as lua\, \%keys as lua\)
 macro [max of %items with respect to %keys] =:
-    ".."|compiler.utils.max(\%items as lua\, \%keys as lua\)
+    ".."|nomsu.utils.max(\%items as lua\, \%keys as lua\)

@@ -11,46 +11,46 @@ macro [%if_expr if %condition else %else_expr] =:
     pass # TODO: Fix compiler bug that doesn't parse right here
     #.. Note: this uses a function instead of (condition and if_expr or else_expr)
         because that breaks if %if_expr is falsey.
-    ".."|(function(compiler, vars)
+    ".."|(function(nomsu, vars)
         |    if \%condition as lua\ then
         |        return \%if_expr as lua\
         |    else
         |        return \%else_expr as lua\
         |    end
-        |end)(compiler, vars)
+        |end)(nomsu, vars)
 
 # Variable assignment operator, and += type versions
 lua block ".."
     |local function assign(callback)
-    |    return function(compiler, vars, kind)
+    |    return function(nomsu, vars, kind)
     |        if kind == "Expression" then
-    |            compiler:error("Cannot use an assignment operation as an expression value.")
+    |            nomsu:error("Cannot use an assignment operation as an expression value.")
     |        end
     |        if vars.var.type ~= "Var" then
-    |            compiler:error("Assignment operation has the wrong type for the left hand side. "
+    |            nomsu:error("Assignment operation has the wrong type for the left hand side. "
     |                .."Expected Var, but got: "..vars.var.type.."\\nMaybe you forgot a percent sign on the variable name?")
     |        end
     |        if vars.rhs.type ~= "Thunk" then
-    |            compiler:error("Assignment operation has the wrong type for the right hand side. "
+    |            nomsu:error("Assignment operation has the wrong type for the right hand side. "
     |                .."Expected Thunk, but got: "..vars.rhs.type.."\\nMaybe you used '=' instead of '=:'?")
     |        end
     |        if #vars.rhs.value.value > 1 then
-    |            compiler:error("Assignment operation should not have more than one value on the right hand side.")
+    |            nomsu:error("Assignment operation should not have more than one value on the right hand side.")
     |        end
-    |        return callback(compiler:tree_to_lua(vars.var),
-    |            compiler:tree_to_lua(vars.rhs.value.value[1].value)), true
+    |        return callback(nomsu:tree_to_lua(vars.var),
+    |            nomsu:tree_to_lua(vars.rhs.value.value[1].value)), true
     |    end
     |end
-    |compiler:defmacro("%var = %rhs", assign(function(var,result) return var.." = "..result end))
-    |compiler:defmacro("%var += %rhs", assign(function(var,result) return var.." = "..var.." + "..result end))
-    |compiler:defmacro("%var -= %rhs", assign(function(var,result) return var.." = "..var.." - "..result end))
-    |compiler:defmacro("%var *= %rhs", assign(function(var,result) return var.." = "..var.." * "..result end))
-    |compiler:defmacro("%var /= %rhs", assign(function(var,result) return var.." = "..var.." / "..result end))
-    |compiler:defmacro("%var ^= %rhs", assign(function(var,result) return var.." = "..var.." ^ "..result end))
-    |compiler:defmacro("%var and= %rhs", assign(function(var,result) return var.." = "..var.." and "..result end))
-    |compiler:defmacro("%var or= %rhs", assign(function(var,result) return var.." = "..var.." or "..result end))
-    |compiler:defmacro("%var join= %rhs", assign(function(var,result) return var.." = "..var.." .. "..result end))
-    |compiler:defmacro("%var mod= %rhs", assign(function(var,result) return var.." = "..var.." % "..result end))
+    |nomsu:defmacro("%var = %rhs", assign(function(var,result) return var.." = "..result end))
+    |nomsu:defmacro("%var += %rhs", assign(function(var,result) return var.." = "..var.." + "..result end))
+    |nomsu:defmacro("%var -= %rhs", assign(function(var,result) return var.." = "..var.." - "..result end))
+    |nomsu:defmacro("%var *= %rhs", assign(function(var,result) return var.." = "..var.." * "..result end))
+    |nomsu:defmacro("%var /= %rhs", assign(function(var,result) return var.." = "..var.." / "..result end))
+    |nomsu:defmacro("%var ^= %rhs", assign(function(var,result) return var.." = "..var.." ^ "..result end))
+    |nomsu:defmacro("%var and= %rhs", assign(function(var,result) return var.." = "..var.." and "..result end))
+    |nomsu:defmacro("%var or= %rhs", assign(function(var,result) return var.." = "..var.." or "..result end))
+    |nomsu:defmacro("%var join= %rhs", assign(function(var,result) return var.." = "..var.." .. "..result end))
+    |nomsu:defmacro("%var mod= %rhs", assign(function(var,result) return var.." = "..var.." % "..result end))
 
 # Binary Operators
 lua block ".."
@@ -60,13 +60,13 @@ lua block ".."
     |    if type(op) == 'table' then
     |        nomsu_alias, op = unpack(op)
     |    end
-    |    compiler:defmacro("%a "..nomsu_alias.." %b", (function(compiler, vars, kind)
-    |        return "("..compiler:tree_to_lua(vars.a).." "..op.." "..compiler:tree_to_lua(vars.b)..")"
+    |    nomsu:defmacro("%a "..nomsu_alias.." %b", (function(nomsu, vars, kind)
+    |        return "("..nomsu:tree_to_lua(vars.a).." "..op.." "..nomsu:tree_to_lua(vars.b)..")"
     |    end), [[".."|(\\%a as lua\\ ]]..op..[[ \\%b as lua\\)]])
     |end
 # == and != do equivalence checking, rather than identity checking
-macro [%a == %b] =: ".."|compiler.utils.equivalent(\%a as lua\, \%b as lua\)
-macro [%a != %b] =: ".."|(not compiler.utils.equivalent(\%a as lua\, \%b as lua\))
+macro [%a == %b] =: ".."|nomsu.utils.equivalent(\%a as lua\, \%b as lua\)
+macro [%a != %b] =: ".."|(not nomsu.utils.equivalent(\%a as lua\, \%b as lua\))
 
 # Commutative Operators defined for up to 8 operands
 # TODO: work out solution for commutative operators using more clever macros
@@ -78,10 +78,10 @@ lua block ".."
     |    local spec = "%1 "..op.." %2"
     |    for n=3,max_operands do
     |        spec = spec .." "..op.." %"..tostring(n)
-    |        compiler:defmacro(spec, (function(compiler, vars, kind)
+    |        nomsu:defmacro(spec, (function(nomsu, vars, kind)
     |            local bits = {}
     |            for i=1,n do
-    |                table.insert(bits, (compiler:tree_to_lua(vars[tostring(i)])))
+    |                table.insert(bits, (nomsu:tree_to_lua(vars[tostring(i)])))
     |            end
     |            return "("..table.concat(bits, " "..op.." ")..")"
     |        end))
@@ -100,7 +100,7 @@ lua block ".."
     |                spec = spec .. " "..op.." %"..tostring(i+1)
     |            end
     # Chained comparisons need to be functions to avoid re-evaluating their arguments :\
-    |            compiler:def(spec, function(compiler, vars)
+    |            nomsu:def(spec, function(nomsu, vars)
     |                for i,op in ipairs(chain) do
     |                    local a, b, result = vars[i], vars[i+1]
     |                    if     op == "<"  then result = a < b

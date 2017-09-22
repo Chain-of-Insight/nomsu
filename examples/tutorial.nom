@@ -259,7 +259,7 @@ say the time
 say ".."|Math expression result is: \lua expr "(1 + 2*3 + 3*4)^2"\
 
 #.. In the lua environment, "vars" can be used to get local variables/function args, and
-    "compiler" can be used to access the compiler, function defs, and other things
+    "nomsu" can be used to access the compiler, function defs, and other things
 rule [square root of %n] =:
     lua expr "math.sqrt(vars.n)"
 say ".."|The square root of 2 is \square root of 2\

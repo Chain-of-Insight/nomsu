@@ -6,53 +6,52 @@
 
 lua block ".."
     |local function make_fn(wrap_in_block)
-    |    return function(compiler, vars, kind)
+    |    return function(nomsu, vars, kind)
     # Do a minimal amount of pre-processing (get the aliases and the source)
-    |        local aliases = compiler:repr(compiler:get_aliases(vars.macro_def))
-    |        local src = compiler:repr(vars.user_macro.src)
-    |        local user_macro = compiler:tree_to_lua(vars.user_macro)
+    |        local aliases = nomsu:repr(nomsu:get_aliases(vars.macro_def))
+    |        local src = nomsu:repr(vars.user_macro.src)
+    |        local user_macro = nomsu:tree_to_lua(vars.user_macro)
     # Then produce a block of code that creates the macro at runtime
     |        local lua = [[
-    |    compiler:defmacro(%s, (function(compiler, vars, kind)
-    |        if kind == "Expression" then
-    |            compiler:error("Macro "..%s.." was defined to be a block, but is being used as an expression")
-    |        end
-    |        local user_macro = %s
-    |        local lua = user_macro(compiler, vars)
-    |        %s
-    |        return lua, true
-    |    end), %s)
-    |    ]]
-    |        lua = lua:format(aliases, compiler:repr(aliases), user_macro,
+    |nomsu:defmacro(%s, (function(nomsu, vars, kind)
+    |    if kind == "Expression" then
+    |        nomsu:error("Macro "..%s.." was defined to be a block, but is being used as an expression")
+    |    end
+    |    local user_macro = %s
+    |    local lua = user_macro(nomsu, vars)
+    |    %s
+    |    return lua, true
+    |end), %s)]]
+    |        lua = lua:format(aliases, nomsu:repr(aliases), user_macro,
     |            wrap_in_block and [[lua = "do\\n    "..lua.."\\nend"]] or "", src)
     |        return lua, true
     |    end
     |end
-    |compiler:defmacro("macro statement %macro_def = %user_macro", make_fn(false), "see:lib/metaprogramming.nom")
-    |compiler:defmacro("macro block %macro_def = %user_macro", make_fn(true), "see:lib/metaprogramming.nom")
+    |nomsu:defmacro("macro statement %macro_def = %user_macro", make_fn(false), "see:lib/metaprogramming.nom")
+    |nomsu:defmacro("macro block %macro_def = %user_macro", make_fn(true), "see:lib/metaprogramming.nom")
 
 macro statement [macro %macro_def = %user_macro] =:
-    ".."|compiler:defmacro(
-        |    \lua expr "compiler:get_aliases(vars.macro_def)"\,
-        |    \lua expr "compiler:tree_to_lua(vars.user_macro)"\,
-        |    \lua expr "compiler:repr(vars.user_macro.src)"\)
+    ".."|nomsu:defmacro(
+        |    \lua expr "nomsu:get_aliases(vars.macro_def)"\,
+        |    \lua expr "nomsu:tree_to_lua(vars.user_macro)"\,
+        |    \lua expr "nomsu:repr(vars.user_macro.src)"\)
 
-macro [compiler] =: "compiler"
-macro [compiler's %key] =: ".."|compiler[\%key as lua\]
-macro [compiler %method %args] =:
+macro [nomsu] =: "nomsu"
+macro [nomsu's %key] =: ".."|nomsu[\%key as lua\]
+macro [nomsu %method %args] =:
     lua block ".."
-        |local args = {"compiler"}
+        |local args = {"nomsu"}
         |for _,arg in ipairs(vars.args.value) do
-        |    table.insert(args, compiler:tree_to_lua(arg))
+        |    table.insert(args, nomsu:tree_to_lua(arg))
         |end
-        |return "compiler["..compiler:repr(compiler:tree_to_value(vars.method, vars)).."]("..table.concat(args, ", ")..")"
-macro [compiler utils %method %args] =:
+        |return "nomsu["..nomsu:repr(nomsu:tree_to_value(vars.method, vars)).."]("..table.concat(args, ", ")..")"
+macro [nomsu utils %method %args] =:
     lua block ".."
         |local args = {}
         |for i,arg in ipairs(vars.args.value) do
-        |    args[i] = compiler:tree_to_lua(arg)
+        |    args[i] = nomsu:tree_to_lua(arg)
         |end
-        |return "compiler.utils["..compiler:repr(compiler:tree_to_value(vars.method, vars)).."]("..table.concat(args, ", ")..")"
+        |return "nomsu.utils["..nomsu:repr(nomsu:tree_to_value(vars.method, vars)).."]("..table.concat(args, ", ")..")"
 
 # Macro that lets you make new rules
 #..
@@ -61,51 +60,51 @@ macro [compiler utils %method %args] =:
     is currently in the middle of being defined). Being a macro also allows us to snatch
     the source code and store that
 macro statement [rule %rule_def = %body] =: ".."
-    |compiler:def(
-    |    \compiler "repr" [compiler "get_aliases" [%rule_def]]\,
-    |    \compiler "tree_to_lua" [%body]\,
-    |    \compiler "repr" [lua expr "vars.body.src"]\)
+    |nomsu:def(
+    |    \nomsu "repr" [nomsu "get_aliases" [%rule_def]]\,
+    |    \nomsu "tree_to_lua" [%body]\,
+    |    \nomsu "repr" [lua expr "vars.body.src"]\)
 
 rule [fart]=: lua block "print('poot')"
 
 macro block [alias %aliases = %aliased] =:
     lua block ".."
-        |local aliases = compiler:get_aliases(vars.aliases)
-        |aliases = compiler:repr(aliases)
+        |local aliases = nomsu:get_aliases(vars.aliases)
+        |aliases = nomsu:repr(aliases)
         |if vars.aliased.type ~= "Thunk" then
-        |    compiler:error("Right hand side of alias % = % should be a Thunk, but got "..vars.aliased.type
+        |    nomsu:error("Right hand side of alias % = % should be a Thunk, but got "..vars.aliased.type
         |       ..". Maybe you used = instead of =: by mistake?")
         |end
-        |local aliased = next(compiler:get_aliases(vars.aliased.value))
-        |aliased = compiler:repr(aliased)
+        |local aliased = next(nomsu:get_aliases(vars.aliased.value))
+        |aliased = nomsu:repr(aliased)
         |local lua = ([[
-        |compiler:add_aliases(%s, compiler.defs[%s])
+        |nomsu:add_aliases(%s, nomsu.defs[%s])
         |]]):format(aliases, aliased)
         |return lua
 
 # Get the source code for a function
 rule [help %rule] =:
     lua block ".."
-        |local fn_def = compiler:get_fn_def(vars.rule)
+        |local fn_def = nomsu:get_fn_def(vars.rule)
         |if not fn_def then
-        |    compiler:writeln("Rule not found: "..compiler:repr(vars.rule))
+        |    nomsu:writeln("Rule not found: "..nomsu:repr(vars.rule))
         |else
-        |    compiler:writeln("rule "..compiler:repr(compiler.utils.keys(fn_def.aliases))
+        |    nomsu:writeln("rule "..nomsu:repr(nomsu.utils.keys(fn_def.aliases))
         |        .." ="..(fn_def.src or ":\\n    <unknown source code>"))
         |end
 
 
 # Macro helper functions
 rule [%tree as value] =:
-    lua expr "compiler:tree_to_value(vars.tree, vars)"
+    lua expr "nomsu:tree_to_value(vars.tree, vars)"
 
 rule [%tree as lua] =:
-    lua expr "compiler:tree_to_lua(vars.tree)"
+    lua expr "nomsu:tree_to_lua(vars.tree)"
 
 rule [test, foobar] =: lua expr "print('yup')"
 
 # Compiler tools
-rule [eval %code, run %code] =: compiler "run" [%code]
+rule [eval %code, run %code] =: nomsu "run" [%code]
 
 rule [source code from tree %tree] =:
     lua block ".."
@@ -119,8 +118,8 @@ rule [source code from tree %tree] =:
         |end
 
 macro [source code %body] =:
-    compiler "repr" [compiler "call" ["source code from tree %", %body]]
+    nomsu "repr" [nomsu "call" ["source code from tree %", %body]]
 
 macro [parse tree %code] =:
-    compiler "repr" [compiler "stringify_tree" [lua expr "vars.code.value"]]
+    nomsu "repr" [nomsu "stringify_tree" [lua expr "vars.code.value"]]
 

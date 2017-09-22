@@ -272,7 +272,7 @@ class NomsuCompiler
 
     tree_to_value: (tree, vars)=>
         code = "
-        return (function(compiler, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
+        return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
         lua_thunk, err = load(code)
         if not lua_thunk
             error("Failed to compile generated code:\n#{code}\n\n#{err}")
@@ -284,7 +284,7 @@ class NomsuCompiler
             @error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
-                buffer = {[[return (function(compiler, vars)
+                buffer = {[[return (function(nomsu, vars)
                         local ret]]}
                 vars = {}
                 for statement in *tree.value.body.value
@@ -294,7 +294,7 @@ class NomsuCompiler
                         error(code)
                     -- Run the fuckers as we go
                     lua_code = "
-                    return (function(compiler, vars)\n#{code}\nend)"
+                    return (function(nomsu, vars)\n#{code}\nend)"
                     lua_thunk, err = load(lua_code)
                     if not lua_thunk
                         error("Failed to compile generated code:\n#{code}\n\n#{err}\n\nProduced by statement:\n#{repr(statement)}")
@@ -322,11 +322,11 @@ class NomsuCompiler
                 if #tree.value.value == 1
                     if ret_value = lua\match("^%s*ret = (.*)")
                         return ([[
-                            (function(compiler, vars)
+                            (function(nomsu, vars)
                                 return %s
                             end)]])\format(ret_value)
                 return ([[
-                    (function(compiler, vars)
+                    (function(nomsu, vars)
                         local ret
                         %s
                         return ret
@@ -347,7 +347,7 @@ class NomsuCompiler
                 else
                     args = [@tree_to_lua(a) for a in *tree.value when a.type != "Word"]
                     insert args, 1, repr(alias)
-                    return @@comma_separated_items("compiler:call(", args, ")")
+                    return @@comma_separated_items("nomsu:call(", args, ")")
 
             when "String"
                 return repr(@@unescape_string(tree.value))
@@ -364,7 +364,7 @@ class NomsuCompiler
                             if string_buffer ~= ""
                                 insert concat_parts, repr(string_buffer)
                                 string_buffer = ""
-                            insert concat_parts, "compiler.utils.repr_if_not_string(#{@tree_to_lua(bit)})"
+                            insert concat_parts, "nomsu.utils.repr_if_not_string(#{@tree_to_lua(bit)})"
 
                 if string_buffer ~= ""
                     insert concat_parts, repr(string_buffer)

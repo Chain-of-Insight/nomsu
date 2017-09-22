@@ -12,13 +12,13 @@ with secrets:
         |     add=function(self, key) self[key] = self:by_name(key) end}
         |})
     rule [find user %name] =:
-        lua expr "secrets.users:by_name(vars.name) or compiler:error('Failed to find user: '..tostring(vars.name))"
+        lua expr "secrets.users:by_name(vars.name) or nomsu:error('Failed to find user: '..tostring(vars.name))"
     rule [add user %name] =:
         lua expr "secrets.users:add(vars.name)"
     macro [@%name_block] =:
         %name_str =: lua expr "vars.name_block.value.value.src"
         ".."
-            |compiler:call("find user %", \repr %name_str\)
+            |nomsu:call("find user %", \repr %name_str\)
     rule [everybody, everyone] =:
         (%entry's "key") for %entry in (entries in (secret %users))
 
@@ -74,15 +74,15 @@ with secrets:
         "inventory", "%'s inventory", "%'s stock of %", "%'s stock of % as str"
 
 rule [you] =:
-    lua expr "(compiler.you or 'Anonymous')"
+    lua expr "(nomsu.you or 'Anonymous')"
 
 rule [make %person %action, make %person do %action] =:
     lua block ".."
         |do
-        |    local old_you = compiler.you
-        |    compiler.you = vars.person
-        |    ret = vars.action(compiler, vars)
-        |    compiler.you = old_you
+        |    local old_you = nomsu.you
+        |    nomsu.you = vars.person
+        |    ret = vars.action(nomsu, vars)
+        |    nomsu.you = old_you
         |end
 
 say "===================================================="
@@ -106,7 +106,7 @@ with secrets:
     macro block [propose %action] =:
         %source =: source code from tree %action
         ".."
-            |compiler:call("propose source %", \repr %source\)
+            |nomsu:call("propose source %", \repr %source\)
 
     rule [with everyone's approval do %action] =:
         run %action

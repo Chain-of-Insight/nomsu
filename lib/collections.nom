@@ -15,12 +15,12 @@ macro [..]
     %index st to last in %list, %index nd to last in %list, %index rd to last in %list
     %index th to last in %list
 ..=:
-    ".."|compiler.utils.nth_to_last(\%list as lua\, \%index as lua\)
+    ".."|nomsu.utils.nth_to_last(\%list as lua\, \%index as lua\)
 
 macro [first in %list, first %list] =:
     ".."|\%list as lua\[1]
 macro [last in %list, last %list] =:
-    ".."|compiler.utils.nth_to_last(\%list as lua\, 1)
+    ".."|nomsu.utils.nth_to_last(\%list as lua\, 1)
 
 # Dict iteration convenience function. This could also be accomplished with: for all (entries in %dict): ...
 macro block [for %key -> %value in %dict %body] =:

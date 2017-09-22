@@ -6,40 +6,40 @@ require "lib/collections.nom"
 # Permission functions
 rule [restrict %rules to within %elite-rules] =:
     say ".."|Restricting \%rules\ to within \%elite-rules\
-    %rules =: keys in (compiler "get_aliases" [%rules])
-    %elite-rules =: keys in (compiler "get_aliases" [%elite-rules])
+    %rules =: keys in (nomsu "get_aliases" [%rules])
+    %elite-rules =: keys in (nomsu "get_aliases" [%elite-rules])
     for all (flatten [%elite-rules, %rules]):
-        assert ((compiler's "defs") has key %it) ".."|Undefined function: \%it\
+        assert ((nomsu's "defs") has key %it) ".."|Undefined function: \%it\
     for all %rules:
-        assert (compiler "check_permission" [%it]) ".."
+        assert (nomsu "check_permission" [%it]) ".."
             |You do not have permission to restrict permissions for function: \%it\
         %foo =: dict (..)
             [%it, yes] for %it in %elite-rules
-        ((compiler's "defs")'s %it)'s "whiteset" =: %foo
+        ((nomsu's "defs")'s %it)'s "whiteset" =: %foo
 
 rule [allow %elite-rules to use %rules] =:
     say ".."|Allowing \%elite-rules\ to use \%rules\
-    %rules =: keys in (compiler "get_aliases" [%rules])
-    %elite-rules =: keys in (compiler "get_aliases" [%elite-rules])
+    %rules =: keys in (nomsu "get_aliases" [%rules])
+    %elite-rules =: keys in (nomsu "get_aliases" [%elite-rules])
     for all (flatten [%elite-rules, %rules]):
-        assert ((compiler's "defs") has key %it) ".."|Undefined function: \%it\
+        assert ((nomsu's "defs") has key %it) ".."|Undefined function: \%it\
     for %fn in %rules:
-        assert (compiler "check_permission" [%fn]) ".."
+        assert (nomsu "check_permission" [%fn]) ".."
             |You do not have permission to grant permissions for function: \%fn\
-        %whiteset =: ((compiler's "defs")'s %fn)'s "whiteset"
+        %whiteset =: ((nomsu's "defs")'s %fn)'s "whiteset"
         if (not %whiteset): on to the next %fn
         for all %elite-rules: %whiteset's %it =: yes
 
 rule [forbid %pleb-rules to use %rules] =:
     say ".."|Forbidding \%pleb-rules\ to use \%rules\
-    %rules =: keys in (compiler "get_aliases" [%rules])
-    %pleb-rules =: keys in (compiler "get_aliases" [%pleb-rules])
+    %rules =: keys in (nomsu "get_aliases" [%rules])
+    %pleb-rules =: keys in (nomsu "get_aliases" [%pleb-rules])
     for all (flatten [%pleb-rules, %used]):
-        assert ((compiler's "defs") has key %it) ".."|Undefined function: \%it\
+        assert ((nomsu's "defs") has key %it) ".."|Undefined function: \%it\
     for all %rules:
-        assert (compiler "check_permission" [%it]) ".."
+        assert (nomsu "check_permission" [%it]) ".."
             |You do not have permission to grant permissions for function: \%it\
-        %whiteset =: ((compiler's "defs")'s %it)'s "whiteset"
+        %whiteset =: ((nomsu's "defs")'s %it)'s "whiteset"
         assert %whiteset ".."
             |Cannot individually restrict permissions for \%it\ because it is currently
             |available to everyone. Perhaps you meant to use "restrict % to within %" instead?
