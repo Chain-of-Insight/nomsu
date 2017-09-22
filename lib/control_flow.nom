@@ -48,7 +48,6 @@ macro statement [continue repeat-until] =: "goto continue_repeat_until"
 macro statement [continue repeat-while] =: "goto continue_repeat_while"
 macro statement [continue %var, go to next %var, on to the next %var] =: ".."
     |goto continue_\compiler "var_to_lua_identifier" [%var]\
-# TODO: add labeled break/continue?
 
 # While loops
 macro block [repeat %body] =:
