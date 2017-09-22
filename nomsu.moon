@@ -536,13 +536,15 @@ class NomsuCompiler
         -- Sets up some core functionality
         @defmacro "lua block %lua_code", (vars, kind)=>
             if kind == "Expression" then error("Expected to be in statement.")
-            inner_vars = setmetatable({}, {__index:(_,key)-> error"vars[#{repr(key)}]"})
-            return "do\n"..@tree_to_value(vars.lua_code, inner_vars).."\nend", true
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
+            lua = @tree_to_value(vars.lua_code, inner_vars)
+            return "do\n#{lua}\nend", true
 
         @defmacro "lua expr %lua_code", (vars, kind)=>
             lua_code = vars.lua_code.value
-            inner_vars = setmetatable({}, {__index:(_,key)-> error"vars[#{repr(key)}]"})
-            return @tree_to_value(vars.lua_code, inner_vars)
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
+            lua = @tree_to_value(vars.lua_code, inner_vars)
+            return lua
 
         @def "require %filename", (vars)=>
             if not @loaded_files[vars.filename]

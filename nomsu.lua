@@ -754,19 +754,21 @@ do
         end
         local inner_vars = setmetatable({ }, {
           __index = function(_, key)
-            return error("vars[" .. tostring(repr(key)) .. "]")
+            return "vars[" .. tostring(repr(key)) .. "]"
           end
         })
-        return "do\n" .. self:tree_to_value(vars.lua_code, inner_vars) .. "\nend", true
+        local lua = self:tree_to_value(vars.lua_code, inner_vars)
+        return "do\n" .. tostring(lua) .. "\nend", true
       end)
       self:defmacro("lua expr %lua_code", function(self, vars, kind)
         local lua_code = vars.lua_code.value
         local inner_vars = setmetatable({ }, {
           __index = function(_, key)
-            return error("vars[" .. tostring(repr(key)) .. "]")
+            return "vars[" .. tostring(repr(key)) .. "]"
           end
         })
-        return self:tree_to_value(vars.lua_code, inner_vars)
+        local lua = self:tree_to_value(vars.lua_code, inner_vars)
+        return lua
       end)
       self:def("require %filename", function(self, vars)
         if not self.loaded_files[vars.filename] then
