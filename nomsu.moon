@@ -213,15 +213,16 @@ class NomsuCompiler
         fn_def = @defs[alias]
         if fn_def == nil
             @error "Attempt to call undefined function: #{alias}"
+        -- This is a little bit hacky, but having this check is handy for catching mistakes
         if fn_def.is_macro and @callstack[#@callstack] != "__macro__"
             @error "Attempt to call macro at runtime: #{alias}\nThis can be caused by using a macro in a function that is defined before the macro."
-        unless @check_permission(alias)
+        unless @check_permission(fn_def)
             @error "You do not have the authority to call: #{alias}"
-        insert @callstack, alias
         {:fn, :aliases} = fn_def
         args = {name, select(i,...) for i,name in ipairs(aliases[alias])}
         if @debug
             @writeln "Calling #{alias} with args: #{repr(args)}"
+        insert @callstack, alias
         -- TODO: optimize, but still allow multiple return values?
         rets = {fn(self,args)}
         remove @callstack
@@ -241,15 +242,18 @@ class NomsuCompiler
             ret = "ret = "..ret
         return ret
 
-    check_permission: (fn_name)=>
-        fn_def = @defs[fn_name]
-        if fn_def == nil
-            @error "Undefined function: #{fn_name}"
-        if fn_def.whiteset == nil then return true
-        -- TODO: optimize this, maybe by making the callstack a Counter and having a move-to-front optimization on the whitelist
+    check_permission: (fn_def)=>
+        if getmetatable(fn_def) != functiondef_mt
+            fn_name = fn_def
+            fn_def = @defs[fn_name]
+            if fn_def == nil
+                @error "Undefined function: #{fn_name}"
+        whiteset = fn_def.whiteset
+        if whiteset == nil then return true
+        -- TODO: maybe optimize this by making the callstack a Counter and using a 
+        --    move-to-front optimization on the whitelist to check most likely candidates sooner
         for caller in *@callstack
-            if fn_def.whiteset[caller]
-                return true
+            if whiteset[caller] then return true
         return false
 
     parse: (str, filename)=>
