@@ -41,6 +41,12 @@ utils = {
     split: (str, sep="%s")->
         [chunk for chunk in str\gmatch("[^#{sep}]+")]
     
+    remove_from_list: (list, item)->
+        for i,list_item in ipairs(list)
+            if list_item == item
+                table.remove list, i
+                return
+    
     accumulate: (glue, co)->
         if co == nil then glue, co = "", glue
         bits = {}

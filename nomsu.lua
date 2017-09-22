@@ -1,7 +1,16 @@
 local re = require('re')
 local lpeg = require('lpeg')
 local utils = require('utils')
-local insert = table.insert
+local repr = utils.repr
+local insert, remove, concat
+do
+  local _obj_0 = table
+  insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
+end
+local pcall
+pcall = function(fn, ...)
+  return true, fn(...)
+end
 local INDENT = "    "
 lpeg.setmaxstack(10000)
 local P, V, S, Cg, C, Cp, B, Cmt
@@ -15,6 +24,34 @@ local STRING_ESCAPES = {
   f = "\f",
   r = "\r"
 }
+local parsetree_mt = {
+  __tostring = function(self)
+    return tostring(self.type) .. "(" .. tostring(repr(self.value)) .. ")"
+  end
+}
+local ParseTree
+ParseTree = function(type, src, value, errors)
+  return setmetatable({
+    type = type,
+    src = src,
+    value = value,
+    errors = errors
+  }, parsetree_mt)
+end
+local functiondef_mt = {
+  __tostring = function(self)
+    return "FunctionDef(" .. tostring(repr(self.aliases))
+  end
+}
+local FunctionDef
+FunctionDef = function(fn, aliases, src, is_macro)
+  return setmetatable({
+    fn = fn,
+    aliases = aliases,
+    src = src,
+    is_macro = is_macro
+  }, functiondef_mt)
+end
 local NomsuCompiler
 do
   local _class_0
@@ -23,169 +60,150 @@ do
       self:write(...)
       return self:write("\n")
     end,
-    call = function(self, fn_name, ...)
-      local fn_info = self.defs[fn_name]
-      if fn_info == nil then
-        self:error("Attempt to call undefined function: " .. tostring(fn_name))
-      end
-      if fn_info.is_macro then
-        self:error("Attempt to call macro at runtime: " .. tostring(fn_name) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
-      end
-      if not (self:check_permission(fn_name)) then
-        self:error("You do not have the authority to call: " .. tostring(fn_name))
-      end
-      insert(self.callstack, fn_name)
-      local fn, arg_names
-      fn, arg_names = fn_info.fn, fn_info.arg_names
-      local args
-      do
-        local _tbl_0 = { }
-        for i, name in ipairs(arg_names[fn_name]) do
-          _tbl_0[name] = select(i, ...)
-        end
-        args = _tbl_0
-      end
-      if self.debug then
-        self:writeln("Calling " .. tostring(fn_name) .. " with args: " .. tostring(utils.repr(args)))
-      end
-      local ret = fn(self, args)
-      table.remove(self.callstack)
-      return ret
-    end,
-    check_permission = function(self, fn_name)
-      local fn_info = self.defs[fn_name]
-      if fn_info == nil then
-        self:error("Undefined function: " .. tostring(fn_name))
-      end
-      if fn_info.whiteset == nil then
-        return true
-      end
-      local _list_0 = self.callstack
-      for _index_0 = 1, #_list_0 do
-        local caller = _list_0[_index_0]
-        if fn_info.whiteset[caller] then
-          return true
-        end
-      end
-      return false
-    end,
-    def = function(self, spec, fn, src)
-      if self.debug then
-        self:writeln("Defining rule: " .. tostring(spec))
-      end
-      local invocations, arg_names = self:get_invocations(spec)
-      for i = 2, #invocations do
-        if not utils.equivalent(utils.set(arg_names[invocations[1]]), utils.set(arg_names[invocations[i]])) then
-          self:error("Conflicting argument names " .. tostring(utils.repr(invocations[1])) .. " and " .. tostring(utils.repr(invocations[i])) .. " for " .. tostring(utils.repr(spec)))
-        end
-      end
-      local fn_info = {
-        fn = fn,
-        arg_names = arg_names,
-        invocations = invocations,
-        src = src,
+    def = function(self, aliases, fn, src, is_macro)
+      if is_macro == nil then
         is_macro = false
-      }
-      for _index_0 = 1, #invocations do
-        local invocation = invocations[_index_0]
-        self.defs[invocation] = fn_info
       end
+      if type(aliases) == 'string' then
+        aliases = self:get_aliases(aliases)
+      end
+      if self.debug then
+        self:writeln("Defining rule: " .. tostring(aliases))
+      end
+      local fn_def = FunctionDef(fn, { }, src, is_macro)
+      return self:add_aliases(aliases, fn_def)
     end,
-    get_invocations_from_definition = function(self, def, vars)
-      if def.type == "String" then
-        return self.__class:unescape_string(def.value)
+    defmacro = function(self, aliases, fn, src)
+      return self:def(aliases, fn, src, true)
+    end,
+    add_aliases = function(self, aliases, fn_def)
+      local first_alias, first_args = next(fn_def.aliases)
+      if not first_alias then
+        first_alias, first_args = next(aliases)
       end
-      if def.type ~= "List" then
-        self:error("Trying to get invocations from " .. tostring(def.type) .. ", but expected List or String.")
-      end
-      local invocations = { }
-      local _list_0 = def.value
-      for _index_0 = 1, #_list_0 do
+      for alias, args in pairs(aliases) do
         local _continue_0 = false
         repeat
-          local item = _list_0[_index_0]
-          if item.type == "String" then
-            insert(invocations, item.value)
+          if fn_def[alias] then
             _continue_0 = true
             break
           end
-          if item.type ~= "FunctionCall" then
-            self:error("Invalid list item: " .. tostring(item.type) .. ", expected FunctionCall or String")
+          if self.defs[alias] then
+            self:remove_alias(alias)
           end
-          local name_bits = { }
-          local _list_1 = item.value
-          for _index_1 = 1, #_list_1 do
-            local token = _list_1[_index_1]
-            if token.type == "Word" then
-              insert(name_bits, token.value)
-            elseif token.type == "Var" then
-              insert(name_bits, token.src)
-            else
-              self:error("Unexpected token type in definition: " .. tostring(token.type) .. " (expected Word or Var)")
-            end
+          if alias ~= first_alias and not utils.equivalent(utils.set(args), utils.set(first_args)) then
+            self:error("Conflicting argument names between " .. tostring(first_alias) .. " and " .. tostring(alias))
           end
-          insert(invocations, table.concat(name_bits, " "))
+          fn_def.aliases[alias] = args
+          self.defs[alias] = fn_def
           _continue_0 = true
         until true
         if not _continue_0 then
           break
         end
       end
-      return invocations
     end,
-    get_invocations = function(self, text)
-      if not text then
-        self:error("No text provided!")
+    remove_alias = function(self, alias)
+      local fn_def = self.defs[alias]
+      if not fn_def then
+        return 
       end
-      if type(text) == 'function' then
-        error("Function passed to get_invocations")
+      fn_def.aliases[alias] = nil
+      self.defs[alias] = nil
+    end,
+    remove_aliases = function(self, aliases)
+      for alias in pairs(aliases) do
+        self:remove_alias(alias)
       end
-      if type(text) == 'string' then
-        text = {
-          text
-        }
+    end,
+    get_fn_def = function(self, x)
+      if not x then
+        self:error("Nothing to get function def from")
       end
-      local invocations = { }
-      local arg_names = { }
-      for _index_0 = 1, #text do
-        local _text = text[_index_0]
-        local invocation = _text:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
-        local _arg_names
-        do
-          local _accum_0 = { }
-          local _len_0 = 1
-          for arg in _text:gmatch("%%(%S[^%s']*)") do
-            _accum_0[_len_0] = arg
+      local aliases = self:get_aliases(x)
+      local alias, _ = next(aliases)
+      return self.defs[alias]
+    end,
+    call = function(self, alias, ...)
+      local fn_def = self.defs[alias]
+      if fn_def == nil then
+        self:error("Attempt to call undefined function: " .. tostring(alias))
+      end
+      if fn_def.is_macro and self.callstack[#self.callstack] ~= "__macro__" then
+        self:error("Attempt to call macro at runtime: " .. tostring(alias) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
+      end
+      if not (self:check_permission(alias)) then
+        self:error("You do not have the authority to call: " .. tostring(alias))
+      end
+      insert(self.callstack, alias)
+      local fn, aliases
+      fn, aliases = fn_def.fn, fn_def.aliases
+      local args
+      do
+        local _tbl_0 = { }
+        for i, name in ipairs(aliases[alias]) do
+          _tbl_0[name] = select(i, ...)
+        end
+        args = _tbl_0
+      end
+      if self.debug then
+        self:writeln("Calling " .. tostring(alias) .. " with args: " .. tostring(repr(args)))
+      end
+      local rets = {
+        fn(self, args)
+      }
+      remove(self.callstack)
+      return unpack(rets)
+    end,
+    run_macro = function(self, tree, kind)
+      if kind == nil then
+        kind = "Expression"
+      end
+      local args
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local a = _list_0[_index_0]
+          if a.type ~= "Word" then
+            _accum_0[_len_0] = a
             _len_0 = _len_0 + 1
           end
-          _arg_names = _accum_0
         end
-        insert(invocations, invocation)
-        arg_names[invocation] = _arg_names
+        args = _accum_0
       end
-      return invocations, arg_names
+      local alias, _ = self:get_alias(tree)
+      insert(self.callstack, "__macro__")
+      local ret, manual_mode = self:call(alias, unpack(args))
+      remove(self.callstack)
+      if not ret then
+        self:error("No return value for macro: " .. tostring(name))
+      end
+      if kind == "Statement" and not manual_mode then
+        if ret:match("^do\n") then
+          error("Attempting to use macro return value as an expression, when it looks like a block:\n" .. tostring(ret))
+        end
+        ret = "ret = " .. ret
+      end
+      return ret
     end,
-    defmacro = function(self, spec, lua_gen_fn, src)
-      if self.debug then
-        self:writeln("DEFINING MACRO: " .. tostring(spec) .. tostring(src or ""))
+    check_permission = function(self, fn_name)
+      local fn_def = self.defs[fn_name]
+      if fn_def == nil then
+        self:error("Undefined function: " .. tostring(fn_name))
       end
-      local invocations, arg_names = self:get_invocations(spec)
-      for i = 2, #invocations do
-        if not utils.equivalent(utils.set(arg_names[invocations[1]]), utils.set(arg_names[invocations[i]])) then
-          self:error("Conflicting argument names " .. tostring(utils.repr(invocations[1])) .. " and " .. tostring(utils.repr(invocations[i])) .. " for " .. tostring(utils.repr(spec)))
+      if fn_def.whiteset == nil then
+        return true
+      end
+      local _list_0 = self.callstack
+      for _index_0 = 1, #_list_0 do
+        local caller = _list_0[_index_0]
+        if fn_def.whiteset[caller] then
+          return true
         end
       end
-      local fn_info = {
-        fn = lua_gen_fn,
-        arg_names = arg_names,
-        invocations = invocations,
-        src = src,
-        is_macro = true
-      }
-      for _index_0 = 1, #invocations do
-        local invocation = invocations[_index_0]
-        self.defs[invocation] = fn_info
-      end
+      return false
     end,
     parse = function(self, str, filename)
       if self.debug then
@@ -204,7 +222,7 @@ do
       local check_dedent
       check_dedent = function(subject, end_pos, spaces)
         if #spaces < indent_stack[#indent_stack] then
-          table.remove(indent_stack)
+          remove(indent_stack)
           return end_pos
         end
       end
@@ -319,17 +337,21 @@ do
           return error("\n" .. tostring(err_msg or "Parse error") .. " in " .. tostring(filename) .. " on line " .. tostring(line_no) .. ":\n\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n")
         end
       }
+      local tree_mt = {
+        __tostring = function(self)
+          return tostring(self.type) .. "(" .. tostring(repr(self.value)) .. ")"
+        end
+      }
       setmetatable(defs, {
         __index = function(t, key)
           local fn
           fn = function(src, value, errors)
-            local token = {
+            return setmetatable({
               type = key,
               src = src,
               value = value,
               errors = errors
-            }
-            return token
+            }, tree_mt)
           end
           t[key] = fn
           return fn
@@ -355,7 +377,7 @@ do
     tree_to_lua = function(self, tree)
       assert(tree, "No tree provided.")
       if not tree.type then
-        self:error("Invalid tree: " .. tostring(utils.repr(tree)))
+        self:error("Invalid tree: " .. tostring(repr(tree)))
       end
       local _exp_0 = tree.type
       if "File" == _exp_0 then
@@ -375,7 +397,7 @@ do
           local lua_code = "\n                    return (function(compiler, vars)\n" .. tostring(code) .. "\nend)"
           local lua_thunk, err = load(lua_code)
           if not lua_thunk then
-            error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(utils.repr(statement)))
+            error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(repr(statement)))
           end
           local value = lua_thunk()
           local return_value
@@ -389,7 +411,7 @@ do
         insert(buffer, [[                        return ret
                     end)
                 ]])
-        return table.concat(buffer, "\n"), return_value
+        return concat(buffer, "\n"), return_value
       elseif "Block" == _exp_0 then
         local buffer = { }
         local _list_0 = tree.value
@@ -397,7 +419,7 @@ do
           local statement = _list_0[_index_0]
           insert(buffer, self:tree_to_lua(statement))
         end
-        return table.concat(buffer, "\n")
+        return concat(buffer, "\n")
       elseif "Thunk" == _exp_0 then
         assert(tree.value.type == "Block", "Non-block value in Thunk")
         return [[                    (function(compiler, vars)
@@ -407,15 +429,15 @@ do
                 ]]
       elseif "Statement" == _exp_0 then
         if tree.value.type == "FunctionCall" then
-          local name = self:fn_name_from_tree(tree.value)
-          if self.defs[name] and self.defs[name].is_macro then
+          local alias = self:get_alias(tree.value)
+          if self.defs[alias] and self.defs[alias].is_macro then
             return self:run_macro(tree.value, "Statement")
           end
         end
         return "ret = " .. (self:tree_to_lua(tree.value))
       elseif "FunctionCall" == _exp_0 then
-        local name = self:fn_name_from_tree(tree)
-        if self.defs[name] and self.defs[name].is_macro then
+        local alias = self:get_alias(tree)
+        if self.defs[alias] and self.defs[alias].is_macro then
           return self:run_macro(tree, "Expression")
         else
           local args
@@ -432,11 +454,11 @@ do
             end
             args = _accum_0
           end
-          insert(args, 1, utils.repr(name))
+          insert(args, 1, repr(alias))
           return self.__class:comma_separated_items("compiler:call(", args, ")")
         end
       elseif "String" == _exp_0 then
-        return utils.repr(self.__class:unescape_string(tree.value))
+        return repr(self.__class:unescape_string(tree.value))
       elseif "Longstring" == _exp_0 then
         local concat_parts = { }
         local string_buffer = ""
@@ -450,7 +472,7 @@ do
               string_buffer = string_buffer .. bit:gsub("\\\\", "\\")
             else
               if string_buffer ~= "" then
-                insert(concat_parts, utils.repr(string_buffer))
+                insert(concat_parts, repr(string_buffer))
                 string_buffer = ""
               end
               insert(concat_parts, "compiler.utils.repr_if_not_string(" .. tostring(self:tree_to_lua(bit)) .. ")")
@@ -458,14 +480,14 @@ do
           end
         end
         if string_buffer ~= "" then
-          insert(concat_parts, utils.repr(string_buffer))
+          insert(concat_parts, repr(string_buffer))
         end
         if #concat_parts == 0 then
           return "''"
         elseif #concat_parts == 1 then
           return concat_parts[1]
         else
-          return "(" .. tostring(table.concat(concat_parts, "..")) .. ")"
+          return "(" .. tostring(concat(concat_parts, "..")) .. ")"
         end
       elseif "Number" == _exp_0 then
         return tree.value
@@ -488,26 +510,94 @@ do
           end)(), "}")
         end
       elseif "Var" == _exp_0 then
-        return "vars[" .. tostring(utils.repr(tree.value)) .. "]"
+        return "vars[" .. tostring(repr(tree.value)) .. "]"
       else
         return self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
     end,
-    fn_name_from_tree = function(self, tree)
-      assert(tree.type == "FunctionCall", "Attempt to get fn name from non-functioncall tree: " .. tostring(tree.type))
-      local name_bits = { }
-      local _list_0 = tree.value
-      for _index_0 = 1, #_list_0 do
-        local token = _list_0[_index_0]
-        insert(name_bits, (function()
-          if token.type == "Word" then
-            return token.value
-          else
-            return "%"
-          end
-        end)())
+    get_alias = function(self, x)
+      if not x then
+        self:error("Nothing to get alias from")
       end
-      return table.concat(name_bits, " ")
+      if type(x) == 'string' then
+        local alias = x:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
+        local args
+        do
+          local _accum_0 = { }
+          local _len_0 = 1
+          for arg in x:gmatch("%%(%S[^%s']*)") do
+            _accum_0[_len_0] = arg
+            _len_0 = _len_0 + 1
+          end
+          args = _accum_0
+        end
+        return alias, args
+      end
+      local _exp_0 = x.type
+      if "String" == _exp_0 then
+        return self:get_alias(x.value)
+      elseif "Statement" == _exp_0 then
+        return self:get_alias(x.value)
+      elseif "FunctionCall" == _exp_0 then
+        local alias, args = { }, { }, { }
+        local _list_0 = x.value
+        for _index_0 = 1, #_list_0 do
+          local token = _list_0[_index_0]
+          local _exp_1 = token.type
+          if "Word" == _exp_1 then
+            insert(alias, token.value)
+          elseif "Var" == _exp_1 then
+            insert(alias, "%")
+            insert(args, token.value)
+          else
+            insert(alias, "%")
+            insert(args, token)
+          end
+        end
+        return concat(alias, " "), args
+      end
+    end,
+    get_aliases = function(self, x)
+      if self.value then
+        print(self)
+        error("WTF")
+      end
+      if not x then
+        self:error("Nothing to get aliases from")
+      end
+      if type(x) == 'string' then
+        local alias, args = self:get_alias(x)
+        return {
+          [alias] = args
+        }
+      end
+      local _exp_0 = x.type
+      if "String" == _exp_0 then
+        return self:get_aliases({
+          x.value
+        })
+      elseif "Statement" == _exp_0 then
+        return self:get_aliases({
+          x.value
+        })
+      elseif "FunctionCall" == _exp_0 then
+        return self:get_aliases({
+          x
+        })
+      elseif "List" == _exp_0 then
+        x = x.value
+      elseif "Block" == _exp_0 then
+        x = x.value
+      end
+      do
+        local _with_0 = { }
+        for _index_0 = 1, #x do
+          local y = x[_index_0]
+          local alias, args = self:get_alias(y)
+          _with_0[alias] = args
+        end
+        return _with_0
+      end
     end,
     var_to_lua_identifier = function(self, var)
       if var.type ~= "Var" then
@@ -521,54 +611,6 @@ do
         end
       end))
     end,
-    run_macro = function(self, tree, kind)
-      if kind == nil then
-        kind = "Expression"
-      end
-      local name = self:fn_name_from_tree(tree)
-      if not (self.defs[name] and self.defs[name].is_macro) then
-        self:error("Macro not found: " .. tostring(name))
-      end
-      if not (self:check_permission(name)) then
-        self:error("You do not have the authority to call: " .. tostring(name))
-      end
-      local fn, arg_names
-      do
-        local _obj_0 = self.defs[name]
-        fn, arg_names = _obj_0.fn, _obj_0.arg_names
-      end
-      local args
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local a = _list_0[_index_0]
-          if a.type ~= "Word" then
-            _accum_0[_len_0] = a
-            _len_0 = _len_0 + 1
-          end
-        end
-        args = _accum_0
-      end
-      do
-        local _tbl_0 = { }
-        for i, name in ipairs(arg_names[name]) do
-          _tbl_0[name] = args[i]
-        end
-        args = _tbl_0
-      end
-      insert(self.callstack, name)
-      local ret, manual_mode = fn(self, args, kind)
-      table.remove(self.callstack)
-      if not ret then
-        self:error("No return value for macro: " .. tostring(name))
-      end
-      if kind == "Statement" and not manual_mode then
-        ret = "ret = " .. ret
-      end
-      return ret
-    end,
     _yield_tree = function(self, tree, indent_level)
       if indent_level == nil then
         indent_level = 0
@@ -580,9 +622,9 @@ do
       local _exp_0 = tree.type
       if "File" == _exp_0 then
         coroutine.yield(ind("File:"))
-        self:_yield_tree(tree.value.body, indent_level + 1)
+        return self:_yield_tree(tree.value.body, indent_level + 1)
       elseif "Errors" == _exp_0 then
-        coroutine.yield(ind("Error:\n" .. tostring(tree.value)))
+        return coroutine.yield(ind("Error:\n" .. tostring(tree.value)))
       elseif "Block" == _exp_0 then
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
@@ -591,11 +633,11 @@ do
         end
       elseif "Thunk" == _exp_0 then
         coroutine.yield(ind("Thunk:"))
-        self:_yield_tree(tree.value, indent_level + 1)
+        return self:_yield_tree(tree.value, indent_level + 1)
       elseif "Statement" == _exp_0 then
-        self:_yield_tree(tree.value, indent_level)
+        return self:_yield_tree(tree.value, indent_level)
       elseif "FunctionCall" == _exp_0 then
-        local name = self:fn_name_from_tree(tree)
+        local alias = self:get_alias(tree)
         local args
         do
           local _accum_0 = { }
@@ -611,23 +653,25 @@ do
           args = _accum_0
         end
         if #args == 0 then
-          coroutine.yield(ind("Call [" .. tostring(name) .. "]!"))
+          return coroutine.yield(ind("Call [" .. tostring(alias) .. "]!"))
         else
-          coroutine.yield(ind("Call [" .. tostring(name) .. "]:"))
+          coroutine.yield(ind("Call [" .. tostring(alias) .. "]:"))
           for _index_0 = 1, #args do
             local a = args[_index_0]
             self:_yield_tree(a, indent_level + 1)
           end
         end
       elseif "String" == _exp_0 then
-        coroutine.yield(ind(utils.repr(tree.value)))
+        return coroutine.yield(ind(repr(tree.value)))
       elseif "Longstring" == _exp_0 then
-        coroutine.yield(ind(utils.repr(tree.value)))
+        return coroutine.yield(ind(repr(tree.value)))
       elseif "Number" == _exp_0 then
-        coroutine.yield(ind(tree.value))
+        return coroutine.yield(ind(tree.value))
+      elseif "Var" == _exp_0 then
+        return coroutine.yield(ind("Var[" .. tostring(repr(tree.value)) .. "]"))
       elseif "List" == _exp_0 then
         if #tree.value == 0 then
-          coroutine.yield(ind("<Empty List>"))
+          return coroutine.yield(ind("<Empty List>"))
         else
           coroutine.yield(ind("List:"))
           local _list_0 = tree.value
@@ -636,12 +680,9 @@ do
             self:_yield_tree(item, indent_level + 1)
           end
         end
-      elseif "Var" == _exp_0 then
-        coroutine.yield(ind("Var[" .. tostring(utils.repr(tree.value)) .. "]"))
       else
-        error("Unknown/unimplemented thingy: " .. tostring(tree.type))
+        return error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
-      return nil
     end,
     print_tree = function(self, tree)
       for line in coroutine.wrap(function()
@@ -657,7 +698,7 @@ do
       end) do
         insert(result, line)
       end
-      return table.concat(result, "\n")
+      return concat(result, "\n")
     end,
     run = function(self, src, filename, output_file)
       if output_file == nil then
@@ -707,22 +748,22 @@ do
       end
     end,
     initialize_core = function(self)
-      self:defmacro([[lua block %lua_code]], function(self, vars, kind)
+      self:defmacro("lua block %lua_code", function(self, vars, kind)
         if kind == "Expression" then
           error("Expected to be in statement.")
         end
         local inner_vars = setmetatable({ }, {
           __index = function(_, key)
-            return error("vars[" .. tostring(utils.repr(key)) .. "]")
+            return error("vars[" .. tostring(repr(key)) .. "]")
           end
         })
         return "do\n" .. self:tree_to_value(vars.lua_code, inner_vars) .. "\nend", true
       end)
-      self:defmacro([[lua expr %lua_code]], function(self, vars, kind)
+      self:defmacro("lua expr %lua_code", function(self, vars, kind)
         local lua_code = vars.lua_code.value
         local inner_vars = setmetatable({ }, {
           __index = function(_, key)
-            return error("vars[" .. tostring(utils.repr(key)) .. "]")
+            return error("vars[" .. tostring(repr(key)) .. "]")
           end
         })
         return self:tree_to_value(vars.lua_code, inner_vars)
@@ -759,6 +800,9 @@ do
       self.debug = false
       self:initialize_core()
       self.utils = utils
+      self.repr = function(self, ...)
+        return repr(...)
+      end
       self.loaded_files = { }
     end,
     __base = _base_0,
@@ -795,7 +839,7 @@ do
       end
     end
     insert(bits, close)
-    return table.concat(bits)
+    return concat(bits)
   end
   NomsuCompiler = _class_0
 end
@@ -845,7 +889,7 @@ elseif arg then
       return c:run(buff)
     end)
     if ok and ret ~= nil then
-      print("= " .. utils.repr(ret))
+      print("= " .. repr(ret))
     end
   end
 end

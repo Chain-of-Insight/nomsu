@@ -112,6 +112,22 @@ rule [entries in %dict] =:
         |end
         |return items
 
+rule [keys in %dict] =:
+    lua block ".."
+        |local items = {}
+        |for k,v in pairs(vars.dict) do
+        |    table.insert(items, k)
+        |end
+        |return items
+
+rule [values in %dict] =:
+    lua block ".."
+        |local items = {}
+        |for k,v in pairs(vars.dict) do
+        |    table.insert(items, v)
+        |end
+        |return items
+
 # List Comprehension
 macro [%expression for %var in %iterable] =:
     assert ((%var's "type") == "Var") ".."

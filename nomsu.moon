@@ -2,7 +2,9 @@
 re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
-insert = table.insert
+repr = utils.repr
+{:insert, :remove, :concat} = table
+pcall = (fn,...)-> true, fn(...)
 
 -- TODO:
 -- improve indentation of generated lua code
@@ -19,6 +21,14 @@ lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
 
+-- Helper "classes"
+parsetree_mt = {__tostring:=> "#{@type}(#{repr(@value)})"}
+ParseTree = (type, src, value, errors)->
+    setmetatable({:type, :src, :value, :errors}, parsetree_mt)
+
+functiondef_mt = {__tostring:=> "FunctionDef(#{repr(@aliases)}"}
+FunctionDef = (fn, aliases, src, is_macro)->
+    setmetatable({:fn, :aliases, :src, :is_macro}, functiondef_mt)
 
 class NomsuCompiler
     new:(parent)=>
@@ -28,101 +38,92 @@ class NomsuCompiler
         @debug = false
         @initialize_core!
         @utils = utils
+        @repr = (...)=> repr(...)
         @loaded_files = {}
     
     writeln:(...)=>
         @write(...)
         @write("\n")
-
-    call: (fn_name,...)=>
-        fn_info = @defs[fn_name]
-        if fn_info == nil
-            @error "Attempt to call undefined function: #{fn_name}"
-        if fn_info.is_macro
-            @error "Attempt to call macro at runtime: #{fn_name}\nThis can be caused by using a macro in a function that is defined before the macro."
-        unless @check_permission(fn_name)
-            @error "You do not have the authority to call: #{fn_name}"
-        insert @callstack, fn_name
-        {:fn, :arg_names} = fn_info
-        args = {name, select(i,...) for i,name in ipairs(arg_names[fn_name])}
+    
+    def: (aliases, fn, src, is_macro=false)=>
+        if type(aliases) == 'string'
+            aliases = @get_aliases aliases
         if @debug
-            @writeln "Calling #{fn_name} with args: #{utils.repr(args)}"
-        ret = fn(self, args)
-        table.remove @callstack
+            @writeln "Defining rule: #{aliases}"
+        fn_def = FunctionDef(fn, {}, src, is_macro)
+        @add_aliases aliases, fn_def
+
+    defmacro: (aliases, fn, src)=> @def(aliases, fn, src, true)
+
+    add_aliases: (aliases, fn_def)=>
+        first_alias,first_args = next(fn_def.aliases)
+        if not first_alias
+            first_alias,first_args = next(aliases)
+        for alias,args in pairs(aliases)
+            if fn_def[alias] then continue
+            if @defs[alias] then @remove_alias(alias)
+            if alias != first_alias and not utils.equivalent(utils.set(args), utils.set(first_args))
+                @error "Conflicting argument names between #{first_alias} and #{alias}"
+            fn_def.aliases[alias] = args
+            @defs[alias] = fn_def
+    
+    remove_alias: (alias)=>
+        fn_def = @defs[alias]
+        if not fn_def then return
+        fn_def.aliases[alias] = nil
+        @defs[alias] = nil
+
+    remove_aliases: (aliases)=>
+        for alias in pairs(aliases) do @remove_alias(alias)
+
+    get_fn_def: (x)=>
+        if not x then @error "Nothing to get function def from"
+        aliases = @get_aliases x
+        alias,_ = next(aliases)
+        return @defs[alias]
+
+    call: (alias,...)=>
+        fn_def = @defs[alias]
+        if fn_def == nil
+            @error "Attempt to call undefined function: #{alias}"
+        if fn_def.is_macro and @callstack[#@callstack] != "__macro__"
+            @error "Attempt to call macro at runtime: #{alias}\nThis can be caused by using a macro in a function that is defined before the macro."
+        unless @check_permission(alias)
+            @error "You do not have the authority to call: #{alias}"
+        insert @callstack, alias
+        {:fn, :aliases} = fn_def
+        args = {name, select(i,...) for i,name in ipairs(aliases[alias])}
+        if @debug
+            @writeln "Calling #{alias} with args: #{repr(args)}"
+        -- TODO: optimize, but still allow multiple return values?
+        rets = {fn(self,args)}
+        remove @callstack
+        return unpack(rets)
+    
+    run_macro: (tree, kind="Expression")=>
+        args = [a for a in *tree.value when a.type != "Word"]
+        alias,_ = @get_alias tree
+        insert @callstack, "__macro__"
+        ret, manual_mode = @call(alias, unpack(args))
+        remove @callstack
+        if not ret
+            @error("No return value for macro: #{name}")
+        if kind == "Statement" and not manual_mode
+            if ret\match("^do\n")
+                error "Attempting to use macro return value as an expression, when it looks like a block:\n#{ret}"
+            ret = "ret = "..ret
         return ret
 
     check_permission: (fn_name)=>
-        fn_info = @defs[fn_name]
-        if fn_info == nil
+        fn_def = @defs[fn_name]
+        if fn_def == nil
             @error "Undefined function: #{fn_name}"
-        if fn_info.whiteset == nil then return true
+        if fn_def.whiteset == nil then return true
         -- TODO: optimize this, maybe by making the callstack a Counter and having a move-to-front optimization on the whitelist
         for caller in *@callstack
-            if fn_info.whiteset[caller]
+            if fn_def.whiteset[caller]
                 return true
         return false
-
-    def: (spec, fn, src)=>
-        if @debug
-            @writeln "Defining rule: #{spec}"
-        invocations,arg_names = @get_invocations spec
-        for i=2,#invocations
-            if not utils.equivalent(utils.set(arg_names[invocations[1]]), utils.set(arg_names[invocations[i]]))
-                @error("Conflicting argument names #{utils.repr(invocations[1])} and #{utils.repr(invocations[i])} for #{utils.repr(spec)}")
-        fn_info = {:fn, :arg_names, :invocations, :src, is_macro:false}
-        for invocation in *invocations
-            @defs[invocation] = fn_info
-    
-    get_invocations_from_definition:(def, vars)=>
-        if def.type == "String"
-            return @@unescape_string(def.value)
-
-        if def.type != "List"
-            @error "Trying to get invocations from #{def.type}, but expected List or String."
-
-        invocations = {}
-        for item in *def.value
-            if item.type == "String"
-                insert invocations, item.value
-                continue
-            if item.type != "FunctionCall"
-                @error "Invalid list item: #{item.type}, expected FunctionCall or String"
-            name_bits = {}
-            for token in *item.value
-                if token.type == "Word"
-                    insert name_bits, token.value
-                elseif token.type == "Var"
-                    insert name_bits, token.src
-                else
-                    @error "Unexpected token type in definition: #{token.type} (expected Word or Var)"
-            insert invocations, table.concat(name_bits, " ")
-        return invocations
-
-    get_invocations:(text)=>
-        if not text
-            @error "No text provided!"
-        if type(text) == 'function'
-            error "Function passed to get_invocations"
-        if type(text) == 'string' then text = {text}
-        invocations = {}
-        arg_names = {}
-        for _text in *text
-            invocation = _text\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
-            _arg_names = [arg for arg in _text\gmatch("%%(%S[^%s']*)")]
-            insert invocations, invocation
-            arg_names[invocation] = _arg_names
-        return invocations, arg_names
-
-    defmacro: (spec, lua_gen_fn, src)=>
-        if @debug
-            @writeln("DEFINING MACRO: #{spec}#{src or ""}")
-        invocations,arg_names = @get_invocations spec
-        for i=2,#invocations
-            if not utils.equivalent(utils.set(arg_names[invocations[1]]), utils.set(arg_names[invocations[i]]))
-                @error("Conflicting argument names #{utils.repr(invocations[1])} and #{utils.repr(invocations[i])} for #{utils.repr(spec)}")
-        fn_info = {fn:lua_gen_fn, :arg_names, :invocations, :src, is_macro:true}
-        for invocation in *invocations
-            @defs[invocation] = fn_info
 
     parse: (str, filename)=>
         if @debug
@@ -136,7 +137,7 @@ class NomsuCompiler
                 return end_pos
         check_dedent = (subject,end_pos,spaces)->
             if #spaces < indent_stack[#indent_stack]
-                table.remove(indent_stack)
+                remove(indent_stack)
                 return end_pos
         check_nodent = (subject,end_pos,spaces)->
             if #spaces == indent_stack[#indent_stack]
@@ -245,11 +246,10 @@ class NomsuCompiler
                 pointer = ("-")\rep(err_pos - start_of_err_line + 0) .. "^"
                 error("\n#{err_msg or "Parse error"} in #{filename} on line #{line_no}:\n\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n")
 
+        tree_mt = {__tostring:=> "#{@type}(#{repr(@value)})"}
         setmetatable(defs, {
             __index: (t,key)->
-                fn = (src, value, errors)->
-                    token = {type: key, :src, :value, :errors}
-                    return token
+                fn = (src, value, errors)-> setmetatable({type: key, :src, :value, :errors}, tree_mt)
                 t[key] = fn
                 return fn
         })
@@ -272,7 +272,7 @@ class NomsuCompiler
     tree_to_lua: (tree)=>
         assert tree, "No tree provided."
         if not tree.type
-            @error "Invalid tree: #{utils.repr(tree)}"
+            @error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
                 buffer = {[[return (function(compiler, vars)
@@ -288,7 +288,7 @@ class NomsuCompiler
                     return (function(compiler, vars)\n#{code}\nend)"
                     lua_thunk, err = load(lua_code)
                     if not lua_thunk
-                        error("Failed to compile generated code:\n#{code}\n\n#{err}\n\nProduced by statement:\n#{utils.repr(statement)}")
+                        error("Failed to compile generated code:\n#{code}\n\n#{err}\n\nProduced by statement:\n#{repr(statement)}")
                     value = lua_thunk!
                     ok,return_value = pcall(value, self, vars)
                     if not ok
@@ -299,13 +299,13 @@ class NomsuCompiler
                         return ret
                     end)
                 ]]
-                return table.concat(buffer, "\n"), return_value
+                return concat(buffer, "\n"), return_value
 
             when "Block"
                 buffer = {}
                 for statement in *tree.value
                     insert buffer, @tree_to_lua(statement)
-                return table.concat(buffer, "\n")
+                return concat(buffer, "\n")
         
             when "Thunk"
                 assert tree.value.type == "Block", "Non-block value in Thunk"
@@ -320,22 +320,22 @@ class NomsuCompiler
             when "Statement"
                 -- This case here is to prevent "ret =" from getting prepended when the macro might not want it
                 if tree.value.type == "FunctionCall"
-                    name = @fn_name_from_tree(tree.value)
-                    if @defs[name] and @defs[name].is_macro
+                    alias = @get_alias(tree.value)
+                    if @defs[alias] and @defs[alias].is_macro
                         return @run_macro(tree.value, "Statement")
                 return "ret = "..(@tree_to_lua(tree.value))
 
             when "FunctionCall"
-                name = @fn_name_from_tree(tree)
-                if @defs[name] and @defs[name].is_macro
+                alias = @get_alias(tree)
+                if @defs[alias] and @defs[alias].is_macro
                     return @run_macro(tree, "Expression")
                 else
                     args = [@tree_to_lua(a) for a in *tree.value when a.type != "Word"]
-                    insert args, 1, utils.repr(name)
+                    insert args, 1, repr(alias)
                     return @@comma_separated_items("compiler:call(", args, ")")
 
             when "String"
-                return utils.repr(@@unescape_string(tree.value))
+                return repr(@@unescape_string(tree.value))
 
             when "Longstring"
                 concat_parts = {}
@@ -347,19 +347,19 @@ class NomsuCompiler
                             string_buffer ..= bit\gsub("\\\\","\\")
                         else
                             if string_buffer ~= ""
-                                insert concat_parts, utils.repr(string_buffer)
+                                insert concat_parts, repr(string_buffer)
                                 string_buffer = ""
                             insert concat_parts, "compiler.utils.repr_if_not_string(#{@tree_to_lua(bit)})"
 
                 if string_buffer ~= ""
-                    insert concat_parts, utils.repr(string_buffer)
+                    insert concat_parts, repr(string_buffer)
 
                 if #concat_parts == 0
                     return "''"
                 elseif #concat_parts == 1
                     return concat_parts[1]
                 else
-                    return "(#{table.concat(concat_parts, "..")})"
+                    return "(#{concat(concat_parts, "..")})"
 
             when "Number"
                 return tree.value
@@ -373,7 +373,7 @@ class NomsuCompiler
                     return @@comma_separated_items("{", [@tree_to_lua(item) for item in *tree.value], "}")
 
             when "Var"
-                return "vars[#{utils.repr(tree.value)}]"
+                return "vars[#{repr(tree.value)}]"
 
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
@@ -392,38 +392,60 @@ class NomsuCompiler
                 insert bits, "\n"
                 so_far = 0
         insert bits, close
-        return table.concat(bits)
-    
-    fn_name_from_tree: (tree)=>
-        assert(tree.type == "FunctionCall", "Attempt to get fn name from non-functioncall tree: #{tree.type}")
-        name_bits = {}
-        for token in *tree.value
-            insert name_bits, if token.type == "Word" then token.value else "%"
-        table.concat(name_bits, " ")
+        return concat(bits)
+
+    get_alias: (x)=>
+        if not x then @error "Nothing to get alias from"
+        -- Returns a single alias ("say %"), and list of args ({msg}) from a single rule def
+        --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
+        if type(x) == 'string'
+            -- TODO
+            alias = x\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
+            args = [arg for arg in x\gmatch("%%(%S[^%s']*)")]
+            return alias, args
+        switch x.type
+            when "String" then return @get_alias(x.value)
+            when "Statement" then return @get_alias(x.value)
+            when "FunctionCall"
+                alias, args = {}, {}, {}
+                for token in *x.value
+                    switch token.type
+                        when "Word"
+                            insert alias, token.value
+                        when "Var"
+                            insert alias, "%"
+                            insert args, token.value
+                        else
+                            insert alias, "%"
+                            insert args, token
+                return concat(alias," "), args
+
+    get_aliases:(x)=>
+        if self.value
+            print self
+            error "WTF"
+        if not x then @error "Nothing to get aliases from"
+        if type(x) == 'string'
+            alias, args = @get_alias(x)
+            return {[alias]: args}
+        switch x.type
+            when "String" then return @get_aliases({x.value})
+            when "Statement" then return @get_aliases({x.value})
+            when "FunctionCall" then return @get_aliases({x})
+            when "List" then x = x.value
+            when "Block" then x = x.value
+        with {}
+            for y in *x
+                alias,args = @get_alias(y)
+                [alias] = args
 
     var_to_lua_identifier: (var)=>
+        -- Converts arbitrary nomsu vars to valid lua identifiers by replacing illegal
+        -- characters with escape sequences
         if var.type != "Var"
             @error("Tried to convert something that wasn't a Var into a lua identifier: it was not a Var, it was: "..label.type)
         "var"..(var.value\gsub "%W", (verboten)->
             if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
-    
-    run_macro: (tree, kind="Expression")=>
-        name = @fn_name_from_tree(tree)
-        unless @defs[name] and @defs[name].is_macro
-            @error("Macro not found: #{name}")
-        unless @check_permission(name)
-            @error "You do not have the authority to call: #{name}"
-        {:fn, :arg_names} = @defs[name]
-        args = [a for a in *tree.value when a.type != "Word"]
-        args = {name,args[i] for i,name in ipairs(arg_names[name])}
-        insert @callstack, name
-        ret, manual_mode = fn(self, args, kind)
-        table.remove @callstack
-        if not ret
-            @error("No return value for macro: #{name}")
-        if kind == "Statement" and not manual_mode
-            ret = "ret = "..ret
-        return ret
 
     _yield_tree: (tree, indent_level=0)=>
         ind = (s) -> INDENT\rep(indent_level)..s
@@ -431,42 +453,27 @@ class NomsuCompiler
             when "File"
                 coroutine.yield(ind"File:")
                 @_yield_tree(tree.value.body, indent_level+1)
-
-            when "Errors"
-                coroutine.yield(ind"Error:\n#{tree.value}")
-
+            when "Errors" then coroutine.yield(ind"Error:\n#{tree.value}")
             when "Block"
                 for chunk in *tree.value
                     @_yield_tree(chunk, indent_level)
-        
             when "Thunk"
                 coroutine.yield(ind"Thunk:")
                 @_yield_tree(tree.value, indent_level+1)
-
-            when "Statement"
-                @_yield_tree(tree.value, indent_level)
-
+            when "Statement" then @_yield_tree(tree.value, indent_level)
             when "FunctionCall"
-                name = @fn_name_from_tree(tree)
+                alias = @get_alias tree
                 args = [a for a in *tree.value when a.type != "Word"]
                 if #args == 0
-                    coroutine.yield(ind"Call [#{name}]!")
+                    coroutine.yield(ind"Call [#{alias}]!")
                 else
-                    coroutine.yield(ind"Call [#{name}]:")
+                    coroutine.yield(ind"Call [#{alias}]:")
                     for a in *args
                         @_yield_tree(a, indent_level+1)
-
-            when "String"
-                -- TODO: Better implement
-                coroutine.yield(ind(utils.repr(tree.value)))
-
-            when "Longstring"
-                -- TODO: Better implement
-                coroutine.yield(ind(utils.repr(tree.value)))
-
-            when "Number"
-                coroutine.yield(ind(tree.value))
-
+            when "String" then coroutine.yield(ind(repr(tree.value)))
+            when "Longstring" then coroutine.yield(ind(repr(tree.value)))
+            when "Number" then coroutine.yield(ind(tree.value))
+            when "Var" then coroutine.yield ind"Var[#{repr(tree.value)}]"
             when "List"
                 if #tree.value == 0
                     coroutine.yield(ind("<Empty List>"))
@@ -474,13 +481,7 @@ class NomsuCompiler
                     coroutine.yield(ind"List:")
                     for item in *tree.value
                         @_yield_tree(item, indent_level+1)
-
-            when "Var"
-                coroutine.yield ind"Var[#{utils.repr(tree.value)}]"
-
-            else
-                error("Unknown/unimplemented thingy: #{tree.type}")
-        return nil -- to prevent tail calls
+            else error("Unknown/unimplemented thingy: #{tree.type}")
 
     print_tree:(tree)=>
         for line in coroutine.wrap(-> @_yield_tree(tree))
@@ -490,7 +491,7 @@ class NomsuCompiler
         result = {}
         for line in coroutine.wrap(-> @_yield_tree(tree))
             insert(result, line)
-        return table.concat result, "\n"
+        return concat result, "\n"
 
     run: (src, filename, output_file=nil)=>
         if @debug
@@ -533,14 +534,14 @@ class NomsuCompiler
 
     initialize_core: =>
         -- Sets up some core functionality
-        @defmacro [[lua block %lua_code]], (vars, kind)=>
+        @defmacro "lua block %lua_code", (vars, kind)=>
             if kind == "Expression" then error("Expected to be in statement.")
-            inner_vars = setmetatable({}, {__index:(_,key)-> error"vars[#{utils.repr(key)}]"})
+            inner_vars = setmetatable({}, {__index:(_,key)-> error"vars[#{repr(key)}]"})
             return "do\n"..@tree_to_value(vars.lua_code, inner_vars).."\nend", true
 
-        @defmacro [[lua expr %lua_code]], (vars, kind)=>
+        @defmacro "lua expr %lua_code", (vars, kind)=>
             lua_code = vars.lua_code.value
-            inner_vars = setmetatable({}, {__index:(_,key)-> error"vars[#{utils.repr(key)}]"})
+            inner_vars = setmetatable({}, {__index:(_,key)-> error"vars[#{repr(key)}]"})
             return @tree_to_value(vars.lua_code, inner_vars)
 
         @def "require %filename", (vars)=>
@@ -607,6 +608,6 @@ elseif arg
             break
         ok, ret = pcall(-> c\run(buff))
         if ok and ret != nil
-            print "= "..utils.repr(ret)
+            print "= "..repr(ret)
 
 return NomsuCompiler

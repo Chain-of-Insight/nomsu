@@ -78,6 +78,14 @@ utils = {
     end
     return _accum_0
   end,
+  remove_from_list = function(list, item)
+    for i, list_item in ipairs(list) do
+      if list_item == item then
+        table.remove(list, i)
+        return 
+      end
+    end
+  end,
   accumulate = function(glue, co)
     if co == nil then
       glue, co = "", glue

@@ -1,4 +1,3 @@
-
 #..
     This File contains rules for making rules and macros and some helper functions to make
     that easier.
@@ -8,10 +7,9 @@
 lua block ".."
     |local function make_fn(wrap_in_block)
     |    return function(compiler, vars, kind)
-    # Do a minimal amount of pre-processing (get the spec and the source)
-    |        local spec = compiler:get_invocations_from_definition(vars.spec, vars)
-    |        spec = compiler.utils.repr(spec)
-    |        local src = compiler.utils.repr(vars.user_macro.src)
+    # Do a minimal amount of pre-processing (get the aliases and the source)
+    |        local aliases = compiler:repr(compiler:get_aliases(vars.macro_def))
+    |        local src = compiler:repr(vars.user_macro.src)
     |        local user_macro = compiler:tree_to_lua(vars.user_macro)
     # Then produce a block of code that creates the macro at runtime
     |        local lua = [[
@@ -25,57 +23,75 @@ lua block ".."
     |        return lua, true
     |    end), %s)
     |    ]]
-    |        lua = lua:format(spec, compiler.utils.repr(spec), user_macro,
+    |        lua = lua:format(aliases, compiler:repr(aliases), user_macro,
     |            wrap_in_block and [[lua = "do\\n    "..lua.."\\nend"]] or "", src)
     |        return lua, true
     |    end
     |end
-    |compiler:defmacro("macro statement %spec = %user_macro", make_fn(false), "N/A")
-    |compiler:defmacro("macro block %spec = %user_macro", make_fn(true), "N/A")
+    |compiler:defmacro("macro statement %macro_def = %user_macro", make_fn(false), "see:lib/metaprogramming.nom")
+    |compiler:defmacro("macro block %macro_def = %user_macro", make_fn(true), "see:lib/metaprogramming.nom")
 
-macro block [macro %spec = %user_macro] =:
+macro block [macro %macro_def = %user_macro] =:
     ".."|compiler:defmacro(
-        |    \lua expr "compiler:get_invocations_from_definition(vars.spec, vars)"\,
+        |    \lua expr "compiler:get_aliases(vars.macro_def)"\,
         |    \lua expr "compiler:tree_to_lua(vars.user_macro)"\,
-        |    \lua expr "compiler.utils.repr(vars.user_macro.src)"\)
+        |    \lua expr "compiler:repr(vars.user_macro.src)"\)
 
 macro [compiler] =: "compiler"
 macro [compiler's %key] =: ".."|compiler[\%key as lua\]
 macro [compiler %method %args] =:
     lua block ".."
-        |local args = {}
-        |for i,arg in ipairs(vars.args.value) do
-        |    args[i] = compiler:tree_to_lua(arg)
+        |local args = {"compiler"}
+        |for _,arg in ipairs(vars.args.value) do
+        |    table.insert(args, compiler:tree_to_lua(arg))
         |end
-        |return "compiler:"..compiler:tree_to_value(vars.method, vars).."("..table.concat(args, ", ")..")"
+        |return "compiler["..compiler:repr(compiler:tree_to_value(vars.method, vars)).."]("..table.concat(args, ", ")..")"
 macro [compiler utils %method %args] =:
     lua block ".."
         |local args = {}
         |for i,arg in ipairs(vars.args.value) do
         |    args[i] = compiler:tree_to_lua(arg)
         |end
-        |return "compiler.utils."..compiler:tree_to_value(vars.method, vars).."("..table.concat(args, ", ")..")"
+        |return "compiler.utils["..compiler:repr(compiler:tree_to_value(vars.method, vars)).."]("..table.concat(args, ", ")..")"
 
 # Macro that lets you make new rules
 #..
     This is a macro instead of a rule because it needs to pre-empt processing the list of
-    invocations and convert it into a list of strings (rather than call a function that
+    function calls and convert it into a list of strings (rather than call a function that
     is currently in the middle of being defined). Being a macro also allows us to snatch
     the source code and store that
-macro block [rule %spec = %body] =: ".."
+macro block [rule %rule_def = %body] =: ".."
     |compiler:def(
-    |    \compiler utils "repr" [compiler "get_invocations_from_definition" [%spec, lua expr "vars"]]\,
+    |    \compiler "repr" [compiler "get_aliases" [%rule_def]]\,
     |    \compiler "tree_to_lua" [%body]\,
-    |    \compiler utils "repr" [lua expr "vars.body.src"]\)
+    |    \compiler "repr" [lua expr "vars.body.src"]\)
+
+rule [fart]=: lua block "print('poot')"
+
+macro block [alias %aliases = %aliased] =:
+    lua block ".."
+        |local aliases = compiler:get_aliases(vars.aliases)
+        |aliases = compiler:repr(aliases)
+        |if vars.aliased.type ~= "Thunk" then
+        |    compiler:error("Right hand side of alias % = % should be a Thunk, but got "..vars.aliased.type
+        |       ..". Maybe you used = instead of =: by mistake?")
+        |end
+        |local aliased = next(compiler:get_aliases(vars.aliased.value))
+        |aliased = compiler:repr(aliased)
+        |local lua = ([[
+        |compiler:add_aliases(%s, compiler.defs[%s])
+        |]]):format(aliases, aliased)
+        |return lua
 
 # Get the source code for a function
-rule [help %invocation] =:
+rule [help %rule] =:
     lua block ".."
-        |local fn_info = compiler.defs[vars.invocation]
-        |if not fn_info then
-        |    compiler:writeln("Function not found: "..compiler.utils.repr(vars.invocation))
+        |local fn_def = compiler:get_fn_def(vars.rule)
+        |if not fn_def then
+        |    compiler:writeln("Rule not found: "..compiler:repr(vars.rule))
         |else
-        |    compiler:writeln("rule "..compiler.utils.repr(fn_info.invocations).." ="..(fn_info.src or ":\\n    <unknown source code>"))
+        |    compiler:writeln("rule "..compiler:repr(compiler.utils.keys(fn_def.aliases))
+        |        .." ="..(fn_def.src or ":\\n    <unknown source code>"))
         |end
 
 
@@ -103,8 +119,8 @@ rule [source code from tree %tree] =:
         |end
 
 macro [source code %body] =:
-    compiler utils "repr" [compiler "call" ["source code from tree %", %body]]
+    compiler "repr" [compiler "call" ["source code from tree %", %body]]
 
 macro [parse tree %code] =:
-    compiler utils "repr" [compiler "stringify_tree" [lua expr "vars.code.value"]]
+    compiler "repr" [compiler "stringify_tree" [lua expr "vars.code.value"]]
 
