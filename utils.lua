@@ -10,6 +10,15 @@ utils = {
     end
     return true
   end,
+  size = function(t)
+    do
+      local n = 0
+      for _ in pairs(t) do
+        n = n + 1
+      end
+      return n
+    end
+  end,
   repr = function(x)
     local _exp_0 = type(x)
     if 'table' == _exp_0 then
@@ -39,7 +48,9 @@ utils = {
         end)(), ", ")) .. "}"
       end
     elseif 'string' == _exp_0 then
-      if not x:find([["]]) and not x:find("\n") and not x:find("\\") then
+      if x == "\n" then
+        return "'\\n'"
+      elseif not x:find([["]]) and not x:find("\n") and not x:find("\\") then
         return "\"" .. x .. "\""
       elseif not x:find([[']]) and not x:find("\n") and not x:find("\\") then
         return "\'" .. x .. "\'"
