@@ -57,8 +57,8 @@ macro [..]
     %list doesn't have index %index, %list does not have index %index
 ..=: ".."|(\%list as lua\[\%index as lua\] ~= nil)
 
-macro [length of %list, size of %list, number of %list, len %list] =:
-    ".."|#(\%list as lua\)
+macro [length of %list, size of %list, size %list, number of %list, len %list] =:
+    ".."|nomsu.utils.size(\%list as lua\)
 
 # Chained lookup
 macro [%list ->* %indices] =:
@@ -143,7 +143,7 @@ macro [%expression for all %iterable] =:
     ".."|(function(game, vars)
         |    local comprehension = {}
         |    for i,value in ipairs(\%iterable as lua\) do
-        |        vars.it = value
+        |        vars[''] = value
         |        comprehension[i] = \%expression as lua\
         |    end
         |    return comprehension
@@ -152,7 +152,7 @@ macro [%expression for all %iterable] =:
 # TODO: maybe make a generator/coroutine?
 
 #.. Dict comprehensions can be accomplished okay by doing:
-    dict ([new_key using (%it's "key"), new_value using (%it's "value")] for all (entries in %dict))
+    dict ([new_key using (%'s "key"), new_value using (%'s "value")] for all (entries in %dict))
     or something similar
 # TODO: fix compiler bugs
 pass

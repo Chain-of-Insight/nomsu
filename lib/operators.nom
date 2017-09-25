@@ -4,6 +4,8 @@ require "lib/metaprogramming.nom"
 macro [true, yes] =: "true"
 macro [false, no] =: "false"
 macro [nil, null] =: "nil"
+macro [inf, infinity] =: "math.huge"
+macro [nan, NaN, not a number] =: "(0/0)"
 macro statement [nop, pass] =: ""
 
 # Ternary operator

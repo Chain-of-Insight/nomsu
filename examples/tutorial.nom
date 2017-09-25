@@ -54,24 +54,22 @@ if (1 > 10):
 
 # For longer conditionals, a "when" branch is the best option
 when:
-    ? 1 > 4:
+    * (1 > 4)
+    * (1 > 3):
         say "this won't print"
-    ? 1 > 3:
+    * (1 > 2):
         say "this won't print"
-    ? 1 > 2:
-        say "this won't print"
-    ?:
+    * else:
         say "this will print"
 
 # When "when" is given an argument, it works like a switch statement
-when 3:
-    == 1:
+when 3 == ?:
+    * 1
+    * 2:
         say "this won't print"
-    == 2:
-        say "this won't print"
-    == 3:
+    * 3:
         say "this will print"
-    ==:
+    * else:
         say "this won't print"
 
 # Loops look like this:

@@ -1,4 +1,16 @@
 #!/usr/bin/env moon
+-- This file contains the source code of the Nomsu compiler.
+-- Nomsu is a programming language that cross-compiles to Lua. It was designed to be good
+-- at natural-language-like code that is highly self-modifying and flexible.
+-- The only dependency is LPEG, which can be installed using "luarocks install lpeg"
+-- File usage:
+--    Either, in a lua/moonscript file:
+--        Nomsu = require "nomsu"
+--        nomsu = Nomsu()
+--        nomsu:run(your_nomsu_code)
+--    Or from the command line:
+--        lua nomsu.lua [input_file [output_file or -]]
+
 re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
@@ -7,27 +19,19 @@ repr = utils.repr
 pcall = (fn,...)-> true, fn(...)
 
 -- TODO:
+-- use actual variables instead of a vars table
+-- have macros return (statements, expression)
+-- consider non-linear codegen, like with moonscript's comprehensions, rather than doing thunks
 -- improve indentation of generated lua code
--- provide way to run precompiled nomsu -> lua code
+-- provide way to run precompiled nomsu -> lua code from nomsu
 -- better scoping?
--- first-class rules
 -- better error reporting
 -- add line numbers of function calls
--- versions of rules with auto-supplied arguments
 -- type checking?
 
-INDENT = "    "
 lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-
--- Helper "classes"
-parsetree_mt = {__tostring:=> "#{@type}(#{repr(@value)})"}
-ParseTree = (x)-> setmetatable(x, parsetree_mt)
-
-functiondef_mt = {__tostring:=> "FunctionDef(#{repr(@aliases)}"}
-FunctionDef = (fn, aliases, src, is_macro)->
-    setmetatable({:fn, :aliases, :src, :is_macro}, functiondef_mt)
 
 -- NOTE: this treats tabs as equivalent to 1 space
 indent_stack = {0}
@@ -43,70 +47,81 @@ check_nodent = (subject,end_pos,spaces)->
     if #spaces == indent_stack[#indent_stack]
         return end_pos
 
+-- TYPES:
+-- Number 1, "String", %Var, [List], (Block), \(Nomsu), FunctionCall, File
+
 nomsu = [=[
-    file <- ({ {| shebang? {:body: block :} %nl* (({.+} ("" -> "Unexpected end of file")) => error)? |} }) -> File
+    file <- ({ {| shebang?
+        (ignored_line %nl)*
+        statements (nodent statements)*
+        (%nl ignored_line)* %nl?
+        (({.+} ("" -> "Unexpected end of file")) => error)? |} }) -> File
 
     shebang <- "#!" [^%nl]* %nl
 
-    block <- ({ {|
-        (ignored_line %nl)*
-        line_of_statements (nodent line_of_statements)*
-        (%nl ignored_line)* |} }) -> Block
-    inline_block <- ({ {| inline_line_of_statements |} }) -> Block
+    inline_statements <- inline_statement (semicolon inline_statement)*
+    noeol_statements <- (inline_statement semicolon)* noeol_statement
+    statements <- (inline_statement semicolon)* statement
 
-    line_of_statements <- statement (%ws? ";" %ws? statement)*
-    inline_line_of_statements <- inline_statement (%ws? ";" %ws? inline_statement)*
+    statement <- functioncall / expression
+    noeol_statement <- noeol_functioncall / noeol_expression
+    inline_statement <- inline_functioncall / inline_expression
 
-    statement <- ({ functioncall / expression }) -> Statement
-    inline_statement <- ({ inline_functioncall / expression }) -> Statement
+    inline_block <- ({ {| "(" inline_statements ")" |} }) -> Block
+    eol_block <- ({ {| ":" %ws? noeol_statements eol |} }) -> Block
+    indented_block <- ({ {| (":" / "(..)") indent
+                statements
+            (dedent / (({.+} ("" -> "Error while parsing block")) => error))
+        |} }) -> Block
 
-    expression <- (
-        longstring / string / number / variable / list / thunk / block_functioncall
-        / ("(" %ws? (inline_thunk / inline_functioncall) %ws? ")"))
+    inline_nomsu <- ({ ("\" inline_block ) }) -> Nomsu
+    eol_nomsu <- ({ ("\" eol_block ) }) -> Nomsu
+    indented_nomsu <- ({ ("\" {indented_block} ) }) -> Nomsu
+
+    inline_expression <- number / variable / inline_string / inline_list / inline_block / inline_nomsu
+    noeol_expression <- indented_string / indented_block / indented_nomsu / indented_list / inline_expression
+    expression <- eol_block / eol_nomsu / noeol_expression
 
     -- Function calls need at least one word in them
+    inline_functioncall <- ({ {|
+            (inline_expression tok_gap)* word (tok_gap (inline_expression / word))*
+        |} }) -> FunctionCall
+    noeol_functioncall <- ({ {|
+            (noeol_expression tok_gap)* word (tok_gap (noeol_expression / word))*
+        |} }) -> FunctionCall
     functioncall <- ({ {|
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
-    inline_functioncall <- ({ {|
-            (expression tok_gap)* word (tok_gap (expression / word))*
-        |} }) -> FunctionCall
-    block_functioncall <- "(..)" indent
-            functioncall
-        (dedent / (({.+} ("" -> "Error while parsing block function call")) => error))
 
     word <- ({ !number {%wordchar (!"'" %wordchar)*} }) -> Word
     
-    thunk <- ({ ":" ((indent block (dedent / (({.+} ("" -> "Error while parsing thunk")) => error)))
-        / (%ws? inline_block)) }) -> Thunk
-    inline_thunk <- ({ ":" %ws? inline_block }) -> Thunk
+    inline_string <- ({ '"' {|
+        ({~ (("\\" -> "\") / ('\"' -> '"') / (!string_interpolation [^%nl"]))+ ~}
+        / string_interpolation)* |} '"' }) -> String
+    indented_string <- ({ '".."' indent {|
+            indented_string_line (nodent {~ "" -> "
+" ~} indented_string_line)*
+          |} (dedent / (({.+} ("" -> "Error while parsing String")) => error))
+        }) -> String
+    indented_string_line <- "|" ({~ (("\\" -> "\") / (!string_interpolation [^%nl]))+ ~} / string_interpolation)*
+    string_interpolation <- "\" (inline_block / indented_block / dotdot)
 
-    string <- ({ (!longstring) '"' {(("\" [^%nl]) / [^"%nl])*} '"' }) -> String
+    number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
 
-    longstring <- ({ '".."' %ws?
-        {| (longstring_line (indent
-                longstring_line (nodent longstring_line)*
-            (dedent / longstring_error))?)
-          /(indent
-                longstring_line (nodent longstring_line)*
-            (dedent / longstring_error)) |} }) -> Longstring
-    longstring_line <- "|" {| ({("\\" / (!string_interpolation [^%nl]))+} / string_interpolation)* |}
-    longstring_error <- (({.+} ("" -> "Error while parsing Longstring")) => error)
-    string_interpolation <- "\" %ws? (((inline_functioncall / expression) dotdot?) / dotdot) %ws? "\"
+    -- Variables can be nameless (i.e. just %) and can't contain apostrophes
+    -- which is a hack to allow %foo's to parse as "%foo" and "'s" separately
+    variable <- ({ ("%" { (!"'" %wordchar)* }) }) -> Var
 
-    number <- ({ {"-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)) } }) -> Number
-
-    -- Hack to allow %foo's to parse as "%foo" and "'s" separately
-    variable <- ({ ("%" {%wordchar (!"'" %wordchar)*}) }) -> Var
-
-    list <- ({ {|
+    inline_list <- ({ {|
+         ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
+      |} }) -> List
+    indented_list <- ({ {|
          ("[..]" indent
                 list_line (nodent list_line)*
           (dedent / (({.+} ("" -> "Error while parsing list")) => error)))
-        /("[" %ws? (list_line %ws?)? "]")
       |} }) -> List
-    list_line <- list_bit (%ws? "," tok_gap list_bit)* (%ws? ",")?
-    list_bit <- inline_functioncall / expression
+    list_line <- (inline_list_item comma)* ((inline_list_item %ws? ",") / (functioncall / expression))
+    inline_list_item <- inline_functioncall / inline_expression
 
     block_comment <- "#.." [^%nl]* indent [^%nl]* (%nl ((%ws? (!. / &%nl)) / (!%dedented [^%nl]*)))* 
     line_comment  <- "#" [^%nl]*
@@ -116,18 +131,20 @@ nomsu = [=[
     indent <- eol (%nl ignored_line)* %nl %indented
     nodent <- eol (%nl ignored_line)* %nl %nodented
     dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-    tok_gap <- %ws / %prev_edge / &("[" / [.,:;{("#%'])
+    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%'])
+    comma <- %ws? "," %ws?
+    semicolon <- %ws? ";" %ws?
     dotdot <- nodent ".." %ws?
 ]=]
 
 whitespace = S(" \t")^1
 defs =
-    ws:whitespace, nl: P("\n")
+    ws:whitespace, nl: P("\n"), :tonumber
     wordchar: P(1)-S(' \t\n\r%#:;,.{}[]()"\\')
     indented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_indent)
     nodented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_nodent)
     dedented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_dedent)
-    prev_edge: B(S(" \t\n.,:;}])\""))
+    prev_edge: B(S(" \t\n.,:;}])\"\\"))
     error: (src,pos,errors,err_msg)->
         line_no = 1
         for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
@@ -150,8 +167,6 @@ defs =
 
 setmetatable(defs, {
     __index: (t,key)->
-        -- Disabled for performance
-        --with t[key] = (src, value, errors)-> ParseTree({type: key, :src, :value, :errors}) do nil
         with t[key] = (src, value, errors)-> {type: key, :src, :value, :errors} do nil
 })
 nomsu = re.compile(nomsu, defs)
@@ -162,84 +177,54 @@ class NomsuCompiler
         @defs = setmetatable({}, {__index:parent and parent.defs})
         @callstack = {}
         @debug = false
-        @initialize_core!
         @utils = utils
         @repr = (...)=> repr(...)
         @loaded_files = {}
+        @initialize_core!
     
     writeln:(...)=>
         @write(...)
         @write("\n")
     
-    def: (aliases, fn, src, is_macro=false)=>
-        if type(aliases) == 'string'
-            aliases = @get_aliases aliases
-        if @debug
-            @writeln "Defining rule: #{repr aliases}"
-        fn_def = FunctionDef(fn, {}, src, is_macro)
-        @add_aliases aliases, fn_def
+    def: (invocation, thunk, src)=>
+        if type(invocation) != 'string' then @error "Invocation should be string, not: #{repr invocation}"
+        if @debug then @writeln "Defining rule: #{repr invocation}"
+        stub = invocation\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
+        args = [arg for arg in invocation\gmatch("%%(%S[^%s']*)")]
+        for i=1,#args-1 do for j=i+1,#args
+            if args[i] == args[j] then @error "Duplicate argument in function def: #{args[i]}"
+        with @defs[invocation] = {:thunk, :invocation, :args, :src, is_macro:false} do nil
 
-    defmacro: (aliases, fn, src)=> @def(aliases, fn, src, true)
-
-    add_aliases: (aliases, fn_def)=>
-        first_alias,first_args = next(fn_def.aliases)
-        if not first_alias
-            first_alias,first_args = next(aliases)
-        for alias,args in pairs(aliases)
-            if fn_def[alias] then continue
-            if @defs[alias] then @remove_alias(alias)
-            if alias != first_alias and not utils.equivalent(utils.set(args), utils.set(first_args))
-                @error "Conflicting argument names between #{first_alias} and #{alias}"
-            fn_def.aliases[alias] = args
-            @defs[alias] = fn_def
-    
-    remove_alias: (alias)=>
-        fn_def = @defs[alias]
-        if not fn_def then return
-        fn_def.aliases[alias] = nil
-        @defs[alias] = nil
-
-    remove_aliases: (aliases)=>
-        for alias in pairs(aliases) do @remove_alias(alias)
-
-    get_fn_def: (x)=>
-        if not x then @error "Nothing to get function def from"
-        aliases = @get_aliases x
-        alias,_ = next(aliases)
-        return @defs[alias]
+    defmacro: (invocation, thunk, src)=>
+        with @def(invocation, thunk, src) do .is_macro = true
 
     call: (alias,...)=>
-        fn_def = @defs[alias]
-        if fn_def == nil
+        def = @defs[alias]
+        if def == nil
             @error "Attempt to call undefined function: #{alias}"
         -- This is a little bit hacky, but having this check is handy for catching mistakes
-        if fn_def.is_macro and @callstack[#@callstack] != "__macro__"
+        -- I use a hash sign in "#macro" so it's guaranteed to not be a valid function name
+        if def.is_macro and @callstack[#@callstack] != "#macro"
             @error "Attempt to call macro at runtime: #{alias}\nThis can be caused by using a macro in a function that is defined before the macro."
-        unless @check_permission(fn_def)
+        unless @check_permission(def)
             @error "You do not have the authority to call: #{alias}"
-        {:fn, :aliases} = fn_def
-        args = {name, select(i,...) for i,name in ipairs(aliases[alias])}
+        {:thunk, :args} = def
+        args = {name, select(i,...) for i,name in ipairs(args)}
         if @debug
             @writeln "Calling #{repr alias} with args: #{repr(args)}"
         insert @callstack, alias
         -- TODO: optimize, but still allow multiple return values?
-        rets = {fn(self,args)}
+        rets = {thunk(self,args)}
         remove @callstack
         return unpack(rets)
     
     run_macro: (tree, kind="Expression")=>
-        args = [a for a in *tree.value when a.type != "Word"]
-        alias,_ = @get_alias tree
-        insert @callstack, "__macro__"
-        ret, manual_mode = @call(alias, unpack(args))
+        local args, alias
+        alias,args = @get_alias tree
+        insert @callstack, "#macro"
+        expr, statement = @call(alias, unpack(args))
         remove @callstack
-        if not ret
-            @error("No return value for macro: #{name}")
-        if kind == "Statement" and not manual_mode
-            if ret\match("^do\n")
-                error "Attempting to use macro return value as an expression, when it looks like a block:\n#{ret}"
-            ret = "ret = "..ret
-        return ret
+        return expr, statement
 
     check_permission: (fn_def)=>
         if getmetatable(fn_def) != functiondef_mt
@@ -258,18 +243,56 @@ class NomsuCompiler
     parse: (str, filename)=>
         if @debug
             @writeln("PARSING:\n#{str}")
-
-        str = str\gsub("\r","").."\n"
+        str = str\gsub("\r","")
         export indent_stack
         old_indent_stack, indent_stack = indent_stack, {0}
         tree = nomsu\match(str)
         indent_stack = old_indent_stack -- Put it back, just in case.
-        if @debug
-            @writeln("\nPARSE TREE:")
-            @print_tree(tree)
         assert tree, "Failed to parse: #{str}"
+        if @debug
+            @writeln "PARSE TREE:"
+            @print_tree tree, "    "
         return tree
 
+    run: (src, filename)=>
+        tree = @parse(src, filename)
+        assert tree, "Tree failed to compile: #{src}"
+        assert tree.type == "File"
+
+        buffer = {}
+        vars = {}
+        return_value = nil
+        for statement in *tree.value
+            ok,expr,statements = pcall(@tree_to_lua, self, statement)
+            if not ok
+                @writeln "Error occurred in statement:\n#{statement.src}"
+                @error(expr)
+            code_for_statement = ([[
+                return (function(nomsu, vars)
+                    %s
+                    return %s
+                end)]])\format(statements or "", expr or "")
+            if @debug
+                @writeln "RUNNING LUA:\n#{code_for_statement}"
+            lua_thunk, err = load(code_for_statement)
+            if not lua_thunk
+                error("Failed to compile generated code:\n#{code_for_statement}\n\n#{err}\n\nProduced by statement:\n#{statement.src}")
+            run_statement = lua_thunk!
+            ok,ret = pcall(run_statement, self, vars)
+            if expr then return_value = ret
+            if not ok
+                @writeln "Error occurred in statement:\n#{statement.src}"
+                @error(return_value)
+            insert buffer, "#{statements or ''}\n#{expr and "ret = #{expr}" or ''}"
+        
+        lua_code = ([[
+            return function(nomsu, vars)
+                local ret
+                %s
+                return ret
+            end]])\format(concat(buffer, "\n"))
+        return return_value, lua_code
+    
     tree_to_value: (tree, vars)=>
         code = "
         return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
@@ -279,119 +302,94 @@ class NomsuCompiler
         return (lua_thunk!)(self, vars or {})
 
     tree_to_lua: (tree)=>
+        -- Return <lua code for value>, <additional lua code>
         assert tree, "No tree provided."
         if not tree.type
             @error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
-                buffer = {[[return (function(nomsu, vars)
-                        local ret]]}
-                vars = {}
-                for statement in *tree.value.body.value
-                    ok,code = pcall(@tree_to_lua, self, statement)
-                    if not ok
-                        @writeln "Error occurred in statement:\n#{statement.src}"
-                        error(code)
-                    -- Run the fuckers as we go
-                    lua_code = "
-                    return (function(nomsu, vars)\n#{code}\nend)"
-                    lua_thunk, err = load(lua_code)
-                    if not lua_thunk
-                        error("Failed to compile generated code:\n#{code}\n\n#{err}\n\nProduced by statement:\n#{repr(statement)}")
-                    value = lua_thunk!
-                    ok,return_value = pcall(value, self, vars)
-                    if not ok
-                        @writeln "Error occurred in statement:\n#{statement.src}"
-                        error(return_value)
-                    insert buffer, code
-                insert buffer, [[
-                        return ret
-                    end)
-                ]]
-                return concat(buffer, "\n"), return_value
+                error("Should not be converting File to lua through this function.")
+            
+            when "Nomsu"
+                return repr(tree.value), nil
 
             when "Block"
-                buffer = {}
-                for statement in *tree.value
-                    insert buffer, @tree_to_lua(statement)
-                return concat(buffer, "\n")
-        
-            when "Thunk"
-                assert tree.value.type == "Block", "Non-block value in Thunk"
-                lua = @tree_to_lua(tree.value)
-                if #tree.value.value == 1
-                    if ret_value = lua\match("^%s*ret = (.*)")
-                        return ([[
-                            (function(nomsu, vars)
-                                return %s
-                            end)]])\format(ret_value)
+                lua_bits = {}
+                for arg in *tree.value
+                    expr,statement = @tree_to_lua arg
+                    -- Optimization for common case
+                    if expr and not statement and #tree.value == 1
+                        return expr, nil
+                    if statement then insert lua_bits, statement
+                    if expr then insert lua_bits, "ret = #{expr}"
                 return ([[
-                    (function(nomsu, vars)
+                    function(nomsu, vars)
                         local ret
                         %s
                         return ret
-                    end)]])\format(lua)
-
-            when "Statement"
-                -- This case here is to prevent "ret =" from getting prepended when the macro might not want it
-                if tree.value.type == "FunctionCall"
-                    alias = @get_alias(tree.value)
-                    if @defs[alias] and @defs[alias].is_macro
-                        return @run_macro(tree.value, "Statement")
-                return "ret = "..(@tree_to_lua(tree.value))
+                    end]])\format(concat lua_bits, "\n")
 
             when "FunctionCall"
                 alias = @get_alias(tree)
                 if @defs[alias] and @defs[alias].is_macro
                     return @run_macro(tree, "Expression")
-                else
-                    args = [@tree_to_lua(a) for a in *tree.value when a.type != "Word"]
-                    insert args, 1, repr(alias)
-                    return @@comma_separated_items("nomsu:call(", args, ")")
+                args = {repr(alias)}
+                for arg in *tree.value
+                    if arg.type == 'Word' then continue
+                    expr,statement = @tree_to_lua arg
+                    if statement
+                        @error "Cannot use [[#{arg.src}]] as a function argument, since it's not an expression."
+                    insert args, expr
+                return @@comma_separated_items("nomsu:call(", args, ")"), nil
 
             when "String"
-                return repr(@@unescape_string(tree.value))
-
-            when "Longstring"
                 concat_parts = {}
                 string_buffer = ""
-                for i,line in ipairs(tree.value)
-                    if i > 1 then string_buffer ..= "\n"
-                    for bit in *line
-                        if type(bit) == "string"
-                            string_buffer ..= bit\gsub("\\\\","\\")
-                        else
-                            if string_buffer ~= ""
-                                insert concat_parts, repr(string_buffer)
-                                string_buffer = ""
-                            insert concat_parts, "nomsu.utils.repr_if_not_string(#{@tree_to_lua(bit)})"
+                for bit in *tree.value
+                    if type(bit) == "string"
+                        string_buffer ..= bit
+                        continue
+                    if string_buffer ~= ""
+                        insert concat_parts, repr(string_buffer)
+                        string_buffer = ""
+                    expr, statement = @tree_to_lua bit
+                    if statement
+                        @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
+                    insert concat_parts, "nomsu.utils.repr_if_not_string(#{expr})"
 
                 if string_buffer ~= ""
                     insert concat_parts, repr(string_buffer)
 
-                if #concat_parts == 0
-                    return "''"
-                elseif #concat_parts == 1
-                    return concat_parts[1]
-                else
-                    return "(#{concat(concat_parts, "..")})"
-
-            when "Number"
-                return tree.value
+                return "(#{concat(concat_parts, "..")})", nil
 
             when "List"
-                if #tree.value == 0
-                    return "{}"
-                elseif #tree.value == 1
-                    return "{#{@tree_to_lua(tree.value[1])}}"
-                else
-                    return @@comma_separated_items("{", [@tree_to_lua(item) for item in *tree.value], "}")
+                items = {}
+                for item in *tree.value
+                    expr,statement = @tree_to_lua item
+                    if statement
+                        @error "Cannot use [[#{item.src}]] as a list item, since it's not an expression."
+                    insert items, expr
+                return @@comma_separated_items("{", items, "}"), nil
+
+            when "Number"
+                return repr(tree.value)
 
             when "Var"
-                return "vars[#{repr(tree.value)}]"
+                return "vars[#{repr tree.value}]"
 
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
+    
+    print_tree: (tree, ind="")=>
+        if type(tree) ~= 'table' or not tree.type
+            @writeln "#{ind}#{repr tree}"
+            return
+        @writeln "#{ind}#{tree.type}:"
+        switch tree.type
+            when "List", "File", "Block", "FunctionCall", "String"
+                for v in *tree.value
+                    @print_tree(v, ind.."    ")
+            else @print_tree(tree.value, ind.."    ")
 
     @unescape_string: (str)=>
         str\gsub("\\(.)", ((c)-> STRING_ESCAPES[c] or c))
@@ -408,6 +406,28 @@ class NomsuCompiler
                 so_far = 0
         insert bits, close
         return concat(bits)
+
+    replaced_vars: (tree, vars)=>
+        -- TODO: consider making a pure function version of this that copies instead of modifying
+        if type(tree) != 'table' then return tree
+        switch tree.type
+            when "Var"
+                if vars[tree.value]
+                    tree = vars[tree.value]
+            when "File", "Thunk", "Statement", "Block", "List", "FunctionCall", "String"
+                new_value = @replaced_vars tree.value
+                if new_value != tree.value
+                    tree = {k,v for k,v in pairs(tree)}
+                    tree.value = new_value
+            when nil -- Raw table, probably from one of the .value of a multi-value tree (e.g. List)
+                new_values = {}
+                any_different = false
+                for k,v in pairs tree
+                    new_values[k] = @replaced_vars v
+                    any_different or= (new_values[k] != tree[k])
+                if any_different
+                    tree = new_values
+        return tree
 
     get_alias: (x)=>
         if not x then @error "Nothing to get alias from"
@@ -453,67 +473,10 @@ class NomsuCompiler
     var_to_lua_identifier: (var)=>
         -- Converts arbitrary nomsu vars to valid lua identifiers by replacing illegal
         -- characters with escape sequences
-        if var.type != "Var"
-            @error("Tried to convert something that wasn't a Var into a lua identifier: it was not a Var, it was: "..label.type)
-        "var"..(var.value\gsub "%W", (verboten)->
+        if type(var) == 'table' and var.type == "Var"
+            var = var.value
+        (var\gsub "%W", (verboten)->
             if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
-
-    _yield_tree: (tree, indent_level=0)=>
-        ind = (s) -> INDENT\rep(indent_level)..s
-        switch tree.type
-            when "File"
-                coroutine.yield(ind"File:")
-                @_yield_tree(tree.value.body, indent_level+1)
-            when "Errors" then coroutine.yield(ind"Error:\n#{tree.value}")
-            when "Block"
-                for chunk in *tree.value
-                    @_yield_tree(chunk, indent_level)
-            when "Thunk"
-                coroutine.yield(ind"Thunk:")
-                @_yield_tree(tree.value, indent_level+1)
-            when "Statement" then @_yield_tree(tree.value, indent_level)
-            when "FunctionCall"
-                alias = @get_alias tree
-                args = [a for a in *tree.value when a.type != "Word"]
-                if #args == 0
-                    coroutine.yield(ind"Call [#{alias}]!")
-                else
-                    coroutine.yield(ind"Call [#{alias}]:")
-                    for a in *args
-                        @_yield_tree(a, indent_level+1)
-            when "String" then coroutine.yield(ind(repr(tree.value)))
-            when "Longstring" then coroutine.yield(ind(repr(tree.value)))
-            when "Number" then coroutine.yield(ind(tree.value))
-            when "Var" then coroutine.yield ind"Var[#{repr(tree.value)}]"
-            when "List"
-                if #tree.value == 0
-                    coroutine.yield(ind("<Empty List>"))
-                else
-                    coroutine.yield(ind"List:")
-                    for item in *tree.value
-                        @_yield_tree(item, indent_level+1)
-            else error("Unknown/unimplemented thingy: #{tree.type}")
-
-    print_tree:(tree)=>
-        for line in coroutine.wrap(-> @_yield_tree(tree))
-            @writeln(line)
-
-    stringify_tree:(tree)=>
-        result = {}
-        for line in coroutine.wrap(-> @_yield_tree(tree))
-            insert(result, line)
-        return concat result, "\n"
-
-    run: (src, filename, output_file=nil)=>
-        if @debug
-            @writeln "COMPILING:\n#{src}"
-        tree = @parse(src, filename)
-        assert tree, "Tree failed to compile: #{src}"
-        code, retval = @tree_to_lua(tree)
-        if output_file
-            output = io.open(output_file, "w")
-            output\write(code)
-        return retval, code
 
     error: (...)=>
         @writeln "ERROR!"
@@ -525,40 +488,14 @@ class NomsuCompiler
         @callstack = {}
         error!
 
-    test: (src, filename, expected)=>
-        i = 1
-        while i != nil
-            start,stop = src\find("\n\n", i)
-
-            test = src\sub(i,start)
-            i = stop
-            start,stop = test\find"==="
-            if not start or not stop then
-                @error("WHERE'S THE ===? in:\n#{test}")
-            test_src, expected = test\sub(1,start-1), test\sub(stop+1,-1)
-            expected = expected\match'[\n]*(.*[^\n])'
-            tree = @parse(test_src, filename)
-            got = @stringify_tree(tree.value.body)
-            if got != expected
-                @error"TEST FAILED!\nSource:\n#{test_src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
-
-
     initialize_core: =>
         -- Sets up some core functionality
-        @defmacro "lua block %lua_code", (vars, kind)=>
-            if kind == "Expression" then error("Expected to be in statement.")
+        @defmacro "lua code %statements with value %value", (vars)=>
             inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
-            lua = @tree_to_value(vars.lua_code, inner_vars)
-            if not lua\match("^do\n.*\nend$")
-                lua = "do\n#{lua}\nend"
-            return lua, true
-
-        @defmacro "lua expr %lua_code", (vars, kind)=>
-            lua_code = vars.lua_code.value
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
-            lua = @tree_to_value(vars.lua_code, inner_vars)
-            return lua
-
+            statements = @tree_to_value(vars.statements, inner_vars)
+            value = @tree_to_value(vars.value, inner_vars)
+            return value, statements
+        
         @def "require %filename", (vars)=>
             if not @loaded_files[vars.filename]
                 file = io.open(vars.filename)
@@ -574,12 +511,11 @@ class NomsuCompiler
             return @run(file\read('*a'), vars.filename)
 
 
--- Run on the command line via "./nomsu.moon input_file.nom" to execute
--- and "./nomsu.moon input_file.nom output_file.lua" to compile (use "-" to compile to stdout)
 if arg and arg[1]
     --ProFi = require 'ProFi'
     --ProFi\start()
     c = NomsuCompiler()
+    c.debug = true
     input = io.open(arg[1])\read("*a")
     -- If run via "./nomsu.moon file.nom -", then silence output and print generated
     -- source code instead.
@@ -592,18 +528,12 @@ if arg and arg[1]
         output = if arg[2] == "-"
             io.output()
         else io.open(arg[2], 'w')
-
-        output\write [[
-    local load = function()
-    ]]
-        output\write(code)
-        output\write [[
-
-    end
+        output\write ([[
     local NomsuCompiler = require('nomsu')
     local c = NomsuCompiler()
-    return load()(c, {})
-    ]]
+    local run = %s
+    return run(c, {})
+    ]])\format(code)
     --ProFi\stop()
     --ProFi\writeReport( 'MyProfilingReport.txt' )
 

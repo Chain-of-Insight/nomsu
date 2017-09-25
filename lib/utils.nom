@@ -44,22 +44,10 @@ macro [say %str] =:
     ".."|nomsu:writeln(nomsu.utils.repr_if_not_string(\%str as lua\))
 
 # Number ranges
-macro [%start up to %stop] =: ".."
-    |nomsu.utils.range(\%start as lua\, \%stop as lua\-1)
-macro [%start thru %stop, %start through %stop] =: ".."
-    |nomsu.utils.range(\%start as lua\, \%stop as lua\)
-macro [%start down to %stop] =: ".."
-    |nomsu.utils.range(\%start as lua\, \%stop as lua\+1,-1)
-macro [%start down thru %stop, %start down through %stop] =: ".."
-    |nomsu.utils.range(\%start as lua\, \%stop as lua\,-1)
-macro [%start up to %stop via %step] =: ".."
-    |nomsu.utils.range(\%start as lua\,\%stop as lua\-1,vars.step)
-macro [%start thru %stop via %step, %start through %stop via %step] =: ".."
-    |nomsu.utils.range(\%start as lua\,\%stop as lua\,vars.step)
-macro [%start down to %stop via %step] =: ".."
-    |nomsu.utils.range(\%start as lua\,\%stop as lua\+1,-vars.step)
-macro [%start down thru %stop via %step, %start down through %stop via %step] =: ".."
-    |nomsu.utils.range(\%start as lua\,\%stop as lua\,-vars.step)
+macro [%start to %stop] =: ".."
+   |nomsu.utils.range(\%start as lua\, \%stop as lua\)
+macro [%start to %stop by %step, %start to %stop via %step] =: ".."
+   |nomsu.utils.range(\%start as lua\, \%stop as lua\, \%step as lua\)
 
 # Common utility functions
 macro [random number, random, rand] =: "math.random()"

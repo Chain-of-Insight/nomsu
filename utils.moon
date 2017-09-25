@@ -7,6 +7,10 @@ utils = {
             i += 1
         return true
 
+    size: (t)->
+        with n = 0
+            for _ in pairs(t) do n += 1
+
     repr: (x)->
         switch type(x)
             when 'table'
@@ -18,7 +22,9 @@ utils = {
                 else
                     "{#{table.concat(["[#{utils.repr(k)}]= #{utils.repr(v)}" for k,v in pairs x], ", ")}}"
             when 'string'
-                if not x\find[["]] and not x\find"\n" and not x\find"\\"
+                if x == "\n"
+                    return "'\\n'"
+                elseif not x\find[["]] and not x\find"\n" and not x\find"\\"
                     "\""..x.."\""
                 elseif not x\find[[']] and not x\find"\n" and not x\find"\\"
                     "\'"..x.."\'"
