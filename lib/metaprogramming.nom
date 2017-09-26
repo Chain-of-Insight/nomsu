@@ -5,32 +5,74 @@
 # Nil
 lua code ".."
     |nomsu:defmacro("nil", function(nomsu, vars) return "nil", nil end)
-..with value 0
 
 # Macros:
 lua code ".."
-    |nomsu:def("parse %shorthand as %longhand", function(nomsu, vars)
-    |    local alias = nomsu:get_alias(vars.shorthand)
+    |local function parse_as(nomsu, vars)
+    |    if vars.shorthand.type ~= "Block" then
+    |        nomsu:error("Expected shorthand to be Block, but got "..vars.shorthand.type)
+    |    end
+    |    if vars.longhand.type ~= "Block" then
+    |        nomsu:error("Expected longhand to be Block, but got "..vars.longhand.type)
+    |    end
     |    local template = vars.longhand
-    |    nomsu:defmacro(alias, function(nomsu, vars)
-    |        return nomsu:tree_to_lua(nomsu:replaced_vars(template, vars))
-    |    end)
-    |end)
-..with value (nil)
+    |    local function parsing_as(nomsu, vars)
+    |        local expanded = nomsu:replaced_vars(template, vars)
+    |        local expr,statement = nomsu:tree_to_lua(expanded)
+    |        return expr, statement
+    |    end
+    |    for _,call in ipairs(vars.shorthand.value) do
+    |        nomsu:defmacro(call, parsing_as)
+    |    end
+    |end
+    |nomsu:def("parse nomsu %shorthand as nomsu %longhand", parse_as)
+parse nomsu \(parse %shorthand as %longhand) as nomsu \(parse nomsu \%shorthand as nomsu \%longhand)
+parse (foo %x) as (baz %x)
 
-parse \(lua code %code) as\: lua code %code with value (nil)
-parse \(lua block %block) as\:
+lua code ".."
+    |nomsu:defmacro("lua expr %code", function(nomsu, vars)
+    |    return nomsu:tree_to_value(vars.code, vars), nil
+    |end)
+
+
+# Rule that lets you make new rules
+lua code ".."
+    |nomsu:defmacro("rule %rule_def = %body", function(nomsu, vars)
+    |    if vars.rule_def.type ~= "Block" then
+    |        nomsu:error("Wrong type for rule definition, expected Block, but got "..vars.rule_def.type)
+    |    end
+    |    local thunk = nomsu:tree_to_lua({type="Thunk", value=vars.body, src=vars.body.src})
+    |    local fn_name = "fn_"..nomsu:var_to_lua_identifier(nomsu:get_stub(vars.rule_def.value[1]))
+    |    local lua = ([[
+    |do
+    |    local %s = %s
+    |    for _,alias in ipairs(%s) do
+    |        nomsu:def(alias, %s)
+    |    end
+    |end]]):format(fn_name, thunk, nomsu:repr(vars.rule_def.value), fn_name)
+    |    return nil, lua
+    |end)
+parse (rule %rule_name) as: lua expr "nomsu.defs[(nomsu:get_stub(\(%rule_name).value[1]))]"
+
+
+# Macro helper functions
+rule (%tree as value) =:
+    lua expr "nomsu:tree_to_value(vars.tree, vars)"
+
+rule (%tree as lua) =:
+    lua expr "nomsu:tree_to_lua(vars.tree)"
+
+
+parse (lua block %block) as:
     lua code ".."
         |do
         |    \(%block)
         |end
-    ..with value (nil)
-parse \(lua value %value) as\: lua code (nil) with value %value
 
-parse \(nomsu) as\: lua value "nomsu"
-parse \(nomsu's %key) as\:
-    lua value "nomsu[\(%key as lua)]"
-parse \(nomsu %method %args) as\:
+parse (nomsu) as: lua expr "nomsu"
+parse (nomsu's %key) as:
+    lua expr "nomsu[\(%key as lua)]"
+parse (nomsu %method %args) as:
     lua block ".."
         |local args = {"nomsu"}
         |for _,arg in ipairs(vars.args.value) do
@@ -39,15 +81,7 @@ parse \(nomsu %method %args) as\:
         |local method_name = nomsu:repr(nomsu:tree_to_value(vars.method, vars))
     ..with value ".."
         |("nomsu[%s](%s)"):format(method_name, table.concat(args, ", "))
-parse \(repr %) as\: nomsu "repr" [%]
-
-# Rule that lets you make new rules
-lua block ".."
-    |nomsu:def("rule helper %rule_def = %body", function(nomsu, vars)
-    |    nomsu:def(nomsu:get_alias(vars.rule_def), vars.body)
-    |end)
-parse \(rule %rule_def = %body) as\: rule helper \(%rule_def) = \(%body)
-parse \(rule %rule_name) as\: lua value "nomsu.defs[nomsu:get_alias(\(%rule_name))]"
+parse (repr %) as: nomsu "repr" [%]
 
 # Get the source code for a function
 rule (help %rule) =:
@@ -56,16 +90,9 @@ rule (help %rule) =:
         |if not fn_def then
         |    nomsu:writeln("Rule not found: "..nomsu:repr(vars.rule))
         |else
-        |    nomsu:writeln("rule "..nomsu:repr(nomsu.utils.keys(fn_def.aliases))
+        |    nomsu:writeln("rule "..nomsu:repr(nomsu.utils.keys(fn_def.invocation))
         |        .." ="..(fn_def.src or ":\\n    <unknown source code>"))
         |end
-
-# Macro helper functions
-rule (%tree as value) =:
-    lua expr "nomsu:tree_to_value(vars.tree, vars)"
-
-rule (%tree as lua) =:
-    lua expr "nomsu:tree_to_lua(vars.tree)"
 
 # Compiler tools
 rule (eval %code; run %code) =: nomsu "run" [%code]
@@ -80,9 +107,7 @@ rule (source code from tree %tree) =:
         |    return vars.tree.src:match(":%s*(%S.*)").."\\n"
         |end
 
-macro (source code %body) =:
-    nomsu "repr" [nomsu "call" ["source code from tree %", %body]]
+parse (source code %body) as: source code from tree \%body
 
-macro (parse tree %code) =:
-    nomsu "repr" [nomsu "stringify_tree" [lua expr "vars.code.value"]]
+parse (parse tree %code) as: repr (nomsu "tree_to_str" [\%code])
 

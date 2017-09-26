@@ -16,7 +16,7 @@ lpeg = require 'lpeg'
 utils = require 'utils'
 repr = utils.repr
 {:insert, :remove, :concat} = table
-pcall = (fn,...)-> true, fn(...)
+--pcall = (fn,...)-> true, fn(...)
 
 -- TODO:
 -- use actual variables instead of a vars table
@@ -74,9 +74,9 @@ nomsu = [=[
             (dedent / (({.+} ("" -> "Error while parsing block")) => error))
         |} }) -> Block
 
-    inline_nomsu <- ({ ("\" inline_block ) }) -> Nomsu
-    eol_nomsu <- ({ ("\" eol_block ) }) -> Nomsu
-    indented_nomsu <- ({ ("\" {indented_block} ) }) -> Nomsu
+    inline_nomsu <- ({ ("\" inline_expression) }) -> Nomsu
+    eol_nomsu <- ({ ("\" noeol_expression) }) -> Nomsu
+    indented_nomsu <- ({ ("\" expression) }) -> Nomsu
 
     inline_expression <- number / variable / inline_string / inline_list / inline_block / inline_nomsu
     noeol_expression <- indented_string / indented_block / indented_nomsu / indented_list / inline_expression
@@ -187,42 +187,40 @@ class NomsuCompiler
         @write("\n")
     
     def: (invocation, thunk, src)=>
-        if type(invocation) != 'string' then @error "Invocation should be string, not: #{repr invocation}"
-        if @debug then @writeln "Defining rule: #{repr invocation}"
-        stub = invocation\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
-        args = [arg for arg in invocation\gmatch("%%(%S[^%s']*)")]
-        for i=1,#args-1 do for j=i+1,#args
-            if args[i] == args[j] then @error "Duplicate argument in function def: #{args[i]}"
-        with @defs[invocation] = {:thunk, :invocation, :args, :src, is_macro:false} do nil
+        stub, arg_names = @get_stub invocation
+        assert stub, "NO STUB FOUND: #{repr invocation}"
+        if @debug then @writeln "Defining rule: #{repr stub} with args #{repr arg_names}"
+        for i=1,#arg_names-1 do for j=i+1,#arg_names
+            if arg_names[i] == arg_names[j] then @error "Duplicate argument in function #{stub}: '#{arg_names[i]}'"
+        with @defs[stub] = {:thunk, :invocation, :arg_names, :src, is_macro:false} do nil
 
     defmacro: (invocation, thunk, src)=>
         with @def(invocation, thunk, src) do .is_macro = true
 
-    call: (alias,...)=>
-        def = @defs[alias]
+    call: (stub,...)=>
+        def = @defs[stub]
         if def == nil
-            @error "Attempt to call undefined function: #{alias}"
+            @error "Attempt to call undefined function: #{stub}"
         -- This is a little bit hacky, but having this check is handy for catching mistakes
         -- I use a hash sign in "#macro" so it's guaranteed to not be a valid function name
         if def.is_macro and @callstack[#@callstack] != "#macro"
-            @error "Attempt to call macro at runtime: #{alias}\nThis can be caused by using a macro in a function that is defined before the macro."
+            @error "Attempt to call macro at runtime: #{stub}\nThis can be caused by using a macro in a function that is defined before the macro."
         unless @check_permission(def)
-            @error "You do not have the authority to call: #{alias}"
-        {:thunk, :args} = def
-        args = {name, select(i,...) for i,name in ipairs(args)}
+            @error "You do not have the authority to call: #{stub}"
+        {:thunk, :arg_names} = def
+        args = {name, select(i,...) for i,name in ipairs(arg_names)}
         if @debug
-            @writeln "Calling #{repr alias} with args: #{repr(args)}"
-        insert @callstack, alias
+            @writeln "Calling #{repr stub} with args: #{repr(args)}"
+        insert @callstack, stub
         -- TODO: optimize, but still allow multiple return values?
         rets = {thunk(self,args)}
         remove @callstack
         return unpack(rets)
     
     run_macro: (tree, kind="Expression")=>
-        local args, alias
-        alias,args = @get_alias tree
+        stub,args = @get_stub tree
         insert @callstack, "#macro"
-        expr, statement = @call(alias, unpack(args))
+        expr, statement = @call(stub, unpack(args))
         remove @callstack
         return expr, statement
 
@@ -257,12 +255,15 @@ class NomsuCompiler
     run: (src, filename)=>
         tree = @parse(src, filename)
         assert tree, "Tree failed to compile: #{src}"
-        assert tree.type == "File"
+        assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
 
         buffer = {}
         vars = {}
         return_value = nil
         for statement in *tree.value
+            if @debug
+                @writeln "RUNNING TREE:"
+                @print_tree statement
             ok,expr,statements = pcall(@tree_to_lua, self, statement)
             if not ok
                 @writeln "Error occurred in statement:\n#{statement.src}"
@@ -282,7 +283,7 @@ class NomsuCompiler
             if expr then return_value = ret
             if not ok
                 @writeln "Error occurred in statement:\n#{statement.src}"
-                @error(return_value)
+                @error(repr return_value)
             insert buffer, "#{statements or ''}\n#{expr and "ret = #{expr}" or ''}"
         
         lua_code = ([[
@@ -305,6 +306,7 @@ class NomsuCompiler
         -- Return <lua code for value>, <additional lua code>
         assert tree, "No tree provided."
         if not tree.type
+            @writeln debug.traceback()
             @error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
@@ -313,27 +315,32 @@ class NomsuCompiler
             when "Nomsu"
                 return repr(tree.value), nil
 
-            when "Block"
+            when "Thunk" -- This is not created by the parser, it's just a helper
                 lua_bits = {}
-                for arg in *tree.value
+                for arg in *tree.value.value
                     expr,statement = @tree_to_lua arg
-                    -- Optimization for common case
-                    if expr and not statement and #tree.value == 1
-                        return expr, nil
                     if statement then insert lua_bits, statement
                     if expr then insert lua_bits, "ret = #{expr}"
                 return ([[
-                    function(nomsu, vars)
+                    (function(nomsu, vars)
                         local ret
                         %s
                         return ret
-                    end]])\format(concat lua_bits, "\n")
+                    end)]])\format(concat lua_bits, "\n")
+
+            when "Block"
+                if #tree.value == 1
+                    expr,statement = @tree_to_lua tree.value[1]
+                    if not statement
+                        return expr, nil
+                thunk_lua = @tree_to_lua {type:"Thunk", value:tree, src:tree.src}
+                return ("%s(nomsu, vars)")\format(thunk_lua), nil
 
             when "FunctionCall"
-                alias = @get_alias(tree)
-                if @defs[alias] and @defs[alias].is_macro
+                stub = @get_stub(tree)
+                if @defs[stub] and @defs[stub].is_macro
                     return @run_macro(tree, "Expression")
-                args = {repr(alias)}
+                args = {repr(stub)}
                 for arg in *tree.value
                     if arg.type == 'Word' then continue
                     expr,statement = @tree_to_lua arg
@@ -380,16 +387,32 @@ class NomsuCompiler
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
     
-    print_tree: (tree, ind="")=>
-        if type(tree) ~= 'table' or not tree.type
-            @writeln "#{ind}#{repr tree}"
+    walk_tree: (tree, depth=0)=>
+        coroutine.yield(tree, depth)
+        if type(tree) != 'table' or not tree.type
             return
-        @writeln "#{ind}#{tree.type}:"
         switch tree.type
-            when "List", "File", "Block", "FunctionCall", "String"
+            when "List", "File", "Nomsu", "Block", "FunctionCall", "String"
                 for v in *tree.value
-                    @print_tree(v, ind.."    ")
-            else @print_tree(tree.value, ind.."    ")
+                    @walk_tree(v, depth+1)
+            else @walk_tree(tree.value, depth+1)
+        return nil
+
+    print_tree: (tree)=>
+        for node,depth in coroutine.wrap(-> @walk_tree tree)
+            if type(node) != 'table' or not node.type
+                @writeln(("    ")\rep(depth)..repr(node))
+            else
+                @writeln("#{("    ")\rep(depth)}#{node.type}:")
+    
+    tree_to_str: (tree)=>
+        bits = {}
+        for node,depth in coroutine.wrap(-> @walk_tree tree)
+            if type(node) != 'table' or not node.type
+                insert bits, (("    ")\rep(depth)..repr(node))
+            else
+                insert bits, ("#{("    ")\rep(depth)}#{node.type}:")
+        return concat(bits, "\n")
 
     @unescape_string: (str)=>
         str\gsub("\\(.)", ((c)-> STRING_ESCAPES[c] or c))
@@ -414,8 +437,8 @@ class NomsuCompiler
             when "Var"
                 if vars[tree.value]
                     tree = vars[tree.value]
-            when "File", "Thunk", "Statement", "Block", "List", "FunctionCall", "String"
-                new_value = @replaced_vars tree.value
+            when "File", "Nomsu", "Thunk", "Block", "List", "FunctionCall", "String"
+                new_value = @replaced_vars tree.value, vars
                 if new_value != tree.value
                     tree = {k,v for k,v in pairs(tree)}
                     tree.value = new_value
@@ -423,52 +446,39 @@ class NomsuCompiler
                 new_values = {}
                 any_different = false
                 for k,v in pairs tree
-                    new_values[k] = @replaced_vars v
+                    new_values[k] = @replaced_vars v, vars
                     any_different or= (new_values[k] != tree[k])
                 if any_different
                     tree = new_values
         return tree
 
-    get_alias: (x)=>
-        if not x then @error "Nothing to get alias from"
-        -- Returns a single alias ("say %"), and list of args ({msg}) from a single rule def
+    get_stub: (x)=>
+        if not x
+            @error "Nothing to get stub from"
+        -- Returns a single stub ("say %"), and list of args ({msg}) from a single rule def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
-            alias = x\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
-            args = [arg for arg in x\gmatch("%%(%S[^%s']*)")]
-            return alias, args
+            stub = x\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
+            args = [arg for arg in x\gmatch("%%([^%s']*)")]
+            return stub, args
         switch x.type
-            when "String" then return @get_alias(x.value)
-            when "Statement" then return @get_alias(x.value)
+            when "String" then return @get_stub(x.value)
             when "FunctionCall"
-                alias, args = {}, {}, {}
+                stub, args = {}, {}, {}
                 for token in *x.value
                     switch token.type
                         when "Word"
-                            insert alias, token.value
+                            insert stub, token.value
                         when "Var"
-                            insert alias, "%"
+                            insert stub, "%"
                             insert args, token.value
                         else
-                            insert alias, "%"
+                            insert stub, "%"
                             insert args, token
-                return concat(alias," "), args
-
-    get_aliases:(x)=>
-        if not x then @error "Nothing to get aliases from"
-        if type(x) == 'string'
-            alias, args = @get_alias(x)
-            return {[alias]: args}
-        switch x.type
-            when "String" then return @get_aliases({x.value})
-            when "Statement" then return @get_aliases({x.value})
-            when "FunctionCall" then return @get_aliases({x})
-            when "List" then x = x.value
-            when "Block" then x = x.value
-        with {}
-            for y in *x
-                alias,args = @get_alias(y)
-                [alias] = args
+                return concat(stub," "), args
+            when "Block"
+                @writeln debug.traceback!
+                @error "Please pass in a single line from a block, not the whole thing:\n#{@tree_to_str x}"
 
     var_to_lua_identifier: (var)=>
         -- Converts arbitrary nomsu vars to valid lua identifiers by replacing illegal
@@ -480,7 +490,8 @@ class NomsuCompiler
 
     error: (...)=>
         @writeln "ERROR!"
-        @writeln(...)
+        if select(1, ...)
+            @writeln(...)
         @writeln("Callstack:")
         for i=#@callstack,1,-1
             @writeln "    #{@callstack[i]}"
@@ -490,32 +501,39 @@ class NomsuCompiler
 
     initialize_core: =>
         -- Sets up some core functionality
-        @defmacro "lua code %statements with value %value", (vars)=>
+        lua_code = (vars)=>
             inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
-            statements = @tree_to_value(vars.statements, inner_vars)
-            value = @tree_to_value(vars.value, inner_vars)
-            return value, statements
+            lua = @tree_to_value(vars.code, inner_vars)
+            return nil, lua
+        @defmacro "lua code %code", lua_code
+
+        lua_value = (vars)=>
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
+            lua = @tree_to_value(vars.code, inner_vars)
+            return lua, nil
+        @defmacro "lua value %code", lua_value
         
-        @def "require %filename", (vars)=>
+        _require = (vars)=>
             if not @loaded_files[vars.filename]
                 file = io.open(vars.filename)
                 if not file
                     @error "File does not exist: #{vars.filename}"
                 @loaded_files[vars.filename] = (@run(file\read('*a'), vars.filename)) or true
             return @loaded_files[vars.filename]
+        @def "require %filename", _require
 
-        @def "run file %filename", (vars)=>
+        run_file = (vars)=>
             file = io.open(vars.filename)
             if not file
                 @error "File does not exist: #{vars.filename}"
             return @run(file\read('*a'), vars.filename)
+        @def "run file %filename", run_file
 
 
 if arg and arg[1]
     --ProFi = require 'ProFi'
     --ProFi\start()
     c = NomsuCompiler()
-    c.debug = true
     input = io.open(arg[1])\read("*a")
     -- If run via "./nomsu.moon file.nom -", then silence output and print generated
     -- source code instead.

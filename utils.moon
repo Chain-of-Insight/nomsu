@@ -1,6 +1,7 @@
 local utils
 utils = {
     is_list: (t)->
+        if type(t) != 'table' then return false
         i = 1
         for _ in pairs(t)
             if t[i] == nil then return false
