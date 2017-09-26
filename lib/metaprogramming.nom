@@ -27,7 +27,6 @@ lua code ".."
     |end
     |nomsu:def("parse nomsu %shorthand as nomsu %longhand", parse_as)
 parse nomsu \(parse %shorthand as %longhand) as nomsu \(parse nomsu \%shorthand as nomsu \%longhand)
-parse (foo %x) as (baz %x)
 
 lua code ".."
     |nomsu:defmacro("lua expr %code", function(nomsu, vars)
@@ -71,17 +70,12 @@ parse (lua block %block) as:
 
 parse (nomsu) as: lua expr "nomsu"
 parse (nomsu's %key) as:
-    lua expr "nomsu[\(%key as lua)]"
+    lua expr "nomsu['\(%key)']"
 parse (nomsu %method %args) as:
-    lua block ".."
-        |local args = {"nomsu"}
-        |for _,arg in ipairs(vars.args.value) do
-        |    table.insert(args, nomsu:tree_to_lua(arg))
-        |end
-        |local method_name = nomsu:repr(nomsu:tree_to_value(vars.method, vars))
-    ..with value ".."
-        |("nomsu[%s](%s)"):format(method_name, table.concat(args, ", "))
+    lua expr "nomsu['\(%method)'](nomsu, unpack(\(%args)))"
 parse (repr %) as: nomsu "repr" [%]
+repr 5
+
 
 # Get the source code for a function
 rule (help %rule) =:
@@ -111,3 +105,18 @@ parse (source code %body) as: source code from tree \%body
 
 parse (parse tree %code) as: repr (nomsu "tree_to_str" [\%code])
 
+parse (parse %code as lua code %lua) as:
+    parse nomsu \%code as nomsu:
+        nomsu "replaced_vars" [\(lua code %lua), lua expr "vars"]
+
+parse (parse %code as lua expr %lua) as:
+    parse nomsu \%code as nomsu:
+        nomsu "replaced_vars" [\(lua expr %lua), lua expr "vars"]
+
+parse (parse %code as lua block %lua) as:
+    parse nomsu \%code as nomsu:
+        nomsu "replaced_vars" [\(lua block %lua), lua expr "vars"]
+
+parse (pass) as lua code: ""
+
+pass

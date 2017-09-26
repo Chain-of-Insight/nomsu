@@ -1,6 +1,9 @@
 local utils
 utils = {
   is_list = function(t)
+    if type(t) ~= 'table' then
+      return false
+    end
     local i = 1
     for _ in pairs(t) do
       if t[i] == nil then

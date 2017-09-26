@@ -7,10 +7,6 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local pcall
-pcall = function(fn, ...)
-  return true, fn(...)
-end
 lpeg.setmaxstack(10000)
 local P, V, S, Cg, C, Cp, B, Cmt
 P, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
@@ -65,13 +61,13 @@ local nomsu = [=[    file <- ({ {| shebang?
     inline_block <- ({ {| "(" inline_statements ")" |} }) -> Block
     eol_block <- ({ {| ":" %ws? noeol_statements eol |} }) -> Block
     indented_block <- ({ {| (":" / "(..)") indent
-                statements
+                statements (nodent statements)*
             (dedent / (({.+} ("" -> "Error while parsing block")) => error))
         |} }) -> Block
 
-    inline_nomsu <- ({ ("\" inline_block ) }) -> Nomsu
-    eol_nomsu <- ({ ("\" eol_block ) }) -> Nomsu
-    indented_nomsu <- ({ ("\" {indented_block} ) }) -> Nomsu
+    inline_nomsu <- ({ ("\" inline_expression) }) -> Nomsu
+    eol_nomsu <- ({ ("\" noeol_expression) }) -> Nomsu
+    indented_nomsu <- ({ ("\" expression) }) -> Nomsu
 
     inline_expression <- number / variable / inline_string / inline_list / inline_block / inline_nomsu
     noeol_expression <- indented_string / indented_block / indented_nomsu / indented_list / inline_expression
@@ -192,27 +188,15 @@ do
       return self:write("\n")
     end,
     def = function(self, invocation, thunk, src)
-      if type(invocation) ~= 'string' then
-        self:error("Invocation should be string, not: " .. tostring(repr(invocation)))
-      end
+      local stub, arg_names = self:get_stub(invocation)
+      assert(stub, "NO STUB FOUND: " .. tostring(repr(invocation)))
       if self.debug then
-        self:writeln("Defining rule: " .. tostring(repr(invocation)))
+        self:writeln("Defining rule: " .. tostring(repr(stub)) .. " with args " .. tostring(repr(arg_names)))
       end
-      local stub = invocation:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
-      local args
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for arg in invocation:gmatch("%%(%S[^%s']*)") do
-          _accum_0[_len_0] = arg
-          _len_0 = _len_0 + 1
-        end
-        args = _accum_0
-      end
-      for i = 1, #args - 1 do
-        for j = i + 1, #args do
-          if args[i] == args[j] then
-            self:error("Duplicate argument in function def: " .. tostring(args[i]))
+      for i = 1, #arg_names - 1 do
+        for j = i + 1, #arg_names do
+          if arg_names[i] == arg_names[j] then
+            self:error("Duplicate argument in function " .. tostring(stub) .. ": '" .. tostring(arg_names[i]) .. "'")
           end
         end
       end
@@ -220,11 +204,11 @@ do
         local _with_0 = {
           thunk = thunk,
           invocation = invocation,
-          args = args,
+          arg_names = arg_names,
           src = src,
           is_macro = false
         }
-        self.defs[invocation] = _with_0
+        self.defs[stub] = _with_0
         local _ = nil
         return _with_0
       end
@@ -236,30 +220,31 @@ do
         return _with_0
       end
     end,
-    call = function(self, alias, ...)
-      local def = self.defs[alias]
+    call = function(self, stub, ...)
+      local def = self.defs[stub]
       if def == nil then
-        self:error("Attempt to call undefined function: " .. tostring(alias))
+        self:error("Attempt to call undefined function: " .. tostring(stub))
       end
       if def.is_macro and self.callstack[#self.callstack] ~= "#macro" then
-        self:error("Attempt to call macro at runtime: " .. tostring(alias) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
+        self:error("Attempt to call macro at runtime: " .. tostring(stub) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
       end
       if not (self:check_permission(def)) then
-        self:error("You do not have the authority to call: " .. tostring(alias))
+        self:error("You do not have the authority to call: " .. tostring(stub))
       end
-      local thunk, args
-      thunk, args = def.thunk, def.args
+      local thunk, arg_names
+      thunk, arg_names = def.thunk, def.arg_names
+      local args
       do
         local _tbl_0 = { }
-        for i, name in ipairs(args) do
+        for i, name in ipairs(arg_names) do
           _tbl_0[name] = select(i, ...)
         end
         args = _tbl_0
       end
       if self.debug then
-        self:writeln("Calling " .. tostring(repr(alias)) .. " with args: " .. tostring(repr(args)))
+        self:writeln("Calling " .. tostring(repr(stub)) .. " with args: " .. tostring(repr(args)))
       end
-      insert(self.callstack, alias)
+      insert(self.callstack, stub)
       local rets = {
         thunk(self, args)
       }
@@ -270,10 +255,9 @@ do
       if kind == nil then
         kind = "Expression"
       end
-      local args, alias
-      alias, args = self:get_alias(tree)
+      local stub, args = self:get_stub(tree)
       insert(self.callstack, "#macro")
-      local expr, statement = self:call(alias, unpack(args))
+      local expr, statement = self:call(stub, unpack(args))
       remove(self.callstack)
       return expr, statement
     end,
@@ -319,13 +303,17 @@ do
     run = function(self, src, filename)
       local tree = self:parse(src, filename)
       assert(tree, "Tree failed to compile: " .. tostring(src))
-      assert(tree.type == "File")
+      assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local buffer = { }
       local vars = { }
       local return_value = nil
       local _list_0 = tree.value
       for _index_0 = 1, #_list_0 do
         local statement = _list_0[_index_0]
+        if self.debug then
+          self:writeln("RUNNING TREE:")
+          self:print_tree(statement)
+        end
         local ok, expr, statements = pcall(self.tree_to_lua, self, statement)
         if not ok then
           self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
@@ -350,7 +338,7 @@ do
         end
         if not ok then
           self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
-          self:error(return_value)
+          self:error(repr(return_value))
         end
         insert(buffer, tostring(statements or '') .. "\n" .. tostring(expr and "ret = " .. tostring(expr) or ''))
       end
@@ -372,6 +360,7 @@ do
     tree_to_lua = function(self, tree)
       assert(tree, "No tree provided.")
       if not tree.type then
+        self:writeln(debug.traceback())
         self:error("Invalid tree: " .. tostring(repr(tree)))
       end
       local _exp_0 = tree.type
@@ -379,15 +368,12 @@ do
         return error("Should not be converting File to lua through this function.")
       elseif "Nomsu" == _exp_0 then
         return repr(tree.value), nil
-      elseif "Block" == _exp_0 then
+      elseif "Thunk" == _exp_0 then
         local lua_bits = { }
-        local _list_0 = tree.value
+        local _list_0 = tree.value.value
         for _index_0 = 1, #_list_0 do
           local arg = _list_0[_index_0]
           local expr, statement = self:tree_to_lua(arg)
-          if expr and not statement and #tree.value == 1 then
-            return expr, nil
-          end
           if statement then
             insert(lua_bits, statement)
           end
@@ -395,18 +381,34 @@ do
             insert(lua_bits, "ret = " .. tostring(expr))
           end
         end
-        return ([[                    function(nomsu, vars)
+        return ([[                    (function(nomsu, vars)
                         local ret
                         %s
                         return ret
-                    end]]):format(concat(lua_bits, "\n"))
+                    end)]]):format(concat(lua_bits, "\n"))
+      elseif "Block" == _exp_0 then
+        if #tree.value == 0 then
+          return "nil", nil
+        end
+        if #tree.value == 1 then
+          local expr, statement = self:tree_to_lua(tree.value[1])
+          if not statement then
+            return expr, nil
+          end
+        end
+        local thunk_lua = self:tree_to_lua({
+          type = "Thunk",
+          value = tree,
+          src = tree.src
+        })
+        return ("%s(nomsu, vars)"):format(thunk_lua), nil
       elseif "FunctionCall" == _exp_0 then
-        local alias = self:get_alias(tree)
-        if self.defs[alias] and self.defs[alias].is_macro then
+        local stub = self:get_stub(tree)
+        if self.defs[stub] and self.defs[stub].is_macro then
           return self:run_macro(tree, "Expression")
         end
         local args = {
-          repr(alias)
+          repr(stub)
         }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
@@ -460,6 +462,9 @@ do
         if string_buffer ~= "" then
           insert(concat_parts, repr(string_buffer))
         end
+        if #concat_parts == 0 then
+          return "''", nil
+        end
         return "(" .. tostring(concat(concat_parts, "..")) .. ")", nil
       elseif "List" == _exp_0 then
         local items = { }
@@ -481,25 +486,49 @@ do
         return self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
     end,
-    print_tree = function(self, tree, ind)
-      if ind == nil then
-        ind = ""
+    walk_tree = function(self, tree, depth)
+      if depth == nil then
+        depth = 0
       end
+      coroutine.yield(tree, depth)
       if type(tree) ~= 'table' or not tree.type then
-        self:writeln(tostring(ind) .. tostring(repr(tree)))
         return 
       end
-      self:writeln(tostring(ind) .. tostring(tree.type) .. ":")
       local _exp_0 = tree.type
-      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
+      if "List" == _exp_0 or "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local v = _list_0[_index_0]
-          self:print_tree(v, ind .. "    ")
+          self:walk_tree(v, depth + 1)
         end
       else
-        return self:print_tree(tree.value, ind .. "    ")
+        self:walk_tree(tree.value, depth + 1)
       end
+      return nil
+    end,
+    print_tree = function(self, tree)
+      for node, depth in coroutine.wrap(function()
+        return self:walk_tree(tree)
+      end) do
+        if type(node) ~= 'table' or not node.type then
+          self:writeln(("    "):rep(depth) .. repr(node))
+        else
+          self:writeln(tostring(("    "):rep(depth)) .. tostring(node.type) .. ":")
+        end
+      end
+    end,
+    tree_to_str = function(self, tree)
+      local bits = { }
+      for node, depth in coroutine.wrap(function()
+        return self:walk_tree(tree)
+      end) do
+        if type(node) ~= 'table' or not node.type then
+          insert(bits, (("    "):rep(depth) .. repr(node)))
+        else
+          insert(bits, (tostring(("    "):rep(depth)) .. tostring(node.type) .. ":"))
+        end
+      end
+      return concat(bits, "\n")
     end,
     replaced_vars = function(self, tree, vars)
       if type(tree) ~= 'table' then
@@ -510,8 +539,8 @@ do
         if vars[tree.value] then
           tree = vars[tree.value]
         end
-      elseif "File" == _exp_0 or "Thunk" == _exp_0 or "Statement" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
-        local new_value = self:replaced_vars(tree.value)
+      elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Thunk" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
+        local new_value = self:replaced_vars(tree.value, vars)
         if new_value ~= tree.value then
           do
             local _tbl_0 = { }
@@ -526,7 +555,7 @@ do
         local new_values = { }
         local any_different = false
         for k, v in pairs(tree) do
-          new_values[k] = self:replaced_vars(v)
+          new_values[k] = self:replaced_vars(v, vars)
           any_different = any_different or (new_values[k] ~= tree[k])
         end
         if any_different then
@@ -535,84 +564,47 @@ do
       end
       return tree
     end,
-    get_alias = function(self, x)
+    get_stub = function(self, x)
       if not x then
-        self:error("Nothing to get alias from")
+        self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        local alias = x:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
+        local stub = x:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
         local args
         do
           local _accum_0 = { }
           local _len_0 = 1
-          for arg in x:gmatch("%%(%S[^%s']*)") do
+          for arg in x:gmatch("%%([^%s']*)") do
             _accum_0[_len_0] = arg
             _len_0 = _len_0 + 1
           end
           args = _accum_0
         end
-        return alias, args
+        return stub, args
       end
       local _exp_0 = x.type
       if "String" == _exp_0 then
-        return self:get_alias(x.value)
-      elseif "Statement" == _exp_0 then
-        return self:get_alias(x.value)
+        return self:get_stub(x.value)
       elseif "FunctionCall" == _exp_0 then
-        local alias, args = { }, { }, { }
+        local stub, args = { }, { }, { }
         local _list_0 = x.value
         for _index_0 = 1, #_list_0 do
           local token = _list_0[_index_0]
           local _exp_1 = token.type
           if "Word" == _exp_1 then
-            insert(alias, token.value)
+            insert(stub, token.value)
           elseif "Var" == _exp_1 then
-            insert(alias, "%")
+            insert(stub, "%")
             insert(args, token.value)
           else
-            insert(alias, "%")
+            insert(stub, "%")
             insert(args, token)
           end
         end
-        return concat(alias, " "), args
-      end
-    end,
-    get_aliases = function(self, x)
-      if not x then
-        self:error("Nothing to get aliases from")
-      end
-      if type(x) == 'string' then
-        local alias, args = self:get_alias(x)
-        return {
-          [alias] = args
-        }
-      end
-      local _exp_0 = x.type
-      if "String" == _exp_0 then
-        return self:get_aliases({
-          x.value
-        })
-      elseif "Statement" == _exp_0 then
-        return self:get_aliases({
-          x.value
-        })
-      elseif "FunctionCall" == _exp_0 then
-        return self:get_aliases({
-          x
-        })
-      elseif "List" == _exp_0 then
-        x = x.value
+        return concat(stub, " "), args
       elseif "Block" == _exp_0 then
-        x = x.value
-      end
-      do
-        local _with_0 = { }
-        for _index_0 = 1, #x do
-          local y = x[_index_0]
-          local alias, args = self:get_alias(y)
-          _with_0[alias] = args
-        end
-        return _with_0
+        self:writeln(debug.traceback())
+        return self:error("Please pass in a single line from a block, not the whole thing:\n" .. tostring(self:tree_to_str(x)))
       end
     end,
     var_to_lua_identifier = function(self, var)
@@ -629,7 +621,9 @@ do
     end,
     error = function(self, ...)
       self:writeln("ERROR!")
-      self:writeln(...)
+      if select(1, ...) then
+        self:writeln(...)
+      end
       self:writeln("Callstack:")
       for i = #self.callstack, 1, -1 do
         self:writeln("    " .. tostring(self.callstack[i]))
@@ -639,17 +633,22 @@ do
       return error()
     end,
     initialize_core = function(self)
-      self:defmacro("lua code %statements with value %value", function(self, vars)
-        local inner_vars = setmetatable({ }, {
-          __index = function(_, key)
-            return "vars[" .. tostring(repr(key)) .. "]"
-          end
-        })
-        local statements = self:tree_to_value(vars.statements, inner_vars)
-        local value = self:tree_to_value(vars.value, inner_vars)
-        return value, statements
-      end)
-      self:def("require %filename", function(self, vars)
+      local lua_code
+      lua_code = function(self, vars)
+        local inner_vars = vars
+        local lua = self:tree_to_value(vars.code, inner_vars)
+        return nil, lua
+      end
+      self:defmacro("lua code %code", lua_code)
+      local lua_value
+      lua_value = function(self, vars)
+        local inner_vars = vars
+        local lua = self:tree_to_value(vars.code, inner_vars)
+        return lua, nil
+      end
+      self:defmacro("lua value %code", lua_value)
+      local _require
+      _require = function(self, vars)
         if not self.loaded_files[vars.filename] then
           local file = io.open(vars.filename)
           if not file then
@@ -658,14 +657,17 @@ do
           self.loaded_files[vars.filename] = (self:run(file:read('*a'), vars.filename)) or true
         end
         return self.loaded_files[vars.filename]
-      end)
-      return self:def("run file %filename", function(self, vars)
+      end
+      self:def("require %filename", _require)
+      local run_file
+      run_file = function(self, vars)
         local file = io.open(vars.filename)
         if not file then
           self:error("File does not exist: " .. tostring(vars.filename))
         end
         return self:run(file:read('*a'), vars.filename)
-      end)
+      end
+      return self:def("run file %filename", run_file)
     end
   }
   _base_0.__index = _base_0
@@ -726,7 +728,6 @@ do
 end
 if arg and arg[1] then
   local c = NomsuCompiler()
-  c.debug = true
   local input = io.open(arg[1]):read("*a")
   local _write = c.write
   if arg[2] == "-" then

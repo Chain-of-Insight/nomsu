@@ -70,7 +70,7 @@ nomsu = [=[
     inline_block <- ({ {| "(" inline_statements ")" |} }) -> Block
     eol_block <- ({ {| ":" %ws? noeol_statements eol |} }) -> Block
     indented_block <- ({ {| (":" / "(..)") indent
-                statements
+                statements (nodent statements)*
             (dedent / (({.+} ("" -> "Error while parsing block")) => error))
         |} }) -> Block
 
@@ -329,6 +329,8 @@ class NomsuCompiler
                     end)]])\format(concat lua_bits, "\n")
 
             when "Block"
+                if #tree.value == 0
+                    return "nil",nil
                 if #tree.value == 1
                     expr,statement = @tree_to_lua tree.value[1]
                     if not statement
@@ -367,6 +369,8 @@ class NomsuCompiler
                 if string_buffer ~= ""
                     insert concat_parts, repr(string_buffer)
 
+                if #concat_parts == 0
+                    return "''", nil
                 return "(#{concat(concat_parts, "..")})", nil
 
             when "List"
@@ -502,13 +506,13 @@ class NomsuCompiler
     initialize_core: =>
         -- Sets up some core functionality
         lua_code = (vars)=>
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
+            inner_vars = vars-- setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
             lua = @tree_to_value(vars.code, inner_vars)
             return nil, lua
         @defmacro "lua code %code", lua_code
 
         lua_value = (vars)=>
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
+            inner_vars =  vars--setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
             lua = @tree_to_value(vars.code, inner_vars)
             return lua, nil
         @defmacro "lua value %code", lua_value

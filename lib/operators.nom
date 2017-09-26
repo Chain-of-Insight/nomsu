@@ -1,25 +1,25 @@
 require "lib/metaprogramming.nom"
 
 # Literals
-macro [true, yes] =: "true"
-macro [false, no] =: "false"
-macro [nil, null] =: "nil"
-macro [inf, infinity] =: "math.huge"
-macro [nan, NaN, not a number] =: "(0/0)"
-macro statement [nop, pass] =: ""
+parse (true; yes) as lua expr "true"
+parse (false; no) as lua expr "false"
+parse (nil; null) as lua expr "nil"
+parse (inf; infinity) as lua expr "math.huge"
+parse (nan; NaN; not a number) as lua expr "(0/0)"
+parse (nop; pass) as lua code ""
 
 # Ternary operator
-macro [%if_expr if %condition else %else_expr] =:
-    pass # TODO: Fix compiler bug that doesn't parse right here
+parse (%if_expr if %condition else %else_expr) as lua expr ".."
+    |(function(nomsu, vars)
+    # TODO: fix compiler bug that breaks this code if comments immediately follow ".."
     #.. Note: this uses a function instead of (condition and if_expr or else_expr)
         because that breaks if %if_expr is falsey.
-    ".."|(function(nomsu, vars)
-        |    if \%condition as lua\ then
-        |        return \%if_expr as lua\
-        |    else
-        |        return \%else_expr as lua\
-        |    end
-        |end)(nomsu, vars)
+    |    if \(%condition) then
+    |        return \(%if_expr)
+    |    else
+    |        return \(%else_expr)
+    |    end
+    |end)(nomsu, vars)
 
 # Variable assignment operator, and += type versions
 lua block ".."
@@ -64,11 +64,11 @@ lua block ".."
     |    end
     |    nomsu:defmacro("%a "..nomsu_alias.." %b", (function(nomsu, vars, kind)
     |        return "("..nomsu:tree_to_lua(vars.a).." "..op.." "..nomsu:tree_to_lua(vars.b)..")"
-    |    end), [[".."|(\\%a as lua\\ ]]..op..[[ \\%b as lua\\)]])
+    |    end), [["(\\(%a) ]]..op..[[ \\(%b))"]])
     |end
 # == and != do equivalence checking, rather than identity checking
-macro [%a == %b] =: ".."|nomsu.utils.equivalent(\%a as lua\, \%b as lua\)
-macro [%a != %b] =: ".."|(not nomsu.utils.equivalent(\%a as lua\, \%b as lua\))
+parse (%a == %b) as lua expr "nomsu.utils.equivalent(\(%a), \(%b))"
+parse (%a != %b) as lua expr "(not nomsu.utils.equivalent(\(%a), \(%b)))"
 
 # Commutative Operators defined for up to 8 operands
 # TODO: work out solution for commutative operators using more clever macros
@@ -125,5 +125,5 @@ lua block ".."
     |end
 
 # Unary operators
-macro [- %a] =: ".."|-(\%a as lua\)
-macro [not %a] =: ".."|not (\%a as lua\)
+parse (- %a) as lua expr "-(\(%a))"
+parse (not %a) as lua expr "not (\(%a))"
