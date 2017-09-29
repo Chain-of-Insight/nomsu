@@ -3,73 +3,60 @@ require "lib/operators.nom"
 require "lib/utils.nom"
 
 # Conditionals
-parse (if %condition %if_body) as lua code ".."
-    |if \(%condition) then
-    |    \(lua expr "vars.if_body.value")
+compile (if %condition %if_body) to code: ".."
+    |if \(%condition as lua) then
+    |    \(%if_body as lua statements)
     |end
 
-parse (if %condition %if_body else %else_body) as lua code ".."
-    |if \(%condition) then
-    |    \(lua expr "vars.if_body.value")
+compile (if %condition %if_body else %else_body) to code: ".."
+    |if \(%condition as lua) then
+    |    \(%if_body as lua statements)
     |else
-    |    \(lua expr "vars.else_body.value")
+    |    \(%else_body as lua statements)
     |end
 
 # Return
-parse (return) as lua code "do return end"
-parse (return %return-value) as lua code "do return \(%return-value)"
-parse (do %action) as lua expr ".."
-    |(\(%action))(nomsu, setmetatable({}, {__index=vars}))
-
+compile (return) to code: "do return end"
+compile (return %return-value) to code: "do return \(%return-value as lua) end"
 
 # GOTOs
-parse (-> %label) as lua code ".."
+compile (-> %label) to code: ".."
     |::label_\(nomsu "var_to_lua_identifier" [%label])::
-parse (go to %label) as lua code ".."
+compile (go to %label) to code: ".."
     |goto label_\(nomsu "var_to_lua_identifier" [%label])
 
 # Loop control flow
-parse (stop; stop loop; break) as lua code "break"
-parse (stop for; stop for-loop; break for) as lua code "goto break_for"
-parse (stop repeat; stop repeat-loop; break repeat) as lua code "goto break_repeat"
-parse (stop %var; break %var) as lua code ".."
+compile (stop; stop loop; break) to code: "break"
+compile (stop for; stop for-loop; break for) to code: "goto break_for"
+compile (stop repeat; stop repeat-loop; break repeat) to code: "goto break_repeat"
+compile (stop %var; break %var) to code: ".."
     |goto break_\(nomsu "var_to_lua_identifier" [%var])
 
-parse (continue; continue loop) as lua code "continue"
-parse (continue for; continue for-loop) as lua code "goto continue_for"
-parse (continue repeat; continue repeat-loop) as lua code "goto continue_repeat"
-parse (continue %var; go to next %var; on to the next %var) as lua code ".."
+compile (continue; continue loop) to code: "continue"
+compile (continue for; continue for-loop) to code: "goto continue_for"
+compile (continue repeat; continue repeat-loop) to code: "goto continue_repeat"
+compile (continue %var; go to next %var; on to the next %var) to code: ".."
     |goto continue_\(nomsu "var_to_lua_identifier" [%var])
 
 # While loops
-parse (repeat %body) as lua block ".."
-    |while true do
-    |    \(lua expr "vars.body.value")
-    |    ::continue_repeat::
-    |end
-    |::break_repeat::
-parse (repeat while %condition %body) as lua block ".."
+compile (repeat while %condition %body) to block: ".."
     |while \(%condition) do
-    |    \(lua expr "vars.body.value")
+    |    \(%body as lua statements)
     |    ::continue_repeat::
     |end
     |::break_repeat::
-parse (repeat until %condition %body) as lua block ".."
-    |while not (\(%condition)) do
-    |    \(lua expr "vars.body.value")
-    |    ::continue_repeat::
-    |end
-    |::break_repeat::
+parse (repeat %body) as: repeat while (true) %body
+parse (repeat until %condition %body) as: repeat while (not %condition) %body
 
 # Numeric range for loops
-parse:
+compile:
     for %var from %start to %stop by %step %body
     for %var from %start to %stop via %step %body
-..as lua block ".."
-    |for i=\(%start),\(%stop),\(%step) do
+..to block: ".."
+    |for i=\(%start as lua),\(%stop as lua),\(%step as lua) do
     # This trashes the loop variables, just like in Python.
-    |    \(%var) = i
-    |    \(lua expr "vars.body.value")
+    |    \(%var as lua) = i
+    |    \(%body as lua statements)
     |    ::continue_for::
     |    ::continue_\(nomsu "var_to_lua_identifier" [%var])::
     |end
@@ -82,38 +69,39 @@ parse:
 ..as: for % from %start to %stop via %step %body
 parse (for all %start to %stop %body) as: for all %start to %stop via 1 %body
 
-parse (for %var in %iterable %body) as lua block ".."
-    |for i,value in ipairs(\(%iterable)) do
-    # This trashes the loop variables, just like in Python.
-    |    \(%var) = value
-    |    \(lua expr "vars.body.value")
-    |    ::continue_for::
-    |    ::continue_\(nomsu "var_to_lua_identifier" [%var])::
-    |end
-    |::break_for::
-    |::break_\(nomsu "var_to_lua_identifier" [%var])::
+compile (for %var in %iterable %body) to block:
+    ".."
+        |for i,value in ipairs(\(%iterable as lua)) do
+        # This trashes the loop variables, just like in Python.
+        |    \(%var as lua) = value
+        |    \(%body as lua statements)
+        |    ::continue_for::
+        |    ::continue_\(nomsu "var_to_lua_identifier" [%var])::
+        |end
+        |::break_for::
+        |::break_\(nomsu "var_to_lua_identifier" [%var])::
 parse (for all %iterable %body) as: for % in %iterable %body
 
+
 # Switch statement/multi-branch if
-parse (when %body) as lua block:
+compile (when %body) to block:
     %result =: ""
     %fallthroughs =: []
-    for %statement in (lua expr "vars.body.value.value"):
-        %func-call =: lua expr "vars.statement.value"
-        assert ((lua expr "vars['func-call'].type") == "FunctionCall") ".."
+    for %statement in (%body's "value"):
+        %func-call =: %statement's "value"
+        assert ((%func-call's "type") == "FunctionCall") ".."
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
-        %tokens =: lua expr "vars['func-call'].value"
-
-        %star =: lua expr "vars.tokens[1]"
+        %tokens =: %func-call's "value"
+        %star =: %tokens -> 1
         assert (lua expr "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
             |Invalid format for 'when' statement. Lines must begin with '*'
 
-        %condition =: lua expr "vars.tokens[2]"
+        %condition =: %tokens -> 2
         assert %condition ".."
             |Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
 
-        %thunk =: lua expr "vars.tokens[3]"
-        if (%thunk == (nil)):
+        %action =: %tokens -> 3
+        if (%action == (nil)):
             lua block "table.insert(vars.fallthroughs, vars.condition)"
             go to next %statement
 
@@ -123,13 +111,14 @@ parse (when %body) as lua block:
                 |do
         ..else:
             %condition =: %condition as lua
-            for all %fallthroughs: %condition join= " or \(%)"
+            for all %fallthroughs:
+                %condition join=: " or \(% as lua)"
             %result join=: ".."
                 |
                 |if \(%condition) then
         %result join=: ".."
             |
-            |    \(lua expr "vars.thunk.value")
+            |    \(%action as lua statements)
             |    goto finished_when
             |end
 
@@ -139,25 +128,24 @@ parse (when %body) as lua block:
     %result
 
 # Switch statement
-parse (when %branch-value == ? %body) as lua block:
+compile (when %branch-value == ? %body) to block:
     %result =: "local branch_value = \(%branch-value)"
     %fallthroughs =: []
-    for %statement in (lua expr "vars.body.value.value"):
-        %func-call =: lua expr "vars.statement.value"
-        assert ((lua expr "vars['func-call'].type") == "FunctionCall") ".."
+    for %statement in (%body's "value"):
+        %func-call =: %statement's "value"
+        assert ((%func-call's "type") == "FunctionCall") ".."
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
-        %tokens =: lua expr "vars['func-call'].value"
-
-        %star =: lua expr "vars.tokens[1]"
+        %tokens =: %func-call's "value"
+        %star =: %tokens -> 1
         assert (lua expr "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
             |Invalid format for 'when' statement. Lines must begin with '*'
 
-        %condition =: lua expr "vars.tokens[2]"
+        %condition =: %tokens -> 2
         assert %condition ".."
             |Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
 
-        %thunk =: lua expr "vars.tokens[3]"
-        if (%thunk == (nil)):
+        %action =: %tokens -> 3
+        if (%action == (nil)):
             lua block "table.insert(vars.fallthroughs, vars.condition)"
             go to next %statement
 
@@ -166,14 +154,15 @@ parse (when %branch-value == ? %body) as lua block:
                 |
                 |do
         ..else:
-            %condition =: "branch_value == (\(%condition))"
-            for all %fallthroughs: %condition join= " or (branch_value == \(%))"
+            %condition =: "branch_value == (\(%condition as lua))"
+            for all %fallthroughs:
+                %condition join=: " or (branch_value == \(% as lua))"
             %result join=: ".."
                 |
-                |if \%condition\ then
+                |if \(%condition) then
         %result join=: ".."
             |
-            |    \((lua expr "vars.thunk.value"))
+            |    \(%action as lua statements)
             |    goto finished_when
             |end
 

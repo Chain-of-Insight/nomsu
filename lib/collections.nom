@@ -5,149 +5,122 @@ require "lib/operators.nom"
 # List/dict functions:
 
 # Indexing
-macro [..]
-    %list's %index, %index st in %list, %index nd in %list, %index rd in %list
-    %index th in %list, %index in %list, %list -> %index
-..=:
-    ".."|\%list as lua\[\%index as lua\]
-    ".."|\%list as lua\[\%index as lua\]
-macro [..]
-    %index st to last in %list, %index nd to last in %list, %index rd to last in %list
+parse:
+    %index st in %list; %index nd in %list; %index rd in %list
+    %index th in %list; %index in %list
+..as: %list -> %index
+compile:
+    %index st to last in %list; %index nd to last in %list; %index rd to last in %list
     %index th to last in %list
-..=:
-    ".."|nomsu.utils.nth_to_last(\%list as lua\, \%index as lua\)
+..to: "nomsu.utils.nth_to_last(\(%list as lua), \(%index as lua))"
 
-macro [first in %list, first %list] =:
-    ".."|\%list as lua\[1]
-macro [last in %list, last %list] =:
-    ".."|nomsu.utils.nth_to_last(\%list as lua\, 1)
+parse (first in %list; first %list) as: 1 st in %list
+parse (last in %list; last %list) as: 1 st to last in %list
 
 # Dict iteration convenience function. This could also be accomplished with: for all (entries in %dict): ...
-macro block [for %key -> %value in %dict %body] =:
-    assert ((%key's "type") == "Var") ".."
-        |For loop has the wrong type for the key variable. Expected Var, but got: \%key's "type"\
-    assert ((%value's "type") == "Var") ".."
-        |For loop has the wrong type for the value variable. Expected Var, but got: \%value's "type"\
-    ".."
-        |local vars = setmetatable({}, {__index=vars})
-        |for k, v in pairs(\%dict as lua\) do
-        |    \%key as lua\, \%value as lua\ = k, v
-        |    \%body as lua\
-        |end
+compile (for %key -> %value in %dict %body) to block: ".."
+    |for k, v in pairs(\(%dict as lua)) do
+    |    \(%key as lua), \(%value as lua) = k, v
+    |    \(%body as lua statements)
+    |end
 
 # Membership testing
-rule [%item is in %list, %list contains %item, %list has %item] =:
+rule (%item is in %list; %list contains %item; %list has %item) =:
     for %key -> %value in %list:
         if (%key == %item): return (yes)
     return (no)
-macro [%list has key %index, %list has index %index] =: ".."
-    |(\%list as lua\[\%index as lua\] ~= nil)
 
-rule [..]
-    %item isn't in %list, %item is not in %list
-    %list doesn't contain %item, %list does not contain %item
-    %list doesn't have %item, %list does not have %item
+rule:
+    %item isn't in %list; %item is not in %list
+    %list doesn't contain %item; %list does not contain %item
+    %list doesn't have %item; %list does not have %item
 ..=:
     for %key -> %value in %list:
         if (%key == %item): return (no)
     return (yes)
 
-macro [..]
-    %list doesn't have key %index, %list does not have key %index
-    %list doesn't have index %index, %list does not have index %index
-..=: ".."|(\%list as lua\[\%index as lua\] ~= nil)
+compile (%list has key %index; %list has index %index) to: ".."
+    |(\(%list as lua)[\(%index as lua)] ~= nil)
 
-macro [length of %list, size of %list, size %list, number of %list, len %list] =:
-    ".."|nomsu.utils.size(\%list as lua\)
+compile:
+    %list doesn't have key %index; %list does not have key %index
+    %list doesn't have index %index; %list does not have index %index
+..to: "(\(%list as lua)[\(%index as lua)] ~= nil)"
+
+compile (length of %list; size of %list; size %list; number of %list; len %list) to:
+    "nomsu.utils.size(\(%list as lua))"
 
 # Chained lookup
-macro [%list ->* %indices] =:
+compile (%list ->* %indices) to:
     assert ((%indices's "type") == "List") ".."
-        |Expected List for chained lookup, not \%indices's "type"\
-    %ret =: ".."|(\%list as lua\)
+        |Expected List for chained lookup, not \(%indices's "type")
+    %ret =: "\(%list as lua)"
     for %index in (%indices's "value"):
-        %ret join=: ".."|[\%index as lua\]
-    ".."|(\%ret\)
+        %ret join=: "[\(%index as lua)]"
+    "\(%ret)"
 
 # Assignment
-macro statement [..]
-    %list's %index = %new_value, %index st in %list = %new_value, %index nd in %list = %new_value
-    %index rd in %list = %new_value, %index th in %list = %new_value, %index in %list = %new_value
+compile:
+    %list's %index = %new_value; %index st in %list = %new_value; %index nd in %list = %new_value
+    %index rd in %list = %new_value; %index th in %list = %new_value; %index in %list = %new_value
     %list -> %index = %new_value
-..=:
-    assert ((%new_value's "type") == "Thunk") ".."
+..to code:
+    assert ((%new_value's "type") == "Block") ".."
         |Dict assignment operation has the wrong type for the right hand side.
-        |Expected Thunk, but got \%new_value's "type"\.
+        |Expected Block, but got \(%new_value's "type").
         |Maybe you used "=" instead of "=:"?
-    assert ((size of (%new_value ->*["value","value"])) == 1) ".."
+    assert ((size of (%new_value's "value")) == 1) ".."
         |Dict assignment operation has the wrong number of values on the right hand side.
-        |Expected 1 value, but got \repr %new_value\
-    %new_value =: %new_value ->*["value","value",1]
-    if ((%new_value's "type") == "Statement"): %new_value =: %new_value's "value"
-    ".."|\%list as lua\[\%index as lua\] = \%new_value as lua\
+        |Expected 1 value, but got \(repr %new_value)
+    %new_value =: %new_value ->* ["value",1]
+    "\(%list as lua)[\(%index as lua)] = \(%new_value as lua)"
 
-macro [append %item to %list, add %item to %list] =:
-    ".."|table.insert(\%list as lua\, \%item as lua\)
+compile (append %item to %list; add %item to %list) to:
+    "table.insert(\(%list as lua), \(%item as lua))"
 
-rule [flatten %lists] =:
+rule (flatten %lists) =:
     %flat =: []
     for %list in %lists:
         for %item in %list:
             add %item to %flat
     %flat
 
-rule [dict %items] =:
+rule (dict %items) =:
     %dict =: []
     for %pair in %items:
         %dict -> (first in %pair) =: last in %pair
     %dict
 
-rule [entries in %dict] =:
-    lua block ".."
-        |local items = {}
-        |for k,v in pairs(vars.dict) do
-        |    table.insert(items, {key=k,value=v})
-        |end
-        |return items
+rule (entries in %dict) =:
+    %entries =: []
+    for %k -> %v in %dict:
+        add (dict [["key",%k],["value",%v]]) to %entries
+    %entries
 
-rule [keys in %dict] =:
-    lua block ".."
-        |local items = {}
-        |for k,v in pairs(vars.dict) do
-        |    table.insert(items, k)
-        |end
-        |return items
+rule (keys in %dict) =:
+    %keys =: []
+    for %k -> %v in %dict: add %k to %keys
+    %keys
 
-rule [values in %dict] =:
-    lua block ".."
-        |local items = {}
-        |for k,v in pairs(vars.dict) do
-        |    table.insert(items, v)
-        |end
-        |return items
+rule (values in %dict) =:
+    %values =: []
+    for %k -> %v in %dict: add %v to %values
+    %values
 
 # List Comprehension
-macro [%expression for %var in %iterable] =:
+compile (%expression for %var in %iterable) to:
     assert ((%var's "type") == "Var") ".."
-        |List comprehension has the wrong type for the loop variable. Expected Var, but got: \%var's "type"\
+        |List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%var's "type")
     ".."
         |(function(game, vars)
         |    local comprehension = {}
-        |    for i,value in ipairs(\%iterable as lua\) do
-        |        \%var as lua\ = value
-        |        comprehension[i] = \%expression as lua\
+        |    for i,value in ipairs(\(%iterable as lua)) do
+        |        \(%var as lua) = value
+        |        comprehension[i] = \(%expression as lua)
         |    end
         |    return comprehension
         |end)(game, setmetatable({}, {__index=vars}))
-macro [%expression for all %iterable] =:
-    ".."|(function(game, vars)
-        |    local comprehension = {}
-        |    for i,value in ipairs(\%iterable as lua\) do
-        |        vars[''] = value
-        |        comprehension[i] = \%expression as lua\
-        |    end
-        |    return comprehension
-        |end)(game, setmetatable({}, {__index=vars}))
+parse (%expression for all %iterable) as: %expression for % in %iterable
 
 # TODO: maybe make a generator/coroutine?
 

@@ -5,62 +5,82 @@ rule (error!; panic!; fail!; abort!) =:
     nomsu "error" []
 rule (error %msg) =:
     nomsu "error"[%msg]
-parse (assert %condition) as: lua code ".."
-    |if not (\(%condition)) then
-    |    nomsu:error()
+compile (assert %condition %msg) to code: ".."
+    |if not (\(%condition as lua)) then
+    |    nomsu:error(\(%msg as lua))
     |end
-parse (assert %condition %msg) as: lua code ".."
-    |if not (\(%condition)) then
-    |    nomsu:error(\(%msg))
-    |end
-
-parse (show generated lua %block) as: lua code ".."
-    |nomsu:writeln(\(repr (nomsu "tree_to_lua" [%block])))
-
+parse (assert %condition) as: assert %condition (nil)
 
 # String functions
-rule (join %strs) =:
-    lua block ".."
-        |local str_bits = {}
-        |for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu.utils.repr_if_not_string(bit) end
-        |return table.concat(str_bits)
-
 rule (join %strs with glue %glue) =:
     lua block ".."
         |local str_bits = {}
         |for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu.utils.repr_if_not_string(bit) end
         |return table.concat(str_bits, vars.glue)
+parse (join %strs) as: join %strs with glue ""
 
-parse (capitalize %str; %str capitalized) as: lua expr "(\(%str)):gsub('%l', string.upper, 1)"
+compile (capitalize %str; %str capitalized) to:
+    "(\(%str as lua)):gsub('%l', string.upper, 1)"
 
-parse (say %str) as: lua block ".."
-    |nomsu:writeln(nomsu.utils.repr_if_not_string(\(%str)))
+compile (say %str) to: ".."
+    |nomsu:writeln(\(%str as lua))
 
 # Number ranges
-parse (%start to %stop) as: lua expr ".."
-   |nomsu.utils.range(\(%start), \(%stop))
-parse (%start to %stop by %step; %start to %stop via %step) as: lua expr ".."
-   |nomsu.utils.range(\(%start), \(%stop), \(%step))
+compile (%start to %stop by %step; %start to %stop via %step) to: ".."
+   |nomsu.utils.range(\(%start as lua), \(%stop as lua), \(%step as lua))
+parse (%start to %stop) as: %start to %stop by 1
+
+# Random functions
+compile (random number; random; rand) to: "math.random()"
+compile (random int %n; random integer %n; randint %n) to: "math.random(\(%n as lua))"
+compile (random from %low to %high; random number from %low to %high; rand %low %high) to:
+    "math.random(\(%low as lua), \(%high as lua))"
+rule (random choice from %elements; random choice %elements; random %elements) =:
+    lua expr "\(%elements)[math.random(#\(%elements))]"
+
+# Math functions
+compile (abs %; absolute value of %; | % |) to: "math.abs(\(% as lua))"
+compile (sqrt %; square root of %) to: "math.sqrt(\(% as lua))"
+compile (sin %; sine %) to: "math.sin(\(% as lua))"
+compile (cos %; cosine %) to: "math.cos(\(% as lua))"
+compile (tan %; tangent %) to: "math.tan(\(% as lua))"
+compile (asin %; arc sine %) to: "math.asin(\(% as lua))"
+compile (acos %; arc cosine %) to: "math.acos(\(% as lua))"
+compile (atan %; arc tangent %) to: "math.atan(\(% as lua))"
+compile (atan2 %y %x) to: "math.atan2(\(%y as lua), \(%x as lua))"
+compile (sinh %; hyperbolic sine %) to: "math.sinh(\(% as lua))"
+compile (cosh %; hyperbolic cosine %) to: "math.cosh(\(% as lua))"
+compile (tanh %; hyperbolic tangent %) to: "math.tanh(\(% as lua))"
+compile (ceil %; ceiling %) to: "math.ceil(\(% as lua))"
+compile (exp %; e^ %) to: "math.exp(\(% as lua))"
+compile (log %; ln %; natural log %) to: "math.log(\(% as lua))"
+compile (log % base %base) to: "math.log(\(% as lua), \(%base as lua))"
+compile (floor %) to: "math.floor(\(% as lua))"
+compile (round %; % rounded) to: "math.floor(\(% as lua) + .5)"
+rule (%n rounded to the nearest %rounder) =:
+    lua expr "(\(%rounder))*math.floor(\(%n)/\(%rounder) + .5)"
 
 # Common utility functions
-parse (random number; random; rand) as: lua expr "math.random()"
-parse (random int %n; random integer %n; randint %n) as: lua expr "math.random(\(%n))"
-parse (random from %low to %high; random number from %low to %high; rand %low %high) as:
-    lua expr "math.random(\(%low), \(%high))"
-rule (random choice from %elements; random choice %elements; random %elements) =:
-    lua expr "vars.elements[math.random(#vars.elements)]"
-parse (sum of %items; sum %items) as: lua expr "nomsu.utils.sum(\(%items))"
-parse (product of %items; product %items) as: lua expr "nomsu.utils.product(\(%items))"
-parse (all of %items) as: lua expr "nomsu.utils.all(\(%items))"
-parse (any of %items) as: lua expr "nomsu.utils.any(\(%items))"
-# This is a rule, not a macro so we can use vars.items twice without running it twice.
+compile (sum of %items; sum %items) to: "nomsu.utils.sum(\(%items as lua))"
+compile (product of %items; product %items) to: "nomsu.utils.product(\(%items as lua))"
+compile (all of %items) to: "nomsu.utils.all(\(%items as lua))"
+compile (any of %items) to: "nomsu.utils.any(\(%items as lua))"
 rule (avg of %items; average of %items) =:
-    lua expr "(nomsu.utils.sum(vars.items)/#vars.items)"
-parse (min of %items; smallest of %items; lowest of %items) as:
-    lua expr "nomsu.utils.min(\(%items))"
-parse (max of %items; biggest of %items; largest of %items; highest of %items) as:
-    lua expr "nomsu.utils.max(\(%items))"
-parse (min of %items with respect to %keys) as:
-    lua expr "nomsu.utils.min(\(%items), \(%keys))"
-parse (max of %items with respect to %keys) as:
-    lua expr "nomsu.utils.max(\(%items), \(%keys))"
+    lua expr "(nomsu.utils.sum(\(%items))/#\(%items))"
+compile (min of %items; smallest of %items; lowest of %items) to:
+    "nomsu.utils.min(\(%items as lua))"
+compile (max of %items; biggest of %items; largest of %items; highest of %items) to:
+    "nomsu.utils.max(\(%items as lua))"
+compile (min of %items by %value_expr) to:
+    ".."
+        |nomsu.utils.min(\(%items as lua), function(item)
+        |    local vars = setmetatable({['']=item}, {__index=vars})
+        |    return \(%value_expr as lua)
+        |end)
+compile (max of %items by %value_expr) to:
+    ".."
+        |nomsu.utils.max(\(%items as lua), function(item)
+        |    local vars = setmetatable({['']=item}, {__index=vars})
+        |    return \(%value_expr as lua)
+        |end)
+

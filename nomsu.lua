@@ -2,6 +2,14 @@ local re = require('re')
 local lpeg = require('lpeg')
 local utils = require('utils')
 local repr = utils.repr
+local colors = require('ansicolors')
+local colored = setmetatable({ }, {
+  __index = function(_, color)
+    return (function(msg)
+      return colors[color] .. msg .. colors.reset
+    end)
+  end
+})
 local insert, remove, concat
 do
   local _obj_0 = table
@@ -191,7 +199,7 @@ do
       local stub, arg_names = self:get_stub(invocation)
       assert(stub, "NO STUB FOUND: " .. tostring(repr(invocation)))
       if self.debug then
-        self:writeln("Defining rule: " .. tostring(repr(stub)) .. " with args " .. tostring(repr(arg_names)))
+        self:writeln(tostring(colored.bright("DEFINING RULE:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
       end
       for i = 1, #arg_names - 1 do
         for j = i + 1, #arg_names do
@@ -242,7 +250,8 @@ do
         args = _tbl_0
       end
       if self.debug then
-        self:writeln("Calling " .. tostring(repr(stub)) .. " with args: " .. tostring(repr(args)))
+        self:write(tostring(colored.bright("CALLING")) .. " " .. tostring(colored.magenta(colored.underscore(stub))) .. " ")
+        self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
       insert(self.callstack, stub)
       local rets = {
@@ -255,7 +264,11 @@ do
       if kind == nil then
         kind = "Expression"
       end
-      local stub, args = self:get_stub(tree)
+      local stub, arg_names, args = self:get_stub(tree)
+      if self.debug then
+        self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(stub))) .. " ")
+        self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
+      end
       insert(self.callstack, "#macro")
       local expr, statement = self:call(stub, unpack(args))
       remove(self.callstack)
@@ -284,7 +297,7 @@ do
     end,
     parse = function(self, str, filename)
       if self.debug then
-        self:writeln("PARSING:\n" .. tostring(str))
+        self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(str))
       end
       str = str:gsub("\r", "")
       local old_indent_stack
@@ -311,12 +324,13 @@ do
       for _index_0 = 1, #_list_0 do
         local statement = _list_0[_index_0]
         if self.debug then
-          self:writeln("RUNNING TREE:")
+          self:writeln(tostring(colored.bright("RUNNING NOMSU:")) .. "\n" .. tostring(colored.bright(colored.yellow(statement.src))))
+          self:writeln(colored.bright("PARSED TO TREE:"))
           self:print_tree(statement)
         end
         local ok, expr, statements = pcall(self.tree_to_lua, self, statement)
         if not ok then
-          self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
+          self:writeln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.bright(colored.yellow(statement.src))))
           self:error(expr)
         end
         local code_for_statement = ([[                return (function(nomsu, vars)
@@ -324,11 +338,11 @@ do
                     return %s
                 end)]]):format(statements or "", expr or "")
         if self.debug then
-          self:writeln("RUNNING LUA:\n" .. tostring(code_for_statement))
+          self:writeln(tostring(colored.bright("RUNNING LUA:")) .. "\n" .. tostring(colored.blue(colored.bright(code_for_statement))))
         end
         local lua_thunk, err = load(code_for_statement)
         if not lua_thunk then
-          error("Failed to compile generated code:\n" .. tostring(code_for_statement) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(statement.src))
+          error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(code_for_statement))) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(colored.bright(colored.yellow(statement.src))))
         end
         local run_statement = lua_thunk()
         local ret
@@ -337,7 +351,7 @@ do
           return_value = ret
         end
         if not ok then
-          self:writeln("Error occurred in statement:\n" .. tostring(statement.src))
+          self:writeln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.yellow(statement.src)))
           self:error(repr(return_value))
         end
         insert(buffer, tostring(statements or '') .. "\n" .. tostring(expr and "ret = " .. tostring(expr) or ''))
@@ -350,10 +364,13 @@ do
       return return_value, lua_code
     end,
     tree_to_value = function(self, tree, vars)
-      local code = "\n        return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
+      local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
+      if self.debug then
+        self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
+      end
       local lua_thunk, err = load(code)
       if not lua_thunk then
-        error("Failed to compile generated code:\n" .. tostring(code) .. "\n\n" .. tostring(err))
+        self:error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(code))) .. "\n\n" .. tostring(colored.red(err)))
       end
       return (lua_thunk())(self, vars or { })
     end,
@@ -369,23 +386,12 @@ do
       elseif "Nomsu" == _exp_0 then
         return repr(tree.value), nil
       elseif "Thunk" == _exp_0 then
-        local lua_bits = { }
-        local _list_0 = tree.value.value
-        for _index_0 = 1, #_list_0 do
-          local arg = _list_0[_index_0]
-          local expr, statement = self:tree_to_lua(arg)
-          if statement then
-            insert(lua_bits, statement)
-          end
-          if expr then
-            insert(lua_bits, "ret = " .. tostring(expr))
-          end
-        end
+        local _, body = self:tree_to_lua(tree.value)
         return ([[                    (function(nomsu, vars)
                         local ret
                         %s
                         return ret
-                    end)]]):format(concat(lua_bits, "\n"))
+                    end)]]):format(body), nil
       elseif "Block" == _exp_0 then
         if #tree.value == 0 then
           return "nil", nil
@@ -398,10 +404,28 @@ do
         end
         local thunk_lua = self:tree_to_lua({
           type = "Thunk",
-          value = tree,
+          value = {
+            type = "Statements",
+            value = tree.value,
+            src = tree.src
+          },
           src = tree.src
         })
         return ("%s(nomsu, vars)"):format(thunk_lua), nil
+      elseif "Statements" == _exp_0 then
+        local lua_bits = { }
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local arg = _list_0[_index_0]
+          local expr, statement = self:tree_to_lua(arg)
+          if statement then
+            insert(lua_bits, statement)
+          end
+          if expr then
+            insert(lua_bits, "ret = " .. tostring(expr))
+          end
+        end
+        return nil, concat(lua_bits, "\n")
       elseif "FunctionCall" == _exp_0 then
         local stub = self:get_stub(tree)
         if self.defs[stub] and self.defs[stub].is_macro then
@@ -432,6 +456,10 @@ do
         end
         return self.__class:comma_separated_items("nomsu:call(", args, ")"), nil
       elseif "String" == _exp_0 then
+        if self.debug then
+          self:writeln((colored.bright("STRING:")))
+          self:print_tree(tree)
+        end
         local concat_parts = { }
         local string_buffer = ""
         local _list_0 = tree.value
@@ -449,6 +477,11 @@ do
               string_buffer = ""
             end
             local expr, statement = self:tree_to_lua(bit)
+            if self.debug then
+              self:writeln((colored.bright("INTERP:")))
+              self:print_tree(bit)
+              self:writeln(tostring(colored.bright("EXPR:")) .. " " .. tostring(expr) .. ", " .. tostring(colored.bright("STATEMENT:")) .. " " .. tostring(statement))
+            end
             if statement then
               self:error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
             end
@@ -464,8 +497,11 @@ do
         end
         if #concat_parts == 0 then
           return "''", nil
+        elseif #concat_parts == 1 then
+          return concat_parts[1], nil
+        else
+          return "(" .. tostring(concat(concat_parts, "..")) .. ")", nil
         end
-        return "(" .. tostring(concat(concat_parts, "..")) .. ")", nil
       elseif "List" == _exp_0 then
         local items = { }
         local _list_0 = tree.value
@@ -479,9 +515,9 @@ do
         end
         return self.__class:comma_separated_items("{", items, "}"), nil
       elseif "Number" == _exp_0 then
-        return repr(tree.value)
+        return repr(tree.value), nil
       elseif "Var" == _exp_0 then
-        return "vars[" .. tostring(repr(tree.value)) .. "]"
+        return "vars[" .. tostring(repr(tree.value)) .. "]", nil
       else
         return self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
@@ -495,7 +531,7 @@ do
         return 
       end
       local _exp_0 = tree.type
-      if "List" == _exp_0 or "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
+      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local v = _list_0[_index_0]
@@ -507,6 +543,7 @@ do
       return nil
     end,
     print_tree = function(self, tree)
+      self:write(colors.bright .. colors.green)
       for node, depth in coroutine.wrap(function()
         return self:walk_tree(tree)
       end) do
@@ -516,6 +553,7 @@ do
           self:writeln(tostring(("    "):rep(depth)) .. tostring(node.type) .. ":")
         end
       end
+      return self:write(colors.reset)
     end,
     tree_to_str = function(self, tree)
       local bits = { }
@@ -536,7 +574,7 @@ do
       end
       local _exp_0 = tree.type
       if "Var" == _exp_0 then
-        if vars[tree.value] then
+        if vars[tree.value] ~= nil then
           tree = vars[tree.value]
         end
       elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Thunk" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
@@ -570,7 +608,7 @@ do
       end
       if type(x) == 'string' then
         local stub = x:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
-        local args
+        local arg_names
         do
           local _accum_0 = { }
           local _len_0 = 1
@@ -578,15 +616,15 @@ do
             _accum_0[_len_0] = arg
             _len_0 = _len_0 + 1
           end
-          args = _accum_0
+          arg_names = _accum_0
         end
-        return stub, args
+        return stub, arg_names
       end
       local _exp_0 = x.type
       if "String" == _exp_0 then
         return self:get_stub(x.value)
       elseif "FunctionCall" == _exp_0 then
-        local stub, args = { }, { }, { }
+        local stub, arg_names, args = { }, { }, { }
         local _list_0 = x.value
         for _index_0 = 1, #_list_0 do
           local token = _list_0[_index_0]
@@ -595,13 +633,17 @@ do
             insert(stub, token.value)
           elseif "Var" == _exp_1 then
             insert(stub, "%")
-            insert(args, token.value)
+            if arg_names then
+              insert(arg_names, token.value)
+            end
+            insert(args, token)
           else
             insert(stub, "%")
+            arg_names = nil
             insert(args, token)
           end
         end
-        return concat(stub, " "), args
+        return concat(stub, " "), arg_names, args
       elseif "Block" == _exp_0 then
         self:writeln(debug.traceback())
         return self:error("Please pass in a single line from a block, not the whole thing:\n" .. tostring(self:tree_to_str(x)))
@@ -632,21 +674,39 @@ do
       self.callstack = { }
       return error()
     end,
+    typecheck = function(self, vars, varname, desired_type)
+      local x = vars[varname]
+      if type(x) == desired_type then
+        return x
+      end
+      if type(x) == 'table' and x.type == desired_type then
+        return x
+      end
+      return self:error("Invalid type for %" .. tostring(varname) .. ". Expected " .. tostring(desired_type) .. ", but got " .. tostring(x.type) .. ".")
+    end,
     initialize_core = function(self)
       local lua_code
       lua_code = function(self, vars)
-        local inner_vars = vars
+        local inner_vars = setmetatable({ }, {
+          __index = function(_, key)
+            return "vars[" .. tostring(repr(key)) .. "]"
+          end
+        })
         local lua = self:tree_to_value(vars.code, inner_vars)
         return nil, lua
       end
       self:defmacro("lua code %code", lua_code)
       local lua_value
       lua_value = function(self, vars)
-        local inner_vars = vars
+        local inner_vars = setmetatable({ }, {
+          __index = function(_, key)
+            return "vars[" .. tostring(repr(key)) .. "]"
+          end
+        })
         local lua = self:tree_to_value(vars.code, inner_vars)
         return lua, nil
       end
-      self:defmacro("lua value %code", lua_value)
+      self:defmacro("lua expr %code", lua_value)
       local _require
       _require = function(self, vars)
         if not self.loaded_files[vars.filename] then
@@ -744,7 +804,9 @@ if arg and arg[1] then
     end
     output:write(([[    local NomsuCompiler = require('nomsu')
     local c = NomsuCompiler()
-    local run = %s
+    local run = function(nomsu, vars)
+        %s
+    end
     return run(c, {})
     ]]):format(code))
   end

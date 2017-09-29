@@ -15,6 +15,8 @@ re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
 repr = utils.repr
+colors = require 'ansicolors'
+colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..colors.reset)})
 {:insert, :remove, :concat} = table
 --pcall = (fn,...)-> true, fn(...)
 
@@ -189,7 +191,7 @@ class NomsuCompiler
     def: (invocation, thunk, src)=>
         stub, arg_names = @get_stub invocation
         assert stub, "NO STUB FOUND: #{repr invocation}"
-        if @debug then @writeln "Defining rule: #{repr stub} with args #{repr arg_names}"
+        if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
         for i=1,#arg_names-1 do for j=i+1,#arg_names
             if arg_names[i] == arg_names[j] then @error "Duplicate argument in function #{stub}: '#{arg_names[i]}'"
         with @defs[stub] = {:thunk, :invocation, :arg_names, :src, is_macro:false} do nil
@@ -210,7 +212,8 @@ class NomsuCompiler
         {:thunk, :arg_names} = def
         args = {name, select(i,...) for i,name in ipairs(arg_names)}
         if @debug
-            @writeln "Calling #{repr stub} with args: #{repr(args)}"
+            @write "#{colored.bright "CALLING"} #{colored.magenta(colored.underscore stub)} "
+            @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr(args)}"
         insert @callstack, stub
         -- TODO: optimize, but still allow multiple return values?
         rets = {thunk(self,args)}
@@ -218,7 +221,10 @@ class NomsuCompiler
         return unpack(rets)
     
     run_macro: (tree, kind="Expression")=>
-        stub,args = @get_stub tree
+        stub,arg_names,args = @get_stub tree
+        if @debug
+            @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(stub)} "
+            @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
         insert @callstack, "#macro"
         expr, statement = @call(stub, unpack(args))
         remove @callstack
@@ -240,7 +246,7 @@ class NomsuCompiler
 
     parse: (str, filename)=>
         if @debug
-            @writeln("PARSING:\n#{str}")
+            @writeln("#{colored.bright "PARSING:"}\n#{str}")
         str = str\gsub("\r","")
         export indent_stack
         old_indent_stack, indent_stack = indent_stack, {0}
@@ -262,11 +268,12 @@ class NomsuCompiler
         return_value = nil
         for statement in *tree.value
             if @debug
-                @writeln "RUNNING TREE:"
+                @writeln "#{colored.bright "RUNNING NOMSU:"}\n#{colored.bright colored.yellow statement.src}"
+                @writeln colored.bright("PARSED TO TREE:")
                 @print_tree statement
             ok,expr,statements = pcall(@tree_to_lua, self, statement)
             if not ok
-                @writeln "Error occurred in statement:\n#{statement.src}"
+                @writeln "#{colored.red "Error occurred in statement:"}\n#{colored.bright colored.yellow statement.src}"
                 @error(expr)
             code_for_statement = ([[
                 return (function(nomsu, vars)
@@ -274,15 +281,15 @@ class NomsuCompiler
                     return %s
                 end)]])\format(statements or "", expr or "")
             if @debug
-                @writeln "RUNNING LUA:\n#{code_for_statement}"
+                @writeln "#{colored.bright "RUNNING LUA:"}\n#{colored.blue colored.bright(code_for_statement)}"
             lua_thunk, err = load(code_for_statement)
             if not lua_thunk
-                error("Failed to compile generated code:\n#{code_for_statement}\n\n#{err}\n\nProduced by statement:\n#{statement.src}")
+                error("Failed to compile generated code:\n#{colored.bright colored.blue code_for_statement}\n\n#{err}\n\nProduced by statement:\n#{colored.bright colored.yellow statement.src}")
             run_statement = lua_thunk!
             ok,ret = pcall(run_statement, self, vars)
             if expr then return_value = ret
             if not ok
-                @writeln "Error occurred in statement:\n#{statement.src}"
+                @writeln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow statement.src}"
                 @error(repr return_value)
             insert buffer, "#{statements or ''}\n#{expr and "ret = #{expr}" or ''}"
         
@@ -295,11 +302,12 @@ class NomsuCompiler
         return return_value, lua_code
     
     tree_to_value: (tree, vars)=>
-        code = "
-        return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
+        code = "return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree)}\nend)"
+        if @debug
+            @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
         lua_thunk, err = load(code)
         if not lua_thunk
-            error("Failed to compile generated code:\n#{code}\n\n#{err}")
+            @error("Failed to compile generated code:\n#{colored.bright colored.blue code}\n\n#{colored.red err}")
         return (lua_thunk!)(self, vars or {})
 
     tree_to_lua: (tree)=>
@@ -316,17 +324,13 @@ class NomsuCompiler
                 return repr(tree.value), nil
 
             when "Thunk" -- This is not created by the parser, it's just a helper
-                lua_bits = {}
-                for arg in *tree.value.value
-                    expr,statement = @tree_to_lua arg
-                    if statement then insert lua_bits, statement
-                    if expr then insert lua_bits, "ret = #{expr}"
+                _,body = @tree_to_lua tree.value
                 return ([[
                     (function(nomsu, vars)
                         local ret
                         %s
                         return ret
-                    end)]])\format(concat lua_bits, "\n")
+                    end)]])\format(body), nil
 
             when "Block"
                 if #tree.value == 0
@@ -335,8 +339,16 @@ class NomsuCompiler
                     expr,statement = @tree_to_lua tree.value[1]
                     if not statement
                         return expr, nil
-                thunk_lua = @tree_to_lua {type:"Thunk", value:tree, src:tree.src}
+                thunk_lua = @tree_to_lua {type:"Thunk", value:{type:"Statements", value:tree.value, src:tree.src}, src:tree.src}
                 return ("%s(nomsu, vars)")\format(thunk_lua), nil
+
+            when "Statements"
+                lua_bits = {}
+                for arg in *tree.value
+                    expr,statement = @tree_to_lua arg
+                    if statement then insert lua_bits, statement
+                    if expr then insert lua_bits, "ret = #{expr}"
+                return nil, concat(lua_bits, "\n")
 
             when "FunctionCall"
                 stub = @get_stub(tree)
@@ -352,6 +364,9 @@ class NomsuCompiler
                 return @@comma_separated_items("nomsu:call(", args, ")"), nil
 
             when "String"
+                if @debug
+                    @writeln (colored.bright "STRING:")
+                    @print_tree tree
                 concat_parts = {}
                 string_buffer = ""
                 for bit in *tree.value
@@ -362,6 +377,10 @@ class NomsuCompiler
                         insert concat_parts, repr(string_buffer)
                         string_buffer = ""
                     expr, statement = @tree_to_lua bit
+                    if @debug
+                        @writeln (colored.bright "INTERP:")
+                        @print_tree bit
+                        @writeln "#{colored.bright "EXPR:"} #{expr}, #{colored.bright "STATEMENT:"} #{statement}"
                     if statement
                         @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, "nomsu.utils.repr_if_not_string(#{expr})"
@@ -371,7 +390,9 @@ class NomsuCompiler
 
                 if #concat_parts == 0
                     return "''", nil
-                return "(#{concat(concat_parts, "..")})", nil
+                elseif #concat_parts == 1
+                    return concat_parts[1], nil
+                else return "(#{concat(concat_parts, "..")})", nil
 
             when "List"
                 items = {}
@@ -383,10 +404,10 @@ class NomsuCompiler
                 return @@comma_separated_items("{", items, "}"), nil
 
             when "Number"
-                return repr(tree.value)
+                return repr(tree.value), nil
 
             when "Var"
-                return "vars[#{repr tree.value}]"
+                return "vars[#{repr tree.value}]", nil
 
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
@@ -396,18 +417,20 @@ class NomsuCompiler
         if type(tree) != 'table' or not tree.type
             return
         switch tree.type
-            when "List", "File", "Nomsu", "Block", "FunctionCall", "String"
+            when "List", "File", "Block", "FunctionCall", "String"
                 for v in *tree.value
                     @walk_tree(v, depth+1)
             else @walk_tree(tree.value, depth+1)
         return nil
 
     print_tree: (tree)=>
+        @write colors.bright..colors.green
         for node,depth in coroutine.wrap(-> @walk_tree tree)
             if type(node) != 'table' or not node.type
                 @writeln(("    ")\rep(depth)..repr(node))
             else
                 @writeln("#{("    ")\rep(depth)}#{node.type}:")
+        @write colors.reset
     
     tree_to_str: (tree)=>
         bits = {}
@@ -439,7 +462,7 @@ class NomsuCompiler
         if type(tree) != 'table' then return tree
         switch tree.type
             when "Var"
-                if vars[tree.value]
+                if vars[tree.value] ~= nil
                     tree = vars[tree.value]
             when "File", "Nomsu", "Thunk", "Block", "List", "FunctionCall", "String"
                 new_value = @replaced_vars tree.value, vars
@@ -463,23 +486,25 @@ class NomsuCompiler
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
             stub = x\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
-            args = [arg for arg in x\gmatch("%%([^%s']*)")]
-            return stub, args
+            arg_names = [arg for arg in x\gmatch("%%([^%s']*)")]
+            return stub, arg_names
         switch x.type
             when "String" then return @get_stub(x.value)
             when "FunctionCall"
-                stub, args = {}, {}, {}
+                stub, arg_names, args = {}, {}, {}
                 for token in *x.value
                     switch token.type
                         when "Word"
                             insert stub, token.value
                         when "Var"
                             insert stub, "%"
-                            insert args, token.value
+                            if arg_names then insert arg_names, token.value
+                            insert args, token
                         else
                             insert stub, "%"
+                            arg_names = nil
                             insert args, token
-                return concat(stub," "), args
+                return concat(stub," "), arg_names, args
             when "Block"
                 @writeln debug.traceback!
                 @error "Please pass in a single line from a block, not the whole thing:\n#{@tree_to_str x}"
@@ -502,21 +527,28 @@ class NomsuCompiler
         @writeln "    <top level>"
         @callstack = {}
         error!
+    
+    typecheck: (vars, varname, desired_type)=>
+        x = vars[varname]
+        if type(x) == desired_type then return x
+        if type(x) == 'table' and x.type == desired_type then return x
+        @error "Invalid type for %#{varname}. Expected #{desired_type}, but got #{x.type}."
 
     initialize_core: =>
         -- Sets up some core functionality
+        -- Uses named local functions to help out callstack readability
         lua_code = (vars)=>
-            inner_vars = vars-- setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
             lua = @tree_to_value(vars.code, inner_vars)
             return nil, lua
         @defmacro "lua code %code", lua_code
 
         lua_value = (vars)=>
-            inner_vars =  vars--setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
+            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
             lua = @tree_to_value(vars.code, inner_vars)
             return lua, nil
-        @defmacro "lua value %code", lua_value
-        
+        @defmacro "lua expr %code", lua_value
+
         _require = (vars)=>
             if not @loaded_files[vars.filename]
                 file = io.open(vars.filename)
@@ -553,7 +585,9 @@ if arg and arg[1]
         output\write ([[
     local NomsuCompiler = require('nomsu')
     local c = NomsuCompiler()
-    local run = %s
+    local run = function(nomsu, vars)
+        %s
+    end
     return run(c, {})
     ]])\format(code)
     --ProFi\stop()

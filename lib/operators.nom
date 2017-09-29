@@ -1,15 +1,18 @@
 require "lib/metaprogramming.nom"
 
 # Literals
-parse (true; yes) as lua expr "true"
-parse (false; no) as lua expr "false"
-parse (nil; null) as lua expr "nil"
-parse (inf; infinity) as lua expr "math.huge"
-parse (nan; NaN; not a number) as lua expr "(0/0)"
-parse (nop; pass) as lua code ""
+compile (true; yes) to: "true"
+compile (false; no) to: "false"
+compile (nil; null) to: "nil"
+compile (inf; infinity) to: "math.huge"
+compile (nan; NaN; not a number) to: "(0/0)"
+compile (pi; PI) to: "math.pi"
+compile (tau; TAU) to: "(2*math.pi)"
+compile (phi; PHI; golden ratio) to: "((1+math.sqrt(5))/2)"
+compile (nop; pass) to code: ""
 
 # Ternary operator
-parse (%if_expr if %condition else %else_expr) as lua expr ".."
+compile (%if_expr if %condition else %else_expr) to: ".."
     |(function(nomsu, vars)
     # TODO: fix compiler bug that breaks this code if comments immediately follow ".."
     #.. Note: this uses a function instead of (condition and if_expr or else_expr)
@@ -21,54 +24,46 @@ parse (%if_expr if %condition else %else_expr) as lua expr ".."
     |    end
     |end)(nomsu, vars)
 
+# Indexing:
+compile (%obj's %key; %obj -> %key) to: "\(%obj as lua)[\(%key as lua)]"
+
 # Variable assignment operator, and += type versions
-lua block ".."
-    |local function assign(callback)
-    |    return function(nomsu, vars, kind)
-    |        if kind == "Expression" then
-    |            nomsu:error("Cannot use an assignment operation as an expression value.")
-    |        end
-    |        if vars.var.type ~= "Var" then
-    |            nomsu:error("Assignment operation has the wrong type for the left hand side. "
-    |                .."Expected Var, but got: "..vars.var.type.."\\nMaybe you forgot a percent sign on the variable name?")
-    |        end
-    |        if vars.rhs.type ~= "Thunk" then
-    |            nomsu:error("Assignment operation has the wrong type for the right hand side. "
-    |                .."Expected Thunk, but got: "..vars.rhs.type.."\\nMaybe you used '=' instead of '=:'?")
-    |        end
-    |        if #vars.rhs.value.value > 1 then
-    |            nomsu:error("Assignment operation should not have more than one value on the right hand side.")
-    |        end
-    |        return callback(nomsu:tree_to_lua(vars.var),
-    |            nomsu:tree_to_lua(vars.rhs.value.value[1].value)), true
-    |    end
-    |end
-    |nomsu:defmacro("%var = %rhs", assign(function(var,result) return var.." = "..result end))
-    |nomsu:defmacro("%var += %rhs", assign(function(var,result) return var.." = "..var.." + "..result end))
-    |nomsu:defmacro("%var -= %rhs", assign(function(var,result) return var.." = "..var.." - "..result end))
-    |nomsu:defmacro("%var *= %rhs", assign(function(var,result) return var.." = "..var.." * "..result end))
-    |nomsu:defmacro("%var /= %rhs", assign(function(var,result) return var.." = "..var.." / "..result end))
-    |nomsu:defmacro("%var ^= %rhs", assign(function(var,result) return var.." = "..var.." ^ "..result end))
-    |nomsu:defmacro("%var and= %rhs", assign(function(var,result) return var.." = "..var.." and "..result end))
-    |nomsu:defmacro("%var or= %rhs", assign(function(var,result) return var.." = "..var.." or "..result end))
-    |nomsu:defmacro("%var join= %rhs", assign(function(var,result) return var.." = "..var.." .. "..result end))
-    |nomsu:defmacro("%var mod= %rhs", assign(function(var,result) return var.." = "..var.." % "..result end))
+compile (%var = %val) to code: "\(%var as lua) = \(%val as lua)"
+compile (%var += %val) to code: "\(%var as lua) += \(%val as lua)"
+compile (%var -= %val) to code: "\(%var as lua) -= \(%val as lua)"
+compile (%var *= %val) to code: "\(%var as lua) *= \(%val as lua)"
+compile (%var /= %val) to code: "\(%var as lua) /= \(%val as lua)"
+compile (%var ^= %val) to code: "\(%var as lua) ^= \(%val as lua)"
+compile (%var and= %val) to code: "\(%var as lua) = \(%var as lua) and\(%val as lua)"
+compile (%var or= %val) to code: "\(%var as lua) = \(%var as lua) or \(%val as lua)"
+compile (%var join= %val) to code: "\(%var as lua) = \(%var as lua) .. \(%val as lua)"
+compile (%var mod= %val) to code: "\(%var as lua) = \(%var as lua) % \(%val as lua)"
+
+%x =: 5
 
 # Binary Operators
 lua block ".."
-    |local binops = {"+","-","*","/","<","<=",">",">=","^",{"===","=="},{"!==","~="},"and","or",{"mod","%"}}
+    |local binops = {"-","/","<","<=",">",">=","^",{"===","=="},{"!==","~="},{"mod","%"}}
     |for _,op in ipairs(binops) do
     |    local nomsu_alias = op
     |    if type(op) == 'table' then
     |        nomsu_alias, op = unpack(op)
     |    end
-    |    nomsu:defmacro("%a "..nomsu_alias.." %b", (function(nomsu, vars, kind)
+    |    nomsu:defmacro("%a "..nomsu_alias.." %b", (function(nomsu, vars)
     |        return "("..nomsu:tree_to_lua(vars.a).." "..op.." "..nomsu:tree_to_lua(vars.b)..")"
     |    end), [["(\\(%a) ]]..op..[[ \\(%b))"]])
     |end
+# TODO: implement OR, XOR, AND for multiple operands
+compile (%a OR %b; %a | %b) to: "bit32.bor(\(%a as lua), \(%b as lua))"
+compile (%a XOR %b) to: "bit32.bxor(\(%a as lua), \(%b as lua))"
+compile (%a AND %b; %a & %b) to: "bit32.band(\(%a as lua), \(%b as lua))"
+compile (NOT %; ~ %) to: "bit32.bnot(\(% as lua))"
+compile (%x LSHIFT %shift; %x << %shift) to: "bit32.lshift(\(%x as lua), \(%shift as lua))"
+compile (%x RSHIFT %shift) to: "bit32.rshift(\(%x as lua), \(%shift as lua))"
+compile (%x ARSHIFT %shift; %x >> %shift) to: "bit32.arshift(\(%x as lua), \(%shift as lua))"
 # == and != do equivalence checking, rather than identity checking
-parse (%a == %b) as lua expr "nomsu.utils.equivalent(\(%a), \(%b))"
-parse (%a != %b) as lua expr "(not nomsu.utils.equivalent(\(%a), \(%b)))"
+compile (%a == %b) to: "nomsu.utils.equivalent(\(%a as lua), \(%b as lua))"
+compile (%a != %b) to: "(not nomsu.utils.equivalent(\(%a as lua), \(%b as lua)))"
 
 # Commutative Operators defined for up to 8 operands
 # TODO: work out solution for commutative operators using more clever macros
@@ -77,10 +72,10 @@ lua block ".."
     |local comops = {"+","*","and","or"}
     |for _,_op in ipairs(comops) do
     |    local op = _op
-    |    local spec = "%1 "..op.." %2"
-    |    for n=3,max_operands do
+    |    local spec = "%1 "
+    |    for n=2,max_operands do
     |        spec = spec .." "..op.." %"..tostring(n)
-    |        nomsu:defmacro(spec, (function(nomsu, vars, kind)
+    |        nomsu:defmacro(spec, (function(nomsu, vars)
     |            local bits = {}
     |            for i=1,n do
     |                table.insert(bits, (nomsu:tree_to_lua(vars[tostring(i)])))
@@ -125,5 +120,5 @@ lua block ".."
     |end
 
 # Unary operators
-parse (- %a) as lua expr "-(\(%a))"
-parse (not %a) as lua expr "not (\(%a))"
+compile (- %) to: "-(\(% as lua))"
+compile (not %) to: "not (\(% as lua))"
