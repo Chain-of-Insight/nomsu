@@ -4,17 +4,24 @@ require "lib/operators.nom"
 require "lib/collections.nom"
 
 # Permission functions
+rule (standardize rules %rules) =:
+    if (lua expr "type(vars.rules) == 'string'"): %rules = [%rules]
+    (nomsu "get_stub" [%]) for all %rules
 rule (restrict %rules to within %elite-rules) =:
+    %rules =: standardize rules %rules
+    %elite-rules =: standardize rules %elite-rules
     say "Restricting \(%rules) to within \(%elite-rules)"
     for all (flatten [%elite-rules, %rules]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
-    for all %rules:
+    for %rule in %rules:
         assert (nomsu "check_permission" [%]) ".."
             |You do not have permission to restrict permissions for function: \(%)
-        ((nomsu) ->* ["defs",%,"whiteset"]) =:
-            dict: [%, yes] for %it in %elite-rules
+        ((nomsu) ->* ["defs",%rule,"whiteset"]) =:
+            dict: [%, yes] for all %elite-rules
 
 rule (allow %elite-rules to use %rules) =:
+    %rules =: standardize rules %rules
+    %elite-rules =: standardize rules %elite-rules
     say "Allowing \(%elite-rules) to use \(%rules)"
     for all (flatten [%elite-rules, %rules]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
@@ -26,12 +33,14 @@ rule (allow %elite-rules to use %rules) =:
         for all %elite-rules: %whiteset -> % = (yes)
 
 rule (forbid %pleb-rules to use %rules) =:
+    %rules =: standardize rules %rules
+    %pleb-rules =: standardize rules %pleb-rules
     say "Forbidding \(%pleb-rules) to use \(%rules)"
     for all (flatten [%pleb-rules, %used]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for all %rules:
         assert (nomsu "check_permission" [%]) ".."
-            |You do not have permission to grant permissions for function: \%it\
+            |You do not have permission to grant permissions for function: \(%)
         %whiteset =: (nomsu) ->* ["defs",%,"whiteset"]
         assert %whiteset ".."
             |Cannot individually restrict permissions for \(%) because it is currently

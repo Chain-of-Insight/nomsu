@@ -95,7 +95,8 @@ local nomsu = [=[    file <- ({ {| shebang?
     word <- ({ !number {%wordchar (!"'" %wordchar)*} }) -> Word
     
     inline_string <- ({ '"' {|
-        ({~ (("\\" -> "\") / ('\"' -> '"') / (!string_interpolation [^%nl"]))+ ~}
+        ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
+") / (!string_interpolation [^%nl"]))+ ~}
         / string_interpolation)* |} '"' }) -> String
     indented_string <- ({ '".."' indent {|
             indented_string_line (nodent {~ "" -> "

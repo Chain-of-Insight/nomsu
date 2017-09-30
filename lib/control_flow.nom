@@ -40,7 +40,7 @@ compile (continue %var; go to next %var; on to the next %var) to code: ".."
 
 # While loops
 compile (repeat while %condition %body) to block: ".."
-    |while \(%condition) do
+    |while \(%condition as lua) do
     |    \(%body as lua statements)
     |    ::continue_repeat::
     |end
@@ -87,8 +87,7 @@ parse (for all %iterable %body) as: for % in %iterable %body
 compile (when %body) to block:
     %result =: ""
     %fallthroughs =: []
-    for %statement in (%body's "value"):
-        %func-call =: %statement's "value"
+    for %func-call in (%body's "value"):
         assert ((%func-call's "type") == "FunctionCall") ".."
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
         %tokens =: %func-call's "value"
@@ -103,7 +102,7 @@ compile (when %body) to block:
         %action =: %tokens -> 3
         if (%action == (nil)):
             lua block "table.insert(vars.fallthroughs, vars.condition)"
-            go to next %statement
+            go to next %func-call
 
         if (lua expr "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
             %result join=: ".."
@@ -129,10 +128,9 @@ compile (when %body) to block:
 
 # Switch statement
 compile (when %branch-value == ? %body) to block:
-    %result =: "local branch_value = \(%branch-value)"
+    %result =: "local branch_value = \(%branch-value as lua)"
     %fallthroughs =: []
-    for %statement in (%body's "value"):
-        %func-call =: %statement's "value"
+    for %func-call in (%body's "value"):
         assert ((%func-call's "type") == "FunctionCall") ".."
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
         %tokens =: %func-call's "value"
@@ -147,7 +145,7 @@ compile (when %branch-value == ? %body) to block:
         %action =: %tokens -> 3
         if (%action == (nil)):
             lua block "table.insert(vars.fallthroughs, vars.condition)"
-            go to next %statement
+            go to next %func-call
 
         if (lua expr "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
             %result join=: ".."

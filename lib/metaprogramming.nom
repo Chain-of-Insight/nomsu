@@ -13,7 +13,7 @@ lua code ".."
     |nomsu:def(%s, %s, %s)
     |]]):format(nomsu:repr(canonical.src), thunk, nomsu:repr(body.src))
     |    if #aliases > 1 then
-    |        lua = lua .. ([[
+    |        lua = lua .. "\n" .. ([[
     |do
     |    local aliased = %s
     |    local src = %s
@@ -27,8 +27,7 @@ lua code ".."
     |]]):format(nomsu:repr(aliases[i].src), nomsu:repr(canonical.src))
     |        end
     |        lua = lua .. [[
-    |end
-    |]]
+    |end]]
     |    end
     |    return nil, lua
     |end, "<source can be found in lib/metaprogramming.nom>")
@@ -71,6 +70,8 @@ parse (compile %macro_def to block %body) as: escaped compile \%macro_def to cod
     |do
     |    \(%body)
     |end
+
+rule (do %) =: %
 
 rule (%tree as lua) =:
     lua expr "nomsu:tree_to_lua(\(%tree))"
