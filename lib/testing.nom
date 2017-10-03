@@ -1,83 +1,13 @@
 require "lib/metaprogramming.nom"
 
 # For unit testing
-macro block [test %code yields %expected] =:
-
-
-    _yield_tree: (tree, indent_level=0)=>
-        ind = (s) -> INDENT\rep(indent_level)..s
-        switch tree.type
-            when "File"
-                coroutine.yield(ind"File:")
-                @_yield_tree(tree.value.body, indent_level+1)
-            when "Errors" then coroutine.yield(ind"Error:\n#{tree.value}")
-            when "Block"
-                for chunk in *tree.value
-                    @_yield_tree(chunk, indent_level)
-            when "Thunk"
-                coroutine.yield(ind"Thunk:")
-                @_yield_tree(tree.value, indent_level+1)
-            when "Statement" then @_yield_tree(tree.value, indent_level)
-            when "FunctionCall"
-                alias = @get_alias tree
-                args = [a for a in *tree.value when a.type != "Word"]
-                if #args == 0
-                    coroutine.yield(ind"Call [#{alias}]!")
-                else
-                    coroutine.yield(ind"Call [#{alias}]:")
-                    for a in *args
-                        @_yield_tree(a, indent_level+1)
-            when "String" then coroutine.yield(ind(repr(tree.value)))
-            when "Longstring" then coroutine.yield(ind(repr(tree.value)))
-            when "Number" then coroutine.yield(ind(tree.value))
-            when "Var" then coroutine.yield ind"Var[#{repr(tree.value)}]"
-            when "List"
-                if #tree.value == 0
-                    coroutine.yield(ind("<Empty List>"))
-                else
-                    coroutine.yield(ind"List:")
-                    for item in *tree.value
-                        @_yield_tree(item, indent_level+1)
-            else error("Unknown/unimplemented thingy: #{tree.type}")
-
-    print_tree:(tree)=>
-        for line in coroutine.wrap(-> @_yield_tree(tree))
-            @writeln(line)
-
-    stringify_tree:(tree)=>
-        result = {}
-        for line in coroutine.wrap(-> @_yield_tree(tree))
-            insert(result, line)
-        return concat result, "\n"
-
-    test: (src, filename, expected)=>
-        i = 1
-        while i != nil
-            start,stop = src\find("\n\n", i)
-
-            test = src\sub(i,start)
-            i = stop
-            start,stop = test\find"==="
-            if not start or not stop then
-                @error("WHERE'S THE ===? in:\n#{test}")
-            test_src, expected = test\sub(1,start-1), test\sub(stop+1,-1)
-            expected = expected\match'[\n]*(.*[^\n])'
-            tree = @parse(test_src, filename)
-            got = @stringify_tree(tree.value.body)
-            if got != expected
-                @error"TEST FAILED!\nSource:\n#{test_src}\nExpected:\n#{expected}\n\nGot:\n#{got}"
-
-
-
-
-
-    %generated =: repr (nomsu "stringify_tree" [%code's "value"])
-    %expected =: %expected as lua
+rule [test tree %generated == %expected] =:
     if (%generated != %expected):
-        say "Test failed!"
-        say "Expected:"
-        say %expected
-        say "But got:"
-        say %generated
-        error!
-    return ""
+        error ".."
+            |Test Failed!
+            |Expected:
+            |\(%expected)
+            |But got:
+            |\(%generated)
+parse [test %code yields %expected] as:
+    test tree (nomsu "tree_to_str" [\%code]) == %expected

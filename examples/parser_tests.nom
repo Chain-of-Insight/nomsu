@@ -3,28 +3,35 @@ require "lib/testing.nom"
 
 test: say "foo"
 ..yields ".."
-    |Call [say %]:
-    |    "foo"
+    |FunctionCall:
+    |    Word:
+    |        "say"
+    |    String:
+    |        "foo"
 
 test: say (foo)
 ..yields ".."
-    |Call [say %]:
-    |    Call [foo]!
+    |FunctionCall:
+    |    Word:
+    |        "say"
+    |    FunctionCall:
+    |        Word:
+    |            "foo"
 
 test:
-    rule [fart] =: say "poot"
+    rule (fart) =: say "poot"
 ..yields ".."
     |Call [rule % = %]:
     |    List:
-    |        Call [fart]!
-    |    Thunk:
+    |        Call [fart]:
+    |    Block:
     |        Call [say %]:
     |            "poot"
 
 test: say (subexpressions work)
 ..yields ".."
     |Call [say %]:
-    |    Call [subexpressions work]!
+    |    Call [subexpressions work]:
 
 test: say ["lists", "work"]
 ..yields ".."
@@ -33,9 +40,9 @@ test: say ["lists", "work"]
     |        "lists"
     |        "work"
 
-test (: say []) yields ".."
+test (say []) yields ".."
     |Call [say %]:
-    |    <Empty List>
+    |    List:
 
 test:
     say [..]
@@ -69,50 +76,50 @@ test:
 ..yields ".."
     |Call [if % % else %]:
     |    1
-    |    Thunk:
-    |        Call [yes]!
-    |    Thunk:
-    |        Call [no]!
+    |    Block:
+    |        Call [yes]:
+    |    Block:
+    |        Call [no]:
 
 test:
-    if 1 (: yes) else: no
+    if 1 (yes) else: no
 ..yields ".."
     |Call [if % % else %]:
     |    1
-    |    Thunk:
-    |        Call [yes]!
-    |    Thunk:
-    |        Call [no]!
+    |    Block:
+    |        Call [yes]:
+    |    Block:
+    |        Call [no]:
 
-test: say (do: return 5)
+test: say (do (return 5))
 ..yields ".."
     |Call [say %]:
     |    Call [do %]:
-    |        Thunk:
+    |        Block:
     |            Call [return %]:
     |                5
 
 test:
-    say (..)
+    say:
       fn call
 ..yields ".."
     |Call [say %]:
-    |    Call [fn call]!
+    |    Call [fn call]:
 
 test:
     do: say "one liner"
     ..also: say "another one liner"
 ..yields ".."
     |Call [do % also %]:
-    |    Thunk:
+    |    Block:
     |        Call [say %]:
     |            "one liner"
-    |    Thunk:
+    |    Block:
     |        Call [say %]:
     |            "another one liner"
 
 test:
-    say (..)
+    say:
         do:
             say "hi"
             return 5
@@ -120,7 +127,7 @@ test:
 ..yields ".."
     |Call [say %]:
     |    Call [do %]:
-    |        Thunk:
+    |        Block:
     |            Call [say %]:
     |                "hi"
     |            Call [return %]:
@@ -150,21 +157,21 @@ test:
 ..yields ".."
     |Call [if % % else %]:
     |    Var["x"]
-    |    Thunk:
-    |        Call [x]!
-    |    Thunk:
+    |    Block:
+    |        Call [x]:
+    |    Block:
     |        Call [if % % else %]:
     |            Var["y"]
-    |            Thunk:
-    |                Call [y]!
-    |            Thunk:
-    |                Call [z]!
+    |            Block:
+    |                Call [y]:
+    |            Block:
+    |                Call [z]:
 
 
 test:
     don't fuck this up
 ..yields ".."
-    |Call [don 't fuck this up]!
+    |Call [don 't fuck this up]:
 
 test:
     %Brian's hat
@@ -173,3 +180,4 @@ test:
     |    Var["Brian"]
 
 say "All tests passed!"
+

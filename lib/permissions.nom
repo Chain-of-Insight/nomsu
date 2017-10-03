@@ -4,44 +4,44 @@ require "lib/operators.nom"
 require "lib/collections.nom"
 
 # Permission functions
-rule (standardize rules %rules) =:
+rule [standardize rules %rules] =:
     if (lua expr "type(vars.rules) == 'string'"): %rules = [%rules]
     (nomsu "get_stub" [%]) for all %rules
-rule (restrict %rules to within %elite-rules) =:
-    %rules =: standardize rules %rules
-    %elite-rules =: standardize rules %elite-rules
+rule [restrict %rules to within %elite-rules] =:
+    %rules = (standardize rules %rules)
+    %elite-rules = (standardize rules %elite-rules)
     say "Restricting \(%rules) to within \(%elite-rules)"
     for all (flatten [%elite-rules, %rules]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for %rule in %rules:
         assert (nomsu "check_permission" [%]) ".."
             |You do not have permission to restrict permissions for function: \(%)
-        ((nomsu) ->* ["defs",%rule,"whiteset"]) =:
+        ((nomsu) ->* ["defs",%rule,"whiteset"]) = (..)
             dict: [%, yes] for all %elite-rules
 
-rule (allow %elite-rules to use %rules) =:
-    %rules =: standardize rules %rules
-    %elite-rules =: standardize rules %elite-rules
+rule [allow %elite-rules to use %rules] =:
+    %rules = (standardize rules %rules)
+    %elite-rules = (standardize rules %elite-rules)
     say "Allowing \(%elite-rules) to use \(%rules)"
     for all (flatten [%elite-rules, %rules]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for %rule in %rules:
         assert (nomsu "check_permission" [%rule]) ".."
             |You do not have permission to grant permissions for function: \(%rule)
-        %whiteset =: (nomsu) ->* ["defs",%rule,"whiteset"]
+        %whiteset = ((nomsu) ->* ["defs",%rule,"whiteset"])
         if (not %whiteset): go to next %rule
         for all %elite-rules: %whiteset -> % = (yes)
 
-rule (forbid %pleb-rules to use %rules) =:
-    %rules =: standardize rules %rules
-    %pleb-rules =: standardize rules %pleb-rules
+rule [forbid %pleb-rules to use %rules] =:
+    %rules = (standardize rules %rules)
+    %pleb-rules = (standardize rules %pleb-rules)
     say "Forbidding \(%pleb-rules) to use \(%rules)"
     for all (flatten [%pleb-rules, %used]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for all %rules:
         assert (nomsu "check_permission" [%]) ".."
             |You do not have permission to grant permissions for function: \(%)
-        %whiteset =: (nomsu) ->* ["defs",%,"whiteset"]
+        %whiteset = ((nomsu) ->* ["defs",%,"whiteset"])
         assert %whiteset ".."
             |Cannot individually restrict permissions for \(%) because it is currently
             |available to everyone. Perhaps you meant to use "restrict % to within %" instead?

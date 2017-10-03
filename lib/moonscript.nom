@@ -1,30 +1,30 @@
 require "lib/metaprogramming.nom"
 
 # Moonscript!
-macro block [moonscript block %moonscript_code] =:
+parse [moonscript block %moonscript_code] as:
     lua block ".."
-        |local parse, compile = require('moonscript.parse'), require('moonscript.compile')
-        |local moon_code = nomsu:tree_to_value(vars.moonscript_code, vars)
-        |local tree, err = parse.string(moon_code)
-        |if not tree then
-        |    nomsu:error("Failed to parse moonscript: "..err)
-        |end
-        |local lua_code, err, pos = compile.tree(tree)
-        |if not lua_code then
-        |    nomsu:error(compile.format_error(err, pos, moon_code))
-        |end
-        |return "do\\n"..lua_code.."\\nend"
+        |local parse, compile = require('moonscript.parse'), require('moonscript.compile');
+        |local moon_code = nomsu:tree_to_value(vars.moonscript_code, vars);
+        |local tree, err = parse.string(moon_code);
+        |if not tree then;
+        |    nomsu:error("Failed to parse moonscript: "..err);
+        |end;
+        |local lua_code, err, pos = compile.tree(tree);
+        |if not lua_code then;
+        |    nomsu:error(compile.format_error(err, pos, moon_code));
+        |end;
+        |return "do\\n"..lua_code.."\\nend";
 
-macro [moonscript %moonscript_code] =:
+parse [moonscript %moonscript_code] as:
     lua block ".."
-        |local parse, compile = require('moonscript.parse'), require('moonscript.compile')
-        |local moon_code = nomsu:tree_to_value(vars.moonscript_code, vars)
-        |local tree, err = parse.string(moon_code)
-        |if not tree then
-        |    nomsu:error("Failed to parse moonscript: "..err)
-        |end
-        |local lua_code, err, pos = compile.tree(tree)
-        |if not lua_code then
-        |    nomsu:error(compile.format_error(err, pos, moon_code))
-        |end
-        |return "(function(nomsu, vars)\\n"..lua_code.."\\nend)(nomsu, vars)"
+        |local parse, compile = require('moonscript.parse'), require('moonscript.compile');
+        |local moon_code = nomsu:tree_to_value(vars.moonscript_code, vars);
+        |local tree, err = parse.string(moon_code);
+        |if not tree then;
+        |    nomsu:error("Failed to parse moonscript: "..err);
+        |end;
+        |local lua_code, err, pos = compile.tree(tree);
+        |if not lua_code then;
+        |    nomsu:error(compile.format_error(err, pos, moon_code));
+        |end;
+        |return "(function(nomsu, vars)\\n"..lua_code.."\\nend)(nomsu, vars)";

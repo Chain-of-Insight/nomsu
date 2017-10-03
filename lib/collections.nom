@@ -5,122 +5,116 @@ require "lib/operators.nom"
 # List/dict functions:
 
 # Indexing
-parse:
-    %index st in %list; %index nd in %list; %index rd in %list
-    %index th in %list; %index in %list
+parse [..]
+    %index st in %list, %index nd in %list, %index rd in %list
+    %index th in %list, %index in %list
 ..as: %list -> %index
-compile:
-    %index st to last in %list; %index nd to last in %list; %index rd to last in %list
+compile [..]
+    %index st to last in %list, %index nd to last in %list, %index rd to last in %list
     %index th to last in %list
 ..to: "nomsu.utils.nth_to_last(\(%list as lua), \(%index as lua))"
 
-parse (first in %list; first %list) as: 1 st in %list
-parse (last in %list; last %list) as: 1 st to last in %list
+parse [first in %list, first %list] as: 1 st in %list
+parse [last in %list, last %list] as: 1 st to last in %list
 
 # Dict iteration convenience function. This could also be accomplished with: for all (entries in %dict): ...
-compile (for %key -> %value in %dict %body) to block: ".."
-    |for k, v in pairs(\(%dict as lua)) do
-    |    \(%key as lua), \(%value as lua) = k, v
-    |    \(%body as lua statements)
-    |end
+compile [for %key -> %value in %dict %body] to code: ".."
+    |do;
+    |    for k, v in pairs(\(%dict as lua)) do;
+    |        \(%key as lua), \(%value as lua) = k, v;
+    |        \(%body as lua statements)
+    |    end;
+    |end;
 
 # Membership testing
-rule (%item is in %list; %list contains %item; %list has %item) =:
+rule [%item is in %list, %list contains %item, %list has %item] =:
     for %key -> %value in %list:
         if (%key == %item): return (yes)
     return (no)
 
-rule:
-    %item isn't in %list; %item is not in %list
-    %list doesn't contain %item; %list does not contain %item
-    %list doesn't have %item; %list does not have %item
+rule [..]
+    %item isn't in %list, %item is not in %list
+    %list doesn't contain %item, %list does not contain %item
+    %list doesn't have %item, %list does not have %item
 ..=:
     for %key -> %value in %list:
         if (%key == %item): return (no)
     return (yes)
 
-compile (%list has key %index; %list has index %index) to: ".."
-    |(\(%list as lua)[\(%index as lua)] ~= nil)
+compile [%list has key %index, %list has index %index] to: ".."
+    |((\(%list as lua))[\(%index as lua)] ~= nil)
 
-compile:
-    %list doesn't have key %index; %list does not have key %index
-    %list doesn't have index %index; %list does not have index %index
-..to: "(\(%list as lua)[\(%index as lua)] ~= nil)"
+compile [..]
+    %list doesn't have key %index, %list does not have key %index
+    %list doesn't have index %index, %list does not have index %index
+..to: "((\(%list as lua))[\(%index as lua)] ~= nil)"
 
-compile (length of %list; size of %list; size %list; number of %list; len %list) to:
+compile [length of %list, size of %list, size %list, number of %list, len %list] to:
     "nomsu.utils.size(\(%list as lua))"
 
 # Chained lookup
-compile (%list ->* %indices) to:
+compile [%list ->* %indices] to:
     assert ((%indices's "type") == "List") ".."
         |Expected List for chained lookup, not \(%indices's "type")
-    %ret =: "\(%list as lua)"
+    %ret = "\(%list as lua)"
     for %index in (%indices's "value"):
-        %ret join=: "[\(%index as lua)]"
+        %ret join= "[\(%index as lua)]"
     "\(%ret)"
 
 # Assignment
-compile:
-    %list's %index = %new_value; %index st in %list = %new_value; %index nd in %list = %new_value
-    %index rd in %list = %new_value; %index th in %list = %new_value; %index in %list = %new_value
+compile [..]
+    %list's %index = %new_value, %index st in %list = %new_value, %index nd in %list = %new_value
+    %index rd in %list = %new_value, %index th in %list = %new_value, %index in %list = %new_value
     %list -> %index = %new_value
 ..to code:
-    assert ((%new_value's "type") == "Block") ".."
-        |Dict assignment operation has the wrong type for the right hand side.
-        |Expected Block, but got \(%new_value's "type").
-        |Maybe you used "=" instead of "=:"?
-    assert ((size of (%new_value's "value")) == 1) ".."
-        |Dict assignment operation has the wrong number of values on the right hand side.
-        |Expected 1 value, but got \(repr %new_value)
-    %new_value =: %new_value ->* ["value",1]
-    "\(%list as lua)[\(%index as lua)] = \(%new_value as lua)"
+    "(\(%list as lua))[\(%index as lua)] = \(%new_value as lua)"
 
-compile (append %item to %list; add %item to %list) to:
+compile [append %item to %list, add %item to %list] to:
     "table.insert(\(%list as lua), \(%item as lua))"
 
-rule (flatten %lists) =:
-    %flat =: []
+rule [flatten %lists] =:
+    %flat = []
     for %list in %lists:
         for %item in %list:
             add %item to %flat
     %flat
 
-rule (dict %items) =:
-    %dict =: []
+rule [dict %items] =:
+    %dict = []
     for %pair in %items:
-        %dict -> (first in %pair) =: last in %pair
+        %dict -> (%pair -> 1) = (%pair -> 2)
     %dict
 
-rule (entries in %dict) =:
-    %entries =: []
+rule [entries in %dict] =:
+    %entries = []
     for %k -> %v in %dict:
         add (dict [["key",%k],["value",%v]]) to %entries
     %entries
 
-rule (keys in %dict) =:
-    %keys =: []
+rule [keys in %dict] =:
+    %keys = []
     for %k -> %v in %dict: add %k to %keys
     %keys
 
-rule (values in %dict) =:
-    %values =: []
+rule [values in %dict] =:
+    %values = []
     for %k -> %v in %dict: add %v to %values
     %values
 
 # List Comprehension
-compile (%expression for %var in %iterable) to:
+compile [%expression for %var in %iterable] to:
     assert ((%var's "type") == "Var") ".."
         |List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%var's "type")
     ".."
-        |(function(game, vars)
-        |    local comprehension = {}
-        |    for i,value in ipairs(\(%iterable as lua)) do
-        |        \(%var as lua) = value
-        |        comprehension[i] = \(%expression as lua)
-        |    end
-        |    return comprehension
+        |(function(game, vars);
+        |    local comprehension = {};
+        |    for i,value in ipairs(\(%iterable as lua)) do;
+        |        \(%var as lua) = value;
+        |        comprehension[i] = \(%expression as lua);
+        |    end;
+        |    return comprehension;
         |end)(game, setmetatable({}, {__index=vars}))
-parse (%expression for all %iterable) as: %expression for % in %iterable
+parse [%expression for all %iterable] as: %expression for % in %iterable
 
 # TODO: maybe make a generator/coroutine?
 

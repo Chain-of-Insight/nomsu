@@ -3,168 +3,174 @@ require "lib/operators.nom"
 require "lib/utils.nom"
 
 # Conditionals
-compile (if %condition %if_body) to code: ".."
-    |if \(%condition as lua) then
+compile [if %condition %if_body] to code: ".."
+    |if \(%condition as lua) then;
     |    \(%if_body as lua statements)
-    |end
+    |end;
 
-compile (if %condition %if_body else %else_body) to code: ".."
-    |if \(%condition as lua) then
+compile [if %condition %if_body else %else_body] to code: ".."
+    |if \(%condition as lua) then;
     |    \(%if_body as lua statements)
-    |else
+    |else;
     |    \(%else_body as lua statements)
-    |end
+    |end;
 
 # Return
-compile (return) to code: "do return end"
-compile (return %return-value) to code: "do return \(%return-value as lua) end"
+compile [return] to code: "do; return; end;"
+compile [return %return-value] to code: "do; return \(%return-value as lua); end;"
 
 # GOTOs
-compile (-> %label) to code: ".."
-    |::label_\(nomsu "var_to_lua_identifier" [%label])::
-compile (go to %label) to code: ".."
-    |goto label_\(nomsu "var_to_lua_identifier" [%label])
+compile [-> %label] to code: ".."
+    |::label_\(nomsu "var_to_lua_identifier" [%label])::;
+compile [go to %label] to code: ".."
+    |goto label_\(nomsu "var_to_lua_identifier" [%label]);
 
 # Loop control flow
-compile (stop; stop loop; break) to code: "break"
-compile (stop for; stop for-loop; break for) to code: "goto break_for"
-compile (stop repeat; stop repeat-loop; break repeat) to code: "goto break_repeat"
-compile (stop %var; break %var) to code: ".."
-    |goto break_\(nomsu "var_to_lua_identifier" [%var])
+compile [stop, stop loop, break] to code: "break"
+compile [stop for, stop for-loop, break for] to code: "goto break_for"
+compile [stop repeat, stop repeat-loop, break repeat] to code: "goto break_repeat"
+compile [stop %var, break %var] to code: ".."
+    |goto break_\(nomsu "var_to_lua_identifier" [%var]);
 
-compile (continue; continue loop) to code: "continue"
-compile (continue for; continue for-loop) to code: "goto continue_for"
-compile (continue repeat; continue repeat-loop) to code: "goto continue_repeat"
-compile (continue %var; go to next %var; on to the next %var) to code: ".."
-    |goto continue_\(nomsu "var_to_lua_identifier" [%var])
+compile [continue, continue loop] to code: "continue"
+compile [continue for, continue for-loop] to code: "goto continue_for"
+compile [continue repeat, continue repeat-loop] to code: "goto continue_repeat"
+compile [continue %var, go to next %var, on to the next %var] to code: ".."
+    |goto continue_\(nomsu "var_to_lua_identifier" [%var]);
 
 # While loops
-compile (repeat while %condition %body) to block: ".."
-    |while \(%condition as lua) do
-    |    \(%body as lua statements)
-    |    ::continue_repeat::
-    |end
-    |::break_repeat::
-parse (repeat %body) as: repeat while (true) %body
-parse (repeat until %condition %body) as: repeat while (not %condition) %body
+compile [repeat while %condition %body] to code: ".."
+    |do;
+    |    while \(%condition as lua) do;
+    |        \(%body as lua statements)
+    |        ::continue_repeat::;
+    |    end;
+    |    ::break_repeat::;
+    |end;
+parse [repeat %body] as: repeat while (true) %body
+parse [repeat until %condition %body] as: repeat while (not %condition) %body
 
 # Numeric range for loops
-compile:
+compile [..]
     for %var from %start to %stop by %step %body
     for %var from %start to %stop via %step %body
-..to block: ".."
-    |for i=\(%start as lua),\(%stop as lua),\(%step as lua) do
+..to code: ".."
+    |do;
+    |    for i=\(%start as lua),\(%stop as lua),\(%step as lua) do;
     # This trashes the loop variables, just like in Python.
-    |    \(%var as lua) = i
-    |    \(%body as lua statements)
-    |    ::continue_for::
-    |    ::continue_\(nomsu "var_to_lua_identifier" [%var])::
-    |end
-    |::break_for::
-    |::break_\(nomsu "var_to_lua_identifier" [%var])::
-parse (for %var from %start to %stop %body) as: for %var from %start to %stop via 1 %body
-parse:
+    |        \(%var as lua) = i;
+    |        \(%body as lua statements)
+    |        ::continue_for::;
+    |        ::continue_\(nomsu "var_to_lua_identifier" [%var])::;
+    |    end;
+    |    ::break_for::;
+    |    ::break_\(nomsu "var_to_lua_identifier" [%var])::;
+    |end;
+parse [for %var from %start to %stop %body] as: for %var from %start to %stop via 1 %body
+parse [..]
     for all %start to %stop by %step %body
     for all %start to %stop via %step %body
 ..as: for % from %start to %stop via %step %body
-parse (for all %start to %stop %body) as: for all %start to %stop via 1 %body
+parse [for all %start to %stop %body] as: for all %start to %stop via 1 %body
 
-compile (for %var in %iterable %body) to block:
+compile [for %var in %iterable %body] to code:
     ".."
-        |for i,value in ipairs(\(%iterable as lua)) do
+        |do;
+        |    for i,value in ipairs(\(%iterable as lua)) do;
         # This trashes the loop variables, just like in Python.
-        |    \(%var as lua) = value
-        |    \(%body as lua statements)
-        |    ::continue_for::
-        |    ::continue_\(nomsu "var_to_lua_identifier" [%var])::
-        |end
-        |::break_for::
-        |::break_\(nomsu "var_to_lua_identifier" [%var])::
-parse (for all %iterable %body) as: for % in %iterable %body
+        |        \(%var as lua) = value;
+        |        \(%body as lua statements)
+        |        ::continue_for::;
+        |        ::continue_\(nomsu "var_to_lua_identifier" [%var])::;
+        |    end;
+        |    ::break_for::;
+        |    ::break_\(nomsu "var_to_lua_identifier" [%var])::;
+        |end;
+parse [for all %iterable %body] as: for % in %iterable %body
 
 
 # Switch statement/multi-branch if
-compile (when %body) to block:
-    %result =: ""
-    %fallthroughs =: []
+compile [when %body] to code:
+    %result = "do;\n"
+    %fallthroughs = []
     for %func-call in (%body's "value"):
         assert ((%func-call's "type") == "FunctionCall") ".."
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
-        %tokens =: %func-call's "value"
-        %star =: %tokens -> 1
+        %tokens = (%func-call's "value")
+        %star = (%tokens -> 1)
         assert (lua expr "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
             |Invalid format for 'when' statement. Lines must begin with '*'
 
-        %condition =: %tokens -> 2
+        %condition = (%tokens -> 2)
         assert %condition ".."
             |Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
 
-        %action =: %tokens -> 3
+        %action = (%tokens -> 3)
         if (%action == (nil)):
             lua block "table.insert(vars.fallthroughs, vars.condition)"
             go to next %func-call
 
         if (lua expr "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
-            %result join=: ".."
+            %result join= ".."
                 |
-                |do
+                |do;
         ..else:
-            %condition =: %condition as lua
+            %condition = (%condition as lua)
             for all %fallthroughs:
-                %condition join=: " or \(% as lua)"
-            %result join=: ".."
+                %condition join= " or \(% as lua)"
+            %result join= ".."
                 |
-                |if \(%condition) then
-        %result join=: ".."
+                |if \(%condition) then;
+        %result join= ".."
             |
             |    \(%action as lua statements)
-            |    goto finished_when
-            |end
+            |    goto finished_when;
+            |end;
 
-        %fallthroughs =: []
+        %fallthroughs = []
 
-    %result join=: "\n::finished_when::"
+    %result join= "\n::finished_when::;\nend;"
     %result
 
 # Switch statement
-compile (when %branch-value == ? %body) to block:
-    %result =: "local branch_value = \(%branch-value as lua)"
-    %fallthroughs =: []
+compile [when %branch-value == ? %body] to code:
+    %result = "do;\nlocal branch_value = \(%branch-value as lua)"
+    %fallthroughs = []
     for %func-call in (%body's "value"):
         assert ((%func-call's "type") == "FunctionCall") ".."
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
-        %tokens =: %func-call's "value"
-        %star =: %tokens -> 1
+        %tokens = (%func-call's "value")
+        %star = (%tokens -> 1)
         assert (lua expr "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
             |Invalid format for 'when' statement. Lines must begin with '*'
 
-        %condition =: %tokens -> 2
+        %condition = (%tokens -> 2)
         assert %condition ".."
             |Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
 
-        %action =: %tokens -> 3
+        %action = (%tokens -> 3)
         if (%action == (nil)):
             lua block "table.insert(vars.fallthroughs, vars.condition)"
             go to next %func-call
 
         if (lua expr "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
-            %result join=: ".."
+            %result join= ".."
                 |
-                |do
+                |do;
         ..else:
-            %condition =: "branch_value == (\(%condition as lua))"
+            %condition = "branch_value == (\(%condition as lua))"
             for all %fallthroughs:
-                %condition join=: " or (branch_value == \(% as lua))"
-            %result join=: ".."
+                %condition join= " or (branch_value == \(% as lua))"
+            %result join= ".."
                 |
-                |if \(%condition) then
-        %result join=: ".."
+                |if \(%condition) then;
+        %result join= ".."
             |
             |    \(%action as lua statements)
-            |    goto finished_when
-            |end
+            |    goto finished_when;
+            |end;
 
-        %fallthroughs =: []
+        %fallthroughs = []
 
-    %result join=: "\n::finished_when::"
+    %result join= "\n::finished_when::;\nend;"
     %result
