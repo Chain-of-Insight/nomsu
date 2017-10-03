@@ -67,7 +67,7 @@ compile [..]
     %index rd in %list = %new_value, %index th in %list = %new_value, %index in %list = %new_value
     %list -> %index = %new_value
 ..to code:
-    "(\(%list as lua))[\(%index as lua)] = \(%new_value as lua)"
+    "(\(%list as lua))[\(%index as lua)] = \(%new_value as lua);"
 
 compile [append %item to %list, add %item to %list] to:
     "table.insert(\(%list as lua), \(%item as lua))"

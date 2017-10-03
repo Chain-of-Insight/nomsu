@@ -44,7 +44,8 @@ rule [escaped compile %macro_def to code %body] =:
 parse [compile %macro_def to %body] as: escaped compile \%macro_def to \%body
 parse [compile %macro_def to code %body] as: escaped compile \%macro_def to code \%body
 
-rule [do %] =: %
+rule [do %] =:
+    lua expr "\(%)(nomsu, vars)"
 
 rule [%tree as lua] =:
     lua expr "nomsu:tree_to_lua(\(%tree))"

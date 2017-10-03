@@ -17,7 +17,7 @@ rule [restrict %rules to within %elite-rules] =:
         assert (nomsu "check_permission" [%]) ".."
             |You do not have permission to restrict permissions for function: \(%)
         ((nomsu) ->* ["defs",%rule,"whiteset"]) = (..)
-            dict: [%, yes] for all %elite-rules
+            dict ([%, yes] for all %elite-rules)
 
 rule [allow %elite-rules to use %rules] =:
     %rules = (standardize rules %rules)

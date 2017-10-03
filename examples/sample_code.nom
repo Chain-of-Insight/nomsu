@@ -34,7 +34,7 @@ say ".."
     |^and trailing spaces
     |
 
-say ".."|Longstrings have interpolation: \1 + 2\ <- like that
+say "Strings have interpolation: \(1 + 2) <- like that"
 
 rule [doublefart] =: # this farts twice
     say "poot"
@@ -76,9 +76,9 @@ say both
 if 1: yes
 ..else: no
 
-if 1 (:yes) else (:no)
+if 1 {yes} else {no}
 
-say (do: return 5)
+say (do {return 5})
 
 # Some variables
 rule [do %one also %two] =:
@@ -88,7 +88,7 @@ rule [do %one also %two] =:
 do: say "one liner"
 ..also: say "another one liner"
 
-say (do: return "wow")
+say (do {return "wow"})
 
 say (1 + (-(2 * 3)))
 
@@ -97,21 +97,21 @@ say (..)
         3 * 4
 
 when:
-    ? %x == 1:
+    * (%x == 1):
         say "one"
-    ? %x == 2:
+    * (%x == 2):
         say "two"
-    ? %x:
+    * %x:
         say "nonzero"
-    ?:
+    * else:
         say "???"
 
-when %x:
-    == 1:
+when %x == ?:
+    * 1:
         say "one"
-    == 2:
+    * 2:
         say "two"
-    ==:
+    * else:
         say "???"
 
 
@@ -134,7 +134,7 @@ rule [%n bottles] =:
     lua block ".."
         |do
         |    print("running raw lua code...")
-        |    for i=\%n\,1,-1 do
+        |    for i=\(%n),1,-1 do
         |        print(tostring(i).." bottles of beer on the wall. Take one down, pass it around,")
         |    end
         |    print("no more bottles of beer on the wall.")
@@ -143,9 +143,9 @@ rule [%n bottles] =:
 9 bottles
 
 rule [dumsum %nums] =:
-    %sum =: 0
+    %sum = 0
     for %n in %nums:
-        %sum +=: %n
+        %sum += %n
     return %sum
 
 say (dumsum [1,2,3])

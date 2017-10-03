@@ -66,20 +66,25 @@ local nomsu = [=[    file <- ({ {| shebang?
     noeol_statement <- noeol_functioncall / noeol_expression
     inline_statement <- inline_functioncall / inline_expression
 
-    inline_block <- ({ {| "(" inline_statements ")" |} }) -> Block
-    eol_block <- ({ {| ":" %ws? noeol_statements eol |} }) -> Block
-    indented_block <- ({ {| (":" / "(..)") indent
+    inline_thunk <- ({ {| "{" inline_statements "}" |} }) -> Thunk
+    eol_thunk <- ({ {| ":" %ws? noeol_statements eol |} }) -> Thunk
+    indented_thunk <- ({ {| (":" / "{..}") indent
                 statements (nodent statements)*
-            (dedent / (({.+} ("" -> "Error while parsing block")) => error))
-        |} }) -> Block
+            (dedent / (({.+} ("" -> "Error while parsing thunk")) => error))
+        |} }) -> Thunk
 
     inline_nomsu <- ({ ("\" inline_expression) }) -> Nomsu
     eol_nomsu <- ({ ("\" noeol_expression) }) -> Nomsu
     indented_nomsu <- ({ ("\" expression) }) -> Nomsu
 
-    inline_expression <- number / variable / inline_string / inline_list / inline_block / inline_nomsu
-    noeol_expression <- indented_string / indented_block / indented_nomsu / indented_list / inline_expression
-    expression <- eol_block / eol_nomsu / noeol_expression
+    inline_expression <- number / variable / inline_string / inline_list / inline_nomsu
+        / inline_thunk / ("(" inline_statement ")")
+    noeol_expression <- indented_string / indented_nomsu / indented_list / indented_thunk
+        / ("(..)" indent
+            statement
+        (dedent / (({.+} ("" -> "Error while parsing indented expression"))))
+        ) / inline_expression
+    expression <- eol_thunk / eol_nomsu / noeol_expression
 
     -- Function calls need at least one word in them
     inline_functioncall <- ({ {|
@@ -104,7 +109,7 @@ local nomsu = [=[    file <- ({ {| shebang?
           |} (dedent / (({.+} ("" -> "Error while parsing String")) => error))
         }) -> String
     indented_string_line <- "|" ({~ (("\\" -> "\") / (!string_interpolation [^%nl]))+ ~} / string_interpolation)*
-    string_interpolation <- "\" (inline_block / indented_block / dotdot)
+    string_interpolation <- "\" ((noeol_expression dotdot?) / dotdot)
 
     number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
 
@@ -196,38 +201,44 @@ do
       self:write(...)
       return self:write("\n")
     end,
-    def = function(self, invocation, thunk, src)
-      local stub, arg_names = self:get_stub(invocation)
-      assert(stub, "NO STUB FOUND: " .. tostring(repr(invocation)))
-      if self.debug then
-        self:writeln(tostring(colored.bright("DEFINING RULE:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
+    def = function(self, signature, thunk, src, is_macro)
+      if is_macro == nil then
+        is_macro = false
       end
-      for i = 1, #arg_names - 1 do
-        for j = i + 1, #arg_names do
-          if arg_names[i] == arg_names[j] then
-            self:error("Duplicate argument in function " .. tostring(stub) .. ": '" .. tostring(arg_names[i]) .. "'")
+      assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
+      local canonical_args = nil
+      local _list_0 = self:get_stubs(signature)
+      for _index_0 = 1, #_list_0 do
+        local _des_0 = _list_0[_index_0]
+        local stub, arg_names
+        stub, arg_names = _des_0[1], _des_0[2]
+        assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
+        if self.debug then
+          self:writeln(tostring(colored.bright("DEFINING RULE:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
+        end
+        for i = 1, #arg_names - 1 do
+          for j = i + 1, #arg_names do
+            if arg_names[i] == arg_names[j] then
+              self:error("Duplicate argument in function " .. tostring(stub) .. ": '" .. tostring(arg_names[i]) .. "'")
+            end
           end
         end
-      end
-      do
-        local _with_0 = {
+        if canonical_args then
+          assert(utils.equivalent(utils.set(arg_names), canonical_args), "Mismatched args")
+        else
+          canonical_args = utils.set(arg_names)
+        end
+        self.defs[stub] = {
           thunk = thunk,
-          invocation = invocation,
+          stub = stub,
           arg_names = arg_names,
           src = src,
-          is_macro = false
+          is_macro = is_macro
         }
-        self.defs[stub] = _with_0
-        local _ = nil
-        return _with_0
       end
     end,
-    defmacro = function(self, invocation, thunk, src)
-      do
-        local _with_0 = self:def(invocation, thunk, src)
-        _with_0.is_macro = true
-        return _with_0
-      end
+    defmacro = function(self, signature, thunk, src)
+      return self:def(signature, thunk, src, true)
     end,
     call = function(self, stub, ...)
       local def = self.defs[stub]
@@ -336,14 +347,21 @@ do
         end
         local code_for_statement = ([[                return (function(nomsu, vars)
                     %s
-                    return %s
-                end)]]):format(statements or "", expr or "")
+                    return %s;
+                end);]]):format(statements or "", expr or "ret")
         if self.debug then
           self:writeln(tostring(colored.bright("RUNNING LUA:")) .. "\n" .. tostring(colored.blue(colored.bright(code_for_statement))))
         end
         local lua_thunk, err = load(code_for_statement)
         if not lua_thunk then
-          error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(code_for_statement))) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(colored.bright(colored.yellow(statement.src))))
+          local n = 1
+          local fn
+          fn = function()
+            n = n + 1
+            return ("\n%-3d|"):format(n)
+          end
+          local code = "1  |" .. code_for_statement:gsub("\n", fn)
+          error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(code))) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(colored.bright(colored.yellow(statement.src))))
         end
         local run_statement = lua_thunk()
         local ret
@@ -353,19 +371,20 @@ do
         end
         if not ok then
           self:writeln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.yellow(statement.src)))
-          self:error(repr(return_value))
+          self:writeln(debug.traceback())
+          self:error(ret)
         end
         insert(buffer, tostring(statements or '') .. "\n" .. tostring(expr and "ret = " .. tostring(expr) or ''))
       end
-      local lua_code = ([[            return function(nomsu, vars)
-                local ret
+      local lua_code = ([[            return (function(nomsu, vars)
+                local ret;
                 %s
-                return ret
-            end]]):format(concat(buffer, "\n"))
+                return ret;
+            end);]]):format(concat(buffer, "\n"))
       return return_value, lua_code
     end,
     tree_to_value = function(self, tree, vars)
-      local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. "\nend)"
+      local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. ";\nend);"
       if self.debug then
         self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
       end
@@ -387,33 +406,6 @@ do
       elseif "Nomsu" == _exp_0 then
         return repr(tree.value), nil
       elseif "Thunk" == _exp_0 then
-        local _, body = self:tree_to_lua(tree.value)
-        return ([[                    (function(nomsu, vars)
-                        local ret
-                        %s
-                        return ret
-                    end)]]):format(body), nil
-      elseif "Block" == _exp_0 then
-        if #tree.value == 0 then
-          return "nil", nil
-        end
-        if #tree.value == 1 then
-          local expr, statement = self:tree_to_lua(tree.value[1])
-          if not statement then
-            return expr, nil
-          end
-        end
-        local thunk_lua = self:tree_to_lua({
-          type = "Thunk",
-          value = {
-            type = "Statements",
-            value = tree.value,
-            src = tree.src
-          },
-          src = tree.src
-        })
-        return ("%s(nomsu, vars)"):format(thunk_lua), nil
-      elseif "Statements" == _exp_0 then
         local lua_bits = { }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
@@ -423,10 +415,14 @@ do
             insert(lua_bits, statement)
           end
           if expr then
-            insert(lua_bits, "ret = " .. tostring(expr))
+            insert(lua_bits, "ret = " .. tostring(expr) .. ";")
           end
         end
-        return nil, concat(lua_bits, "\n")
+        return ([[                    (function(nomsu, vars)
+                        local ret;
+                        %s
+                        return ret;
+                    end)]]):format(concat(lua_bits, "\n"))
       elseif "FunctionCall" == _exp_0 then
         local stub = self:get_stub(tree)
         if self.defs[stub] and self.defs[stub].is_macro then
@@ -532,7 +528,7 @@ do
         return 
       end
       local _exp_0 = tree.type
-      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
+      if "List" == _exp_0 or "File" == _exp_0 or "Thunk" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local v = _list_0[_index_0]
@@ -578,7 +574,7 @@ do
         if vars[tree.value] ~= nil then
           tree = vars[tree.value]
         end
-      elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Thunk" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
+      elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Thunk" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
         local new_value = self:replaced_vars(tree.value, vars)
         if new_value ~= tree.value then
           do
@@ -645,10 +641,48 @@ do
           end
         end
         return concat(stub, " "), arg_names, args
-      elseif "Block" == _exp_0 then
-        self:writeln(debug.traceback())
-        return self:error("Please pass in a single line from a block, not the whole thing:\n" .. tostring(self:tree_to_str(x)))
+      else
+        return self:error("Unsupported get stub type: " .. tostring(x.type))
       end
+    end,
+    get_stubs = function(self, x)
+      if type(x) ~= 'table' then
+        return {
+          {
+            self:get_stub(x)
+          }
+        }
+      end
+      local _exp_0 = x.type
+      if nil == _exp_0 then
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_0 = 1, #x do
+          local i = x[_index_0]
+          _accum_0[_len_0] = {
+            self:get_stub(i)
+          }
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      elseif "List" == _exp_0 then
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = x.value
+        for _index_0 = 1, #_list_0 do
+          local i = _list_0[_index_0]
+          _accum_0[_len_0] = {
+            self:get_stub(i)
+          }
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end
+      return {
+        {
+          self:get_stub(x)
+        }
+      }
     end,
     var_to_lua_identifier = function(self, var)
       if type(var) == 'table' and var.type == "Var" then
@@ -803,12 +837,12 @@ if arg and arg[1] then
     else
       output = io.open(arg[2], 'w')
     end
-    output:write(([[    local NomsuCompiler = require('nomsu')
-    local c = NomsuCompiler()
-    local run = function(nomsu, vars)
+    output:write(([[    local NomsuCompiler = require('nomsu');
+    local c = NomsuCompiler();
+    local run = (function(nomsu, vars)
         %s
-    end
-    return run(c, {})
+    end);
+    return run(c, {});
     ]]):format(code))
   end
 elseif arg then

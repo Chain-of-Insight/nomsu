@@ -23,7 +23,7 @@ compile [capitalize %str, %str capitalized] to:
     "(\(%str as lua)):gsub('%l', string.upper, 1)"
 
 compile [say %str] to: ".."
-    |nomsu:writeln(\(%str as lua))
+    |nomsu:writeln(nomsu.utils.repr_if_not_string(\(%str as lua)))
 
 # Number ranges
 compile [%start to %stop by %step, %start to %stop via %step] to: ".."
