@@ -94,7 +94,7 @@ with secrets:
         secret %pending = %src
         secret %approvals = []
         say ".."
-            |Proposal:
+            |\(underscore)\(yellow)Proposal:\(reset color)
             |\(bright)\(blue)\(%src)\(reset color)
 
     parse [propose %action] as:
@@ -138,7 +138,7 @@ with secrets:
 rule [join] =:
     add user (you)
     say ".."
-        |Welcome to the game, \(you)!
+        |\(on yellow)\(black)Welcome to the game, \(you)!\(reset color)
 
 restrict (rules that change users) to within "join"
 
