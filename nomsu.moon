@@ -27,8 +27,10 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..col
 -- provide way to run precompiled nomsu -> lua code from nomsu
 -- better scoping?
 -- better error reporting
+-- fix propagation of filename for error reporting
 -- add line numbers of function calls
 -- type checking?
+-- Fix compiler bug that breaks when file ends with a block comment
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -130,12 +132,12 @@ nomsu = [=[
     list_line <- (inline_list_item comma)* ((inline_list_item %ws? ",") / (functioncall / expression))
     inline_list_item <- inline_functioncall / inline_expression
 
-    block_comment <- "#.." [^%nl]* indent [^%nl]* (%nl ((%ws? (!. / &%nl)) / (!%dedented [^%nl]*)))* 
+    block_comment <- "#.." [^%nl]* (%nl (%ws? &%nl))* %nl %indented [^%nl]+ (%nl ((%ws? (!. / &%nl)) / (!%dedented [^%nl]+)))*
     line_comment  <- "#" [^%nl]*
 
     eol <- %ws? line_comment? (!. / &%nl)
     ignored_line <- (%nodented (block_comment / line_comment)) / (%ws? (!. / &%nl))
-    indent <- eol (%nl ignored_line)* %nl %indented
+    indent <- eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
     nodent <- eol (%nl ignored_line)* %nl %nodented
     dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
     tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%'])

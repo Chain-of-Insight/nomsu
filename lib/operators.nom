@@ -13,10 +13,9 @@ compile [nop, pass] to code: ""
 
 # Ternary operator
 compile [%if_expr if %condition else %else_expr] to: ".."
-    |(function(nomsu, vars)
-    # TODO: fix compiler bug that breaks this code if comments immediately follow ".."
     #.. Note: this uses a function instead of (condition and if_expr or else_expr)
         because that breaks if %if_expr is falsey.
+    |(function(nomsu, vars)
     |    if \(%condition) then;
     |        return \(%if_expr);
     |    else;
