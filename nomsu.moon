@@ -22,8 +22,7 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..col
 
 -- TODO:
 -- use actual variables instead of a vars table
--- have macros return (statements, expression)
--- consider non-linear codegen, like with moonscript's comprehensions, rather than doing thunks
+-- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- improve indentation of generated lua code
 -- provide way to run precompiled nomsu -> lua code from nomsu
 -- better scoping?
@@ -461,7 +460,6 @@ class NomsuCompiler
         return concat(bits)
 
     replaced_vars: (tree, vars)=>
-        -- TODO: consider making a pure function version of this that copies instead of modifying
         if type(tree) != 'table' then return tree
         switch tree.type
             when "Var"
