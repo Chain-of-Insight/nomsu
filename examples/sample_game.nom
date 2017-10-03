@@ -95,7 +95,7 @@ with secrets:
         secret %approvals = []
         say ".."
             |Proposal:
-            |\(%src)
+            |\(bright)\(blue)\(%src)\(reset color)
 
     parse [propose %action] as:
         propose source (..)
@@ -253,7 +253,7 @@ as bill: approve
 as dave: join
 
 propose:
-    rule [declare war] =: say "WAR!!!"
+    rule [declare war] =: say "\(red)WAR!!!\(reset color)"
     with secrets:
         secret %president = (nil)
         rule [elect president from %candidates] =:
