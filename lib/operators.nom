@@ -12,14 +12,19 @@ compile [phi, PHI, golden ratio] to: "((1+math.sqrt(5))/2)"
 compile [nop, pass] to code: ""
 
 # Ternary operator
-compile [%if_expr if %condition else %else_expr] to: ".."
+compile [..]
+    %when_true_expr if %condition else %when_false_expr
+    %when_true_expr if %condition otherwise %when_false_expr
+    %when_false_expr unless %condition else %when_true_expr
+    %when_false_expr unless %condition then %when_true_expr
+..to: ".."
     #.. Note: this uses a function instead of (condition and if_expr or else_expr)
         because that breaks if %if_expr is falsey.
     |(function(nomsu, vars)
     |    if \(%condition as lua) then;
-    |        return \(%if_expr as lua);
+    |        return \(%when_true_expr as lua);
     |    else;
-    |        return \(%else_expr as lua);
+    |        return \(%when_false_expr as lua);
     |    end;
     |end)(nomsu, vars)
 
