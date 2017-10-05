@@ -1,0 +1,6 @@
+require "lib/core.nom"
+rule [cap at %num instructions] =:
+    lua code ".."
+        |print("capped at", \(%num))
+        |local f = function() error("timeout") end
+        |debug.sethook(f, "", \(%num))
