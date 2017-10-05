@@ -2,5 +2,7 @@ require "lib/core.nom"
 rule [cap at %num instructions] =:
     lua code ".."
         |print("capped at", \(%num))
-        |local f = function() error("timeout") end
+        |local f = function()
+        |    nomsu:error("Execution quota exceeded. Your code took too long.")
+        |end
         |debug.sethook(f, "", \(%num))
