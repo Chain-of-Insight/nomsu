@@ -21,6 +21,7 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..col
 --pcall = (fn,...)-> true, fn(...)
 
 -- TODO:
+-- check robustness/functionality of compiler mode.
 -- use actual variables instead of a vars table
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- improve indentation of generated lua code
