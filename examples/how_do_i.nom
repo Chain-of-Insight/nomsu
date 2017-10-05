@@ -1,0 +1,269 @@
+# How do I...
+# Write a comment? Put a # and go till the end of the line
+
+#.. How do I write a multi-line comment?
+    Put a #.. on its own line and
+        write whatever you want
+      in an
+    indented area.
+
+# How do I import files?
+require "lib/core.nom"
+
+# Declare a variable?
+%x = 1
+%str = "Hello world"
+# Expressions that are more than just literal values require parentheses:
+%x = (2 + 3)
+
+# Modify a variable?
+%x = 100
+%x += 1
+
+# Print stuff?
+say "Hello world!"
+
+# Define a mutli-line string?
+%mutli_str = ".."
+    |Start with "..", then put lines below it
+    |that are indented one level and start
+    |with a |
+
+# Format a string?
+%format_str = ".."
+    |Strings can have areas delimited with a backslash and parens like this:
+    |The value of %x is \(%x), isn't that nice?
+    |If you need to use a plain ol' backslash, you can do \\ <-- that
+%format_str2 = "Single-line strings can contain \", \\, and \n"
+
+# Define a list?
+%my_list = [1,2,"hello"]
+#.. Really long lists can use [..] followed by a bunch of indented values delimited
+    by commas and/or newlines
+%my_really_long_list = [..]
+    1,2,3,4
+    5,6
+    7
+    8,9,10
+
+# Use a list?
+%my_list = ["first item", "second item", "third item"]
+# Lists are 1-indexed because they're implemented as Lua tables, so this prints "first item"
+say (%my_list -> 1)
+# These do the same thing:
+say (%my_list's 1)
+say (1 in %my_list)
+# List entries can be modified like this:
+%my_list -> 1 = "ONE!!!"
+say (size of %my_list)
+
+# Define a dictionary/hash map?
+# Dicts are created by passing a list of key-value pairs to the function "dict"
+%my_dict = (dict [["x", 99], ["y", 101]])
+
+# Use a dict?
+# Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
+say (%my_dict -> "x")
+%my_dict -> "x" = 9999
+
+# Do conditional branching?
+if (1 < 10):
+    say "1 is indeed < 10"
+
+if (1 > 10):
+    say "this won't print"
+..else:
+    say "this will print"
+
+# There's no "elseif", so for longer conditionals, a "when" branch is the best option
+when:
+    * (3 > 6)
+    * (3 > 5)
+    * (3 > 4):
+        say "this won't print"
+    * (3 > 3):
+        say "this won't print"
+    * (3 > 2):
+        say "this will print"
+    * else:
+        say "this is the default case"
+
+# Do a switch statement?
+when 3 == ?:
+    * 0
+    * 1
+    * 2:
+        say "this won't print"
+    * 3:
+        say "this will print"
+    * else:
+        say "this won't print"
+
+# Loop over a list (a foreach loop)?
+%list = [1,2,3]
+for %x in %list:
+    say "For %x loop #\(%x)"
+# There's also a slightly more concise version that automatically populates a loop variable "%"
+for all %list:
+    say "For all loop #\(%)"
+
+# Loop over a number range?
+# This is inclusive, so it will loop over 1,2, and 3
+for %i from 1 to 3:
+    say "For %i from 1 to 3 loop #\(%i)"
+for all 1 to 3:
+    say "For all 1 to 3 loop #\(%)"
+# This will print 0,2, and 4
+for %even from 0 to 5 by 2:
+    say "Even #\(%even)"
+for %backwards from 3 to 1 by -1:
+    say "Backwards #\(%backwards)"
+
+# While loops:
+%x = 1
+repeat while (%x <= 3):
+    say "repeat while loop #\(%x)"
+    %x += 1
+
+%x = 1
+repeat until (%x > 3):
+    say "repeat until loop #\(%x)"
+    %x += 1
+
+# Infinite loop:
+%x = 1
+repeat:
+    say "repeat loop #\(%x)"
+    %x += 1
+    if (%x > 3):
+        break
+
+# GOTOs:
+do:
+    %x = 1
+    -> %again
+    say "GOTO loop #\(%x)"
+    %x += 1
+    if (%x <= 3):
+        go to %again
+    say "finished going to"
+
+
+# Function definition:
+rule [say both %first and also %second] =:
+    say %first
+    # Function arguments are accessed just like variables
+    say %second
+
+# The last line of a function is the return value
+rule [add %x and %y] =:
+    %result = %x + %y
+    %result
+
+# Functions can use "return" to return a value early
+rule [first fibonacci above %n] =:
+    %f1 = 0
+    %f2 = 1
+    repeat:
+        %tmp = (%f1 + %f2)
+        %f1 = %f2
+        %f2 = %tmp
+        if (%f2 > %n):
+            return %f2
+
+say (first fibonacci above 10)
+
+# Functions can have aliases, which may or may not have the arguments in different order
+rule [..]
+    I hate %worse-things more than %better-things
+    I think %worse-things are worse than %better-things
+    I like %better-things more than %worse-things
+..=:
+    say "\(%better-things capitalized) rule and \(%worse-things) drool!"
+
+I like "dogs" more than "cats"
+I think "chihuahuas" are worse than "corgis"
+
+
+#.. Function calls can have parts of the function's name spread throughout.
+    Everything that's not a literal value is treated as part of the function's name
+say both "Hello" and also "again!"
+
+# Functions can even have their name at the end:
+rule [%what-she-said is what she said] =:
+    say %what-she-said
+    say "-- she said"
+
+"Howdy pardner" is what she said
+
+#.. The language only reserves []{}().,:;% as special characters, so functions and variables
+    can have really funky names!
+rule [>> %foo-bar$$$^ --> %@@& _~-^-~_~-^ %1 !] =:
+    say %foo-bar$$$^
+    say %@@&
+    say %1
+
+>> "wow" --> "so flexible!" _~-^-~_~-^ "even numbers can be variables!" !
+
+# Math and logic operations are just treated the same as function calls in the syntax
+say (2 + 3)
+# So it's easy to define your own operators
+rule [%a ++ %b] =:
+    2 * (%a + %b)
+
+say (2 ++ 3)
+
+
+# Do grouping?
+# Expressions can be grouped by enclosing parentheses:
+say (2 + 3)
+# Or by a (..) followed by an indented region
+say (..)
+    2 + 3
+# If you need to keep going after an indented region, you can start the next line with ".."
+say both (..)
+    "Very long first argument that needs its own line"
+..and also "short second arg"
+
+rule [my favorite number] =: 21 + 2
+
+# This can be nested:
+say both (..)
+    my favorite
+    ..number
+..and also "foo"
+
+
+# Macros: 
+# The "lua block %" and "lua expr %" macros can be used to write raw lua code: 
+rule [say the time] =:
+    lua block ".."
+        |io.write("The OS time is: ")
+        |io.write(tostring(os.time()).."\\n")
+say the time
+say "Math expression result is: \(lua expr "(1 + 2*3 + 3*4)^2")"
+
+#.. In the lua environment, "vars" can be used to get local variables/function args, and
+    "nomsu" can be used to access the compiler, function defs, and other things
+rule [square root of %n] =:
+    lua expr "math.sqrt(vars.n)"
+say "The square root of 2 is \(square root of 2)"
+
+# Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
+parse [unless %condition %body] as:
+    if (not %condition): %body
+
+# Or to transform nomsu code into custom lua code using "compile % to code %"
+compile [unless2 %condition %body] to code: ".."
+    |if not (\(%condition as lua)) then
+    |    \(%body as lua statements)
+    |end
+
+unless (1 > 10):
+    say "Nomsu parsing macros work!"
+    say "It looks like a keyword, but there's no magic here!"
+
+unless2 (1 > 10):
+    say "Lua compiling macros work!"
+    say "It looks like a keyword, but there's no magic here!"
+
