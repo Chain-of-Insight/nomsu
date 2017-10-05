@@ -16,10 +16,10 @@ compile [%if_expr if %condition else %else_expr] to: ".."
     #.. Note: this uses a function instead of (condition and if_expr or else_expr)
         because that breaks if %if_expr is falsey.
     |(function(nomsu, vars)
-    |    if \(%condition) then;
-    |        return \(%if_expr);
+    |    if \(%condition as lua) then;
+    |        return \(%if_expr as lua);
     |    else;
-    |        return \(%else_expr);
+    |        return \(%else_expr as lua);
     |    end;
     |end)(nomsu, vars)
 
