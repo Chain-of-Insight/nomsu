@@ -10,7 +10,6 @@ rule [standardize rules %rules] =:
 rule [restrict %rules to within %elite-rules] =:
     %rules = (standardize rules %rules)
     %elite-rules = (standardize rules %elite-rules)
-    say "Restricting \(%rules) to within \(%elite-rules)"
     for all (flatten [%elite-rules, %rules]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for %rule in %rules:
@@ -22,7 +21,6 @@ rule [restrict %rules to within %elite-rules] =:
 rule [allow %elite-rules to use %rules] =:
     %rules = (standardize rules %rules)
     %elite-rules = (standardize rules %elite-rules)
-    say "Allowing \(%elite-rules) to use \(%rules)"
     for all (flatten [%elite-rules, %rules]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for %rule in %rules:
@@ -35,7 +33,6 @@ rule [allow %elite-rules to use %rules] =:
 rule [forbid %pleb-rules to use %rules] =:
     %rules = (standardize rules %rules)
     %pleb-rules = (standardize rules %pleb-rules)
-    say "Forbidding \(%pleb-rules) to use \(%rules)"
     for all (flatten [%pleb-rules, %used]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for all %rules:
