@@ -7,8 +7,12 @@ compile [if %condition %if_body] to code: ".."
     |if \(%condition as lua) then;
     |    \(%if_body as lua statements)
     |end;
+compile [unless %condition %body] to code: ".."
+    |if not (\(%condition as lua)) then;
+    |    \(%body as lua statements)
+    |end;
 
-compile [if %condition %if_body else %else_body] to code: ".."
+compile [if %condition %if_body else %else_body, unless %condition %else_body else %if_body] to code: ".."
     |if \(%condition as lua) then;
     |    \(%if_body as lua statements)
     |else;

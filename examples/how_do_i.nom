@@ -250,20 +250,20 @@ rule [square root of %n] =:
 say "The square root of 2 is \(square root of 2)"
 
 # Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
-parse [unless %condition %body] as:
+parse [if %condition is untrue %body] as:
     if (not %condition): %body
 
 # Or to transform nomsu code into custom lua code using "compile % to code %"
-compile [unless2 %condition %body] to code: ".."
+compile [if %condition on opposite day %body] to code: ".."
     |if not (\(%condition as lua)) then
     |    \(%body as lua statements)
     |end
 
-unless (1 > 10):
+if (1 > 10) is untrue:
     say "Nomsu parsing macros work!"
     say "It looks like a keyword, but there's no magic here!"
 
-unless2 (1 > 10):
+if (1 > 10) on opposite day:
     say "Lua compiling macros work!"
     say "It looks like a keyword, but there's no magic here!"
 
