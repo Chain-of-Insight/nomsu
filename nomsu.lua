@@ -2,7 +2,7 @@ local re = require('re')
 local lpeg = require('lpeg')
 local utils = require('utils')
 local repr = utils.repr
-local colors = require('ansicolors')
+local colors = require('consolecolors')
 local colored = setmetatable({ }, {
   __index = function(_, color)
     return (function(msg)
