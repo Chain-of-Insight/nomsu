@@ -207,6 +207,7 @@ do
       end
       assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
       local canonical_args = nil
+      local aliases = { }
       local _list_0 = self:get_stubs(signature)
       for _index_0 = 1, #_list_0 do
         local _des_0 = _list_0[_index_0]
@@ -228,12 +229,14 @@ do
         else
           canonical_args = utils.set(arg_names)
         end
+        insert(aliases, stub)
         self.defs[stub] = {
           thunk = thunk,
           stub = stub,
           arg_names = arg_names,
           src = src,
-          is_macro = is_macro
+          is_macro = is_macro,
+          aliases = aliases
         }
       end
     end,
@@ -781,7 +784,9 @@ do
         return repr(...)
       end
       self.loaded_files = { }
-      return self:initialize_core()
+      if not parent then
+        return self:initialize_core()
+      end
     end,
     __base = _base_0,
     __name = "NomsuCompiler"

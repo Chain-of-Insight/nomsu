@@ -7,6 +7,14 @@ require "lib/collections.nom"
 rule [standardize rules %rules] =:
     if (lua expr "type(vars.rules) == 'string'"): %rules = [%rules]
     (nomsu "get_stub" [%]) for all %rules
+    %set = []
+    for %rule in %rules:
+        %stub = (nomsu "get_stub" [%rule])
+        %aliases = (((nomsu's "defs")->%stub)->"aliases")
+        for all %aliases: %set -> % = (yes)
+    keys in %set
+
+
 rule [restrict %rules to within %elite-rules] =:
     %rules = (standardize rules %rules)
     %elite-rules = (standardize rules %elite-rules)

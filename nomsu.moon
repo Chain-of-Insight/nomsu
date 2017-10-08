@@ -191,7 +191,8 @@ class NomsuCompiler
         @utils = utils
         @repr = (...)=> repr(...)
         @loaded_files = {}
-        @initialize_core!
+        if not parent
+            @initialize_core!
     
     writeln:(...)=>
         @write(...)
@@ -200,6 +201,7 @@ class NomsuCompiler
     def: (signature, thunk, src, is_macro=false)=>
         assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
         canonical_args = nil
+        aliases = {}
         for {stub, arg_names} in *@get_stubs(signature)
             assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
@@ -208,7 +210,8 @@ class NomsuCompiler
             if canonical_args
                 assert utils.equivalent(utils.set(arg_names), canonical_args), "Mismatched args"
             else canonical_args = utils.set(arg_names)
-            @defs[stub] = {:thunk, :stub, :arg_names, :src, :is_macro}
+            insert aliases, stub
+            @defs[stub] = {:thunk, :stub, :arg_names, :src, :is_macro, :aliases}
 
     defmacro: (signature, thunk, src)=>
         @def(signature, thunk, src, true)

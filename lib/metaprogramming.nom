@@ -80,12 +80,14 @@ compile [nomsu %method %args] to: "nomsu[\(%method as lua)](nomsu, unpack(\(%arg
 # Get the source code for a function
 rule [help %rule] =:
     lua block ".."
-        |local fn_def = nomsu:get_fn_def(vars.rule);
+        |local fn_def = nomsu.defs[nomsu:get_stub(vars.rule)]
         |if not fn_def then;
         |    nomsu:writeln("Rule not found: "..nomsu:repr(vars.rule));
         |else;
-        |    nomsu:writeln("rule "..nomsu:repr(nomsu.utils.keys(fn_def.stub))
-        |        .." ="..(fn_def.src or ":\\n    <unknown source code>"));
+        |    local template = fn_def.is_macro and "compile %s to%s" or "rule %s =%s";
+        |    local src = fn_def.src or ":\\n    <unknown source code>";
+        |    if src:sub(1,1) ~= ":" and fn_def.is_macro then; template = "parse %s as: %s"; end;
+        |    nomsu:writeln(template:format(nomsu:repr(fn_def.stub), src));
         |end;
 
 # Compiler tools
