@@ -277,6 +277,7 @@ class NomsuCompiler
     run: (src, filename, max_operations=nil)=>
         if max_operations
             timeout = ->
+                debug.sethook!
                 @error "Execution quota exceeded. Your code took too long."
             debug.sethook timeout, "", max_operations
         tree = @parse(src, filename)

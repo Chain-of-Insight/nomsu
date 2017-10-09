@@ -339,6 +339,7 @@ do
       if max_operations then
         local timeout
         timeout = function()
+          debug.sethook()
           return self:error("Execution quota exceeded. Your code took too long.")
         end
         debug.sethook(timeout, "", max_operations)
