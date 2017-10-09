@@ -189,7 +189,7 @@ class NomsuCompiler
         @debug = false
         @utils = utils
         @repr = (...)=> repr(...)
-        @loaded_files = {}
+        @loaded_files = setmetatable({}, {__index:parent and parent.loaded_files})
         if not parent
             @initialize_core!
     

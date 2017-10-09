@@ -802,7 +802,9 @@ do
       self.repr = function(self, ...)
         return repr(...)
       end
-      self.loaded_files = { }
+      self.loaded_files = setmetatable({ }, {
+        __index = parent and parent.loaded_files
+      })
       if not parent then
         return self:initialize_core()
       end
