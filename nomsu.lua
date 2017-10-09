@@ -745,27 +745,42 @@ do
         return lua, nil
       end
       self:defmacro("lua expr %code", lua_value)
-      local _require
-      _require = function(self, vars)
-        if not self.loaded_files[vars.filename] then
+      local run_file
+      run_file = function(self, vars)
+        if vars.filename:match(".*%.lua") then
+          return dofile(vars.filename)(self, vars)
+        end
+        if vars.filename:match(".*%.nom") then
+          if not self.skip_precompiled then
+            local file = io.open(vars.filename .. ".lua", "r")
+            if file then
+              local contents = file:read('*a')
+              file:close()
+              return load(contents)()(self, vars)
+            end
+          end
           local file = io.open(vars.filename)
           if not file then
             self:error("File does not exist: " .. tostring(vars.filename))
           end
-          self.loaded_files[vars.filename] = (self:run(file:read('*a'), vars.filename)) or true
+          local contents = file:read('*a')
+          file:close()
+          return self:run(contents, vars.filename)
+        else
+          return self:error("Invalid filetype for " .. tostring(vars.filename))
+        end
+      end
+      self:def("run file %filename", run_file)
+      local _require
+      _require = function(self, vars)
+        if not self.loaded_files[vars.filename] then
+          self.loaded_files[vars.filename] = run_file(self, {
+            filename = vars.filename
+          }) or true
         end
         return self.loaded_files[vars.filename]
       end
-      self:def("require %filename", _require)
-      local run_file
-      run_file = function(self, vars)
-        local file = io.open(vars.filename)
-        if not file then
-          self:error("File does not exist: " .. tostring(vars.filename))
-        end
-        return self:run(file:read('*a'), vars.filename)
-      end
-      return self:def("run file %filename", run_file)
+      return self:def("require %filename", _require)
     end
   }
   _base_0.__index = _base_0
@@ -826,51 +841,74 @@ do
   end
   NomsuCompiler = _class_0
 end
-if arg and arg[1] then
-  local c = NomsuCompiler()
-  local input = io.open(arg[1]):read("*a")
-  local _write = c.write
-  if arg[2] == "-" then
-    c.write = function() end
+if arg then
+  local parser = re.compile([[        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? |} !.
+        flags <- (({| ({flag} ";")* |}) -> set)
+        flag <- "-c" / "-i" / "-p" / "-f" / "--help" / "-h"
+        input <- "-" / [^;]+
+        output <- "-" / [^;]+
+    ]], {
+    set = utils.set
+  })
+  local args = concat(arg, ";") .. ";"
+  args = parser:match(args) or { }
+  if not args or not args.flags or args.flags["--help"] or args.flags["-h"] then
+    print("Usage: lua nomsu.lua [-c] [-i] [-p] [-f] [--help] [input [-o output]]")
+    os.exit()
   end
-  local retval, code = c:run(input, arg[1])
-  c.write = _write
-  if arg[2] then
-    local output
-    if arg[2] == "-" then
-      output = io.output()
-    else
-      output = io.open(arg[2], 'w')
+  local c = NomsuCompiler()
+  c.skip_precompiled = args.flags["-f"]
+  if args.input then
+    if args.flags["-c"] and not args.output then
+      args.output = args.input .. ".lua"
     end
-    output:write(([[    local NomsuCompiler = require('nomsu');
-    local c = NomsuCompiler();
-    local run = (function(nomsu, vars)
-        %s
-    end);
-    return run(c, {});
-    ]]):format(code))
+    local compiled_output = nil
+    if args.flags["-p"] then
+      local _write = c.write
+      c.write = function() end
+      compiled_output = io.output()
+    elseif args.output then
+      compiled_output = io.open(args.output, 'w')
+    end
+    if args.input:match(".*%.lua") then
+      local retval = dofile(args.input)(c, { })
+    else
+      local input
+      if args.input == '-' then
+        input = io.read('*a')
+      else
+        input = io.open(args.input):read("*a")
+      end
+      local retval, code = c:run(input, args.input)
+      if compiled_output then
+        compiled_output:write(code)
+      end
+    end
+    if args.flags["-p"] then
+      c.write = _write
+    end
   end
-elseif arg then
-  local c = NomsuCompiler()
-  c:run('require "lib/core.nom"')
-  while true do
-    local buff = ""
+  if not args.input or args.flags["-i"] then
+    c:run('require "lib/core.nom"')
     while true do
-      io.write(">> ")
-      local line = io.read("*L")
-      if line == "\n" or not line then
+      local buff = ""
+      while true do
+        io.write(">> ")
+        local line = io.read("*L")
+        if line == "\n" or not line then
+          break
+        end
+        buff = buff .. line
+      end
+      if #buff == 0 then
         break
       end
-      buff = buff .. line
-    end
-    if #buff == 0 then
-      break
-    end
-    local ok, ret = pcall(function()
-      return c:run(buff)
-    end)
-    if ok and ret ~= nil then
-      print("= " .. repr(ret))
+      local ok, ret = pcall(function()
+        return c:run(buff)
+      end)
+      if ok and ret ~= nil then
+        print("= " .. repr(ret))
+      end
     end
   end
 end

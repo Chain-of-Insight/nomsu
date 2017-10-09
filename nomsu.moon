@@ -21,7 +21,6 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..col
 --pcall = (fn,...)-> true, fn(...)
 
 -- TODO:
--- check robustness/functionality of compiler mode.
 -- Maybe get GOTOs working at file scope.
 -- use actual variables instead of a vars table
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -564,66 +563,89 @@ class NomsuCompiler
             return lua, nil
         @defmacro "lua expr %code", lua_value
 
-        _require = (vars)=>
-            if not @loaded_files[vars.filename]
+        run_file = (vars)=>
+            if vars.filename\match(".*%.lua")
+                return dofile(vars.filename)(@, vars)
+            if vars.filename\match(".*%.nom")
+                if not @skip_precompiled -- Look for precompiled version
+                    file = io.open(vars.filename..".lua", "r")
+                    if file
+                        contents = file\read('*a')
+                        file\close!
+                        return load(contents)!(@, vars)
                 file = io.open(vars.filename)
                 if not file
                     @error "File does not exist: #{vars.filename}"
-                @loaded_files[vars.filename] = (@run(file\read('*a'), vars.filename)) or true
+                contents = file\read('*a')
+                file\close!
+                return @run(contents, vars.filename)
+            else
+                @error "Invalid filetype for #{vars.filename}"
+        @def "run file %filename", run_file
+
+        _require = (vars)=>
+            if not @loaded_files[vars.filename]
+                @loaded_files[vars.filename] = run_file(self, {filename:vars.filename}) or true
             return @loaded_files[vars.filename]
         @def "require %filename", _require
 
-        run_file = (vars)=>
-            file = io.open(vars.filename)
-            if not file
-                @error "File does not exist: #{vars.filename}"
-            return @run(file\read('*a'), vars.filename)
-        @def "run file %filename", run_file
 
+if arg
+    parser = re.compile([[
+        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? |} !.
+        flags <- (({| ({flag} ";")* |}) -> set)
+        flag <- "-c" / "-i" / "-p" / "-f" / "--help" / "-h"
+        input <- "-" / [^;]+
+        output <- "-" / [^;]+
+    ]], {set: utils.set})
+    args = concat(arg, ";")..";"
+    args = parser\match(args) or {}
+    if not args or not args.flags or args.flags["--help"] or args.flags["-h"]
+        print "Usage: lua nomsu.lua [-c] [-i] [-p] [-f] [--help] [input [-o output]]"
+        os.exit!
 
-if arg and arg[1]
-    --ProFi = require 'ProFi'
-    --ProFi\start()
     c = NomsuCompiler()
-    input = io.open(arg[1])\read("*a")
-    -- If run via "./nomsu.moon file.nom -", then silence output and print generated
-    -- source code instead.
-    _write = c.write
-    if arg[2] == "-"
-        c.write = ->
-    retval, code = c\run(input, arg[1])
-    c.write = _write -- put it back
-    if arg[2]
-        output = if arg[2] == "-"
-            io.output()
-        else io.open(arg[2], 'w')
-        output\write ([[
-    local NomsuCompiler = require('nomsu');
-    local c = NomsuCompiler();
-    local run = (function(nomsu, vars)
-        %s
-    end);
-    return run(c, {});
-    ]])\format(code)
-    --ProFi\stop()
-    --ProFi\writeReport( 'MyProfilingReport.txt' )
+    c.skip_precompiled = args.flags["-f"]
+    if args.input
+        -- Read a file or stdin and output either the printouts or the compiled lua
+        if args.flags["-c"] and not args.output
+            args.output = args.input..".lua"
+        compiled_output = nil
+        if args.flags["-p"]
+            _write = c.write
+            c.write = ->
+            compiled_output = io.output()
+        elseif args.output
+            compiled_output = io.open(args.output, 'w')
 
-elseif arg
-    -- REPL:
-    c = NomsuCompiler()
-    c\run('require "lib/core.nom"')
-    while true
-        buff = ""
+        if args.input\match(".*%.lua")
+            retval = dofile(args.input)(c, {})
+        else
+            input = if args.input == '-'
+                io.read('*a')
+            else io.open(args.input)\read("*a")
+            retval, code = c\run(input, args.input)
+            -- Output compile lua code
+            if compiled_output
+                compiled_output\write code
+        if args.flags["-p"]
+            c.write = _write
+
+    if not args.input or args.flags["-i"]
+        -- REPL
+        c\run('require "lib/core.nom"')
         while true
-            io.write(">> ")
-            line = io.read("*L")
-            if line == "\n" or not line
+            buff = ""
+            while true
+                io.write(">> ")
+                line = io.read("*L")
+                if line == "\n" or not line
+                    break
+                buff ..= line
+            if #buff == 0
                 break
-            buff ..= line
-        if #buff == 0
-            break
-        ok, ret = pcall(-> c\run(buff))
-        if ok and ret != nil
-            print "= "..repr(ret)
+            ok, ret = pcall(-> c\run(buff))
+            if ok and ret != nil
+                print "= "..repr(ret)
 
 return NomsuCompiler
