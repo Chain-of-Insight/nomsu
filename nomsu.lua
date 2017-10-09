@@ -842,7 +842,7 @@ do
   NomsuCompiler = _class_0
 end
 if arg then
-  local parser = re.compile([[        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? |} !.
+  local parser = re.compile([[        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)
         flag <- "-c" / "-i" / "-p" / "-f" / "--help" / "-h"
         input <- "-" / [^;]+
