@@ -31,6 +31,9 @@ compile [%start to %stop by %step, %start to %stop via %step] to: ".."
 parse [%start to %stop] as: %start to %stop by 1
 
 # Random functions
+lua code ".." # Seed
+    |math.randomseed(os.time());
+    |for i=1,20 do; math.random(); end;
 compile [random number, random, rand] to: "math.random()"
 compile [random int %n, random integer %n, randint %n] to: "math.random(\(%n as lua))"
 compile [random from %low to %high, random number from %low to %high, rand %low %high] to:
