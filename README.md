@@ -17,16 +17,16 @@ Nomsu's only dependencies are [Lua](https://www.lua.org/) (tested with version 5
 
 ## Layout
 
-* `nomsu.moon`/`nomsu.lua` - The nomsu compiler. The compiler is written in [Moonscript](http://moonscript.org/), but a lua version of the file is provided in this repository for convenience.
+* `nomsu.moon`/`nomsu.lua` - *The nomsu compiler*. The compiler is written in [Moonscript](http://moonscript.org/), but a lua version of the file is provided in this repository for convenience.
 * `utils.moon`/`utils.lua` - A set of utility functions used by nomsu.moon. A lua version of this is also provided for convenience.
 * `consolecolors.lua` - Lua module that defines ANSI color codes for colored console output (used internally in nomsu.moon).
-* `examples/how_do_i.nom` - A simple walkthrough of some of the features of nomsu, written in nomsu. This is a good place to start.
+* `examples/how_do_i.nom` - A simple walkthrough of some of the features of nomsu, written in nomsu. *This is a good place to start.*
 * `examples/sample_code.nom` - Some additional sample nomsu code.
 * `examples/sample_game.nom` - A sample game of Nomic, written in nomsu.
 * `lib/collections.nom` - Core library definitions related to collections, like lists and dictionaries.
 * `lib/control_flow.nom` - Core library definitions related to control flow, like `if` statements and `for` loops.
 * `lib/core.nom` - Core library file that loads other core library files. Files are loaded in dependency order.
-* `lib/metaprogramming.nom` - Core library essential functionality for metaprogramming, including macros to define macros, rules to define rules, and other mind-bending Escher-like paradoxes.
+* `lib/metaprogramming.nom` - Core library essential functionality for metaprogramming, including macros to define macros, rules to define rules, and so on. This is where the language pulls itself up by its hair out the swamps of nothingness.
 * `lib/moonscript.nom` - Core library definitions for writing in moonscript. This is optional, and requires Lua's "moon" package.
 * `lib/operators.nom` - Core library definitions for operators like `=` and `+`.
 * `lib/permissions.nom` - Core library definitions for rules that modify the permission levels of rules.
