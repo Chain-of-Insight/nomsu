@@ -15,7 +15,7 @@ re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
 repr = utils.repr
-colors = require 'consolecolors'
+colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..colors.reset)})
 {:insert, :remove, :concat} = table
 --pcall = (fn,...)-> true, fn(...)
@@ -591,6 +591,8 @@ class NomsuCompiler
 
 
 if arg
+    export colors
+    colors = require 'consolecolors'
     parser = re.compile([[
         args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)

@@ -2,7 +2,11 @@ local re = require('re')
 local lpeg = require('lpeg')
 local utils = require('utils')
 local repr = utils.repr
-local colors = require('consolecolors')
+local colors = setmetatable({ }, {
+  __index = function()
+    return ""
+  end
+})
 local colored = setmetatable({ }, {
   __index = function(_, color)
     return (function(msg)
@@ -842,6 +846,7 @@ do
   NomsuCompiler = _class_0
 end
 if arg then
+  colors = require('consolecolors')
   local parser = re.compile([[        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)
         flag <- "-c" / "-i" / "-p" / "-f" / "--help" / "-h"
