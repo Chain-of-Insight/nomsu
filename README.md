@@ -17,10 +17,10 @@ Nomsu's only dependencies are [Lua](https://www.lua.org/) (tested with version 5
 
 ## Layout
 
-* `nomsu.moon`/`nomsu.lua` - *The nomsu compiler*. The compiler is written in [Moonscript](http://moonscript.org/), but a lua version of the file is provided in this repository for convenience.
+* `nomsu.moon`/`nomsu.lua` - **The nomsu compiler**. The compiler is written in [Moonscript](http://moonscript.org/), but a lua version of the file is provided in this repository for convenience.
 * `utils.moon`/`utils.lua` - A set of utility functions used by nomsu.moon. A lua version of this is also provided for convenience.
 * `consolecolors.lua` - Lua module that defines ANSI color codes for colored console output (used internally in nomsu.moon).
-* `examples/how_do_i.nom` - A simple walkthrough of some of the features of nomsu, written in nomsu. *This is a good place to start.*
+* `examples/how_do_i.nom` - A simple walkthrough of some of the features of nomsu, written in nomsu. **This is a good place to start.**
 * `examples/sample_code.nom` - Some additional sample nomsu code.
 * `examples/sample_game.nom` - A sample game of Nomic, written in nomsu.
 * `lib/collections.nom` - Core library definitions related to collections, like lists and dictionaries.
