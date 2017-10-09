@@ -11,12 +11,12 @@ The language compiler was written in [Moonscript](http://moonscript.org/), using
 so you need to install it in order to run the compiler. All of the moon files have been
 compiled into lua for convenience, so Moonscript is not a dependency.
 
-## How to use
+## Usage
 
-In order to run a .nom file, run `lua nomsu.lua your_file.nom`. Code can also be compiled
-into lua code directly, which still requires nomsu.lua as a dependency, but bypasses the
-compilation phase when it runs. To compile, run `lua nomsu.lua your_file.nom output_file.lua`
-which produces an output file which can be run with the command `lua output_file.lua`.
+* To get a nomsu [REPL](https://en.wikipedia.org/wiki/Read-eval-print_loop), simply run `lua nomsu.lua`.
+* To run a .nom file with nomsu code, run `lua nomsu.lua your_file.nom`. Or `lua nomsu.lua -` if reading from stdin.
+* (Advanced/optional) To precompile a .nom file into lua, either run `lua nomsu.lua your_file.nom -o output_file.lua` or simply `lua nomsu.lua -c your_file.nom` (which will default to outputting to `your_file.nom.lua`). It is not necessary to precompile .nom files, but it can speed things up if it's a file that gets loaded by `require "your_file.nom"` a lot. `require %` can either take a .nom file (it will automatically look for a .nom.lua precompiled version), or a .lua file.
+* More usage options are avilable via `lua nomsu.lua --help`.
 
 ## Layout
 
