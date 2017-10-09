@@ -332,7 +332,17 @@ do
       end
       return tree
     end,
-    run = function(self, src, filename)
+    run = function(self, src, filename, max_operations)
+      if max_operations == nil then
+        max_operations = nil
+      end
+      if max_operations then
+        local timeout
+        timeout = function()
+          return self:error("Execution quota exceeded. Your code took too long.")
+        end
+        debug.sethook(timeout, "", max_operations)
+      end
       local tree = self:parse(src, filename)
       assert(tree, "Tree failed to compile: " .. tostring(src))
       assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
@@ -388,6 +398,9 @@ do
                 %s
                 return ret;
             end);]]):format(concat(buffer, "\n"))
+      if max_operations then
+        debug.sethook()
+      end
       return return_value, lua_code
     end,
     tree_to_value = function(self, tree, vars)
@@ -896,7 +909,7 @@ if arg then
     end
   end
   if not args.input or args.flags["-i"] then
-    c:run('require "lib/core.nom"')
+    c:run('require "lib/core.nom"', "stdin")
     while true do
       local buff = ""
       while true do
@@ -911,7 +924,7 @@ if arg then
         break
       end
       local ok, ret = pcall(function()
-        return c:run(buff)
+        return c:run(buff, "stdin")
       end)
       if ok and ret ~= nil then
         print("= " .. repr(ret))

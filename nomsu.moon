@@ -274,7 +274,11 @@ class NomsuCompiler
             @print_tree tree, "    "
         return tree
 
-    run: (src, filename)=>
+    run: (src, filename, max_operations=nil)=>
+        if max_operations
+            timeout = ->
+                @error "Execution quota exceeded. Your code took too long."
+            debug.sethook timeout, "", max_operations
         tree = @parse(src, filename)
         assert tree, "Tree failed to compile: #{src}"
         assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
@@ -321,6 +325,8 @@ class NomsuCompiler
                 %s
                 return ret;
             end);]])\format(concat(buffer, "\n"))
+        if max_operations
+            debug.sethook!
         return return_value, lua_code
     
     tree_to_value: (tree, vars)=>
@@ -635,7 +641,7 @@ if arg
 
     if not args.input or args.flags["-i"]
         -- REPL
-        c\run('require "lib/core.nom"')
+        c\run('require "lib/core.nom"', "stdin")
         while true
             buff = ""
             while true
@@ -646,7 +652,7 @@ if arg
                 buff ..= line
             if #buff == 0
                 break
-            ok, ret = pcall(-> c\run(buff))
+            ok, ret = pcall(-> c\run(buff, "stdin"))
             if ok and ret != nil
                 print "= "..repr(ret)
 
