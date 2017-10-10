@@ -274,7 +274,7 @@ class NomsuCompiler
             @print_tree tree, "    "
         return tree
 
-    run: (src, filename, max_operations=nil)=>
+    run: (src, filename, vars={}, max_operations=nil)=>
         if max_operations
             timeout = ->
                 debug.sethook!
@@ -285,7 +285,6 @@ class NomsuCompiler
         assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
 
         buffer = {}
-        vars = {}
         return_value = nil
         for statement in *tree.value
             if @debug
@@ -320,15 +319,15 @@ class NomsuCompiler
                 @error(ret)
             insert buffer, "#{statements or ''}\n#{expr and "ret = #{expr}" or ''}"
         
+        if max_operations
+            debug.sethook!
         lua_code = ([[
             return (function(nomsu, vars)
                 local ret;
                 %s
                 return ret;
             end);]])\format(concat(buffer, "\n"))
-        if max_operations
-            debug.sethook!
-        return return_value, lua_code
+        return return_value, lua_code, vars
     
     tree_to_value: (tree, vars)=>
         code = "return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree)};\nend);"

@@ -332,7 +332,10 @@ do
       end
       return tree
     end,
-    run = function(self, src, filename, max_operations)
+    run = function(self, src, filename, vars, max_operations)
+      if vars == nil then
+        vars = { }
+      end
       if max_operations == nil then
         max_operations = nil
       end
@@ -348,7 +351,6 @@ do
       assert(tree, "Tree failed to compile: " .. tostring(src))
       assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local buffer = { }
-      local vars = { }
       local return_value = nil
       local _list_0 = tree.value
       for _index_0 = 1, #_list_0 do
@@ -394,15 +396,15 @@ do
         end
         insert(buffer, tostring(statements or '') .. "\n" .. tostring(expr and "ret = " .. tostring(expr) or ''))
       end
+      if max_operations then
+        debug.sethook()
+      end
       local lua_code = ([[            return (function(nomsu, vars)
                 local ret;
                 %s
                 return ret;
             end);]]):format(concat(buffer, "\n"))
-      if max_operations then
-        debug.sethook()
-      end
-      return return_value, lua_code
+      return return_value, lua_code, vars
     end,
     tree_to_value = function(self, tree, vars)
       local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. ";\nend);"
