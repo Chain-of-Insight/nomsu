@@ -86,6 +86,13 @@ compile [max of %items by %value_expr] to:
         |    local vars = setmetatable({['']=item}, {__index=vars})
         |    return \(%value_expr as lua)
         |end)
+compile [sort %items] to: "table.sort(\(%items as lua))"
+compile [sort %items by %key] to: ".."
+    |nomsu.utils.sort(\(%items as lua), function(x)
+    |    local ret, vars = nil, {['']=x};
+    |    \(%key as lua statements)
+    |    return ret
+    |end)
 
 # String utilities
 compile [nl, newline, line feed, linefeed, lf] to: ".."
