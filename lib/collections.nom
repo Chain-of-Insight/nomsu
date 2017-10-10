@@ -1,4 +1,5 @@
 require "lib/metaprogramming.nom"
+require "lib/utils.nom"
 require "lib/control_flow.nom"
 require "lib/operators.nom"
 
@@ -115,6 +116,15 @@ compile [%expression for %var in %iterable] to:
         |    return comprehension;
         |end)(game, setmetatable({}, {__index=vars}))
 parse [%expression for all %iterable] as: %expression for % in %iterable
+
+rule [%items sorted] =:
+    %copy = (% for all %items)
+    sort %copy
+    %copy
+rule [%items sorted by %key] =:
+    %copy = (% for all %items)
+    sort %copy by %key
+    %copy
 
 # TODO: maybe make a generator/coroutine?
 

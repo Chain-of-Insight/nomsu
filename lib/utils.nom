@@ -87,11 +87,9 @@ compile [max of %items by %value_expr] to:
         |    return \(%value_expr as lua)
         |end)
 compile [sort %items] to: "table.sort(\(%items as lua))"
-compile [sort %items by %key] to: ".."
-    |nomsu.utils.sort(\(%items as lua), function(x)
-    |    local ret, vars = nil, {['']=x};
-    |    \(%key as lua statements)
-    |    return ret
+rule [sort %items by %key] =: lua expr ".."
+    |nomsu.utils.sort(\(%items), function(x)
+    |    return (\(%key))(nomsu, {['']=x});
     |end)
 
 # String utilities
