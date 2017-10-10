@@ -53,6 +53,8 @@ rule [%tree as value] =:
     lua expr "nomsu:tree_to_value(\(%tree), vars)"
 compile [repr %obj] to:
     "nomsu:repr(\(%obj as lua))"
+compile [type %obj] to:
+    "type(\(%obj as lua))"
 
 parse [lua block %block] as: lua code ".."
     |do;
