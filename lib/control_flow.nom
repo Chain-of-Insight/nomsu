@@ -178,3 +178,12 @@ compile [when %branch-value == ? %body] to code:
 
     %result join= "\n::finished_when::;\nend;"
     %result
+
+# With statement
+compile [with %thing = %value %action] to code: ".."
+    |do;
+    |    local old_value = \(%thing as lua);
+    |    \(%thing as lua) = \(%value as lua);
+    |    \(%action as lua statements);
+    |    \(%thing as lua) = old_value;
+    |end;

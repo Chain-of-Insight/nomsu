@@ -133,10 +133,22 @@ rule [%items sorted by %key] =:
     sort %copy by %key
     %copy
 
+# Metatable stuff
+compile [counter] to: "setmetatable({}, {__index=function() return 0; end})"
+rule [chain %dict to %fallback] =:
+    when (type of %fallback) == ?:
+        * "table":
+            lua expr "setmetatable(\(%dict), \(%fallback))"
+        * "function":
+            lua expr "setmetatable(\(%dict), {__index=function(self, key) return (\(%fallback))(nomsu, {['']=key, self=self}); end})"
+        * else:
+            lua expr "setmetatable(\(%dict), {__index=function(self, key) return (\(%fallback)); end})"
+
+
 # TODO: maybe make a generator/coroutine?
 
 #.. Dict comprehensions can be accomplished okay by doing:
-    dict ([new_key using (%'s "key"), new_value using (%'s "value")] for all (entries in %dict))
+    dict ([%'s "key", %'s "value"] for all (entries in %dict))
     or something similar
 # TODO: fix compiler bugs
 pass
