@@ -205,6 +205,10 @@ do
       self:write(...)
       return self:write("\n")
     end,
+    errorln = function(self, ...)
+      self:write_err(...)
+      return self:write_err("\n")
+    end,
     def = function(self, signature, thunk, src, is_macro)
       if is_macro == nil then
         is_macro = false
@@ -362,7 +366,7 @@ do
         end
         local ok, expr, statements = pcall(self.tree_to_lua, self, statement)
         if not ok then
-          self:writeln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.bright(colored.yellow(statement.src))))
+          self:errorln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.bright(colored.yellow(statement.src))))
           self:error(expr)
         end
         local code_for_statement = ([[                return (function(nomsu, vars)
@@ -390,8 +394,8 @@ do
           return_value = ret
         end
         if not ok then
-          self:writeln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.yellow(statement.src)))
-          self:writeln(debug.traceback())
+          self:errorln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.yellow(statement.src)))
+          self:errorln(debug.traceback())
           self:error(ret)
         end
         insert(buffer, tostring(statements or '') .. "\n" .. tostring(expr and "ret = " .. tostring(expr) or ''))
@@ -420,7 +424,7 @@ do
     tree_to_lua = function(self, tree)
       assert(tree, "No tree provided.")
       if not tree.type then
-        self:writeln(debug.traceback())
+        self:errorln(debug.traceback())
         self:error("Invalid tree: " .. tostring(repr(tree)))
       end
       local _exp_0 = tree.type
@@ -719,16 +723,16 @@ do
         end
       end))
     end,
-    error = function(self, ...)
-      self:writeln("ERROR!")
-      if select(1, ...) then
-        self:writeln(...)
+    error = function(self, msg)
+      self:errorln((colored.red("ERROR!")))
+      if msg then
+        self:errorln(colored.bright(colored.yellow(colored.onred(msg))))
       end
-      self:writeln("Callstack:")
+      self:errorln("Callstack:")
       for i = #self.callstack, 1, -1 do
-        self:writeln("    " .. tostring(self.callstack[i]))
+        self:errorln("    " .. tostring(self.callstack[i]))
       end
-      self:writeln("    <top level>")
+      self:errorln("    <top level>")
       self.callstack = { }
       return error()
     end,
@@ -808,6 +812,9 @@ do
     __init = function(self, parent)
       self.write = function(self, ...)
         return io.write(...)
+      end
+      self.write_err = function(self, ...)
+        return io.stderr:write(...)
       end
       self.defs = setmetatable({ }, {
         __index = parent and parent.defs

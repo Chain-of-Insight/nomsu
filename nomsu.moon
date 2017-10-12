@@ -184,6 +184,7 @@ nomsu = re.compile(nomsu, defs)
 class NomsuCompiler
     new:(parent)=>
         @write = (...)=> io.write(...)
+        @write_err = (...)=> io.stderr\write(...)
         @defs = setmetatable({}, {__index:parent and parent.defs})
         @callstack = {}
         @debug = false
@@ -196,6 +197,10 @@ class NomsuCompiler
     writeln:(...)=>
         @write(...)
         @write("\n")
+    
+    errorln:(...)=>
+        @write_err(...)
+        @write_err("\n")
     
     def: (signature, thunk, src, is_macro=false)=>
         assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
@@ -293,7 +298,7 @@ class NomsuCompiler
                 @print_tree statement
             ok,expr,statements = pcall(@tree_to_lua, self, statement)
             if not ok
-                @writeln "#{colored.red "Error occurred in statement:"}\n#{colored.bright colored.yellow statement.src}"
+                @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.bright colored.yellow statement.src}"
                 @error(expr)
             code_for_statement = ([[
                 return (function(nomsu, vars)
@@ -314,8 +319,8 @@ class NomsuCompiler
             ok,ret = pcall(run_statement, self, vars)
             if expr then return_value = ret
             if not ok
-                @writeln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow statement.src}"
-                @writeln debug.traceback!
+                @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow statement.src}"
+                @errorln debug.traceback!
                 @error(ret)
             insert buffer, "#{statements or ''}\n#{expr and "ret = #{expr}" or ''}"
         
@@ -342,7 +347,7 @@ class NomsuCompiler
         -- Return <lua code for value>, <additional lua code>
         assert tree, "No tree provided."
         if not tree.type
-            @writeln debug.traceback()
+            @errorln debug.traceback()
             @error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
@@ -537,14 +542,14 @@ class NomsuCompiler
         (var\gsub "%W", (verboten)->
             if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
 
-    error: (...)=>
-        @writeln "ERROR!"
-        if select(1, ...)
-            @writeln(...)
-        @writeln("Callstack:")
+    error: (msg)=>
+        @errorln (colored.red "ERROR!")
+        if msg
+            @errorln(colored.bright colored.yellow colored.onred msg)
+        @errorln("Callstack:")
         for i=#@callstack,1,-1
-            @writeln "    #{@callstack[i]}"
-        @writeln "    <top level>"
+            @errorln "    #{@callstack[i]}"
+        @errorln "    <top level>"
         @callstack = {}
         error!
     
