@@ -73,6 +73,13 @@ compile [..]
 compile [append %item to %list, add %item to %list] to:
     "table.insert(\(%list as lua), \(%item as lua))"
 
+compile [pop from %list, remove last from %list] to:
+    "table.remove(\(%list as lua))"
+
+compile [remove index %index from %list] to:
+    "table.remove(\(%list as lua), \(%index as lua))"
+
+
 rule [flatten %lists] =:
     %flat = []
     for %list in %lists:
