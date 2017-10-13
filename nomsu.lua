@@ -578,7 +578,7 @@ do
             if statement then
               self:error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
             end
-            insert(concat_parts, "nomsu.utils.repr_if_not_string(" .. tostring(expr) .. ")")
+            insert(concat_parts, "nomsu:stringify(" .. tostring(expr) .. ")")
             _continue_0 = true
           until true
           if not _continue_0 then
@@ -904,6 +904,9 @@ do
       self.utils = utils
       self.repr = function(self, ...)
         return repr(...)
+      end
+      self.stringify = function(self, ...)
+        return utils.stringify(...)
       end
       self.loaded_files = setmetatable({ }, {
         __index = parent and parent.loaded_files

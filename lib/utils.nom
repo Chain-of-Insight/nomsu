@@ -15,7 +15,7 @@ parse [assert %condition] as: assert %condition (nil)
 rule [join %strs with glue %glue] =:
     lua block ".."
         |local str_bits = {}
-        |for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu.utils.repr_if_not_string(bit) end
+        |for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu:stringify(bit) end
         |return table.concat(str_bits, vars.glue)
 parse [join %strs] as: join %strs with glue ""
 
@@ -23,7 +23,7 @@ compile [capitalize %str, %str capitalized] to:
     "(\(%str as lua)):gsub('%l', string.upper, 1)"
 
 compile [say %str] to: ".."
-    |nomsu:writeln(nomsu.utils.repr_if_not_string(\(%str as lua)))
+    |nomsu:writeln(nomsu:stringify(\(%str as lua)))
 
 # Number ranges
 compile [%start to %stop by %step, %start to %stop via %step] to: ".."

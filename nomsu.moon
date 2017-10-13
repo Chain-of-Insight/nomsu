@@ -197,6 +197,7 @@ class NomsuCompiler
         @debug = false
         @utils = utils
         @repr = (...)=> repr(...)
+        @stringify = (...)=> utils.stringify(...)
         @loaded_files = setmetatable({}, {__index:parent and parent.loaded_files})
         if not parent
             @initialize_core!
@@ -436,7 +437,7 @@ class NomsuCompiler
                         @writeln "#{colored.bright "EXPR:"} #{expr}, #{colored.bright "STATEMENT:"} #{statement}"
                     if statement
                         @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
-                    insert concat_parts, "nomsu.utils.repr_if_not_string(#{expr})"
+                    insert concat_parts, "nomsu:stringify(#{expr})"
 
                 if string_buffer ~= ""
                     insert concat_parts, repr(string_buffer)

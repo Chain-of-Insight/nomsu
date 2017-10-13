@@ -73,7 +73,7 @@ utils = {
       return tostring(x)
     end
   end,
-  repr_if_not_string = function(x)
+  stringify = function(x)
     if type(x) == 'string' then
       return x
     else

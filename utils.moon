@@ -41,7 +41,7 @@ utils = {
             else
                 tostring(x)
     
-    repr_if_not_string: (x)->
+    stringify: (x)->
         if type(x) == 'string' then x
         else utils.repr(x)
     
