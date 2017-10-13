@@ -55,7 +55,7 @@ check_nodent = (subject,end_pos,spaces)->
 -- Number 1, "String", %Var, [List], (expression), {Thunk}, \Nomsu, FunctionCall, File
 
 nomsu = [=[
-    file <- ({ {| shebang?
+    file <- ({{| shebang?
         (ignored_line %nl)*
         statements (nodent statements)*
         (%nl ignored_line)* %nl?
@@ -78,9 +78,9 @@ nomsu = [=[
             (dedent / (({.+} ("" -> "Error while parsing thunk")) => error))
         |} }) -> Thunk
 
-    inline_nomsu <- ({ ("\" inline_expression) }) -> Nomsu
-    eol_nomsu <- ({ ("\" noeol_expression) }) -> Nomsu
-    indented_nomsu <- ({ ("\" expression) }) -> Nomsu
+    inline_nomsu <- ({("\" inline_expression) }) -> Nomsu
+    eol_nomsu <- ({("\" noeol_expression) }) -> Nomsu
+    indented_nomsu <- ({("\" expression) }) -> Nomsu
 
     inline_expression <- number / variable / inline_string / inline_list / inline_nomsu
         / inline_thunk / ("(" inline_statement ")")
@@ -92,13 +92,13 @@ nomsu = [=[
     expression <- eol_thunk / eol_nomsu / noeol_expression
 
     -- Function calls need at least one word in them
-    inline_functioncall <- ({ {|
+    inline_functioncall <- ({(''=>line_no) {|
             (inline_expression tok_gap)* word (tok_gap (inline_expression / word))*
         |} }) -> FunctionCall
-    noeol_functioncall <- ({ {|
+    noeol_functioncall <- ({(''=>line_no) {|
             (noeol_expression tok_gap)* word (tok_gap (noeol_expression / word))*
         |} }) -> FunctionCall
-    functioncall <- ({ {|
+    functioncall <- ({(''=>line_no) {|
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
 
@@ -147,6 +147,7 @@ nomsu = [=[
     dotdot <- nodent ".." %ws?
 ]=]
 
+CURRENT_FILE = nil
 whitespace = S(" \t")^1
 defs =
     ws:whitespace, nl: P("\n"), :tonumber
@@ -155,6 +156,12 @@ defs =
     nodented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_nodent)
     dedented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_dedent)
     prev_edge: B(S(" \t\n.,:;}])\"\\"))
+    line_no: (src, pos)->
+        line_no = 1
+        for _ in src\sub(1,pos)\gmatch("\n") do line_no += 1
+        return pos, "#{CURRENT_FILE}:#{line_no}"
+    FunctionCall: (src, line_no, value, errors)->
+        {type: "FunctionCall", :src, :line_no, :value, :errors}
     error: (src,pos,errors,err_msg)->
         line_no = 1
         for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
@@ -173,7 +180,7 @@ defs =
         prev_line,err_line,next_line = src\match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line+1)
 
         pointer = ("-")\rep(err_pos - start_of_err_line + 0) .. "^"
-        error("\n#{err_msg or "Parse error"} in #{filename} on line #{line_no}:\n\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n")
+        error("\n#{err_msg or "Parse error"} in #{CURRENT_FILE} on line #{line_no}:\n\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n")
 
 setmetatable(defs, {
     __index: (t,key)->
@@ -220,14 +227,15 @@ class NomsuCompiler
     defmacro: (signature, thunk, src)=>
         @def(signature, thunk, src, true)
 
-    call: (stub,...)=>
+    call: (stub,line_no,...)=>
         def = @defs[stub]
-        if def == nil
-            @error "Attempt to call undefined function: #{stub}"
         -- This is a little bit hacky, but having this check is handy for catching mistakes
         -- I use a hash sign in "#macro" so it's guaranteed to not be a valid function name
-        if def.is_macro and @callstack[#@callstack] != "#macro"
+        if def and def.is_macro and @callstack[#@callstack] != "#macro"
             @error "Attempt to call macro at runtime: #{stub}\nThis can be caused by using a macro in a function that is defined before the macro."
+        insert @callstack, {stub, line_no}
+        if def == nil
+            @error "Attempt to call undefined function: #{stub}"
         unless def.is_macro
             @assert_permission(stub)
         {:thunk, :arg_names} = def
@@ -235,7 +243,6 @@ class NomsuCompiler
         if @debug
             @write "#{colored.bright "CALLING"} #{colored.magenta(colored.underscore stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr(args)}"
-        insert @callstack, stub
         -- TODO: optimize, but still allow multiple return values?
         rets = {thunk(self,args)}
         remove @callstack
@@ -247,7 +254,7 @@ class NomsuCompiler
             @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
         insert @callstack, "#macro"
-        expr, statement = @call(stub, unpack(args))
+        expr, statement = @call(stub, tree.line_no, unpack(args))
         remove @callstack
         return expr, statement
 
@@ -260,7 +267,7 @@ class NomsuCompiler
         -- TODO: maybe optimize this by making the callstack a Counter and using a 
         --    move-to-front optimization on the whitelist to check most likely candidates sooner
         for caller in *@callstack
-            if whiteset[caller] then return true
+            if whiteset[caller[1]] then return true
         @error "You do not have the authority to call: #{stub}"
 
     check_permission: (fn_def)=>
@@ -274,17 +281,20 @@ class NomsuCompiler
         -- TODO: maybe optimize this by making the callstack a Counter and using a 
         --    move-to-front optimization on the whitelist to check most likely candidates sooner
         for caller in *@callstack
-            if whiteset[caller] then return true
+            if whiteset[caller[1]] then return true
         return false
 
     parse: (str, filename)=>
         if @debug
             @writeln("#{colored.bright "PARSING:"}\n#{str}")
         str = str\gsub("\r","")
-        export indent_stack
+        export indent_stack, CURRENT_FILE
+        old_file = CURRENT_FILE
         old_indent_stack, indent_stack = indent_stack, {0}
+        CURRENT_FILE = filename
         tree = nomsu\match(str)
         indent_stack = old_indent_stack -- Put it back, just in case.
+        CURRENT_FILE = old_file
         assert tree, "Failed to parse: #{str}"
         if @debug
             @writeln "PARSE TREE:"
@@ -392,7 +402,7 @@ class NomsuCompiler
                         if statement
                             statement = "nomsu:assert_permission(#{repr stub});\n"..statement
                     return expr, statement
-                args = {repr(stub)}
+                args = {repr(stub), repr(tree.line_no)}
                 for arg in *tree.value
                     if arg.type == 'Word' then continue
                     expr,statement = @tree_to_lua arg
@@ -566,8 +576,10 @@ class NomsuCompiler
         if msg
             @errorln(colored.bright colored.yellow colored.onred msg)
         @errorln("Callstack:")
+        maxlen = utils.max([#c[2] for c in *@callstack])
         for i=#@callstack,1,-1
-            @errorln "    #{@callstack[i]}"
+            if @callstack[i] != "#macro"
+                @errorln "    #{"%-#{maxlen}s"\format @callstack[i][2]}| #{@callstack[i][1]}"
         @errorln "    <top level>"
         @callstack = {}
         error!
