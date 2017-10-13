@@ -259,8 +259,8 @@ do
       if def.is_macro and self.callstack[#self.callstack] ~= "#macro" then
         self:error("Attempt to call macro at runtime: " .. tostring(stub) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
       end
-      if not (self:check_permission(def)) then
-        self:error("You do not have the authority to call: " .. tostring(stub))
+      if not (def.is_macro) then
+        self:assert_permission(stub)
       end
       local thunk, arg_names
       thunk, arg_names = def.thunk, def.arg_names
@@ -283,10 +283,7 @@ do
       remove(self.callstack)
       return unpack(rets)
     end,
-    run_macro = function(self, tree, kind)
-      if kind == nil then
-        kind = "Expression"
-      end
+    run_macro = function(self, tree)
       local stub, arg_names, args = self:get_stub(tree)
       if self.debug then
         self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(stub))) .. " ")
@@ -296,6 +293,24 @@ do
       local expr, statement = self:call(stub, unpack(args))
       remove(self.callstack)
       return expr, statement
+    end,
+    assert_permission = function(self, stub)
+      local fn_def = self.defs[stub]
+      if not (fn_def) then
+        self:error("Undefined function: " .. tostring(fn_name))
+      end
+      local whiteset = fn_def.whiteset
+      if whiteset == nil then
+        return true
+      end
+      local _list_0 = self.callstack
+      for _index_0 = 1, #_list_0 do
+        local caller = _list_0[_index_0]
+        if whiteset[caller] then
+          return true
+        end
+      end
+      return self:error("You do not have the authority to call: " .. tostring(stub))
     end,
     check_permission = function(self, fn_def)
       if getmetatable(fn_def) ~= functiondef_mt then
@@ -452,8 +467,18 @@ do
                     end)]]):format(concat(lua_bits, "\n"))
       elseif "FunctionCall" == _exp_0 then
         local stub = self:get_stub(tree)
-        if self.defs[stub] and self.defs[stub].is_macro then
-          return self:run_macro(tree, "Expression")
+        local def = self.defs[stub]
+        if def and def.is_macro then
+          local expr, statement = self:run_macro(tree)
+          if def.whiteset then
+            if expr then
+              expr = "(nomsu:assert_permission(" .. tostring(repr(stub)) .. ") and " .. tostring(expr) .. ")"
+            end
+            if statement then
+              statement = "nomsu:assert_permission(" .. tostring(repr(stub)) .. ");\n" .. statement
+            end
+          end
+          return expr, statement
         end
         local args = {
           repr(stub)

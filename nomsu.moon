@@ -228,8 +228,8 @@ class NomsuCompiler
         -- I use a hash sign in "#macro" so it's guaranteed to not be a valid function name
         if def.is_macro and @callstack[#@callstack] != "#macro"
             @error "Attempt to call macro at runtime: #{stub}\nThis can be caused by using a macro in a function that is defined before the macro."
-        unless @check_permission(def)
-            @error "You do not have the authority to call: #{stub}"
+        unless def.is_macro
+            @assert_permission(stub)
         {:thunk, :arg_names} = def
         args = {name, select(i,...) for i,name in ipairs(arg_names)}
         if @debug
@@ -241,7 +241,7 @@ class NomsuCompiler
         remove @callstack
         return unpack(rets)
     
-    run_macro: (tree, kind="Expression")=>
+    run_macro: (tree)=>
         stub,arg_names,args = @get_stub tree
         if @debug
             @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(stub)} "
@@ -250,6 +250,18 @@ class NomsuCompiler
         expr, statement = @call(stub, unpack(args))
         remove @callstack
         return expr, statement
+
+    assert_permission: (stub)=>
+        fn_def = @defs[stub]
+        unless fn_def
+            @error "Undefined function: #{fn_name}"
+        whiteset = fn_def.whiteset
+        if whiteset == nil then return true
+        -- TODO: maybe optimize this by making the callstack a Counter and using a 
+        --    move-to-front optimization on the whitelist to check most likely candidates sooner
+        for caller in *@callstack
+            if whiteset[caller] then return true
+        @error "You do not have the authority to call: #{stub}"
 
     check_permission: (fn_def)=>
         if getmetatable(fn_def) != functiondef_mt
@@ -371,8 +383,15 @@ class NomsuCompiler
 
             when "FunctionCall"
                 stub = @get_stub(tree)
-                if @defs[stub] and @defs[stub].is_macro
-                    return @run_macro(tree, "Expression")
+                def = @defs[stub]
+                if def and def.is_macro
+                    expr, statement = @run_macro(tree)
+                    if def.whiteset
+                        if expr
+                            expr = "(nomsu:assert_permission(#{repr stub}) and #{expr})"
+                        if statement
+                            statement = "nomsu:assert_permission(#{repr stub});\n"..statement
+                    return expr, statement
                 args = {repr(stub)}
                 for arg in *tree.value
                     if arg.type == 'Word' then continue
