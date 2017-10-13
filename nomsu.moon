@@ -210,10 +210,14 @@ class NomsuCompiler
         @write_err("\n")
     
     def: (signature, thunk, src, is_macro=false)=>
+        if type(signature) == 'string'
+            signature = @get_stubs {signature}
+        elseif type(signature) == 'table' and type(signature[1]) == 'string'
+            signature = @get_stubs signature
         assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
         canonical_args = nil
         aliases = {}
-        for {stub, arg_names} in *@get_stubs(signature)
+        for {stub, arg_names} in *signature
             assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
             for i=1,#arg_names-1 do for j=i+1,#arg_names
@@ -249,7 +253,8 @@ class NomsuCompiler
         return unpack(rets)
     
     run_macro: (tree)=>
-        stub,arg_names,args = @get_stub tree
+        stub = @get_stub tree
+        args = [arg for arg in *tree.value when arg.type != "Word"]
         if @debug
             @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
@@ -529,7 +534,7 @@ class NomsuCompiler
     get_stub: (x)=>
         if not x
             @error "Nothing to get stub from"
-        -- Returns a single stub ("say %"), and list of args ({msg}) from a single rule def
+        -- Returns a single stub ("say %"), and list of arg names ({"msg"}) from a single rule def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
             stub = x\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
@@ -538,7 +543,7 @@ class NomsuCompiler
         switch x.type
             when "String" then return @get_stub(x.value)
             when "FunctionCall"
-                stub, arg_names, args = {}, {}, {}
+                stub, arg_names = {}, {}, {}
                 for token in *x.value
                     switch token.type
                         when "Word"
@@ -546,12 +551,10 @@ class NomsuCompiler
                         when "Var"
                             insert stub, "%"
                             if arg_names then insert arg_names, token.value
-                            insert args, token
                         else
                             insert stub, "%"
                             arg_names = nil
-                            insert args, token
-                return concat(stub," "), arg_names, args
+                return concat(stub," "), arg_names
             else @error "Unsupported get stub type: #{x.type}"
     
     get_stubs: (x)=>

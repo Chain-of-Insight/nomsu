@@ -5,7 +5,7 @@
 # Rule to make rules:
 lua code ".."
     |nomsu:defmacro("rule %signature = %body", (function(nomsu, vars)
-    |    local signature = nomsu:typecheck(vars, "signature", "List").value;
+    |    local signature = nomsu:get_stubs(nomsu:typecheck(vars, "signature", "List").value);
     |    local body = nomsu:typecheck(vars, "body", "Thunk");
     |    return ([[
     |nomsu:def(%s, %s, %s)
@@ -15,7 +15,7 @@ lua code ".."
 # Rule to make nomsu macros:
 rule [escaped parse %shorthand as %longhand] =:
     lua code ".."
-        |local aliases = nomsu:typecheck(vars, "shorthand", "List").value;
+        |local aliases = nomsu:get_stubs(nomsu:typecheck(vars, "shorthand", "List").value);
         |if #vars.longhand.value ~= 1 then;
         |    nomsu:error("Expected only 1 line to parse to, but got "..tostring(#vars.longhand.value));
         |end;
@@ -30,13 +30,13 @@ escaped parse \[parse %shorthand as %longhand] as \: escaped parse \%shorthand a
 # Rule to make lua macros:
 rule [escaped compile %macro_def to %body] =:
     lua code ".."
-        |local aliases = nomsu:typecheck(vars, "macro_def", "List").value;
+        |local aliases = nomsu:get_stubs(nomsu:typecheck(vars, "macro_def", "List").value);
         |local body = nomsu:typecheck(vars, "body", "Thunk");
         |local thunk = nomsu:tree_to_value(body);
         |nomsu:defmacro(aliases, thunk, body.src);
 rule [escaped compile %macro_def to code %body] =:
     lua code ".."
-        |local aliases = nomsu:typecheck(vars, "macro_def", "List").value;
+        |local aliases = nomsu:get_stubs(nomsu:typecheck(vars, "macro_def", "List").value);
         |local body = nomsu:typecheck(vars, "body", "Thunk");
         |local thunk = nomsu:tree_to_value(body);
         |local thunk_wrapper = function(nomsu, vars) return nil, thunk(nomsu, vars); end;

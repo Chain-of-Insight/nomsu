@@ -54,7 +54,7 @@ check_nodent = function(subject, end_pos, spaces)
     return end_pos
   end
 end
-local nomsu = [=[    file <- ({ {| shebang?
+local nomsu = [=[    file <- ({{| shebang?
         (ignored_line %nl)*
         statements (nodent statements)*
         (%nl ignored_line)* %nl?
@@ -77,9 +77,9 @@ local nomsu = [=[    file <- ({ {| shebang?
             (dedent / (({.+} ("" -> "Error while parsing thunk")) => error))
         |} }) -> Thunk
 
-    inline_nomsu <- ({ ("\" inline_expression) }) -> Nomsu
-    eol_nomsu <- ({ ("\" noeol_expression) }) -> Nomsu
-    indented_nomsu <- ({ ("\" expression) }) -> Nomsu
+    inline_nomsu <- ({("\" inline_expression) }) -> Nomsu
+    eol_nomsu <- ({("\" noeol_expression) }) -> Nomsu
+    indented_nomsu <- ({("\" expression) }) -> Nomsu
 
     inline_expression <- number / variable / inline_string / inline_list / inline_nomsu
         / inline_thunk / ("(" inline_statement ")")
@@ -91,13 +91,13 @@ local nomsu = [=[    file <- ({ {| shebang?
     expression <- eol_thunk / eol_nomsu / noeol_expression
 
     -- Function calls need at least one word in them
-    inline_functioncall <- ({ {|
+    inline_functioncall <- ({(''=>line_no) {|
             (inline_expression tok_gap)* word (tok_gap (inline_expression / word))*
         |} }) -> FunctionCall
-    noeol_functioncall <- ({ {|
+    noeol_functioncall <- ({(''=>line_no) {|
             (noeol_expression tok_gap)* word (tok_gap (noeol_expression / word))*
         |} }) -> FunctionCall
-    functioncall <- ({ {|
+    functioncall <- ({(''=>line_no) {|
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
 
@@ -145,6 +145,7 @@ local nomsu = [=[    file <- ({ {| shebang?
     semicolon <- %ws? ";" %ws?
     dotdot <- nodent ".." %ws?
 ]=]
+local CURRENT_FILE = nil
 local whitespace = S(" \t") ^ 1
 local defs = {
   ws = whitespace,
@@ -155,6 +156,22 @@ local defs = {
   nodented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_nodent),
   dedented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_dedent),
   prev_edge = B(S(" \t\n.,:;}])\"\\")),
+  line_no = function(src, pos)
+    local line_no = 1
+    for _ in src:sub(1, pos):gmatch("\n") do
+      line_no = line_no + 1
+    end
+    return pos, tostring(CURRENT_FILE) .. ":" .. tostring(line_no)
+  end,
+  FunctionCall = function(src, line_no, value, errors)
+    return {
+      type = "FunctionCall",
+      src = src,
+      line_no = line_no,
+      value = value,
+      errors = errors
+    }
+  end,
   error = function(src, pos, errors, err_msg)
     local line_no = 1
     for _ in src:sub(1, -#errors):gmatch("\n") do
@@ -175,7 +192,7 @@ local defs = {
     local prev_line, err_line, next_line
     prev_line, err_line, next_line = src:match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line + 1)
     local pointer = ("-"):rep(err_pos - start_of_err_line + 0) .. "^"
-    return error("\n" .. tostring(err_msg or "Parse error") .. " in " .. tostring(filename) .. " on line " .. tostring(line_no) .. ":\n\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n")
+    return error("\n" .. tostring(err_msg or "Parse error") .. " in " .. tostring(CURRENT_FILE) .. " on line " .. tostring(line_no) .. ":\n\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n")
   end
 }
 setmetatable(defs, {
@@ -213,12 +230,18 @@ do
       if is_macro == nil then
         is_macro = false
       end
+      if type(signature) == 'string' then
+        signature = self:get_stubs({
+          signature
+        })
+      elseif type(signature) == 'table' and type(signature[1]) == 'string' then
+        signature = self:get_stubs(signature)
+      end
       assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
       local canonical_args = nil
       local aliases = { }
-      local _list_0 = self:get_stubs(signature)
-      for _index_0 = 1, #_list_0 do
-        local _des_0 = _list_0[_index_0]
+      for _index_0 = 1, #signature do
+        local _des_0 = signature[_index_0]
         local stub, arg_names
         stub, arg_names = _des_0[1], _des_0[2]
         assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
@@ -251,13 +274,17 @@ do
     defmacro = function(self, signature, thunk, src)
       return self:def(signature, thunk, src, true)
     end,
-    call = function(self, stub, ...)
+    call = function(self, stub, line_no, ...)
       local def = self.defs[stub]
+      if def and def.is_macro and self.callstack[#self.callstack] ~= "#macro" then
+        self:error("Attempt to call macro at runtime: " .. tostring(stub) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
+      end
+      insert(self.callstack, {
+        stub,
+        line_no
+      })
       if def == nil then
         self:error("Attempt to call undefined function: " .. tostring(stub))
-      end
-      if def.is_macro and self.callstack[#self.callstack] ~= "#macro" then
-        self:error("Attempt to call macro at runtime: " .. tostring(stub) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
       end
       if not (def.is_macro) then
         self:assert_permission(stub)
@@ -276,7 +303,6 @@ do
         self:write(tostring(colored.bright("CALLING")) .. " " .. tostring(colored.magenta(colored.underscore(stub))) .. " ")
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
-      insert(self.callstack, stub)
       local rets = {
         thunk(self, args)
       }
@@ -284,13 +310,27 @@ do
       return unpack(rets)
     end,
     run_macro = function(self, tree)
-      local stub, arg_names, args = self:get_stub(tree)
+      local stub = self:get_stub(tree)
+      local args
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local arg = _list_0[_index_0]
+          if arg.type ~= "Word" then
+            _accum_0[_len_0] = arg
+            _len_0 = _len_0 + 1
+          end
+        end
+        args = _accum_0
+      end
       if self.debug then
         self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(stub))) .. " ")
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
       insert(self.callstack, "#macro")
-      local expr, statement = self:call(stub, unpack(args))
+      local expr, statement = self:call(stub, tree.line_no, unpack(args))
       remove(self.callstack)
       return expr, statement
     end,
@@ -306,7 +346,7 @@ do
       local _list_0 = self.callstack
       for _index_0 = 1, #_list_0 do
         local caller = _list_0[_index_0]
-        if whiteset[caller] then
+        if whiteset[caller[1]] then
           return true
         end
       end
@@ -327,7 +367,7 @@ do
       local _list_0 = self.callstack
       for _index_0 = 1, #_list_0 do
         local caller = _list_0[_index_0]
-        if whiteset[caller] then
+        if whiteset[caller[1]] then
           return true
         end
       end
@@ -338,12 +378,15 @@ do
         self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(str))
       end
       str = str:gsub("\r", "")
+      local old_file = CURRENT_FILE
       local old_indent_stack
       old_indent_stack, indent_stack = indent_stack, {
         0
       }
+      CURRENT_FILE = filename
       local tree = nomsu:match(str)
       indent_stack = old_indent_stack
+      CURRENT_FILE = old_file
       assert(tree, "Failed to parse: " .. tostring(str))
       if self.debug then
         self:writeln("PARSE TREE:")
@@ -481,7 +524,8 @@ do
           return expr, statement
         end
         local args = {
-          repr(stub)
+          repr(stub),
+          repr(tree.line_no)
         }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
@@ -673,7 +717,7 @@ do
       if "String" == _exp_0 then
         return self:get_stub(x.value)
       elseif "FunctionCall" == _exp_0 then
-        local stub, arg_names, args = { }, { }, { }
+        local stub, arg_names = { }, { }, { }
         local _list_0 = x.value
         for _index_0 = 1, #_list_0 do
           local token = _list_0[_index_0]
@@ -685,14 +729,12 @@ do
             if arg_names then
               insert(arg_names, token.value)
             end
-            insert(args, token)
           else
             insert(stub, "%")
             arg_names = nil
-            insert(args, token)
           end
         end
-        return concat(stub, " "), arg_names, args
+        return concat(stub, " "), arg_names
       else
         return self:error("Unsupported get stub type: " .. tostring(x.type))
       end
@@ -754,8 +796,21 @@ do
         self:errorln(colored.bright(colored.yellow(colored.onred(msg))))
       end
       self:errorln("Callstack:")
+      local maxlen = utils.max((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = self.callstack
+        for _index_0 = 1, #_list_0 do
+          local c = _list_0[_index_0]
+          _accum_0[_len_0] = #c[2]
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)())
       for i = #self.callstack, 1, -1 do
-        self:errorln("    " .. tostring(self.callstack[i]))
+        if self.callstack[i] ~= "#macro" then
+          self:errorln("    " .. tostring(("%-" .. tostring(maxlen) .. "s"):format(self.callstack[i][2])) .. "| " .. tostring(self.callstack[i][1]))
+        end
       end
       self:errorln("    <top level>")
       self.callstack = { }
