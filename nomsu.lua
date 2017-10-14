@@ -427,10 +427,10 @@ do
           self:errorln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.bright(colored.yellow(statement.src))))
           self:error(expr)
         end
-        local code_for_statement = ([[                return (function(nomsu, vars)
-                    %s
-                    return %s;
-                end);]]):format(statements or "", expr or "ret")
+        local code_for_statement = ([[return (function(nomsu, vars)
+%s
+return %s;
+end);]]):format(statements or "", expr or "ret")
         if self.debug then
           self:writeln(tostring(colored.bright("RUNNING LUA:")) .. "\n" .. tostring(colored.blue(colored.bright(code_for_statement))))
         end
@@ -443,7 +443,7 @@ do
             return ("\n%-3d|"):format(n)
           end
           local code = "1  |" .. code_for_statement:gsub("\n", fn)
-          error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(code))) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(colored.bright(colored.yellow(statement.src))))
+          error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(err) .. "\n\nProduced by statement:\n" .. tostring(colored.bright(colored.yellow(statement.src))))
         end
         local run_statement = lua_thunk()
         local ret
@@ -456,16 +456,16 @@ do
           self:errorln(debug.traceback())
           self:error(ret)
         end
-        insert(buffer, tostring(statements or '') .. "\n" .. tostring(expr and "ret = " .. tostring(expr) or ''))
+        insert(buffer, tostring(statements or '') .. "\n" .. tostring(expr and "ret = " .. tostring(expr) .. ";" or ''))
       end
       if max_operations then
         debug.sethook()
       end
-      local lua_code = ([[            return (function(nomsu, vars)
-                local ret;
-                %s
-                return ret;
-            end);]]):format(concat(buffer, "\n"))
+      local lua_code = ([[return (function(nomsu, vars)
+local ret;
+%s
+return ret;
+end);]]):format(concat(buffer, "\n"))
       return return_value, lua_code, vars
     end,
     tree_to_value = function(self, tree, vars)
@@ -475,7 +475,7 @@ do
       end
       local lua_thunk, err = load(code)
       if not lua_thunk then
-        self:error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(code))) .. "\n\n" .. tostring(colored.red(err)))
+        self:error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(colored.red(err)))
       end
       return (lua_thunk())(self, vars or { })
     end,
@@ -503,11 +503,11 @@ do
             insert(lua_bits, "ret = " .. tostring(expr) .. ";")
           end
         end
-        return ([[                    (function(nomsu, vars)
-                        local ret;
-                        %s
-                        return ret;
-                    end)]]):format(concat(lua_bits, "\n"))
+        return ([[(function(nomsu, vars)
+local ret;
+%s
+return ret;
+end)]]):format(concat(lua_bits, "\n"))
       elseif "FunctionCall" == _exp_0 then
         local stub = self:get_stub(tree)
         local def = self.defs[stub]
