@@ -290,7 +290,10 @@ utils = {
     end
     return table.sort(list, comparison)
   end,
-  equivalent = function(x, y)
+  equivalent = function(x, y, depth)
+    if depth == nil then
+      depth = 1
+    end
     if x == y then
       return true
     end
@@ -300,13 +303,16 @@ utils = {
     if type(x) ~= 'table' then
       return false
     end
+    if depth == 0 then
+      return false
+    end
     for k, v in pairs(x) do
-      if y[k] ~= v then
+      if not (utils.equivalent(y[k], v, depth - 1)) then
         return false
       end
     end
     for k, v in pairs(y) do
-      if x[k] ~= v then
+      if not (utils.equivalent(x[k], v, depth - 1)) then
         return false
       end
     end

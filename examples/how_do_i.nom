@@ -136,7 +136,7 @@ repeat:
     say "repeat loop #\(%x)"
     %x += 1
     if (%x > 3):
-        break
+        stop repeat-loop
 
 # GOTOs:
 do:

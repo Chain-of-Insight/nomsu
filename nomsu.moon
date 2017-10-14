@@ -329,10 +329,10 @@ class NomsuCompiler
                 @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.bright colored.yellow statement.src}"
                 @error(expr)
             code_for_statement = ([[
-                return (function(nomsu, vars)
-                    %s
-                    return %s;
-                end);]])\format(statements or "", expr or "ret")
+return (function(nomsu, vars)
+%s
+return %s;
+end);]])\format(statements or "", expr or "ret")
             if @debug
                 @writeln "#{colored.bright "RUNNING LUA:"}\n#{colored.blue colored.bright(code_for_statement)}"
             lua_thunk, err = load(code_for_statement)
@@ -342,7 +342,7 @@ class NomsuCompiler
                     n = n + 1
                     ("\n%-3d|")\format(n)
                 code = "1  |"..code_for_statement\gsub("\n", fn)
-                error("Failed to compile generated code:\n#{colored.bright colored.blue code}\n\n#{err}\n\nProduced by statement:\n#{colored.bright colored.yellow statement.src}")
+                error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{err}\n\nProduced by statement:\n#{colored.bright colored.yellow statement.src}")
             run_statement = lua_thunk!
             ok,ret = pcall(run_statement, self, vars)
             if expr then return_value = ret
@@ -350,16 +350,16 @@ class NomsuCompiler
                 @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow statement.src}"
                 @errorln debug.traceback!
                 @error(ret)
-            insert buffer, "#{statements or ''}\n#{expr and "ret = #{expr}" or ''}"
+            insert buffer, "#{statements or ''}\n#{expr and "ret = #{expr};" or ''}"
         
         if max_operations
             debug.sethook!
         lua_code = ([[
-            return (function(nomsu, vars)
-                local ret;
-                %s
-                return ret;
-            end);]])\format(concat(buffer, "\n"))
+return (function(nomsu, vars)
+local ret;
+%s
+return ret;
+end);]])\format(concat(buffer, "\n"))
         return return_value, lua_code, vars
     
     tree_to_value: (tree, vars)=>
@@ -368,7 +368,7 @@ class NomsuCompiler
             @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
         lua_thunk, err = load(code)
         if not lua_thunk
-            @error("Failed to compile generated code:\n#{colored.bright colored.blue code}\n\n#{colored.red err}")
+            @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{colored.red err}")
         return (lua_thunk!)(self, vars or {})
 
     tree_to_lua: (tree)=>
@@ -391,11 +391,11 @@ class NomsuCompiler
                     if statement then insert lua_bits, statement
                     if expr then insert lua_bits, "ret = #{expr};"
                 return ([[
-                    (function(nomsu, vars)
-                        local ret;
-                        %s
-                        return ret;
-                    end)]])\format(concat(lua_bits, "\n"))
+(function(nomsu, vars)
+local ret;
+%s
+return ret;
+end)]])\format(concat(lua_bits, "\n"))
 
             when "FunctionCall"
                 stub = @get_stub(tree)

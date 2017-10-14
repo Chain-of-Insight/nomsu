@@ -138,15 +138,16 @@ utils = {
         comparison = if reverse then ((x,y)->(keyFn(x)>keyFn(y))) else ((x,y)->(keyFn(x)<keyFn(y)))
         table.sort list, comparison
 
-    equivalent: (x,y)->
+    equivalent: (x,y,depth=1)->
         if x == y then return true
         if type(x) != type(y) then return false
         if type(x) != 'table' then return false
+        if depth == 0 then return false
         for k,v in pairs(x)
-            if y[k] != v
+            unless utils.equivalent(y[k], v, depth-1)
                 return false
         for k,v in pairs(y)
-            if x[k] != v
+            unless utils.equivalent(x[k], v, depth-1)
                 return false
         return true
 

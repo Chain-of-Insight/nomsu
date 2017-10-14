@@ -110,4 +110,3 @@ parse [parse tree %code] as: nomsu "tree_to_str" [\%code]
 
 parse [enable debugging] as: lua code "nomsu.debug = true"
 parse [disable debugging] as: lua code "nomsu.debug = false"
-
