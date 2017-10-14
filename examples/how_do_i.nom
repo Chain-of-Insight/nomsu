@@ -238,8 +238,7 @@ say both (..)
 # The "lua block %" and "lua expr %" macros can be used to write raw lua code: 
 rule [say the time] =:
     lua block ".."
-        |io.write("The OS time is: ")
-        |io.write(tostring(os.time()).."\\n")
+        |nomsu:writeln("The OS time is: "..os.time());
 say the time
 say "Math expression result is: \(lua expr "(1 + 2*3 + 3*4)^2")"
 
