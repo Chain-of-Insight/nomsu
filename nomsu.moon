@@ -102,7 +102,7 @@ nomsu = [=[
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
 
-    word <- ({ { %wordbreaker / (!number %wordchar+) } }) -> Word
+    word <- ({ { (%wordbreaker+) / (!number %wordchar+) } }) -> Word
     
     inline_string <- ({ '"' {|
         ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
@@ -120,7 +120,7 @@ nomsu = [=[
 
     -- Variables can be nameless (i.e. just %) and can't contain apostrophes
     -- which is a hack to allow %foo's to parse as "%foo" and "'s" separately
-    variable <- ({ ("%" { (%wordbreaker / (%wordchar+))? }) }) -> Var
+    variable <- ({ ("%" { ((%wordbreaker+) / (%wordchar+))? }) }) -> Var
 
     inline_list <- ({ {|
          ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
@@ -542,7 +542,7 @@ end)]])\format(concat(lua_bits, "\n"))
         -- Returns a single stub ("say %"), and list of arg names ({"msg"}) from a single rule def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
-            stub = x\gsub("([#{wordbreaker}])"," %1 ")\gsub("%%%S+","%%")\gsub("%s+"," ")\gsub("%s*$","")
+            stub = x\gsub("([#{wordbreaker}]+)"," %1 ")\gsub("%%%S+","%%")\gsub("%s+"," ")\gsub("%s*$","")
             arg_names = [arg for arg in x\gmatch("%%([^%s']*)")]
             return stub, arg_names
         switch x.type

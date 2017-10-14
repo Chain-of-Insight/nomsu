@@ -90,7 +90,7 @@ lua block ".."
 # Chained compairsions (e.g. x < y <= z) are defined up to 3 operands
 lua block ".."
     |local max_operands = 3;
-    |for _,chainers in ipairs({{"<","< ="},{">","> ="}}) do;
+    |for _,chainers in ipairs({{"<","<="},{">",">="}}) do;
     |    local function recurse(chainers, chain)
     # The 1-op versions are already more efficiently defined, and a 0-op version doesnt make sense
     |        if #chain >= 2 then;
