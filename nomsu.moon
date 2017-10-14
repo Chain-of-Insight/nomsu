@@ -461,7 +461,10 @@ end)]])\format(concat(lua_bits, "\n"))
                 return repr(tree.value), nil
 
             when "Var"
-                return "vars[#{repr tree.value}]", nil
+                if tree.value\match("^[a-zA-Z_][a-zA-Z0-9_]*$")
+                    return "vars.#{tree.value}", nil
+                else
+                    return "vars[#{repr tree.value}]", nil
 
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")

@@ -610,7 +610,11 @@ end)]]):format(concat(lua_bits, "\n"))
       elseif "Number" == _exp_0 then
         return repr(tree.value), nil
       elseif "Var" == _exp_0 then
-        return "vars[" .. tostring(repr(tree.value)) .. "]", nil
+        if tree.value:match("^[a-zA-Z_][a-zA-Z0-9_]*$") then
+          return "vars." .. tostring(tree.value), nil
+        else
+          return "vars[" .. tostring(repr(tree.value)) .. "]", nil
+        end
       else
         return self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
