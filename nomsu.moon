@@ -71,7 +71,7 @@ nomsu = [=[
     noeol_statement <- noeol_functioncall / noeol_expression
     inline_statement <- inline_functioncall / inline_expression
 
-    inline_thunk <- ({ {| "{" inline_statements "}" |} }) -> Thunk
+    inline_thunk <- ({ {| "{" %ws? inline_statements %ws? "}" |} }) -> Thunk
     eol_thunk <- ({ {| ":" %ws? noeol_statements eol |} }) -> Thunk
     indented_thunk <- ({ {| (":" / "{..}") indent
                 statements (nodent statements)*
@@ -83,7 +83,7 @@ nomsu = [=[
     indented_nomsu <- ({("\" expression) }) -> Nomsu
 
     inline_expression <- number / variable / inline_string / inline_list / inline_nomsu
-        / inline_thunk / ("(" inline_statement ")")
+        / inline_thunk / ("(" %ws? inline_statement %ws? ")")
     noeol_expression <- indented_string / indented_nomsu / indented_list / indented_thunk
         / ("(..)" indent
             statement
@@ -102,7 +102,7 @@ nomsu = [=[
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
 
-    word <- ({ !number {%wordchar (!"'" %wordchar)*} }) -> Word
+    word <- ({ { %wordbreaker / (!number %wordchar+) } }) -> Word
     
     inline_string <- ({ '"' {|
         ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
@@ -120,7 +120,7 @@ nomsu = [=[
 
     -- Variables can be nameless (i.e. just %) and can't contain apostrophes
     -- which is a hack to allow %foo's to parse as "%foo" and "'s" separately
-    variable <- ({ ("%" { (!"'" %wordchar)* }) }) -> Var
+    variable <- ({ ("%" { (%wordbreaker / (%wordchar+))? }) }) -> Var
 
     inline_list <- ({ {|
          ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
@@ -141,7 +141,7 @@ nomsu = [=[
     indent <- eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
     nodent <- eol (%nl ignored_line)* %nl %nodented
     dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%'])
+    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%] / &%wordbreaker)
     comma <- %ws? "," %ws?
     semicolon <- %ws? ";" %ws?
     dotdot <- nodent ".." %ws?
@@ -149,13 +149,14 @@ nomsu = [=[
 
 CURRENT_FILE = nil
 whitespace = S(" \t")^1
+wordbreaker = ("'~`!@$^&*-+=|<>?/")
 defs =
-    ws:whitespace, nl: P("\n"), :tonumber
-    wordchar: P(1)-S(' \t\n\r%#:;,.{}[]()"\\')
+    ws:whitespace, nl: P("\n"), :tonumber, wordbreaker:S(wordbreaker)
+    wordchar: P(1)-S(' \t\n\r%#:;,.{}[]()"\\'..wordbreaker)
     indented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_indent)
     nodented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_nodent)
     dedented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_dedent)
-    prev_edge: B(S(" \t\n.,:;}])\"\\"))
+    prev_edge: B(S(" \t\n.,:;}])\"\\"..wordbreaker))
     line_no: (src, pos)->
         line_no = 1
         for _ in src\sub(1,pos)\gmatch("\n") do line_no += 1
@@ -541,7 +542,7 @@ end)]])\format(concat(lua_bits, "\n"))
         -- Returns a single stub ("say %"), and list of arg names ({"msg"}) from a single rule def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
-            stub = x\gsub("'"," '")\gsub("%%%S+","%%")\gsub("%s+"," ")
+            stub = x\gsub("([#{wordbreaker}])"," %1 ")\gsub("%%%S+","%%")\gsub("%s+"," ")\gsub("%s*$","")
             arg_names = [arg for arg in x\gmatch("%%([^%s']*)")]
             return stub, arg_names
         switch x.type

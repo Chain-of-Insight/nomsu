@@ -30,7 +30,7 @@ with secrets:
             |    return t;
             |end});
 
-    rule [inventory] =: dict:
+    rule [inventory] =: dict (..)
         [%inv's "key", dict (%entry for %entry in (entries in (%inv's "value")))]
         ..for %inv in (entries in (secret %inventory))
 
@@ -207,16 +207,16 @@ propose:
         rule [vote for %candidate] =:
             for %c in (secret %candidates):
                 if (%c == %candidate):
-                    go to %candidate-is-legit
+                    go to %candidate_is_legit
             error ".."
                 |Invalid candidate: \(%candidate)
-            -> %candidate-is-legit
+            -> %candidate_is_legit
 
             (secret %votes)->(you) =: %candidate
-            %vote-percent = ((number of (votes for %candidate)) / (number of (everyone)))
+            %vote_percent = ((number of (votes for %candidate)) / (number of (everyone)))
             say ".."
-                |Vote cast. \(%candidate) now has \(100 * %vote-percent)% of the votes.
-            if (%vote-percent > 0.5):
+                |Vote cast. \(%candidate) now has \(100 * %vote_percent)% of the votes.
+            if (%vote_percent > 0.5):
                 secret %winner = %candidate
                 after winning a fair election do (secret %action)
                 close the election

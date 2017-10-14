@@ -49,7 +49,7 @@ say "Hello world!"
 # Use a list?
 %my_list = ["first item", "second item", "third item"]
 # Lists are 1-indexed because they're implemented as Lua tables, so this prints "first item"
-say (%my_list -> 1)
+say (%my_list->1)
 # These do the same thing:
 say (%my_list's 1)
 say (1 in %my_list)
@@ -58,7 +58,12 @@ say (1 in %my_list)
 say (size of %my_list)
 
 # Define a dictionary/hash map?
-# Dicts are created by passing a list of key-value pairs to the function "dict"
+%my_dict = (dict {x = 99; y = 101})
+%my_dict = (..)
+    dict:
+        x = 101
+        "99 bottles" = 99
+        653 = 292
 %my_dict = (dict [["x", 99], ["y", 101]])
 
 # Use a dict?
@@ -175,11 +180,11 @@ say (first fibonacci above 10)
 
 # Functions can have aliases, which may or may not have the arguments in different order
 rule [..]
-    I hate %worse-things more than %better-things
-    I think %worse-things are worse than %better-things
-    I like %better-things more than %worse-things
+    I hate %worse_things more than %better_things
+    I think %worse_things are worse than %better_things
+    I like %better_things more than %worse_things
 ..=:
-    say "\(%better-things capitalized) rule and \(%worse-things) drool!"
+    say "\(%better_things capitalized) rule and \(%worse_things) drool!"
 
 I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"
@@ -190,20 +195,26 @@ I think "chihuahuas" are worse than "corgis"
 say both "Hello" and also "again!"
 
 # Functions can even have their name at the end:
-rule [%what-she-said is what she said] =:
-    say %what-she-said
+rule [%what_she_said is what she said] =:
+    say %what_she_said
     say "-- she said"
 
 "Howdy pardner" is what she said
 
-#.. The language only reserves []{}().,:;% as special characters, so functions and variables
+#.. The language only reserves []{}().,:;% as special characters, so functions
     can have really funky names!
-rule [>> %foo-bar$$$^ --> %@@& _~-^-~_~-^ %1 !] =:
-    say %foo-bar$$$^
-    say %@@&
+rule [>> %foo_bar $$$^ --> %@ @& _~-^-~_~-^ %1 !] =:
+    say %foo_bar
+    say %@
     say %1
 
->> "wow" --> "so flexible!" _~-^-~_~-^ "even numbers can be variables!" !
+>> "wow" $$$^ --> "so flexible!" @& _~-^-~_~-^ "even numbers can be variables!" !
+
+#.. The all of the following are characters won't "stick" to their neighbors, so the
+    compiler treats them as solitary single-character tokens: '~`!@$^&*-+=|<>?/
+    which means you can jam things together:
+rule [%x++%y] =: 2*(%x+%y)
+(5++2) == (   5   ++   2   )
 
 # Math and logic operations are just treated the same as function calls in the syntax
 say (2 + 3)

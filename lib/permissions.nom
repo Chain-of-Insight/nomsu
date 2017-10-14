@@ -15,33 +15,33 @@ rule [standardize rules %rules] =:
     keys in %set
 
 
-rule [restrict %rules to within %elite-rules] =:
+rule [restrict %rules to within %elite_rules] =:
     %rules = (standardize rules %rules)
-    %elite-rules = (standardize rules %elite-rules)
-    for all (flatten [%elite-rules, %rules]):
+    %elite_rules = (standardize rules %elite_rules)
+    for all (flatten [%elite_rules, %rules]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for %rule in %rules:
         assert (nomsu "check_permission" [%]) ".."
             |You do not have permission to restrict permissions for function: \(%)
         ((nomsu) ->* ["defs",%rule,"whiteset"]) = (..)
-            dict ([%, yes] for all %elite-rules)
+            dict ([%, yes] for all %elite_rules)
 
-rule [allow %elite-rules to use %rules] =:
+rule [allow %elite_rules to use %rules] =:
     %rules = (standardize rules %rules)
-    %elite-rules = (standardize rules %elite-rules)
-    for all (flatten [%elite-rules, %rules]):
+    %elite_rules = (standardize rules %elite_rules)
+    for all (flatten [%elite_rules, %rules]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for %rule in %rules:
         assert (nomsu "check_permission" [%rule]) ".."
             |You do not have permission to grant permissions for function: \(%rule)
         %whiteset = ((nomsu) ->* ["defs",%rule,"whiteset"])
         if (not %whiteset): go to next %rule
-        for all %elite-rules: %whiteset -> % = (yes)
+        for all %elite_rules: %whiteset -> % = (yes)
 
-rule [forbid %pleb-rules to use %rules] =:
+rule [forbid %pleb_rules to use %rules] =:
     %rules = (standardize rules %rules)
-    %pleb-rules = (standardize rules %pleb-rules)
-    for all (flatten [%pleb-rules, %used]):
+    %pleb_rules = (standardize rules %pleb_rules)
+    for all (flatten [%pleb_rules, %used]):
         assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
     for all %rules:
         assert (nomsu "check_permission" [%]) ".."
@@ -50,4 +50,4 @@ rule [forbid %pleb-rules to use %rules] =:
         assert %whiteset ".."
             |Cannot individually restrict permissions for \(%) because it is currently
             |available to everyone. Perhaps you meant to use "restrict % to within %" instead?
-        for all %pleb-rules: %whiteset's % = (nil)
+        for all %pleb_rules: %whiteset's % = (nil)

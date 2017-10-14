@@ -29,7 +29,7 @@ with secrets:
     rule [plural %singular] =:
         %singular in (secret %plurals)
 
-    rule [canonicalize %item-name] =:
-        %item-name in (secret %canonicals)
+    rule [canonicalize %item_name] =:
+        %item_name in (secret %canonicals)
 
     rule [rules that change plurals] =: ["the plural of % is %"]

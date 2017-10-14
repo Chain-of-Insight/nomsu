@@ -19,7 +19,7 @@ parse [first in %list, first %list] as: 1 st in %list
 parse [last in %list, last %list] as: 1 st to last in %list
 
 # Dict iteration convenience function. This could also be accomplished with: for all (entries in %dict): ...
-compile [for %key -> %value in %dict %body] to code: ".."
+compile [for %key = %value in %dict %body] to code: ".."
     |do;
     |    for k, v in pairs(\(%dict as lua)) do;
     |        \(%key as lua), \(%value as lua) = k, v;
@@ -29,7 +29,7 @@ compile [for %key -> %value in %dict %body] to code: ".."
 
 # Membership testing
 rule [%item is in %list, %list contains %item, %list has %item] =:
-    for %key -> %value in %list:
+    for %key = %value in %list:
         if (%key == %item): return (yes)
     return (no)
 
@@ -38,7 +38,7 @@ rule [..]
     %list doesn't contain %item, %list does not contain %item
     %list doesn't have %item, %list does not have %item
 ..=:
-    for %key -> %value in %list:
+    for %key = %value in %list:
         if (%key == %item): return (no)
     return (yes)
 
@@ -87,26 +87,53 @@ rule [flatten %lists] =:
             add %item to %flat
     %flat
 
-rule [dict %items] =:
+rule [dict from entries %items] =:
     %dict = []
     for %pair in %items:
         %dict -> (%pair -> 1) = (%pair -> 2)
     %dict
 
+compile [dict %items] to:
+    if ((%items's "type") == "Thunk"):
+        %item_codes = []
+        for %func_call in (%items's "value"):
+            assert ((%func_call's "type") == "FunctionCall") ".."
+                |Invalid format for 'dict' expression. Only literals are allowed.
+            %tokens = (%func_call's "value")
+            %equals = (%tokens -> 2)
+            assert (lua expr "#\(%tokens) == 3 and \(%equals) and \(%equals).type == 'Word' and \(%equals).value == '='") ".."
+                |Invalid format for 'dict' expression. Lines must only have the "% = %" format, not \(%func_call's "src")
+            %key = (%tokens -> 1)
+            lua code ".."
+                |if \(%key).type == "Word" and \(%key).value:match("^[a-zA-Z_][a-zA-Z0-9_]*$") then
+                |    \(%key_code) = \(%key).value;
+                |elseif \(%key).type == "Word" then
+                |    \(%key_code) = "["..nomsu:repr(\(%key).value).."]";
+                |else
+                |    \(\{%key_code = "[\((%key as lua))]"} as lua statements)
+                |end
+            add "\(%key_code) = \((%tokens -> 3) as lua)" to %item_codes
+        return "{\(join %item_codes with glue ",\n")}"
+    ..else:
+        return (..)
+            (..)
+                nomsu "replaced_vars" [\(dict from entries %items), lua expr "vars"]
+            ..as lua
+
 rule [entries in %dict] =:
     %entries = []
-    for %k -> %v in %dict:
-        add (dict [["key",%k],["value",%v]]) to %entries
+    for %k = %v in %dict:
+        add (dict {key = %k; value = %v}) to %entries
     %entries
 
 rule [keys in %dict] =:
     %keys = []
-    for %k -> %v in %dict: add %k to %keys
+    for %k = %v in %dict: add %k to %keys
     %keys
 
 rule [values in %dict] =:
     %values = []
-    for %k -> %v in %dict: add %v to %values
+    for %k = %v in %dict: add %v to %values
     %values
 
 # List Comprehension

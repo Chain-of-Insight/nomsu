@@ -21,7 +21,7 @@ compile [if %condition %if_body else %else_body, unless %condition %else_body el
 
 # Return
 compile [return] to code: "do; return; end;"
-compile [return %return-value] to code: "do; return \(%return-value as lua); end;"
+compile [return %return_value] to code: "do; return \(%return_value as lua); end;"
 
 # GOTOs
 compile [-> %label] to code: ".."
@@ -44,11 +44,11 @@ rule [tree %tree has function call %call] =:
 compile [do next repeat-loop] to code: "goto continue_repeat;"
 compile [stop repeat-loop] to code: "goto stop_repeat;"
 compile [repeat while %condition %body] to code:
-    %continue-labels = (..)
+    %continue_labels = (..)
         "\n::continue_repeat::;" if (tree %body has function call \(do next repeat-loop)) else ""
     %code = ".."
         |while \(%condition as lua) do;
-        |\(%body as lua statements)\(%continue-labels)
+        |\(%body as lua statements)\(%continue_labels)
         |end;--while-loop
     if (tree %body has function call \(stop repeat-loop)):
         return ".."
@@ -73,25 +73,25 @@ compile [..]
     for %var from %start to %stop by %step %body
     for %var from %start to %stop via %step %body
 ..to code:
-    %continue-labels = ""
+    %continue_labels = ""
     if (tree %body has function call \(do next for-loop)):
-        %continue-labels join= "\n::continue_for::;"
+        %continue_labels join= "\n::continue_for::;"
     if (tree %body has function call (nomsu "replaced_vars" [\(do next %), lua expr "{['']=\(%var)}"])):
-        %continue-labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+        %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
     %code = ".."
         |for i=\(%start as lua),\(%stop as lua),\(%step as lua) do;
         # This trashes the loop variables, just like in Python.
         |\(%var as lua) = i;
-        |\(%body as lua statements)\(%continue-labels)
+        |\(%body as lua statements)\(%continue_labels)
         |end;--numeric for-loop
-    %stop-labels = ""
+    %stop_labels = ""
     if (tree %body has function call \(stop for-loop)):
-        %stop-labels join= "\n::stop_for::;"
+        %stop_labels join= "\n::stop_for::;"
     if (tree %body has function call (nomsu "replaced_vars" [\(stop %), lua expr "{['']=\(%var)}"])):
-        %stop-labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-    if (%stop-labels != ""): ".."
+        %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
+    if (%stop_labels != ""): ".."
         |do;--for-loop label scope
-        |\(%code)\(%stop-labels)
+        |\(%code)\(%stop_labels)
         |end;--for-loop label scope
     ..else: %code
 parse [for %var from %start to %stop %body] as: for %var from %start to %stop via 1 %body
@@ -102,25 +102,25 @@ parse [..]
 parse [for all %start to %stop %body] as: for all %start to %stop via 1 %body
 
 compile [for %var in %iterable %body] to code:
-    %continue-labels = ""
+    %continue_labels = ""
     if (tree %body has function call \(do next for-loop)):
-        %continue-labels join= "\n::continue_for::;"
+        %continue_labels join= "\n::continue_for::;"
     if (tree %body has function call (nomsu "replaced_vars" [\(do next %), lua expr "{['']=\(%var)}"])):
-        %continue-labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+        %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
     %code = ".."
         |for i,value in ipairs(\(%iterable as lua)) do;
         # This trashes the loop variables, just like in Python.
         |\(%var as lua) = value;
-        |\(%body as lua statements)\(%continue-labels)
+        |\(%body as lua statements)\(%continue_labels)
         |end;--foreach-loop
-    %stop-labels = ""
+    %stop_labels = ""
     if (tree %body has function call \(stop for-loop)):
-        %stop-labels join= "\n::stop_for::;"
+        %stop_labels join= "\n::stop_for::;"
     if (tree %body has function call (nomsu "replaced_vars" [\(stop %), lua expr "{['']=\(%var)}"])):
-        %stop-labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-    if (%stop-labels != ""): ".."
+        %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
+    if (%stop_labels != ""): ".."
         |do;--for-loop label scope
-        |\(%code)\(%stop-labels)
+        |\(%code)\(%stop_labels)
         |end;--for-loop label scope
     ..else: %code
 parse [for all %iterable %body] as: for % in %iterable %body
@@ -131,10 +131,10 @@ compile [when %body] to code:
     %result = ""
     %fallthroughs = []
     %first = (yes)
-    for %func-call in (%body's "value"):
-        assert ((%func-call's "type") == "FunctionCall") ".."
+    for %func_call in (%body's "value"):
+        assert ((%func_call's "type") == "FunctionCall") ".."
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
-        %tokens = (%func-call's "value")
+        %tokens = (%func_call's "value")
         %star = (%tokens -> 1)
         assert (lua expr "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
             |Invalid format for 'when' statement. Lines must begin with '*'
@@ -146,7 +146,7 @@ compile [when %body] to code:
         %action = (%tokens -> 3)
         if (%action == (nil)):
             lua block "table.insert(vars.fallthroughs, vars.condition)"
-            do next %func-call
+            do next %func_call
 
         if (lua expr "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
             %result join= ".."
@@ -171,14 +171,14 @@ compile [when %body] to code:
     %result
 
 # Switch statement
-compile [when %branch-value == ? %body] to code:
+compile [when %branch_value == ? %body] to code:
     %result = ""
     %fallthroughs = []
     %first = (yes)
-    for %func-call in (%body's "value"):
-        assert ((%func-call's "type") == "FunctionCall") ".."
+    for %func_call in (%body's "value"):
+        assert ((%func_call's "type") == "FunctionCall") ".."
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
-        %tokens = (%func-call's "value")
+        %tokens = (%func_call's "value")
         %star = (%tokens -> 1)
         assert (lua expr "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
             |Invalid format for 'when' statement. Lines must begin with '*'
@@ -190,7 +190,7 @@ compile [when %branch-value == ? %body] to code:
         %action = (%tokens -> 3)
         if (%action == (nil)):
             lua block "table.insert(vars.fallthroughs, vars.condition)"
-            do next %func-call
+            do next %func_call
 
         if (lua expr "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
             %result join= ".."
@@ -213,7 +213,7 @@ compile [when %branch-value == ? %body] to code:
     if (%result != ""):
         %result = ".."
             |do;--when == ?
-            |local branch_value = \(%branch-value as lua);\(%result)
+            |local branch_value = \(%branch_value as lua);\(%result)
             |end;
             |end;--when == ?
     %result

@@ -70,7 +70,7 @@ local nomsu = [=[    file <- ({{| shebang?
     noeol_statement <- noeol_functioncall / noeol_expression
     inline_statement <- inline_functioncall / inline_expression
 
-    inline_thunk <- ({ {| "{" inline_statements "}" |} }) -> Thunk
+    inline_thunk <- ({ {| "{" %ws? inline_statements %ws? "}" |} }) -> Thunk
     eol_thunk <- ({ {| ":" %ws? noeol_statements eol |} }) -> Thunk
     indented_thunk <- ({ {| (":" / "{..}") indent
                 statements (nodent statements)*
@@ -82,7 +82,7 @@ local nomsu = [=[    file <- ({{| shebang?
     indented_nomsu <- ({("\" expression) }) -> Nomsu
 
     inline_expression <- number / variable / inline_string / inline_list / inline_nomsu
-        / inline_thunk / ("(" inline_statement ")")
+        / inline_thunk / ("(" %ws? inline_statement %ws? ")")
     noeol_expression <- indented_string / indented_nomsu / indented_list / indented_thunk
         / ("(..)" indent
             statement
@@ -101,7 +101,7 @@ local nomsu = [=[    file <- ({{| shebang?
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
 
-    word <- ({ !number {%wordchar (!"'" %wordchar)*} }) -> Word
+    word <- ({ { %wordbreaker / (!number %wordchar+) } }) -> Word
     
     inline_string <- ({ '"' {|
         ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
@@ -119,7 +119,7 @@ local nomsu = [=[    file <- ({{| shebang?
 
     -- Variables can be nameless (i.e. just %) and can't contain apostrophes
     -- which is a hack to allow %foo's to parse as "%foo" and "'s" separately
-    variable <- ({ ("%" { (!"'" %wordchar)* }) }) -> Var
+    variable <- ({ ("%" { (%wordbreaker / (%wordchar+))? }) }) -> Var
 
     inline_list <- ({ {|
          ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
@@ -140,22 +140,24 @@ local nomsu = [=[    file <- ({{| shebang?
     indent <- eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
     nodent <- eol (%nl ignored_line)* %nl %nodented
     dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%'])
+    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%] / &%wordbreaker)
     comma <- %ws? "," %ws?
     semicolon <- %ws? ";" %ws?
     dotdot <- nodent ".." %ws?
 ]=]
 local CURRENT_FILE = nil
 local whitespace = S(" \t") ^ 1
+local wordbreaker = ("'~`!@$^&*-+=|<>?/")
 local defs = {
   ws = whitespace,
   nl = P("\n"),
   tonumber = tonumber,
-  wordchar = P(1) - S(' \t\n\r%#:;,.{}[]()"\\'),
+  wordbreaker = S(wordbreaker),
+  wordchar = P(1) - S(' \t\n\r%#:;,.{}[]()"\\' .. wordbreaker),
   indented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_indent),
   nodented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_nodent),
   dedented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_dedent),
-  prev_edge = B(S(" \t\n.,:;}])\"\\")),
+  prev_edge = B(S(" \t\n.,:;}])\"\\" .. wordbreaker)),
   line_no = function(src, pos)
     local line_no = 1
     for _ in src:sub(1, pos):gmatch("\n") do
@@ -704,7 +706,7 @@ end)]]):format(concat(lua_bits, "\n"))
         self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        local stub = x:gsub("'", " '"):gsub("%%%S+", "%%"):gsub("%s+", " ")
+        local stub = x:gsub("([" .. tostring(wordbreaker) .. "])", " %1 "):gsub("%%%S+", "%%"):gsub("%s+", " "):gsub("%s*$", "")
         local arg_names
         do
           local _accum_0 = { }
