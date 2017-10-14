@@ -101,7 +101,7 @@ local nomsu = [=[    file <- ({{| shebang?
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
 
-    word <- ({ { %wordbreaker / (!number %wordchar+) } }) -> Word
+    word <- ({ { (%wordbreaker+) / (!number %wordchar+) } }) -> Word
     
     inline_string <- ({ '"' {|
         ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
@@ -119,7 +119,7 @@ local nomsu = [=[    file <- ({{| shebang?
 
     -- Variables can be nameless (i.e. just %) and can't contain apostrophes
     -- which is a hack to allow %foo's to parse as "%foo" and "'s" separately
-    variable <- ({ ("%" { (%wordbreaker / (%wordchar+))? }) }) -> Var
+    variable <- ({ ("%" { ((%wordbreaker+) / (%wordchar+))? }) }) -> Var
 
     inline_list <- ({ {|
          ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
@@ -706,7 +706,7 @@ end)]]):format(concat(lua_bits, "\n"))
         self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        local stub = x:gsub("([" .. tostring(wordbreaker) .. "])", " %1 "):gsub("%%%S+", "%%"):gsub("%s+", " "):gsub("%s*$", "")
+        local stub = x:gsub("([" .. tostring(wordbreaker) .. "]+)", " %1 "):gsub("%%%S+", "%%"):gsub("%s+", " "):gsub("%s*$", "")
         local arg_names
         do
           local _accum_0 = { }
