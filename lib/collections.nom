@@ -162,6 +162,12 @@ rule [%items sorted by %key] =:
 
 # Metatable stuff
 compile [counter] to: "setmetatable({}, {__index=function() return 0; end})"
+compile [default dict] to: ".."
+    |setmetatable({}, {__index=function(self, key)
+    |    t = {};
+    |    self[key] = t;
+    |    return t;
+    |end})"
 rule [chain %dict to %fallback] =:
     when (type of %fallback) == ?:
         * "table":
