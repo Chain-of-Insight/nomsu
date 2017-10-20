@@ -833,28 +833,36 @@ end)]]):format(concat(lua_bits, "\n"))
       return self:error("Invalid type for %" .. tostring(varname) .. ". Expected " .. tostring(desired_type) .. ", but got " .. tostring(x.type) .. ".")
     end,
     initialize_core = function(self)
+      local nomsu_string_as_lua
+      nomsu_string_as_lua = function(self, code)
+        local concat_parts = { }
+        local _list_0 = code.value
+        for _index_0 = 1, #_list_0 do
+          local bit = _list_0[_index_0]
+          if type(bit) == "string" then
+            insert(concat_parts, bit)
+          else
+            local expr, statement = self:tree_to_lua(bit)
+            if statement then
+              self:error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
+            end
+            insert(concat_parts, expr)
+          end
+        end
+        return concat(concat_parts)
+      end
       local lua_code
       lua_code = function(self, vars)
-        local inner_vars = setmetatable({ }, {
-          __index = function(_, key)
-            return "vars[" .. tostring(repr(key)) .. "]"
-          end
-        })
-        local lua = self:tree_to_value(vars.code, inner_vars)
+        local lua = nomsu_string_as_lua(self, vars.code)
         return nil, lua
       end
-      self:defmacro("lua > %code", lua_code)
+      self:defmacro("lua> %code", lua_code)
       local lua_value
       lua_value = function(self, vars)
-        local inner_vars = setmetatable({ }, {
-          __index = function(_, key)
-            return "vars[" .. tostring(repr(key)) .. "]"
-          end
-        })
-        local lua = self:tree_to_value(vars.code, inner_vars)
+        local lua = nomsu_string_as_lua(self, vars.code)
         return lua, nil
       end
-      self:defmacro("= lua %code", lua_value)
+      self:defmacro("=lua %code", lua_value)
       local run_file
       run_file = function(self, vars)
         if vars.filename:match(".*%.lua") then
