@@ -131,14 +131,12 @@ say ".."
     |   and an interpolated expression: \2 + 5\
 
 rule [%n bottles] =:
-    lua block ".."
-        |do
-        |    print("running raw lua code...")
-        |    for i=\(%n),1,-1 do
-        |        print(tostring(i).." bottles of beer on the wall. Take one down, pass it around,")
-        |    end
-        |    print("no more bottles of beer on the wall.")
+    lua do> ".."
+        |print("running raw lua code...")
+        |for i=\(%n),1,-1 do
+        |    print(tostring(i).." bottles of beer on the wall. Take one down, pass it around,")
         |end
+        |print("no more bottles of beer on the wall.")
     nil
 9 bottles
 

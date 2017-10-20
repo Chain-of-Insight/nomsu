@@ -13,7 +13,7 @@ parse [assert %condition] as: assert %condition (nil)
 
 # String functions
 rule [join %strs with glue %glue] =:
-    lua block ".."
+    lua do> ".."
         |local str_bits = {}
         |for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu:stringify(bit) end
         |return table.concat(str_bits, vars.glue)
@@ -31,7 +31,7 @@ compile [%start to %stop by %step, %start to %stop via %step] to: ".."
 parse [%start to %stop] as: %start to %stop by 1
 
 # Random functions
-lua code ".." # Seed
+lua> ".." # Seed
     |math.randomseed(os.time());
     |for i=1,20 do; math.random(); end;
 compile [random number, random, rand] to: "math.random()"
@@ -39,7 +39,7 @@ compile [random int %n, random integer %n, randint %n] to: "math.random(\(%n as 
 compile [random from %low to %high, random number from %low to %high, rand %low %high] to:
     "math.random(\(%low as lua), \(%high as lua))"
 rule [random choice from %elements, random choice %elements, random %elements] =:
-    lua expr "\(%elements)[math.random(#\(%elements))]"
+    =lua "\(%elements)[math.random(#\(%elements))]"
 
 # Math functions
 compile [abs %, absolute value of %, | % |] to: "math.abs(\(% as lua))"
@@ -61,7 +61,7 @@ compile [log % base %base] to: "math.log(\(% as lua), \(%base as lua))"
 compile [floor %] to: "math.floor(\(% as lua))"
 compile [round %, % rounded] to: "math.floor(\(% as lua) + .5)"
 rule [%n rounded to the nearest %rounder] =:
-    lua expr "(\(%rounder))*math.floor(\(%n)/\(%rounder) + .5)"
+    =lua "(\(%rounder))*math.floor(\(%n)/\(%rounder) + .5)"
 
 # Common utility functions
 compile [sum of %items, sum %items] to: "nomsu.utils.sum(\(%items as lua))"
@@ -69,7 +69,7 @@ compile [product of %items, product %items] to: "nomsu.utils.product(\(%items as
 compile [all of %items] to: "nomsu.utils.all(\(%items as lua))"
 compile [any of %items] to: "nomsu.utils.any(\(%items as lua))"
 rule [avg of %items, average of %items] =:
-    lua expr "(nomsu.utils.sum(\(%items))/#\(%items))"
+    =lua "(nomsu.utils.sum(\(%items))/#\(%items))"
 compile [min of %items, smallest of %items, lowest of %items] to:
     "nomsu.utils.min(\(%items as lua))"
 compile [max of %items, biggest of %items, largest of %items, highest of %items] to:
@@ -87,7 +87,7 @@ compile [max of %items by %value_expr] to:
         |    return \(%value_expr as lua)
         |end)
 compile [sort %items] to: "table.sort(\(%items as lua))"
-rule [sort %items by %key] =: lua expr ".."
+rule [sort %items by %key] =: =lua ".."
     |nomsu.utils.sort(\(%items), function(x)
     |    return (\(%key))(nomsu, {['']=x});
     |end)
@@ -108,7 +108,7 @@ compile [form feed, formfeed] to: ".."
 compile [vertical tab] to: ".."
     |"\v"
 
-lua code ".."
+lua> ".."
     |do;
     |    local colors = {
     |        ["reset color"] = 0, bright = 1, dim = 2, underscore = 4, blink = 5,

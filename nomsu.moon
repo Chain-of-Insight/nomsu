@@ -542,7 +542,7 @@ end)]])\format(concat(lua_bits, "\n"))
         -- Returns a single stub ("say %"), and list of arg names ({"msg"}) from a single rule def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
-            stub = x\gsub("([#{wordbreaker}]+)"," %1 ")\gsub("%%%S+","%%")\gsub("%s+"," ")\gsub("%s*$","")
+            stub = x\gsub("([#{wordbreaker}]+)"," %1 ")\gsub("%%%S+","%%")\gsub("%s+"," ")\gsub("^%s*","")\gsub("%s*$","")
             arg_names = [arg for arg in x\gmatch("%%([^%s']*)")]
             return stub, arg_names
         switch x.type
@@ -605,13 +605,13 @@ end)]])\format(concat(lua_bits, "\n"))
             inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
             lua = @tree_to_value(vars.code, inner_vars)
             return nil, lua
-        @defmacro "lua code %code", lua_code
+        @defmacro "lua > %code", lua_code
 
         lua_value = (vars)=>
             inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
             lua = @tree_to_value(vars.code, inner_vars)
             return lua, nil
-        @defmacro "lua expr %code", lua_value
+        @defmacro "= lua %code", lua_value
 
         run_file = (vars)=>
             if vars.filename\match(".*%.lua")

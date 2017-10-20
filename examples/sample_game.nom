@@ -6,15 +6,15 @@ require "lib/plurals.nom"
 # Users:
 with secrets:
     secret %users = (..)
-        lua expr ".."
+        =lua ".."
             |setmetatable({}, {__index={
             |    by_name=function(self, key) return "User<"..key..">"; end,
             |    add=function(self, key) self[key] = self:by_name(key); end,
             |}})
     rule [find user %name, @%name] =:
-        lua expr "secrets.users:by_name(vars.name) or nomsu:error('Failed to find user: '..tostring(vars.name))"
+        =lua "secrets.users:by_name(vars.name) or nomsu:error('Failed to find user: '..tostring(vars.name))"
     rule [add user %name] =:
-        lua expr "secrets.users:add(vars.name)"
+        =lua "secrets.users:add(vars.name)"
     rule [everybody, everyone] =:
         (%entry's "key") for %entry in (entries in (secret %users))
 
@@ -23,7 +23,7 @@ with secrets:
 # Inventory:
 with secrets:
     secret %inventory = (..)
-        lua expr ".."
+        =lua ".."
             |setmetatable({}, {__index=function(self,key)
             |    local t = setmetatable({}, {__index=function() return 0; end});
             |    self[key] = t;
@@ -69,14 +69,14 @@ with secrets:
         "inventory", "%'s inventory", "%'s stock of %", "%'s stock of % as str"
 
 rule [you] =:
-    lua expr "(nomsu.you or 'Anonymous')"
+    =lua "(nomsu.you or 'Anonymous')"
 
 rule [make %person %action, make %person do %action] =:
-    lua code ".."
+    lua> ".."
         |local old_you = nomsu.you
         |nomsu.you = vars.person
     do %action
-    lua code ".."
+    lua> ".."
         |nomsu.you = old_you
 
 say "===================================================="

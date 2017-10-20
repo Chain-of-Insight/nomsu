@@ -30,7 +30,7 @@ compile [go to %label] to code: ".."
     |goto label_\(nomsu "var_to_lua_identifier" [%label]);
 
 rule [tree %tree has function call %call] =:
-    lua code ".."
+    lua> ".."
         |local target = (\(%call)).value;
         |for subtree,_ in coroutine.wrap(function() nomsu:walk_tree(\(%tree)); end) do;
         |    if type(subtree) == 'table' and subtree.type == "FunctionCall"
@@ -76,7 +76,7 @@ compile [..]
     %continue_labels = ""
     if (tree %body has function call \(do next for-loop)):
         %continue_labels join= "\n::continue_for::;"
-    if (tree %body has function call (nomsu "replaced_vars" [\(do next %), lua expr "{['']=\(%var)}"])):
+    if (tree %body has function call (nomsu "replaced_vars" [\(do next %), =lua "{['']=\(%var)}"])):
         %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
     %code = ".."
         |for i=\(%start as lua),\(%stop as lua),\(%step as lua) do;
@@ -87,7 +87,7 @@ compile [..]
     %stop_labels = ""
     if (tree %body has function call \(stop for-loop)):
         %stop_labels join= "\n::stop_for::;"
-    if (tree %body has function call (nomsu "replaced_vars" [\(stop %), lua expr "{['']=\(%var)}"])):
+    if (tree %body has function call (nomsu "replaced_vars" [\(stop %), =lua "{['']=\(%var)}"])):
         %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
     if (%stop_labels != ""): ".."
         |do;--for-loop label scope
@@ -105,7 +105,7 @@ compile [for %var in %iterable %body] to code:
     %continue_labels = ""
     if (tree %body has function call \(do next for-loop)):
         %continue_labels join= "\n::continue_for::;"
-    if (tree %body has function call (nomsu "replaced_vars" [\(do next %), lua expr "{['']=\(%var)}"])):
+    if (tree %body has function call (nomsu "replaced_vars" [\(do next %), =lua "{['']=\(%var)}"])):
         %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
     %code = ".."
         |for i,value in ipairs(\(%iterable as lua)) do;
@@ -116,7 +116,7 @@ compile [for %var in %iterable %body] to code:
     %stop_labels = ""
     if (tree %body has function call \(stop for-loop)):
         %stop_labels join= "\n::stop_for::;"
-    if (tree %body has function call (nomsu "replaced_vars" [\(stop %), lua expr "{['']=\(%var)}"])):
+    if (tree %body has function call (nomsu "replaced_vars" [\(stop %), =lua "{['']=\(%var)}"])):
         %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
     if (%stop_labels != ""): ".."
         |do;--for-loop label scope
@@ -136,7 +136,7 @@ compile [when %body] to code:
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
         %tokens = (%func_call's "value")
         %star = (%tokens -> 1)
-        assert (lua expr "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
+        assert (=lua "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
             |Invalid format for 'when' statement. Lines must begin with '*'
 
         %condition = (%tokens -> 2)
@@ -145,10 +145,10 @@ compile [when %body] to code:
 
         %action = (%tokens -> 3)
         if (%action == (nil)):
-            lua block "table.insert(vars.fallthroughs, vars.condition)"
+            lua do> "table.insert(vars.fallthroughs, vars.condition)"
             do next %func_call
 
-        if (lua expr "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
+        if (=lua "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
             %result join= ".."
                 |
                 |else;
@@ -180,7 +180,7 @@ compile [when %branch_value == ? %body] to code:
             |Invalid format for 'when' statement. Only '*' blocks are allowed.
         %tokens = (%func_call's "value")
         %star = (%tokens -> 1)
-        assert (lua expr "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
+        assert (=lua "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
             |Invalid format for 'when' statement. Lines must begin with '*'
 
         %condition = (%tokens -> 2)
@@ -189,10 +189,10 @@ compile [when %branch_value == ? %body] to code:
 
         %action = (%tokens -> 3)
         if (%action == (nil)):
-            lua block "table.insert(vars.fallthroughs, vars.condition)"
+            lua> "table.insert(vars.fallthroughs, vars.condition)"
             do next %func_call
 
-        if (lua expr "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
+        if (=lua "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
             %result join= ".."
                 |
                 |else;

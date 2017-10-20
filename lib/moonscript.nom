@@ -2,7 +2,7 @@ require "lib/metaprogramming.nom"
 
 # Moonscript!
 parse [moonscript block %moonscript_code] as:
-    lua block ".."
+    lua do> ".."
         |local parse, compile = require('moonscript.parse'), require('moonscript.compile');
         |local moon_code = nomsu:tree_to_value(vars.moonscript_code, vars);
         |local tree, err = parse.string(moon_code);
@@ -16,7 +16,7 @@ parse [moonscript block %moonscript_code] as:
         |return "do\\n"..lua_code.."\\nend";
 
 parse [moonscript %moonscript_code] as:
-    lua block ".."
+    lua do> ".."
         |local parse, compile = require('moonscript.parse'), require('moonscript.compile');
         |local moon_code = nomsu:tree_to_value(vars.moonscript_code, vars);
         |local tree, err = parse.string(moon_code);

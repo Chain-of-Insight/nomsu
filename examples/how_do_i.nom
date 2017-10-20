@@ -246,17 +246,17 @@ say both (..)
 
 
 # Macros: 
-# The "lua block %" and "lua expr %" macros can be used to write raw lua code: 
+# The "lua> %" and "=lua %" macros can be used to write raw lua code: 
 rule [say the time] =:
-    lua block ".."
+    lua> ".."
         |nomsu:writeln("The OS time is: "..os.time());
 say the time
-say "Math expression result is: \(lua expr "(1 + 2*3 + 3*4)^2")"
+say "Math expression result is: \(=lua "(1 + 2*3 + 3*4)^2")"
 
 #.. In the lua environment, "vars" can be used to get local variables/function args, and
     "nomsu" can be used to access the compiler, function defs, and other things
 rule [square root of %n] =:
-    lua expr "math.sqrt(vars.n)"
+    =lua "math.sqrt(vars.n)"
 say "The square root of 2 is \(square root of 2)"
 
 # Macros can be defined to transform one bit of nomsu code into another using "parse % as %":

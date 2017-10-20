@@ -44,7 +44,7 @@ compile [%var join= %val] to code: "\(%var as lua) = \(%var as lua) .. \(%val as
 compile [%var mod= %val] to code: "\(%var as lua) = \(%var as lua) % \(%val as lua);"
 
 # Binary Operators
-lua block ".."
+lua do> ".."
     |local binops = {"-","/","<","<=",">",">=","^",{"===","=="},{"!==","~="},{"mod","%"}};
     |for _,op in ipairs(binops) do;
     |    local nomsu_alias = op;
@@ -69,7 +69,7 @@ compile [%a != %b] to: "(not nomsu.utils.equivalent(\(%a as lua), \(%b as lua)))
 
 # Commutative Operators defined for up to 8 operands
 # TODO: work out solution for commutative operators using more clever macros
-lua block ".."
+lua do> ".."
     |local max_operands = 8;
     |local comops = {"+","*","and","or"};
     |for _,_op in ipairs(comops) do;
@@ -88,7 +88,7 @@ lua block ".."
     |end;
 
 # Chained compairsions (e.g. x < y <= z) are defined up to 3 operands
-lua block ".."
+lua do> ".."
     |local max_operands = 3;
     |for _,chainers in ipairs({{"<","<="},{">",">="}}) do;
     |    local function recurse(chainers, chain)

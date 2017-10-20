@@ -3,7 +3,7 @@ require "lib/secrets.nom"
 
 # Plurals
 with secrets:
-    lua block ".."
+    lua do> ".."
         |local endings = setmetatable({x="es",c="es",s="es"}, {__index=function() return "s"; end});
         |secrets.plurals = setmetatable({}, {__index=function(self,key)
         |    return key..endings[key:sub(-1)];
