@@ -62,6 +62,10 @@ compile [floor %] to: "math.floor(\(% as lua))"
 compile [round %, % rounded] to: "math.floor(\(% as lua) + .5)"
 rule [%n rounded to the nearest %rounder] =:
     =lua "(\(%rounder))*math.floor(\(%n)/\(%rounder) + .5)"
+compile [tau] to: "(2*math.pi)"
+compile [pi] to: "math.pi"
+compile [e] to: "math.e"
+compile [golden ratio, phi] to: "((1 + math.sqrt(5)) / 2)"
 
 # Common utility functions
 compile [sum of %items, sum %items] to: "nomsu.utils.sum(\(%items as lua))"
