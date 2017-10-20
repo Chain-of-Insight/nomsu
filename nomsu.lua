@@ -808,8 +808,10 @@ end)]]):format(concat(lua_bits, "\n"))
         local _list_0 = self.callstack
         for _index_0 = 1, #_list_0 do
           local c = _list_0[_index_0]
-          _accum_0[_len_0] = #c[2]
-          _len_0 = _len_0 + 1
+          if c ~= "#macro" then
+            _accum_0[_len_0] = #c[2]
+            _len_0 = _len_0 + 1
+          end
         end
         return _accum_0
       end)())

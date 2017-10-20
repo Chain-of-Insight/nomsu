@@ -584,7 +584,7 @@ end)]])\format(concat(lua_bits, "\n"))
         if msg
             @errorln(colored.bright colored.yellow colored.onred msg)
         @errorln("Callstack:")
-        maxlen = utils.max([#c[2] for c in *@callstack])
+        maxlen = utils.max([#c[2] for c in *@callstack when c != "#macro"])
         for i=#@callstack,1,-1
             if @callstack[i] != "#macro"
                 @errorln "    #{"%-#{maxlen}s"\format @callstack[i][2]}| #{@callstack[i][1]}"
