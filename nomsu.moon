@@ -600,18 +600,28 @@ end)]])\format(concat(lua_bits, "\n"))
 
     initialize_core: =>
         -- Sets up some core functionality
+        nomsu_string_as_lua = (code)=>
+            concat_parts = {}
+            for bit in *code.value
+                if type(bit) == "string"
+                    insert concat_parts, bit
+                else
+                    expr, statement = @tree_to_lua bit
+                    if statement
+                        @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
+                    insert concat_parts, expr
+            return concat(concat_parts)
+
         -- Uses named local functions to help out callstack readability
         lua_code = (vars)=>
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
-            lua = @tree_to_value(vars.code, inner_vars)
+            lua = nomsu_string_as_lua(@, vars.code)
             return nil, lua
-        @defmacro "lua > %code", lua_code
+        @defmacro "lua> %code", lua_code
 
         lua_value = (vars)=>
-            inner_vars = setmetatable({}, {__index:(_,key)-> "vars[#{repr(key)}]"})
-            lua = @tree_to_value(vars.code, inner_vars)
+            lua = nomsu_string_as_lua(@, vars.code)
             return lua, nil
-        @defmacro "= lua %code", lua_value
+        @defmacro "=lua %code", lua_value
 
         run_file = (vars)=>
             if vars.filename\match(".*%.lua")

@@ -16,13 +16,22 @@ lua> ".."
 rule [escaped parse %shorthand as %longhand] =:
     lua> ".."
         |local aliases = nomsu:get_stubs(nomsu:typecheck(vars, "shorthand", "List").value);
-        |if #vars.longhand.value ~= 1 then;
-        |    nomsu:error("Expected only 1 line to parse to, but got "..tostring(#vars.longhand.value));
-        |end;
-        |local template = nomsu:typecheck(vars, "longhand", "Thunk").value[1];
+        |local template = nomsu:typecheck(vars, "longhand", "Thunk").value;
         |local function parsing_as(nomsu, vars)
-        |    local replacement = nomsu:replaced_vars(template, vars);
-        |    return nomsu:tree_to_lua(replacement);
+        # Single expression/statement
+        |    if #template == 1 then;
+        |        local replacement = nomsu:replaced_vars(template[1], vars);
+        |        return nomsu:tree_to_lua(replacement);
+        |    end
+        # Multiple statements
+        |   local lua_bits = {};
+        |   for _,bit in ipairs(template) do;
+        |       bit = nomsu:replaced_vars(bit, vars);
+        |       local expr, statement = nomsu:tree_to_lua(bit);
+        |       if statement then; table.insert(lua_bits, statement); end;
+        |       if expr then; table.insert(lua_bits, "ret = "..expr..";"); end;
+        |   end;
+        |   return nil, table.concat(lua_bits, "\\n");
         |end;
         |nomsu:defmacro(aliases, parsing_as, template.src);
 escaped parse \[parse %shorthand as %longhand] as \: escaped parse \%shorthand as \%longhand
@@ -56,10 +65,10 @@ compile [repr %obj] to:
 compile [type %obj, type of %obj] to:
     "type(\(%obj as lua))"
 
-parse [lua do> %block] as: lua> ".."
-    |do;
-    |    \(%block)
-    |end;
+parse [lua do> %block] as:
+    lua> "do;"
+    lua> %block
+    lua> "end;"
 rule [%tree as lua statement] =:
     lua do> ".."
         |local _,statement = nomsu:tree_to_lua(\(%tree));
