@@ -159,6 +159,8 @@ rule [%items sorted by %key] =:
     %copy = (% for all %items)
     sort %copy by %key
     %copy
+rule [unique %items] =:
+    keys in (dict from entries ([%,yes] for all %items))
 
 # Metatable stuff
 compile [counter] to: "setmetatable({}, {__index=function() return 0; end})"

@@ -5,15 +5,16 @@ require "lib/collections.nom"
 
 # Permission functions
 rule [standardize rules %rules] =:
-    if (=lua "type(vars.rules) == 'string'"): %rules = [%rules]
+    if ((type of %rules) == "string"): %rules = [%rules]
     (nomsu "get_stub" [%]) for all %rules
-    %set = []
+    %result = []
     for %rule in %rules:
         %stub = (nomsu "get_stub" [%rule])
-        %aliases = (((nomsu's "defs")->%stub)->"aliases")
-        for all %aliases: %set -> % = (yes)
-    keys in %set
-
+        %def = ((nomsu's "defs")->%stub)
+        assert %def "Undefined rule: \(%stub)"
+        %aliases = (%def's "aliases")
+        for all %aliases: add % to %result
+    unique %result
 
 rule [restrict %rules to within %elite_rules] =:
     %rules = (standardize rules %rules)
