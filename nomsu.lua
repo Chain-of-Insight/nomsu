@@ -706,7 +706,7 @@ end)]]):format(concat(lua_bits, "\n"))
         self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        local stub = x:gsub("([" .. tostring(wordbreaker) .. "]+)", " %1 "):gsub("%%%S+", "%%"):gsub("%s+", " "):gsub("%s*$", "")
+        local stub = x:gsub("([" .. tostring(wordbreaker) .. "]+)", " %1 "):gsub("%%%S+", "%%"):gsub("%s+", " "):gsub("^%s*", ""):gsub("%s*$", "")
         local arg_names
         do
           local _accum_0 = { }
@@ -843,7 +843,7 @@ end)]]):format(concat(lua_bits, "\n"))
         local lua = self:tree_to_value(vars.code, inner_vars)
         return nil, lua
       end
-      self:defmacro("lua code %code", lua_code)
+      self:defmacro("lua > %code", lua_code)
       local lua_value
       lua_value = function(self, vars)
         local inner_vars = setmetatable({ }, {
@@ -854,7 +854,7 @@ end)]]):format(concat(lua_bits, "\n"))
         local lua = self:tree_to_value(vars.code, inner_vars)
         return lua, nil
       end
-      self:defmacro("lua expr %code", lua_value)
+      self:defmacro("= lua %code", lua_value)
       local run_file
       run_file = function(self, vars)
         if vars.filename:match(".*%.lua") then
