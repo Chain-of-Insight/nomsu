@@ -693,7 +693,7 @@ if arg
         if args.flags["-p"]
             c.write = _write
 
-    if not args.input or args.flags["-i"]
+    if args.flags["-i"]
         -- REPL
         c\run('require "lib/core.nom"', "stdin")
         while true

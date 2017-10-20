@@ -1017,7 +1017,7 @@ if arg then
       c.write = _write
     end
   end
-  if not args.input or args.flags["-i"] then
+  if args.flags["-i"] then
     c:run('require "lib/core.nom"', "stdin")
     while true do
       local buff = ""
