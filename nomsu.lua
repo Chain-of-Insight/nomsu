@@ -348,7 +348,7 @@ do
       local _list_0 = self.callstack
       for _index_0 = 1, #_list_0 do
         local caller = _list_0[_index_0]
-        if whiteset[caller[1]] then
+        if caller ~= "#macro" and whiteset[caller[1]] then
           return true
         end
       end
@@ -369,7 +369,7 @@ do
       local _list_0 = self.callstack
       for _index_0 = 1, #_list_0 do
         local caller = _list_0[_index_0]
-        if whiteset[caller[1]] then
+        if caller ~= "#macro" and whiteset[caller[1]] then
           return true
         end
       end

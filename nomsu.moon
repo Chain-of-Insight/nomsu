@@ -274,7 +274,7 @@ class NomsuCompiler
         -- TODO: maybe optimize this by making the callstack a Counter and using a 
         --    move-to-front optimization on the whitelist to check most likely candidates sooner
         for caller in *@callstack
-            if whiteset[caller[1]] then return true
+            if caller != "#macro" and whiteset[caller[1]] then return true
         @error "You do not have the authority to call: #{stub}"
 
     check_permission: (fn_def)=>
@@ -288,7 +288,7 @@ class NomsuCompiler
         -- TODO: maybe optimize this by making the callstack a Counter and using a 
         --    move-to-front optimization on the whitelist to check most likely candidates sooner
         for caller in *@callstack
-            if whiteset[caller[1]] then return true
+            if caller != "#macro" and whiteset[caller[1]] then return true
         return false
 
     parse: (str, filename)=>
