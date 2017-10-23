@@ -25,13 +25,13 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..col
 -- use actual variables instead of a vars table
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- improve indentation of generated lua code
--- provide way to run precompiled nomsu -> lua code from nomsu
 -- better scoping?
 -- better error reporting
 -- fix propagation of filename for error reporting
 -- add line numbers of function calls
 -- type checking?
 -- Fix compiler bug that breaks when file ends with a block comment
+-- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
