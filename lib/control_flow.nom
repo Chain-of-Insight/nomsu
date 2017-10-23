@@ -4,24 +4,24 @@ require "lib/utils.nom"
 
 # Conditionals
 compile [if %condition %if_body] to code: ".."
-    |if \(%condition as lua) then;
+    |if \(%condition as lua) then
     |\(%if_body as lua statements)
-    |end;--end if
+    |end --end if
 compile [unless %condition %body] to code: ".."
-    |if not (\(%condition as lua)) then;
+    |if not (\(%condition as lua)) then
     |\(%body as lua statements)
-    |end;--end if
+    |end --end if
 
 compile [if %condition %if_body else %else_body, unless %condition %else_body else %if_body] to code: ".."
-    |if \(%condition as lua) then;
+    |if \(%condition as lua) then
     |\(%if_body as lua statements)
-    |else;
+    |else
     |\(%else_body as lua statements)
-    |end;--end if
+    |end --end if
 
 # Return
-compile [return] to code: "do; return; end;"
-compile [return %return_value] to code: "do; return \(%return_value as lua); end;"
+compile [return] to code: "do return; end"
+compile [return %return_value] to code: "do return \(%return_value as lua); end"
 
 # GOTOs
 compile [-> %label] to code: ".."
@@ -32,13 +32,13 @@ compile [go to %label] to code: ".."
 rule [tree %tree has function call %call] =:
     lua> ".."
         |local target = (\(%call)).value;
-        |for subtree,_ in coroutine.wrap(function() nomsu:walk_tree(\(%tree)); end) do;
+        |for subtree,_ in coroutine.wrap(function() nomsu:walk_tree(\(%tree)); end) do
         |    if type(subtree) == 'table' and subtree.type == "FunctionCall"
-        |    and nomsu.utils.equivalent(subtree.value, target, 2) then;
+        |    and nomsu.utils.equivalent(subtree.value, target, 2) then
         |        return true;
-        |    end;
-        |end;
-        |do; return false; end;
+        |    end
+        |end
+        |do return false; end
 
 # While loops
 compile [do next repeat-loop] to code: "goto continue_repeat;"
@@ -47,15 +47,15 @@ compile [repeat while %condition %body] to code:
     %continue_labels = (..)
         "\n::continue_repeat::;" if (tree %body has function call \(do next repeat-loop)) else ""
     %code = ".."
-        |while \(%condition as lua) do;
+        |while \(%condition as lua) do
         |\(%body as lua statements)\(%continue_labels)
-        |end;--while-loop
+        |end --while-loop
     if (tree %body has function call \(stop repeat-loop)):
         return ".."
-            |do;--while-loop label scope
+            |do --while-loop label scope
             |\(%code)
             |::stop_repeat::;
-            |end;--while-loop label scope
+            |end --while-loop label scope
     return %code
 parse [repeat %body] as: repeat while (true) %body
 parse [repeat until %condition %body] as: repeat while (not %condition) %body
@@ -79,20 +79,20 @@ compile [..]
     if (tree %body has function call (nomsu "replaced_vars" [\(do next %), =lua "{['']=\(%var)}"])):
         %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
     %code = ".."
-        |for i=\(%start as lua),\(%stop as lua),\(%step as lua) do;
+        |for i=\(%start as lua),\(%stop as lua),\(%step as lua) do
         # This trashes the loop variables, just like in Python.
         |\(%var as lua) = i;
         |\(%body as lua statements)\(%continue_labels)
-        |end;--numeric for-loop
+        |end --numeric for-loop
     %stop_labels = ""
     if (tree %body has function call \(stop for-loop)):
         %stop_labels join= "\n::stop_for::;"
     if (tree %body has function call (nomsu "replaced_vars" [\(stop %), =lua "{['']=\(%var)}"])):
         %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
     if (%stop_labels != ""): ".."
-        |do;--for-loop label scope
+        |do --for-loop label scope
         |\(%code)\(%stop_labels)
-        |end;--for-loop label scope
+        |end --for-loop label scope
     ..else: %code
 parse [for %var from %start to %stop %body] as: for %var from %start to %stop via 1 %body
 parse [..]
@@ -108,20 +108,20 @@ compile [for %var in %iterable %body] to code:
     if (tree %body has function call (nomsu "replaced_vars" [\(do next %), =lua "{['']=\(%var)}"])):
         %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
     %code = ".."
-        |for i,value in ipairs(\(%iterable as lua)) do;
+        |for i,value in ipairs(\(%iterable as lua)) do
         # This trashes the loop variables, just like in Python.
         |\(%var as lua) = value;
         |\(%body as lua statements)\(%continue_labels)
-        |end;--foreach-loop
+        |end --foreach-loop
     %stop_labels = ""
     if (tree %body has function call \(stop for-loop)):
         %stop_labels join= "\n::stop_for::;"
     if (tree %body has function call (nomsu "replaced_vars" [\(stop %), =lua "{['']=\(%var)}"])):
         %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
     if (%stop_labels != ""): ".."
-        |do;--for-loop label scope
+        |do --for-loop label scope
         |\(%code)\(%stop_labels)
-        |end;--for-loop label scope
+        |end --for-loop label scope
     ..else: %code
 parse [for all %iterable %body] as: for % in %iterable %body
 
@@ -151,7 +151,7 @@ compile [when %body] to code:
         if (=lua "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
             %result join= ".."
                 |
-                |else;
+                |else
                 |\(%action as lua statements)
             stop for-loop
         ..else:
@@ -160,14 +160,14 @@ compile [when %body] to code:
                 %condition join= " or \(% as lua)"
             %result join= ".."
                 |
-                |\("if" if %first else "elseif") \(%condition) then;
+                |\("if" if %first else "elseif") \(%condition) then
                 |\(%action as lua statements)
 
         %fallthroughs = []
         %first = (no)
 
     if (%result != ""):
-        %result join= "\nend;"
+        %result join= "\nend"
     %result
 
 # Switch statement
@@ -195,7 +195,7 @@ compile [when %branch_value == ? %body] to code:
         if (=lua "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
             %result join= ".."
                 |
-                |else;
+                |else
                 |\(%action as lua statements)
             stop for-loop
         ..else:
@@ -204,7 +204,7 @@ compile [when %branch_value == ? %body] to code:
                 %condition join= " or (branch_value == \(% as lua))"
             %result join= ".."
                 |
-                |\("if" if %first else "elseif") \(%condition) then;
+                |\("if" if %first else "elseif") \(%condition) then
                 |\(%action as lua statements)
 
         %fallthroughs = []
@@ -212,17 +212,17 @@ compile [when %branch_value == ? %body] to code:
 
     if (%result != ""):
         %result = ".."
-            |do;--when == ?
+            |do --when == ?
             |local branch_value = \(%branch_value as lua);\(%result)
-            |end;
-            |end;--when == ?
+            |end
+            |end --when == ?
     %result
 
 # With statement
 compile [with %thing = %value %action] to code: ".."
-    |do;
+    |do
     |    local old_value = \(%thing as lua);
     |    \(%thing as lua) = \(%value as lua);
     |    \(%action as lua statements);
     |    \(%thing as lua) = old_value;
-    |end;
+    |end

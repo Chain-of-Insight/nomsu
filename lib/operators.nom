@@ -21,11 +21,11 @@ compile [..]
     #.. Note: this uses a function instead of (condition and if_expr or else_expr)
         because that breaks if %if_expr is falsey.
     |(function(nomsu, vars)
-    |    if \(%condition as lua) then;
+    |    if \(%condition as lua) then
     |        return \(%when_true_expr as lua);
-    |    else;
+    |    else
     |        return \(%when_false_expr as lua);
-    |    end;
+    |    end
     |end)(nomsu, vars)
 
 # Indexing:
@@ -46,15 +46,15 @@ compile [%var mod= %val] to code: "\(%var as lua) = \(%var as lua) % \(%val as l
 # Binary Operators
 lua do> ".."
     |local binops = {"-","/","<","<=",">",">=","^",{"===","=="},{"!==","~="},{"mod","%"}};
-    |for _,op in ipairs(binops) do;
+    |for _,op in ipairs(binops) do
     |    local nomsu_alias = op;
     |    if type(op) == 'table' then;
     |        nomsu_alias, op = unpack(op);
-    |    end;
+    |    end
     |    nomsu:defmacro("%a "..nomsu_alias.." %b", (function(nomsu, vars)
     |        return "("..nomsu:tree_to_lua(vars.a).." "..op.." "..nomsu:tree_to_lua(vars.b)..")";
     |    end), [["(\\(%a) ]]..op..[[ \\(%b))"]]);
-    |end;
+    |end
 # TODO: implement OR, XOR, AND for multiple operands
 compile [%a OR %b, %a | %b] to: "bit32.bor(\(%a as lua), \(%b as lua))"
 compile [%a XOR %b] to: "bit32.bxor(\(%a as lua), \(%b as lua))"
@@ -72,54 +72,54 @@ compile [%a != %b] to: "(not nomsu.utils.equivalent(\(%a as lua), \(%b as lua)))
 lua do> ".."
     |local max_operands = 8;
     |local comops = {"+","*","and","or"};
-    |for _,_op in ipairs(comops) do;
+    |for _,_op in ipairs(comops) do
     |    local op = _op;
     |    local spec = "%1 ";
-    |    for n=2,max_operands do;
+    |    for n=2,max_operands do
     |        spec = spec .." "..op.." %"..tostring(n);
     |        nomsu:defmacro(spec, (function(nomsu, vars)
     |            local bits = {};
-    |            for i=1,n do;
+    |            for i=1,n do
     |                table.insert(bits, (nomsu:tree_to_lua(vars[tostring(i)])));
-    |            end;
+    |            end
     |            return "("..table.concat(bits, " "..op.." ")..")";
     |        end));
-    |    end;
-    |end;
+    |    end
+    |end
 
 # Chained compairsions (e.g. x < y <= z) are defined up to 3 operands
 lua do> ".."
     |local max_operands = 3;
-    |for _,chainers in ipairs({{"<","<="},{">",">="}}) do;
+    |for _,chainers in ipairs({{"<","<="},{">",">="}}) do
     |    local function recurse(chainers, chain)
     # The 1-op versions are already more efficiently defined, and a 0-op version doesnt make sense
     |        if #chain >= 2 then;
     |            local spec = "%1";
-    |            for i,op in ipairs(chain) do;
+    |            for i,op in ipairs(chain) do
     |                spec = spec .. " "..op.." %"..tostring(i+1);
-    |            end;
+    |            end
     # Chained comparisons need to be functions to avoid re-evaluating their arguments :\
     |            nomsu:def(spec, function(nomsu, vars)
-    |                for i,op in ipairs(chain) do;
+    |                for i,op in ipairs(chain) do
     |                    local a, b, result = vars[i], vars[i+1];
     |                    if     op == "<"  then; result = a < b;
     |                    elseif op == "<=" then; result = a <= b;
     |                    elseif op == ">"  then; result = a > b;
-    |                    elseif op == ">=" then; result = a >= b; end;
+    |                    elseif op == ">=" then; result = a >= b; end
     # Short circuit
-    |                    if not result then; return false; end;
-    |                end;
+    |                    if not result then; return false; end
+    |                end
     |            end);
-    |        end;
-    |        if #chain + 1 >= max_operands then; return; end;
-    |        for _,c in ipairs(chainers) do;
+    |        end
+    |        if #chain + 1 >= max_operands then; return; end
+    |        for _,c in ipairs(chainers) do
     |            table.insert(chain, c);
     |            recurse(chainers, chain);
     |            table.remove(chain);
-    |        end;
-    |    end;
+    |        end
+    |    end
     |    recurse(chainers, {});
-    |end;
+    |end
 
 # Unary operators
 compile [- %] to: "-(\(% as lua))"

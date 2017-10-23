@@ -19,20 +19,20 @@ rule [escaped parse %shorthand as %longhand] =:
         |local template = nomsu:typecheck(vars, "longhand", "Thunk").value;
         |local function parsing_as(nomsu, vars)
         # Single expression/statement
-        |    if #template == 1 then;
+        |    if #template == 1 then
         |        local replacement = nomsu:replaced_vars(template[1], vars);
         |        return nomsu:tree_to_lua(replacement);
         |    end
         # Multiple statements
         |   local lua_bits = {};
-        |   for _,bit in ipairs(template) do;
+        |   for _,bit in ipairs(template) do
         |       bit = nomsu:replaced_vars(bit, vars);
         |       local expr, statement = nomsu:tree_to_lua(bit);
-        |       if statement then; table.insert(lua_bits, statement); end;
-        |       if expr then; table.insert(lua_bits, "ret = "..expr..";"); end;
-        |   end;
+        |       if statement then table.insert(lua_bits, statement); end
+        |       if expr then table.insert(lua_bits, "ret = "..expr..";"); end
+        |   end
         |   return nil, table.concat(lua_bits, "\\n");
-        |end;
+        |end
         |nomsu:defmacro(aliases, parsing_as, template.src);
 escaped parse \[parse %shorthand as %longhand] as \: escaped parse \%shorthand as \%longhand
 
@@ -48,7 +48,7 @@ rule [escaped compile %macro_def to code %body] =:
         |local aliases = nomsu:get_stubs(nomsu:typecheck(vars, "macro_def", "List").value);
         |local body = nomsu:typecheck(vars, "body", "Thunk");
         |local thunk = nomsu:tree_to_value(body);
-        |local thunk_wrapper = function(nomsu, vars) return nil, thunk(nomsu, vars); end;
+        |local thunk_wrapper = function(nomsu, vars) return nil, thunk(nomsu, vars); end
         |nomsu:defmacro(aliases, thunk_wrapper, body.src);
 parse [compile %macro_def to %body] as: escaped compile \%macro_def to \%body
 parse [compile %macro_def to code %body] as: escaped compile \%macro_def to code \%body
@@ -66,9 +66,9 @@ compile [type %obj, type of %obj] to:
     "type(\(%obj as lua))"
 
 parse [lua do> %block] as:
-    lua> "do;"
+    lua> "do"
     lua> %block
-    lua> "end;"
+    lua> "end"
 rule [%tree as lua statement] =:
     lua do> ".."
         |local _,statement = nomsu:tree_to_lua(\(%tree));
@@ -77,11 +77,11 @@ rule [%tree as lua statements] =:
     lua do> ".."
         |local lua_bits = {};
         |local statements = nomsu:typecheck(vars, "tree", "Thunk").value;
-        |for _,bit in ipairs(statements) do;
+        |for _,bit in ipairs(statements) do
         |    local expr, statement = nomsu:tree_to_lua(bit);
-        |    if statement then; table.insert(lua_bits, statement); end;
-        |    if expr then; table.insert(lua_bits, "ret = "..expr..";"); end;
-        |end;
+        |    if statement then table.insert(lua_bits, statement); end
+        |    if expr then table.insert(lua_bits, "ret = "..expr..";"); end
+        |end
         |return table.concat(lua_bits, "\\n");
 
 compile [nomsu] to: "nomsu"
@@ -92,27 +92,27 @@ compile [nomsu %method %args] to: "nomsu[\(%method as lua)](nomsu, unpack(\(%arg
 rule [help %rule] =:
     lua do> ".."
         |local fn_def = nomsu.defs[nomsu:get_stub(vars.rule)]
-        |if not fn_def then;
+        |if not fn_def then
         |    nomsu:writeln("Rule not found: "..nomsu:repr(vars.rule));
-        |else;
+        |else
         |    local template = fn_def.is_macro and "compile %s to%s" or "rule %s =%s";
         |    local src = fn_def.src or ":\\n    <unknown source code>";
-        |    if src:sub(1,1) ~= ":" and fn_def.is_macro then; template = "parse %s as: %s"; end;
+        |    if src:sub(1,1) ~= ":" and fn_def.is_macro then template = "parse %s as: %s"; end
         |    nomsu:writeln(template:format(nomsu:repr(fn_def.stub), src));
-        |end;
+        |end
 
 # Compiler tools
 parse [eval %code, run %code] as: nomsu "run" [%code]
 rule [source code from tree %tree] =:
     lua do> ".."
         |local _,_,leading_space = vars.tree.src:find("\\n(%s*)%S");
-        |if leading_space then;
+        |if leading_space then
         |    local chunk1, chunk2 = vars.tree.src:match(":%s*([^\\n]*)(\\n.*)");
         |    chunk2 = chunk2:gsub("\\n"..leading_space, "\\n");
         |    return chunk1..chunk2.."\\n";
-        |else;
+        |else
         |    return vars.tree.src:match(":%s*(%S.*)").."\\n";
-        |end;
+        |end
 parse [source code %body] as: source code from tree \%body
 
 parse [parse tree %code] as: nomsu "tree_to_str" [\%code]
