@@ -360,7 +360,7 @@ return (function(nomsu, vars)
 local ret;
 %s
 return ret;
-end);]])\format(concat(buffer, "\n"))
+end);]])\format(concat(buffer, ""))
         return return_value, lua_code, vars
     
     tree_to_value: (tree, vars)=>
@@ -371,6 +371,107 @@ end);]])\format(concat(buffer, "\n"))
         if not lua_thunk
             @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{colored.red err}")
         return (lua_thunk!)(self, vars or {})
+
+    tree_to_nomsu: (tree, force_inline=false)=>
+        -- Return <nomsu code>, <is safe for inline use>
+        indent = (s)->
+            s\gsub("\n","\n    ")
+        assert tree, "No tree provided."
+        if not tree.type
+            @errorln debug.traceback()
+            @error "Invalid tree: #{repr(tree)}"
+        switch tree.type
+            when "File"
+                return concat([@tree_to_nomsu(v, force_inline) for v in *tree.value], "\n"), false
+            
+            when "Nomsu"
+                inside, inline = @tree_to_nomsu(tree.value, force_inline)
+                return "\\#{inside}", inline
+
+            when "Thunk"
+                if force_inline
+                    return "{#{concat([@tree_to_nomsu(v, true) for v in *tree.value], "; ")}", true
+                else
+                    return ":"..indent("\n"..concat([@tree_to_nomsu v for v in *tree.value], "\n")), false
+
+            when "FunctionCall"
+                buff = ""
+                sep = ""
+                inline = true
+                do_arg = (arg)->
+
+                for arg in *tree.value
+                    nomsu, arg_inline = @tree_to_nomsu(arg, force_inline)
+                    buff ..= sep
+                    if arg_inline
+                        sep = " "
+                    else
+                        inline = false
+                        sep = "\n.."
+                    if arg.type == 'FunctionCall'
+                        if arg_inline
+                            buff ..= "(#{nomsu})"
+                        else
+                            buff ..= "(..)\n    #{indent nomsu}"
+                    else
+                        buff ..= nomsu
+                return buff, inline
+
+            when "String"
+                buff = "\""
+                longbuff = "\"..\"\n    |"
+                inline = true
+                for bit in *tree.value
+                    if type(bit) == "string"
+                        bit = bit\gsub("\\","\\\\")
+                        buff ..= bit\gsub("\n","\\n")\gsub("\"","\\\"")
+                        longbuff ..= bit\gsub("\n","\n    |")
+                    else
+                        inside, bit_inline = @tree_to_nomsu(bit, force_inline)
+                        inline and= bit_inline
+                        buff ..= "\\(#{inside})"
+                        longbuff ..= "\\(#{inside})"
+                buff ..= "\""
+                if force_inline or (inline and #buff <= 90)
+                    return buff, true
+                else
+                    return longbuff, false
+
+            when "List"
+                buff = "["
+                longbuff = "[..]\n    "
+                longsep = ""
+                longline = 0
+                inline = true
+                for i,bit in ipairs tree.value
+                    nomsu, bit_inline = @tree_to_nomsu(bit, force_inline)
+                    inline and= bit_inline
+                    if inline
+                        if i > 1
+                            buff ..= ", "
+                        buff ..= nomsu
+                    longbuff ..= longsep .. nomsu
+                    longline += #nomsu
+                    longsep = if bit_inline and longline <= 90
+                        ", "
+                    else "\n    "
+                buff ..= "]"
+                if force_inline or (inline and #buff <= 90)
+                    return buff, true
+                else
+                    return longbuff, false
+
+            when "Number"
+                return repr(tree.value), true
+
+            when "Var"
+                return "%#{tree.value}", true
+
+            when "Word"
+                return tree.value, true
+
+            else
+                @error("Unknown/unimplemented thingy: #{tree.type}")
 
     tree_to_lua: (tree)=>
         -- Return <lua code for value>, <additional lua code>
@@ -383,7 +484,7 @@ end);]])\format(concat(buffer, "\n"))
                 error("Should not be converting File to lua through this function.")
             
             when "Nomsu"
-                return repr(tree.value), nil
+                return "nomsu:parse(#{repr tree.value.src}).value[1]", nil
 
             when "Thunk"
                 lua_bits = {}

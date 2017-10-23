@@ -467,7 +467,7 @@ end);]]):format(statements or "", expr or "ret")
 local ret;
 %s
 return ret;
-end);]]):format(concat(buffer, "\n"))
+end);]]):format(concat(buffer, ""))
       return return_value, lua_code, vars
     end,
     tree_to_value = function(self, tree, vars)
@@ -481,6 +481,154 @@ end);]]):format(concat(buffer, "\n"))
       end
       return (lua_thunk())(self, vars or { })
     end,
+    tree_to_nomsu = function(self, tree, force_inline)
+      if force_inline == nil then
+        force_inline = false
+      end
+      local indent
+      indent = function(s)
+        return s:gsub("\n", "\n    ")
+      end
+      assert(tree, "No tree provided.")
+      if not tree.type then
+        self:errorln(debug.traceback())
+        self:error("Invalid tree: " .. tostring(repr(tree)))
+      end
+      local _exp_0 = tree.type
+      if "File" == _exp_0 then
+        return concat((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = tree.value
+          for _index_0 = 1, #_list_0 do
+            local v = _list_0[_index_0]
+            _accum_0[_len_0] = self:tree_to_nomsu(v, force_inline)
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)(), "\n"), false
+      elseif "Nomsu" == _exp_0 then
+        local inside, inline = self:tree_to_nomsu(tree.value, force_inline)
+        return "\\" .. tostring(inside), inline
+      elseif "Thunk" == _exp_0 then
+        if force_inline then
+          return "{" .. tostring(concat((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            local _list_0 = tree.value
+            for _index_0 = 1, #_list_0 do
+              local v = _list_0[_index_0]
+              _accum_0[_len_0] = self:tree_to_nomsu(v, true)
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)(), "; ")), true
+        else
+          return ":" .. indent("\n" .. concat((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            local _list_0 = tree.value
+            for _index_0 = 1, #_list_0 do
+              local v = _list_0[_index_0]
+              _accum_0[_len_0] = self:tree_to_nomsu(v)
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)(), "\n")), false
+        end
+      elseif "FunctionCall" == _exp_0 then
+        local buff = ""
+        local sep = ""
+        local inline = true
+        local do_arg
+        do_arg = function(arg) end
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local arg = _list_0[_index_0]
+          local arg_inline
+          nomsu, arg_inline = self:tree_to_nomsu(arg, force_inline)
+          buff = buff .. sep
+          if arg_inline then
+            sep = " "
+          else
+            inline = false
+            sep = "\n.."
+          end
+          if arg.type == 'FunctionCall' then
+            if arg_inline then
+              buff = buff .. "(" .. tostring(nomsu) .. ")"
+            else
+              buff = buff .. "(..)\n    " .. tostring(indent(nomsu))
+            end
+          else
+            buff = buff .. nomsu
+          end
+        end
+        return buff, inline
+      elseif "String" == _exp_0 then
+        local buff = "\""
+        local longbuff = "\"..\"\n    |"
+        local inline = true
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local bit = _list_0[_index_0]
+          if type(bit) == "string" then
+            bit = bit:gsub("\\", "\\\\")
+            buff = buff .. bit:gsub("\n", "\\n"):gsub("\"", "\\\"")
+            longbuff = longbuff .. bit:gsub("\n", "\n    |")
+          else
+            local inside, bit_inline = self:tree_to_nomsu(bit, force_inline)
+            inline = inline and bit_inline
+            buff = buff .. "\\(" .. tostring(inside) .. ")"
+            longbuff = longbuff .. "\\(" .. tostring(inside) .. ")"
+          end
+        end
+        buff = buff .. "\""
+        if force_inline or (inline and #buff <= 90) then
+          return buff, true
+        else
+          return longbuff, false
+        end
+      elseif "List" == _exp_0 then
+        local buff = "["
+        local longbuff = "[..]\n    "
+        local longsep = ""
+        local longline = 0
+        local inline = true
+        for i, bit in ipairs(tree.value) do
+          local bit_inline
+          nomsu, bit_inline = self:tree_to_nomsu(bit, force_inline)
+          inline = inline and bit_inline
+          if inline then
+            if i > 1 then
+              buff = buff .. ", "
+            end
+            buff = buff .. nomsu
+          end
+          longbuff = longbuff .. (longsep .. nomsu)
+          longline = longline + #nomsu
+          if bit_inline and longline <= 90 then
+            longsep = ", "
+          else
+            longsep = "\n    "
+          end
+        end
+        buff = buff .. "]"
+        if force_inline or (inline and #buff <= 90) then
+          return buff, true
+        else
+          return longbuff, false
+        end
+      elseif "Number" == _exp_0 then
+        return repr(tree.value), true
+      elseif "Var" == _exp_0 then
+        return "%" .. tostring(tree.value), true
+      elseif "Word" == _exp_0 then
+        return tree.value, true
+      else
+        return self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
+      end
+    end,
     tree_to_lua = function(self, tree)
       assert(tree, "No tree provided.")
       if not tree.type then
@@ -491,7 +639,7 @@ end);]]):format(concat(buffer, "\n"))
       if "File" == _exp_0 then
         return error("Should not be converting File to lua through this function.")
       elseif "Nomsu" == _exp_0 then
-        return repr(tree.value), nil
+        return "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ").value[1]", nil
       elseif "Thunk" == _exp_0 then
         local lua_bits = { }
         local _list_0 = tree.value
