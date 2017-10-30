@@ -118,9 +118,9 @@ nomsu = [=[
 
     number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
 
-    -- Variables can be nameless (i.e. just %) and can't contain apostrophes
-    -- which is a hack to allow %foo's to parse as "%foo" and "'s" separately
-    variable <- ({ ("%" { ((%wordbreaker+) / (%wordchar+))? }) }) -> Var
+    -- Variables can be nameless (i.e. just %) and can't contain wordbreakers like apostrophe
+    -- which is a hack to allow %'s to parse as "%" and "' s" separately
+    variable <- ({ ("%" { %wordchar* }) }) -> Var
 
     inline_list <- ({ {|
          ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")

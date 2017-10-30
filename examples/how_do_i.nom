@@ -203,9 +203,9 @@ rule [%what_she_said is what she said] =:
 
 #.. The language only reserves []{}().,:;% as special characters, so functions
     can have really funky names!
-rule [>> %foo_bar $$$^ --> %@ @& _~-^-~_~-^ %1 !] =:
+rule [>> %foo_bar $$$^ --> % @& _~-^-~_~-^ %1 !] =:
     say %foo_bar
-    say %@
+    say %
     say %1
 
 >> "wow" $$$^ --> "so flexible!" @& _~-^-~_~-^ "even numbers can be variables!" !
