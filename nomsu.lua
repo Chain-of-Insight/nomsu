@@ -242,6 +242,7 @@ do
       assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
       local canonical_args = nil
       local aliases = { }
+      self.def_number = self.def_number + 1
       for _index_0 = 1, #signature do
         local _des_0 = signature[_index_0]
         local stub, arg_names
@@ -269,12 +270,32 @@ do
           arg_names = arg_names,
           src = src,
           is_macro = is_macro,
-          aliases = aliases
+          aliases = aliases,
+          def_number = self.def_number
         }
       end
     end,
     defmacro = function(self, signature, thunk, src)
       return self:def(signature, thunk, src, true)
+    end,
+    serialize_defs = function(self, after)
+      if after == nil then
+        after = 0
+      end
+      defs = { }
+      for _, def in pairs(self.defs) do
+        defs[def.def_number] = def.src or ""
+      end
+      local keys = utils.keys(defs)
+      table.sort(keys)
+      local buff = { }
+      for _index_0 = 1, #keys do
+        local i = keys[_index_0]
+        if i > after and #defs[i] > 0 then
+          insert(buff, defs[i])
+        end
+      end
+      return concat(buff, "\n")
     end,
     call = function(self, stub, line_no, ...)
       local def = self.defs[stub]
@@ -1063,6 +1084,7 @@ end)]]):format(concat(lua_bits, "\n"))
       self.defs = setmetatable({ }, {
         __index = parent and parent.defs
       })
+      self.def_number = 0
       self.callstack = { }
       self.debug = false
       self.utils = utils

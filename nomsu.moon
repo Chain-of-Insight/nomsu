@@ -194,6 +194,7 @@ class NomsuCompiler
         @write = (...)=> io.write(...)
         @write_err = (...)=> io.stderr\write(...)
         @defs = setmetatable({}, {__index:parent and parent.defs})
+        @def_number = 0
         @callstack = {}
         @debug = false
         @utils = utils
@@ -219,6 +220,7 @@ class NomsuCompiler
         assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
         canonical_args = nil
         aliases = {}
+        @def_number += 1
         for {stub, arg_names} in *signature
             assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
@@ -228,10 +230,22 @@ class NomsuCompiler
                 assert utils.equivalent(utils.set(arg_names), canonical_args), "Mismatched args"
             else canonical_args = utils.set(arg_names)
             insert aliases, stub
-            @defs[stub] = {:thunk, :stub, :arg_names, :src, :is_macro, :aliases}
+            @defs[stub] = {:thunk, :stub, :arg_names, :src, :is_macro, :aliases, def_number:@def_number}
 
     defmacro: (signature, thunk, src)=>
         @def(signature, thunk, src, true)
+    
+    serialize_defs: (after=0)=>
+        defs = {}
+        for _, def in pairs(@defs)
+            defs[def.def_number] = def.src or ""
+        keys = utils.keys(defs)
+        table.sort(keys)
+        buff = {}
+        for i in *keys
+            if i > after and #defs[i] > 0
+                insert buff, defs[i]
+        return concat buff, "\n"
 
     call: (stub,line_no,...)=>
         def = @defs[stub]

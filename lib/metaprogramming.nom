@@ -9,8 +9,8 @@ lua> ".."
     |    local body = nomsu:typecheck(vars, "body", "Thunk");
     |    return ([[
     |nomsu:def(%s, %s, %s)
-    |]]):format(nomsu:repr(signature), nomsu:tree_to_lua(body), nomsu:repr(body.src)), nil;
-    |end), "<source can be found in lib/metaprogramming.nom>");
+    |]]):format(nomsu:repr(signature), nomsu:tree_to_lua(body), nomsu:repr(("rule %s\\n..=%s"):format(vars.signature.src, vars.body.src))), nil;
+    |end));
 
 # Rule to make nomsu macros:
 rule [escaped parse %shorthand as %longhand] =:
@@ -33,7 +33,7 @@ rule [escaped parse %shorthand as %longhand] =:
         |   end
         |   return nil, table.concat(lua_bits, "\\n");
         |end
-        |nomsu:defmacro(aliases, parsing_as, template.src);
+        |nomsu:defmacro(aliases, parsing_as, ("parse %s\\n..as %s"):format(vars.shorthand.src, vars.longhand.src));
 escaped parse \[parse %shorthand as %longhand] as \: escaped parse \%shorthand as \%longhand
 
 # Rule to make lua macros:
@@ -42,14 +42,14 @@ rule [escaped compile %macro_def to %body] =:
         |local aliases = nomsu:get_stubs(nomsu:typecheck(vars, "macro_def", "List").value);
         |local body = nomsu:typecheck(vars, "body", "Thunk");
         |local thunk = nomsu:tree_to_value(body);
-        |nomsu:defmacro(aliases, thunk, body.src);
+        |nomsu:defmacro(aliases, thunk, ("compile %s\\n..to %s"):format(vars.macro_def.src, body.src));
 rule [escaped compile %macro_def to code %body] =:
     lua> ".."
         |local aliases = nomsu:get_stubs(nomsu:typecheck(vars, "macro_def", "List").value);
         |local body = nomsu:typecheck(vars, "body", "Thunk");
         |local thunk = nomsu:tree_to_value(body);
         |local thunk_wrapper = function(nomsu, vars) return nil, thunk(nomsu, vars); end
-        |nomsu:defmacro(aliases, thunk_wrapper, body.src);
+        |nomsu:defmacro(aliases, thunk_wrapper, ("compile %s\\n..to code %s"):format(vars.macro_def.src, body.src));
 parse [compile %macro_def to %body] as: escaped compile \%macro_def to \%body
 parse [compile %macro_def to code %body] as: escaped compile \%macro_def to code \%body
 
