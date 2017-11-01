@@ -22,6 +22,11 @@ parse [join %strs] as: join %strs with glue ""
 compile [capitalize %str, %str capitalized] to:
     "(\(%str as lua)):gsub('%l', string.upper, 1)"
 
+compile [%str with %patt replaced with %sub, %str s/%patt/%sub] to:
+    "((\(%str as lua)):gsub(\(%patt as lua), \(%sub as lua)))"
+compile [%str with %patt replaced with %sub %n times, %str s/%patt/%sub/%n] to:
+    "((\(%str as lua)):gsub(\(%patt as lua), \(%sub as lua), \(%n as lua)))"
+
 compile [say %str] to: ".."
     |nomsu:writeln(nomsu:stringify(\(%str as lua)))
 
@@ -42,6 +47,7 @@ rule [random choice from %elements, random choice %elements, random %elements] =
     =lua "\(%elements)[math.random(#\(%elements))]"
 
 # Math functions
+compile [% as number] to: "tonumber(\(% as lua))"
 compile [abs %, absolute value of %, | % |] to: "math.abs(\(% as lua))"
 compile [sqrt %, square root of %] to: "math.sqrt(\(% as lua))"
 compile [sin %, sine %] to: "math.sin(\(% as lua))"
