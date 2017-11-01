@@ -479,7 +479,12 @@ end);]]):format(statements or "", expr or "ret")
           self:errorln(debug.traceback())
           self:error(ret)
         end
-        insert(buffer, tostring(statements or '') .. "\n" .. tostring(expr and "ret = " .. tostring(expr) .. ";" or ''))
+        if statements then
+          insert(buffer, statements)
+        end
+        if expr then
+          insert(buffer, "ret = " .. tostring(expr) .. ";")
+        end
       end
       if max_operations then
         debug.sethook()
@@ -488,7 +493,7 @@ end);]]):format(statements or "", expr or "ret")
 local ret;
 %s
 return ret;
-end);]]):format(concat(buffer, ""))
+end);]]):format(concat(buffer, "\n"))
       return return_value, lua_code, vars
     end,
     tree_to_value = function(self, tree, vars)
@@ -911,7 +916,7 @@ end)]]):format(concat(lua_bits, "\n"))
         end
         return concat(stub, " "), arg_names
       else
-        return self:error("Unsupported get stub type: " .. tostring(x.type))
+        return self:error("Unsupported get stub type: " .. tostring(x.type) .. " for " .. tostring(repr(x)))
       end
     end,
     get_stubs = function(self, x)

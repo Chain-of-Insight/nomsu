@@ -365,7 +365,10 @@ end);]])\format(statements or "", expr or "ret")
                 @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow statement.src}"
                 @errorln debug.traceback!
                 @error(ret)
-            insert buffer, "#{statements or ''}\n#{expr and "ret = #{expr};" or ''}"
+            if statements
+                insert buffer, statements
+            if expr
+                insert buffer, "ret = #{expr};"
         
         if max_operations
             debug.sethook!
@@ -374,7 +377,7 @@ return (function(nomsu, vars)
 local ret;
 %s
 return ret;
-end);]])\format(concat(buffer, ""))
+end);]])\format(concat(buffer, "\n"))
         return return_value, lua_code, vars
     
     tree_to_value: (tree, vars)=>
@@ -675,7 +678,7 @@ end)]])\format(concat(lua_bits, "\n"))
                             insert stub, "%"
                             arg_names = nil
                 return concat(stub," "), arg_names
-            else @error "Unsupported get stub type: #{x.type}"
+            else @error "Unsupported get stub type: #{x.type} for #{repr x}"
     
     get_stubs: (x)=>
         if type(x) != 'table' then return {{@get_stub(x)}}

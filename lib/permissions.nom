@@ -6,14 +6,14 @@ require "lib/collections.nom"
 # Permission functions
 rule [standardize rules %rules] =:
     if ((type of %rules) == "string"): %rules = [%rules]
-    (nomsu "get_stub" [%]) for all %rules
+    %stubs = (nomsu "get_stubs" [%rules])
     %result = []
-    for %rule in %rules:
-        %stub = (nomsu "get_stub" [%rule])
+    for %stub in %stubs:
         %def = ((nomsu's "defs")->%stub)
-        assert %def "Undefined rule: \(%stub)"
-        %aliases = (%def's "aliases")
-        for all %aliases: add % to %result
+        if %def:
+            %aliases = (%def's "aliases")
+            for all %aliases: add % to %result
+        ..else: add %def to %result
     unique %result
 
 rule [restrict %rules to within %elite_rules] =:
@@ -52,3 +52,7 @@ rule [forbid %pleb_rules to use %rules] =:
             |Cannot individually restrict permissions for \(%) because it is currently
             |available to everyone. Perhaps you meant to use "restrict % to within %" instead?
         for all %pleb_rules: %whiteset's % = (nil)
+
+parse [rule %spec = %body restricted to %elite_rules] as:
+    rule %spec = %body
+    restrict (nomsu "get_stubs" [\%spec]) to within %elite_rules

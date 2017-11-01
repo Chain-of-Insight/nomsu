@@ -27,9 +27,6 @@ compile [%str with %patt replaced with %sub, %str s/%patt/%sub] to:
 compile [%str with %patt replaced with %sub %n times, %str s/%patt/%sub/%n] to:
     "((\(%str as lua)):gsub(\(%patt as lua), \(%sub as lua), \(%n as lua)))"
 
-compile [say %str] to: ".."
-    |nomsu:writeln(nomsu:stringify(\(%str as lua)))
-
 # Number ranges
 compile [%start to %stop by %step, %start to %stop via %step] to: ".."
    |nomsu.utils.range(\(%start as lua), \(%stop as lua), \(%step as lua))

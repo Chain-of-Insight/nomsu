@@ -1,0 +1,10 @@
+require "lib/metaprogramming.nom"
+require "lib/utils.nom"
+require "lib/control_flow.nom"
+require "lib/operators.nom"
+
+compile [say %str] to:
+    if ((%str's "type") == "String"):
+        "nomsu:writeln(\(%str as lua))"
+    ..else:
+        "nomsu:writeln(nomsu:stringify(\(%str as lua)))"
