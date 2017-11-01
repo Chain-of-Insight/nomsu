@@ -52,7 +52,3 @@ rule [forbid %pleb_rules to use %rules] =:
             |Cannot individually restrict permissions for \(%) because it is currently
             |available to everyone. Perhaps you meant to use "restrict % to within %" instead?
         for all %pleb_rules: %whiteset's % = (nil)
-
-parse [rule %spec = %body restricted to %elite_rules] as:
-    rule %spec = %body
-    restrict (nomsu "get_stubs" [\%spec]) to within %elite_rules
