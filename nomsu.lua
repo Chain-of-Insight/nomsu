@@ -1188,6 +1188,7 @@ if arg then
     end
   end
   if args.flags["-i"] then
+    local vars = { }
     c:run('require "lib/core.nom"', "stdin")
     while true do
       local buff = ""
@@ -1203,7 +1204,7 @@ if arg then
         break
       end
       local ok, ret = pcall(function()
-        return c:run(buff, "stdin")
+        return c:run(buff, "stdin", vars)
       end)
       if ok and ret ~= nil then
         print("= " .. repr(ret))

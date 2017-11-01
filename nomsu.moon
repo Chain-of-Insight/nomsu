@@ -810,6 +810,7 @@ if arg
 
     if args.flags["-i"]
         -- REPL
+        vars = {}
         c\run('require "lib/core.nom"', "stdin")
         while true
             buff = ""
@@ -821,7 +822,7 @@ if arg
                 buff ..= line
             if #buff == 0
                 break
-            ok, ret = pcall(-> c\run(buff, "stdin"))
+            ok, ret = pcall(-> c\run(buff, "stdin", vars))
             if ok and ret != nil
                 print "= "..repr(ret)
 
