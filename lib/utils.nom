@@ -126,3 +126,25 @@ lua> ".."
     |        nomsu:defmacro(name, function() return escape end, "");
     |    end;
     |end;
+
+compile [try %action and if it fails %fallback] to code: ".."
+    |do
+    |    local _write_err = nomsu.write_err
+    |    nomsu.write_err = function() end;
+    |    local had_return = true;
+    |    local ok, ret1, ret2 = pcall(function(nomsu, vars)
+    |        local ret
+    |        \(%action as lua statements)
+    |        had_return = false;
+    |        return ret;
+    |    end, nomsu, vars);
+    |    nomsu.write_err = _write_err;
+    |    if not ok then
+    |        \(%fallback as lua statements)
+    |    elseif had_return then
+    |        return ret1, ret2;
+    |    else
+    |        ret = ret1;
+    |    end
+    |end
+
