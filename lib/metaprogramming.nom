@@ -55,7 +55,7 @@ parse [compile %macro_def to code %body] as: escaped compile \%macro_def to code
 
 rule [remove rule %stub] =:
     lua> ".."
-        |local def = nomsu.defs[stub];
+        |local def = nomsu.defs[\(%stub)];
         |for _, alias in ipairs(def.aliases) do
         |    nomsu.defs[alias] = nil;
         |end
