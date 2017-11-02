@@ -424,6 +424,9 @@ do
       if max_operations == nil then
         max_operations = nil
       end
+      if src == "" then
+        return nil, "", vars
+      end
       if max_operations then
         local timeout
         timeout = function()

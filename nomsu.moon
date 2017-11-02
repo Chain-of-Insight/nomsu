@@ -323,6 +323,7 @@ class NomsuCompiler
         return tree
 
     run: (src, filename, vars={}, max_operations=nil)=>
+        if src == "" then return nil, "", vars
         if max_operations
             timeout = ->
                 debug.sethook!
