@@ -1,0 +1,38 @@
+require "lib/metaprogramming.nom"
+require "lib/operators.nom"
+require "lib/control_flow.nom"
+
+compile [<%var> = %value] to code: ".."
+    |nomsu.defs['#vars'][\(repr (%var's "value"))] = \(%value as lua);
+
+compile [<%var>] to: "nomsu.defs['#vars'][\(repr (%var's "value"))]"
+
+compile [str %] to: "tostring(\(% as lua))"
+
+compile [scope] to: "nomsu.defs"
+compile [parent scope] to: "getmetatable(nomsu.defs).__index"
+
+parse [using %scoped do %actions] as:
+    %scope = (=lua "setmetatable({['#vars']=setmetatable({}, {__index=nomsu.defs['#vars']})}, {__index=nomsu.defs})")
+    with (nomsu's "defs") = %scope:
+        do %scoped
+        lua> ".."
+            |getmetatable(nomsu.defs).__newindex = getmetatable(nomsu.defs).__index;
+            |getmetatable(nomsu.defs["#vars"]).__newindex = getmetatable(nomsu.defs["#vars"]).__index;
+        do %actions
+
+parse [scoped %actions] as: using %actions do {pass}
+
+rule [from %filename import %rules] =:
+    using:
+        require %filename
+    ..do:
+        %srcs = ((%'s "src") for %_ = % in (parent scope))
+        for %src in (unique %srcs):
+            run %src
+
+parse [wrap %signature with %body] as:
+    using:
+        run ((nomsu)->*["defs",nomsu "get_stub" [\%signature->*["value",1]],"src"])
+    ..do:
+        rule %signature = %body

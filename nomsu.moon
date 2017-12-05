@@ -324,7 +324,9 @@ class NomsuCompiler
             @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
         insert @callstack, "#macro"
+        old_tree, @defs["#macro_tree"] = @defs["#macro_tree"], tree
         expr, statement = @call(tree.stub, tree.line_no, unpack(args))
+        @defs["#macro_tree"] = old_tree
         remove @callstack
         return expr, statement
 
@@ -808,13 +810,13 @@ end)]])\format(concat(lua_bits, "\n"))
 
     initialize_core: =>
         -- Sets up some core functionality
-        nomsu_string_as_lua = (code, tree)=>
+        nomsu_string_as_lua = (code)=>
             concat_parts = {}
             for bit in *code.value
                 if type(bit) == "string"
                     insert concat_parts, bit
                 elseif type(bit) == "table" and bit.type == "FunctionCall" and bit.src == "__src__"
-                    insert concat_parts, repr(tree.src)
+                    insert concat_parts, repr(@defs["#macro_tree"].src)
                 else
                     expr, statement = @tree_to_lua bit
                     if statement
