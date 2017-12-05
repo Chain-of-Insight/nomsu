@@ -3,52 +3,16 @@ require "lib/control_flow.nom"
 require "lib/operators.nom"
 require "lib/collections.nom"
 
-# Permission functions
-rule [standardize rules %rules] =:
-    if ((type of %rules) == "string"): %rules = [%rules]
-    %stubs = (nomsu "get_stubs" [%rules])
-    %result = []
-    for %stub in %stubs:
-        %def = ((nomsu's "defs")->%stub)
-        if %def:
-            %aliases = (%def's "aliases")
-            for all %aliases: add % to %result
-        ..else: add %def to %result
-    unique %result
+rule [called by %whitelist] =:
+    if ((%whitelist's "type") != "List"): %whitelist = [%whitelist]
+    %defs = (..)
+        dict ([(nomsu's "defs")->(nomsu "get_stub" [%]), yes] for all %whitelist)
+    for %caller in (nomsu's "callstack"):
+        if (%caller == "#macro"): do next %caller
+        if (%defs -> (nomsu "get_stub" [%caller's 1])): return (yes)
+    return (no)
 
-rule [restrict %rules to within %elite_rules] =:
-    %rules = (standardize rules %rules)
-    %elite_rules = (standardize rules %elite_rules)
-    for all (flatten [%elite_rules, %rules]):
-        assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
-    for %rule in %rules:
-        assert (nomsu "check_permission" [%]) ".."
-            |You do not have permission to restrict permissions for function: \(%)
-        ((nomsu) ->* ["defs",%rule,"whiteset"]) = (..)
-            dict ([%, yes] for all %elite_rules)
+parse [fail unless called by %whitelist] as:
+    unless (called by %whitelist): error "Failed to find \(%whitelist) in callstack."
 
-rule [allow %elite_rules to use %rules] =:
-    %rules = (standardize rules %rules)
-    %elite_rules = (standardize rules %elite_rules)
-    for all (flatten [%elite_rules, %rules]):
-        assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
-    for %rule in %rules:
-        assert (nomsu "check_permission" [%rule]) ".."
-            |You do not have permission to grant permissions for function: \(%rule)
-        %whiteset = ((nomsu) ->* ["defs",%rule,"whiteset"])
-        if (not %whiteset): go to next %rule
-        for all %elite_rules: %whiteset -> % = (yes)
 
-rule [forbid %pleb_rules to use %rules] =:
-    %rules = (standardize rules %rules)
-    %pleb_rules = (standardize rules %pleb_rules)
-    for all (flatten [%pleb_rules, %used]):
-        assert ((nomsu's "defs") has key %) "Undefined function: \(%)"
-    for all %rules:
-        assert (nomsu "check_permission" [%]) ".."
-            |You do not have permission to grant permissions for function: \(%)
-        %whiteset = ((nomsu) ->* ["defs",%,"whiteset"])
-        assert %whiteset ".."
-            |Cannot individually restrict permissions for \(%) because it is currently
-            |available to everyone. Perhaps you meant to use "restrict % to within %" instead?
-        for all %pleb_rules: %whiteset's % = (nil)

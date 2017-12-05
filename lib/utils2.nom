@@ -2,9 +2,51 @@ require "lib/metaprogramming.nom"
 require "lib/utils.nom"
 require "lib/control_flow.nom"
 require "lib/operators.nom"
+require "lib/collections.nom"
+
 
 compile [say %str] to:
     if ((%str's "type") == "String"):
         "nomsu:writeln(\(%str as lua))"
     ..else:
         "nomsu:writeln(nomsu:stringify(\(%str as lua)))"
+
+compile [do %action] to code:
+    if ((%action's "type") == "Thunk"):
+        %action as lua statements
+    ..else:
+        "(\(%action as lua))(nomsu, vars);"
+
+# With statement
+compile [with %assignments %action] to code:
+    %data = []
+    for %i = %assignment in (%assignments' "value"):
+        %tokens = (%assignment's "value")
+        %var = (%tokens -> 1)
+        %eq = (%tokens -> 2)
+        assert (=lua "vars.eq and vars.eq.type == 'Word' and vars.eq.value == '='") ".."
+            |Invalid format for 'with' statement. List entries must have the form %var = (value)
+        %value = (%tokens -> 3)
+        add (d{i=%i; var=%var; value=%value}) to %data
+    %foo = (..)
+        join (..)
+            "local old_value\(%->"i") = \((%->"var") as lua); \((%->"var") as lua) = \((%->"value") as lua);"
+            ..for all %data
+        ..with glue "\n    "
+    ".."
+        |do
+        |    \(%foo)
+        |    local fell_through = false;
+        |    local ok, ret1, ret2 = pcall(function(nomsu, vars)
+        |        \(%action as lua statements);
+        |        fell_through = true;
+        |    end, nomsu, vars);
+        |    \(join ("\((%->"var") as lua) = old_value\(%->"i");" for all %data) with glue "\n    ")
+        |    if not ok then nomsu:error(ret1); end
+        |    if not fell_through then
+        |        return ret1, ret2;
+        |    end
+        |end
+parse [with %thing = %value %action] as: with [%thing = %value] %action
+
+

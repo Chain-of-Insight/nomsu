@@ -218,11 +218,48 @@ compile [when %branch_value == ? %body] to code:
             |end --when == ?
     %result
 
-# With statement
-compile [with %thing = %value %action] to code: ".."
+# Try/except
+compile [..]
+    try %action and if it succeeds %success or if it fails %fallback
+    try %action and if it fails %fallback or if it succeeds %success
+..to code: ".."
     |do
-    |    local old_value = \(%thing as lua);
-    |    \(%thing as lua) = \(%value as lua);
-    |    \(%action as lua statements);
-    |    \(%thing as lua) = old_value;
+    |    local fell_through = false;
+    |    local ok, ret1, ret2 = pcall(function(nomsu, vars)
+    |        \(%action as lua statements)
+    |        fell_through = true;
+    |    end, nomsu, vars);
+    |    if ok then
+    |        \(%success as lua statements)
+    |    end
+    |    if not ok then
+    |        \(%fallback as lua statements)
+    |    elseif not fell_through then
+    |        return ret1, ret2;
+    |    end
     |end
+parse [try %action] as:
+    try %action and if it succeeds {pass} or if it fails {pass}
+parse [try %action and if it fails %fallback] as:
+    try %action and if it succeeds {pass} or if it fails %fallback
+parse [try %action and if it succeeds %success] as:
+    try %action and if it succeeds %success or if it fails {pass}
+
+# Do/finally:
+compile [do %action then always %final_action] to code: ".."
+    |do
+    |    local fell_through = false;
+    |    local ok, ret1, ret2 = pcall(function(nomsu, vars)
+    |        \(%action as lua statements)
+    |        fell_through = true;
+    |    end, nomsu, vars);
+    |    local ok2, _ = pcall(function(nomsu, vars)
+    |        \(%final_action as lua statements)
+    |    end, nomsu, vars);
+    |    if not ok then nomsu:error(ret1); end
+    |    if not ok2 then nomsu:error(ret2); end
+    |    if not fell_through then
+    |        return ret1, ret2;
+    |    end
+    |end
+

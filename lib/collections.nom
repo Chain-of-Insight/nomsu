@@ -93,7 +93,7 @@ rule [dict from entries %items] =:
         %dict -> (%pair -> 1) = (%pair -> 2)
     %dict
 
-compile [dict %items] to:
+compile [dict %items, d %items] to:
     if ((%items's "type") == "Thunk"):
         %item_codes = []
         for %func_call in (%items's "value"):

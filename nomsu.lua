@@ -19,6 +19,19 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
+if _VERSION == "Lua 5.1" then
+  local xp = xpcall
+  local xpcall
+  xpcall = function(f, errhandler, ...)
+    local args = {
+      n = select("#", ...),
+      ...
+    }
+    return xp(function(...)
+      return f(unpack(args, 1, args.n))
+    end), errhandler
+  end
+end
 lpeg.setmaxstack(10000)
 local P, V, S, Cg, C, Cp, B, Cmt
 P, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
@@ -166,12 +179,23 @@ local defs = {
     return pos, tostring(CURRENT_FILE) .. ":" .. tostring(line_no)
   end,
   FunctionCall = function(src, line_no, value, errors)
+    local stub = concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #value do
+        local t = value[_index_0]
+        _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), " ")
     return {
       type = "FunctionCall",
       src = src,
       line_no = line_no,
       value = value,
-      errors = errors
+      errors = errors,
+      stub = stub
     }
   end,
   error = function(src, pos, errors, err_msg)
@@ -241,12 +265,22 @@ do
       end
       assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
       local canonical_args = nil
+      local canonical_escaped_args = nil
       local aliases = { }
-      self.def_number = self.def_number + 1
+      self.__class.def_number = self.__class.def_number + 1
+      local def = {
+        thunk = thunk,
+        src = src,
+        is_macro = is_macro,
+        aliases = { },
+        def_number = self.__class.def_number,
+        defs = self.defs
+      }
+      local where_defs_go = ((getmetatable(self.defs) or { }).__newindex) or self.defs
       for _index_0 = 1, #signature do
         local _des_0 = signature[_index_0]
-        local stub, arg_names
-        stub, arg_names = _des_0[1], _des_0[2]
+        local stub, arg_names, escaped_args
+        stub, arg_names, escaped_args = _des_0[1], _des_0[2], _des_0[3]
         assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
         if self.debug then
           self:writeln(tostring(colored.bright("DEFINING RULE:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
@@ -263,37 +297,103 @@ do
         else
           canonical_args = utils.set(arg_names)
         end
-        insert(aliases, stub)
-        self.defs[stub] = {
-          thunk = thunk,
+        if canonical_escaped_args then
+          assert(utils.equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args")
+        else
+          canonical_escaped_args = escaped_args
+          def.escaped_args = escaped_args
+        end
+        insert(def.aliases, stub)
+        local stub_def = setmetatable({
           stub = stub,
           arg_names = arg_names,
-          src = src,
-          is_macro = is_macro,
-          aliases = aliases,
-          def_number = self.def_number
-        }
+          escaped_args = escaped_args
+        }, {
+          __index = def
+        })
+        rawset(where_defs_go, stub, stub_def)
       end
     end,
     defmacro = function(self, signature, thunk, src)
       return self:def(signature, thunk, src, true)
     end,
-    serialize_defs = function(self, after)
+    scoped = function(self, thunk)
+      local old_defs = self.defs
+      self.defs = setmetatable({ }, {
+        __index = old_defs
+      })
+      local ok, ret1, ret2 = pcall(thunk, self)
+      self.defs = old_defs
+      if not ok then
+        self:error(ret1)
+      end
+      return ret1, ret2
+    end,
+    serialize_defs = function(self, scope, after)
+      if scope == nil then
+        scope = nil
+      end
       if after == nil then
         after = 0
       end
-      defs = { }
-      for _, def in pairs(self.defs) do
-        defs[def.def_number] = def.src or ""
+      scope = scope or self.defs
+      local defs_by_num = { }
+      for stub, def in pairs(scope) do
+        if def and stub:sub(1, 1) ~= "#" then
+          defs_by_num[def.def_number] = def
+        end
       end
-      local keys = utils.keys(defs)
+      local keys
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for k, v in pairs(defs_by_num) do
+          _accum_0[_len_0] = k
+          _len_0 = _len_0 + 1
+        end
+        keys = _accum_0
+      end
       table.sort(keys)
       local buff = { }
-      for _index_0 = 1, #keys do
-        local i = keys[_index_0]
-        if i > after and #defs[i] > 0 then
-          insert(buff, defs[i])
+      local k_i = 1
+      local _using = nil
+      local _using_do = { }
+      for k_i, i in ipairs(keys) do
+        local _continue_0 = false
+        repeat
+          if i <= after then
+            _continue_0 = true
+            break
+          end
+          local def = defs_by_num[i]
+          if def.defs == scope then
+            if def.src then
+              insert(buff, def.src)
+            end
+            _continue_0 = true
+            break
+          end
+          if _using == def.defs then
+            if def.src then
+              insert(_using_do, def.src)
+            end
+          else
+            _using = def.defs
+            _using_do = {
+              def.src
+            }
+          end
+          if k_i == #keys or defs_by_num[keys[k_i + 1]].defs ~= _using then
+            insert(buff, "using:\n    " .. tostring(self:indent(self:serialize_defs(_using))) .. "\n..do:\n    " .. tostring(self:indent(concat(_using_do, "\n"))))
+          end
+          _continue_0 = true
+        until true
+        if not _continue_0 then
+          break
         end
+      end
+      for k, v in pairs(scope["#vars"] or { }) do
+        insert(buff, "<@" .. tostring(k) .. "> = " .. tostring(self:value_to_nomsu(v)))
       end
       return concat(buff, "\n")
     end,
@@ -306,7 +406,7 @@ do
         stub,
         line_no
       })
-      if def == nil then
+      if not (def) then
         self:error("Attempt to call undefined function: " .. tostring(stub))
       end
       if not (def.is_macro) then
@@ -326,14 +426,16 @@ do
         self:write(tostring(colored.bright("CALLING")) .. " " .. tostring(colored.magenta(colored.underscore(stub))) .. " ")
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
+      local old_defs
+      old_defs, self.defs = self.defs, def.defs
       local rets = {
         thunk(self, args)
       }
+      self.defs = old_defs
       remove(self.callstack)
       return unpack(rets)
     end,
     run_macro = function(self, tree)
-      local stub = self:get_stub(tree)
       local args
       do
         local _accum_0 = { }
@@ -349,13 +451,54 @@ do
         args = _accum_0
       end
       if self.debug then
-        self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(stub))) .. " ")
+        self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(tree.stub))) .. " ")
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
       insert(self.callstack, "#macro")
-      local expr, statement = self:call(stub, tree.line_no, unpack(args))
+      local expr, statement = self:call(tree.stub, tree.line_no, unpack(args))
       remove(self.callstack)
       return expr, statement
+    end,
+    dedent = function(self, code)
+      if not (code:find("\n")) then
+        return code
+      end
+      local spaces, indent_spaces = math.huge, math.huge
+      for line in code:gmatch("\n([^\n]*)") do
+        local _continue_0 = false
+        repeat
+          if line:match("^%s*#.*") then
+            _continue_0 = true
+            break
+          else
+            do
+              local s = line:match("^(%s*)%.%..*")
+              if s then
+                spaces = math.min(spaces, #s)
+              else
+                do
+                  s = line:match("^(%s*)%S.*")
+                  if s then
+                    indent_spaces = math.min(indent_spaces, #s)
+                  end
+                end
+              end
+            end
+          end
+          _continue_0 = true
+        until true
+        if not _continue_0 then
+          break
+        end
+      end
+      if spaces ~= math.huge and spaces < indent_spaces then
+        return (code:gsub("\n" .. (" "):rep(spaces), "\n"))
+      else
+        return (code:gsub("\n" .. (" "):rep(indent_spaces), "\n    "))
+      end
+    end,
+    indent = function(self, code)
+      return (code:gsub("\n", "\n    "))
     end,
     assert_permission = function(self, stub)
       local fn_def = self.defs[stub]
@@ -451,7 +594,7 @@ do
         local ok, expr, statements = pcall(self.tree_to_lua, self, statement)
         if not ok then
           self:errorln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.bright(colored.yellow(statement.src))))
-          self:error(expr)
+          error(expr)
         end
         local code_for_statement = ([[return (function(nomsu, vars)
 %s
@@ -480,7 +623,7 @@ end);]]):format(statements or "", expr or "ret")
         if not ok then
           self:errorln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.yellow(statement.src)))
           self:errorln(debug.traceback())
-          self:error(ret)
+          error(ret)
         end
         if statements then
           insert(buffer, statements)
@@ -513,10 +656,6 @@ end);]]):format(concat(buffer, "\n"))
     tree_to_nomsu = function(self, tree, force_inline)
       if force_inline == nil then
         force_inline = false
-      end
-      local indent
-      indent = function(s)
-        return s:gsub("\n", "\n    ")
       end
       assert(tree, "No tree provided.")
       if not tree.type then
@@ -553,7 +692,7 @@ end);]]):format(concat(buffer, "\n"))
             return _accum_0
           end)(), "; ")), true
         else
-          return ":" .. indent("\n" .. concat((function()
+          return ":" .. self:indent("\n" .. concat((function()
             local _accum_0 = { }
             local _len_0 = 1
             local _list_0 = tree.value
@@ -569,17 +708,23 @@ end);]]):format(concat(buffer, "\n"))
         local buff = ""
         local sep = ""
         local inline = true
-        local do_arg
-        do_arg = function(arg) end
+        local line_len = 0
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local arg = _list_0[_index_0]
           local arg_inline
           nomsu, arg_inline = self:tree_to_nomsu(arg, force_inline)
-          buff = buff .. sep
+          if sep == " " and line_len + #nomsu > 80 then
+            sep = "\n.."
+          end
+          if not (sep == " " and not arg_inline and nomsu:sub(1, 1) == ":") then
+            buff = buff .. sep
+          end
           if arg_inline then
             sep = " "
+            line_len = line_len + (1 + #nomsu)
           else
+            line_len = 0
             inline = false
             sep = "\n.."
           end
@@ -587,7 +732,7 @@ end);]]):format(concat(buffer, "\n"))
             if arg_inline then
               buff = buff .. "(" .. tostring(nomsu) .. ")"
             else
-              buff = buff .. "(..)\n    " .. tostring(indent(nomsu))
+              buff = buff .. "(..)\n    " .. tostring(self:indent(nomsu))
             end
           else
             buff = buff .. nomsu
@@ -658,6 +803,41 @@ end);]]):format(concat(buffer, "\n"))
         return self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
     end,
+    value_to_nomsu = function(self, value)
+      local _exp_0 = type(value)
+      if "nil" == _exp_0 then
+        return "(nil)"
+      elseif "bool" == _exp_0 then
+        return value and "(yes)" or "(no)"
+      elseif "number" == _exp_0 then
+        return repr(value)
+      elseif "table" == _exp_0 then
+        if utils.is_list(value) then
+          return "[" .. tostring(concat((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            for _index_0 = 1, #value do
+              local v = value[_index_0]
+              _accum_0[_len_0] = self:value_to_nomsu(v)
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)(), ", ")) .. "]"
+        else
+          return "(d{" .. tostring(concat((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            for k, v in pairs(value) do
+              _accum_0[_len_0] = tostring(self:value_to_nomsu(k)) .. "=" .. tostring(self:value_to_nomsu(v))
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)(), "; ")) .. "})"
+        end
+      else
+        return error("Unsupported value_to_nomsu type: " .. tostring(type(value)))
+      end
+    end,
     tree_to_lua = function(self, tree)
       assert(tree, "No tree provided.")
       if not tree.type then
@@ -668,7 +848,7 @@ end);]]):format(concat(buffer, "\n"))
       if "File" == _exp_0 then
         return error("Should not be converting File to lua through this function.")
       elseif "Nomsu" == _exp_0 then
-        return "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ").value[1]", nil
+        return "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ", " .. tostring(repr(CURRENT_FILE)) .. ").value[1]", nil
       elseif "Thunk" == _exp_0 then
         local lua_bits = { }
         local _list_0 = tree.value
@@ -688,24 +868,42 @@ local ret;
 return ret;
 end)]]):format(concat(lua_bits, "\n"))
       elseif "FunctionCall" == _exp_0 then
-        local stub = self:get_stub(tree)
-        local def = self.defs[stub]
+        local def = self.defs[tree.stub]
         if def and def.is_macro then
           local expr, statement = self:run_macro(tree)
           if def.whiteset then
             if expr then
-              expr = "(nomsu:assert_permission(" .. tostring(repr(stub)) .. ") and " .. tostring(expr) .. ")"
+              expr = "(nomsu:assert_permission(" .. tostring(repr(tree.stub)) .. ") and " .. tostring(expr) .. ")"
             end
             if statement then
-              statement = "nomsu:assert_permission(" .. tostring(repr(stub)) .. ");\n" .. statement
+              statement = "nomsu:assert_permission(" .. tostring(repr(tree.stub)) .. ");\n" .. statement
             end
           end
           return expr, statement
         end
         local args = {
-          repr(stub),
+          repr(tree.stub),
           repr(tree.line_no)
         }
+        local arg_names, escaped_args
+        if def then
+          arg_names, escaped_args = def.arg_names, def.escaped_args
+        else
+          arg_names, escaped_args = (function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            local _list_0 = tree.value
+            for _index_0 = 1, #_list_0 do
+              local w = _list_0[_index_0]
+              if w.type == "Word" then
+                _accum_0[_len_0] = w.value
+                _len_0 = _len_0 + 1
+              end
+            end
+            return _accum_0
+          end)(), { }
+        end
+        local arg_num = 1
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local _continue_0 = false
@@ -715,11 +913,18 @@ end)]]):format(concat(lua_bits, "\n"))
               _continue_0 = true
               break
             end
+            if escaped_args[arg_names[arg_num]] then
+              arg = {
+                type = "Nomsu",
+                value = arg
+              }
+            end
             local expr, statement = self:tree_to_lua(arg)
             if statement then
               self:error("Cannot use [[" .. tostring(arg.src) .. "]] as a function argument, since it's not an expression.")
             end
             insert(args, expr)
+            arg_num = arg_num + 1
             _continue_0 = true
           until true
           if not _continue_0 then
@@ -883,41 +1088,38 @@ end)]]):format(concat(lua_bits, "\n"))
         self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        local stub = x:gsub("([" .. tostring(wordbreaker) .. "]+)", " %1 "):gsub("%%%S+", "%%"):gsub("%s+", " "):gsub("^%s*", ""):gsub("%s*$", "")
+        x = x:gsub("\n%s*%.%.", " "):gsub("([" .. tostring(wordbreaker) .. "]+)", " %1 "):gsub("%s+", " ")
+        x = x:gsub("^%s*", ""):gsub("%s*$", "")
+        local stub = x:gsub("%%%S+", "%%"):gsub("\\", "")
         local arg_names
         do
           local _accum_0 = { }
           local _len_0 = 1
-          for arg in x:gmatch("%%([^%s']*)") do
+          for arg in x:gmatch("%%([^%s]*)") do
             _accum_0[_len_0] = arg
             _len_0 = _len_0 + 1
           end
           arg_names = _accum_0
         end
-        return stub, arg_names
+        local escaped_args = utils.set((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          for arg in x:gmatch("\\%%([^%s]*)") do
+            _accum_0[_len_0] = arg
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)())
+        return stub, arg_names, escaped_args
+      end
+      if type(x) ~= 'table' then
+        self:error("Invalid type for getting stub: " .. tostring(type(x)) .. " for:\n" .. tostring(repr(x)))
       end
       local _exp_0 = x.type
       if "String" == _exp_0 then
         return self:get_stub(x.value)
       elseif "FunctionCall" == _exp_0 then
-        local stub, arg_names = { }, { }, { }
-        local _list_0 = x.value
-        for _index_0 = 1, #_list_0 do
-          local token = _list_0[_index_0]
-          local _exp_1 = token.type
-          if "Word" == _exp_1 then
-            insert(stub, token.value)
-          elseif "Var" == _exp_1 then
-            insert(stub, "%")
-            if arg_names then
-              insert(arg_names, token.value)
-            end
-          else
-            insert(stub, "%")
-            arg_names = nil
-          end
-        end
-        return concat(stub, " "), arg_names
+        return self:get_stub(x.src)
       else
         return self:error("Unsupported get stub type: " .. tostring(x.type) .. " for " .. tostring(repr(x)))
       end
@@ -974,11 +1176,11 @@ end)]]):format(concat(lua_bits, "\n"))
       end))
     end,
     error = function(self, msg)
-      self:errorln((colored.red("ERROR!")))
+      local error_msg = colored.red("ERROR!")
       if msg then
-        self:errorln(colored.bright(colored.yellow(colored.onred(msg))))
+        error_msg = error_msg .. ("\n" .. (colored.bright(colored.yellow(colored.onred(msg)))))
       end
-      self:errorln("Callstack:")
+      error_msg = error_msg .. "\nCallstack:"
       local maxlen = utils.max((function()
         local _accum_0 = { }
         local _len_0 = 1
@@ -994,12 +1196,12 @@ end)]]):format(concat(lua_bits, "\n"))
       end)())
       for i = #self.callstack, 1, -1 do
         if self.callstack[i] ~= "#macro" then
-          self:errorln("    " .. tostring(("%-" .. tostring(maxlen) .. "s"):format(self.callstack[i][2])) .. "| " .. tostring(self.callstack[i][1]))
+          error_msg = error_msg .. "\n    " .. tostring(("%-" .. tostring(maxlen) .. "s"):format(self.callstack[i][2])) .. "| " .. tostring(self.callstack[i][1])
         end
       end
-      self:errorln("    <top level>")
+      error_msg = error_msg .. "\n    <top level>"
       self.callstack = { }
-      return error()
+      return error(error_msg, 3)
     end,
     typecheck = function(self, vars, varname, desired_type)
       local x = vars[varname]
@@ -1009,17 +1211,19 @@ end)]]):format(concat(lua_bits, "\n"))
       if type(x) == 'table' and x.type == desired_type then
         return x
       end
-      return self:error("Invalid type for %" .. tostring(varname) .. ". Expected " .. tostring(desired_type) .. ", but got " .. tostring(x.type) .. ".")
+      return self:error("Invalid type for %" .. tostring(varname) .. ". Expected " .. tostring(desired_type) .. ", but got " .. tostring(repr(x)) .. ".")
     end,
     initialize_core = function(self)
       local nomsu_string_as_lua
-      nomsu_string_as_lua = function(self, code)
+      nomsu_string_as_lua = function(self, code, tree)
         local concat_parts = { }
         local _list_0 = code.value
         for _index_0 = 1, #_list_0 do
           local bit = _list_0[_index_0]
           if type(bit) == "string" then
             insert(concat_parts, bit)
+          elseif type(bit) == "table" and bit.type == "FunctionCall" and bit.src == "__src__" then
+            insert(concat_parts, repr(tree.src))
           else
             local expr, statement = self:tree_to_lua(bit)
             if statement then
@@ -1070,12 +1274,13 @@ end)]]):format(concat(lua_bits, "\n"))
       self:def("run file %filename", run_file)
       local _require
       _require = function(self, vars)
-        if not self.loaded_files[vars.filename] then
-          self.loaded_files[vars.filename] = run_file(self, {
+        local loaded = self.defs["#loaded_files"]
+        if not loaded[vars.filename] then
+          loaded[vars.filename] = run_file(self, {
             filename = vars.filename
           }) or true
         end
-        return self.loaded_files[vars.filename]
+        return loaded[vars.filename]
       end
       return self:def("require %filename", _require)
     end
@@ -1089,10 +1294,21 @@ end)]]):format(concat(lua_bits, "\n"))
       self.write_err = function(self, ...)
         return io.stderr:write(...)
       end
-      self.defs = setmetatable({ }, {
-        __index = parent and parent.defs
-      })
-      self.def_number = 0
+      self.defs = {
+        ["#vars"] = { },
+        ["#loaded_files"] = { }
+      }
+      if parent then
+        setmetatable(self.defs, {
+          __index = parent.defs
+        })
+        setmetatable(self.defs["#vars"], {
+          __index = parent["#vars"]
+        })
+        setmetatable(self.defs["#loaded_files"], {
+          __index = parent["#loaded_files"]
+        })
+      end
       self.callstack = { }
       self.debug = false
       self.utils = utils
@@ -1102,9 +1318,6 @@ end)]]):format(concat(lua_bits, "\n"))
       self.stringify = function(self, ...)
         return utils.stringify(...)
       end
-      self.loaded_files = setmetatable({ }, {
-        __index = parent and parent.loaded_files
-      })
       if not parent then
         return self:initialize_core()
       end
@@ -1121,6 +1334,7 @@ end)]]):format(concat(lua_bits, "\n"))
   })
   _base_0.__class = _class_0
   local self = _class_0
+  self.def_number = 0
   self.unescape_string = function(self, str)
     return str:gsub("\\(.)", (function(c)
       return STRING_ESCAPES[c] or c

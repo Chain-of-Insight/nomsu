@@ -19,6 +19,12 @@ colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..colors.reset)})
 {:insert, :remove, :concat} = table
 --pcall = (fn,...)-> true, fn(...)
+if _VERSION == "Lua 5.1"
+    xp = xpcall
+    xpcall = (f, errhandler, ...)->
+        args = {n:select("#", ...), ...}
+        return xp((...)-> f(unpack(args,1,args.n))), errhandler
+--pcall = (fn, ...) -> xpcall(fn, debug.traceback, ...)
 
 -- TODO:
 -- Maybe get GOTOs working at file scope.
@@ -28,7 +34,6 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..col
 -- better scoping?
 -- better error reporting
 -- fix propagation of filename for error reporting
--- add line numbers of function calls
 -- type checking?
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
@@ -162,7 +167,8 @@ defs =
         for _ in src\sub(1,pos)\gmatch("\n") do line_no += 1
         return pos, "#{CURRENT_FILE}:#{line_no}"
     FunctionCall: (src, line_no, value, errors)->
-        {type: "FunctionCall", :src, :line_no, :value, :errors}
+        stub = concat([(t.type == "Word" and t.value or "%") for t in *value], " ")
+        {type: "FunctionCall", :src, :line_no, :value, :errors, :stub}
     error: (src,pos,errors,err_msg)->
         line_no = 1
         for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
@@ -190,17 +196,21 @@ setmetatable(defs, {
 nomsu = re.compile(nomsu, defs)
 
 class NomsuCompiler
+    @def_number: 0
     new:(parent)=>
         @write = (...)=> io.write(...)
         @write_err = (...)=> io.stderr\write(...)
-        @defs = setmetatable({}, {__index:parent and parent.defs})
-        @def_number = 0
+        -- Use # to prevent someone from defining a function that has a namespace collision.
+        @defs = {["#vars"]:{}, ["#loaded_files"]:{}}
+        if parent
+            setmetatable(@defs, {__index:parent.defs})
+            setmetatable(@defs["#vars"], {__index:parent["#vars"]})
+            setmetatable(@defs["#loaded_files"], {__index:parent["#loaded_files"]})
         @callstack = {}
         @debug = false
         @utils = utils
         @repr = (...)=> repr(...)
         @stringify = (...)=> utils.stringify(...)
-        @loaded_files = setmetatable({}, {__index:parent and parent.loaded_files})
         if not parent
             @initialize_core!
     
@@ -219,9 +229,12 @@ class NomsuCompiler
             signature = @get_stubs signature
         assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
         canonical_args = nil
+        canonical_escaped_args = nil
         aliases = {}
-        @def_number += 1
-        for {stub, arg_names} in *signature
+        @@def_number += 1
+        def = {:thunk, :src, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
+        where_defs_go = ((getmetatable(@defs) or {}).__newindex) or @defs
+        for {stub, arg_names, escaped_args} in *signature
             assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
             for i=1,#arg_names-1 do for j=i+1,#arg_names
@@ -229,22 +242,58 @@ class NomsuCompiler
             if canonical_args
                 assert utils.equivalent(utils.set(arg_names), canonical_args), "Mismatched args"
             else canonical_args = utils.set(arg_names)
-            insert aliases, stub
-            @defs[stub] = {:thunk, :stub, :arg_names, :src, :is_macro, :aliases, def_number:@def_number}
+            if canonical_escaped_args
+                assert utils.equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args"
+            else
+                canonical_escaped_args = escaped_args
+                def.escaped_args = escaped_args
+            insert def.aliases, stub
+            stub_def = setmetatable({:stub, :arg_names, :escaped_args}, {__index:def})
+            rawset(where_defs_go, stub, stub_def)
 
     defmacro: (signature, thunk, src)=>
         @def(signature, thunk, src, true)
-    
-    serialize_defs: (after=0)=>
-        defs = {}
-        for _, def in pairs(@defs)
-            defs[def.def_number] = def.src or ""
-        keys = utils.keys(defs)
+
+    scoped: (thunk)=>
+        old_defs = @defs
+        @defs = setmetatable({}, {__index:old_defs})
+        ok, ret1, ret2 = pcall thunk, @
+        @defs = old_defs
+        if not ok then @error(ret1)
+        return ret1, ret2
+
+    serialize_defs: (scope=nil, after=0)=>
+        scope or= @defs
+        defs_by_num = {}
+        for stub, def in pairs(scope)
+            if def and stub\sub(1,1) != "#"
+                defs_by_num[def.def_number] = def
+        keys = [k for k,v in pairs(defs_by_num)]
         table.sort(keys)
+
         buff = {}
-        for i in *keys
-            if i > after and #defs[i] > 0
-                insert buff, defs[i]
+        k_i = 1
+        _using = nil
+        _using_do = {}
+        for k_i,i in ipairs(keys)
+            if i <= after then continue
+            def = defs_by_num[i]
+            if def.defs == scope
+                if def.src
+                    insert buff, def.src
+                continue
+            if _using == def.defs
+                if def.src
+                    insert _using_do, def.src
+            else
+                _using = def.defs
+                _using_do = {def.src}
+            if k_i == #keys or defs_by_num[keys[k_i+1]].defs != _using
+                insert buff, "using:\n    #{@indent @serialize_defs(_using)}\n..do:\n    #{@indent concat(_using_do, "\n")}"
+
+        for k,v in pairs(scope["#vars"] or {})
+            insert buff, "<@#{k}> = #{@value_to_nomsu v}"
+
         return concat buff, "\n"
 
     call: (stub,line_no,...)=>
@@ -254,7 +303,7 @@ class NomsuCompiler
         if def and def.is_macro and @callstack[#@callstack] != "#macro"
             @error "Attempt to call macro at runtime: #{stub}\nThis can be caused by using a macro in a function that is defined before the macro."
         insert @callstack, {stub, line_no}
-        if def == nil
+        unless def
             @error "Attempt to call undefined function: #{stub}"
         unless def.is_macro
             @assert_permission(stub)
@@ -263,21 +312,40 @@ class NomsuCompiler
         if @debug
             @write "#{colored.bright "CALLING"} #{colored.magenta(colored.underscore stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr(args)}"
-        -- TODO: optimize, but still allow multiple return values?
+        old_defs, @defs = @defs, def.defs
         rets = {thunk(self,args)}
+        @defs = old_defs
         remove @callstack
         return unpack(rets)
     
     run_macro: (tree)=>
-        stub = @get_stub tree
         args = [arg for arg in *tree.value when arg.type != "Word"]
         if @debug
-            @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(stub)} "
+            @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
         insert @callstack, "#macro"
-        expr, statement = @call(stub, tree.line_no, unpack(args))
+        expr, statement = @call(tree.stub, tree.line_no, unpack(args))
         remove @callstack
         return expr, statement
+
+    dedent: (code)=>
+        unless code\find("\n")
+            return code
+        spaces, indent_spaces = math.huge, math.huge
+        for line in code\gmatch("\n([^\n]*)")
+            if line\match("^%s*#.*")
+                continue
+            elseif s = line\match("^(%s*)%.%..*")
+                spaces = math.min(spaces, #s)
+            elseif s = line\match("^(%s*)%S.*")
+                indent_spaces = math.min(indent_spaces, #s)
+        if spaces != math.huge and spaces < indent_spaces
+            return (code\gsub("\n"..(" ")\rep(spaces), "\n"))
+        else
+            return (code\gsub("\n"..(" ")\rep(indent_spaces), "\n    "))
+
+    indent: (code)=>
+        (code\gsub("\n","\n    "))
 
     assert_permission: (stub)=>
         fn_def = @defs[stub]
@@ -343,7 +411,7 @@ class NomsuCompiler
             ok,expr,statements = pcall(@tree_to_lua, self, statement)
             if not ok
                 @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.bright colored.yellow statement.src}"
-                @error(expr)
+                error(expr)
             code_for_statement = ([[
 return (function(nomsu, vars)
 %s
@@ -365,7 +433,7 @@ end);]])\format(statements or "", expr or "ret")
             if not ok
                 @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow statement.src}"
                 @errorln debug.traceback!
-                @error(ret)
+                error(ret)
             if statements
                 insert buffer, statements
             if expr
@@ -392,8 +460,6 @@ end);]])\format(concat(buffer, "\n"))
 
     tree_to_nomsu: (tree, force_inline=false)=>
         -- Return <nomsu code>, <is safe for inline use>
-        indent = (s)->
-            s\gsub("\n","\n    ")
         assert tree, "No tree provided."
         if not tree.type
             @errorln debug.traceback()
@@ -410,27 +476,31 @@ end);]])\format(concat(buffer, "\n"))
                 if force_inline
                     return "{#{concat([@tree_to_nomsu(v, true) for v in *tree.value], "; ")}", true
                 else
-                    return ":"..indent("\n"..concat([@tree_to_nomsu v for v in *tree.value], "\n")), false
+                    return ":"..@indent("\n"..concat([@tree_to_nomsu v for v in *tree.value], "\n")), false
 
             when "FunctionCall"
                 buff = ""
                 sep = ""
                 inline = true
-                do_arg = (arg)->
-
+                line_len = 0
                 for arg in *tree.value
                     nomsu, arg_inline = @tree_to_nomsu(arg, force_inline)
-                    buff ..= sep
+                    if sep == " " and line_len + #nomsu > 80
+                        sep = "\n.."
+                    unless sep == " " and not arg_inline and nomsu\sub(1,1) == ":"
+                        buff ..= sep
                     if arg_inline
                         sep = " "
+                        line_len += 1 + #nomsu
                     else
+                        line_len = 0
                         inline = false
                         sep = "\n.."
                     if arg.type == 'FunctionCall'
                         if arg_inline
                             buff ..= "(#{nomsu})"
                         else
-                            buff ..= "(..)\n    #{indent nomsu}"
+                            buff ..= "(..)\n    #{@indent nomsu}"
                     else
                         buff ..= nomsu
                 return buff, inline
@@ -491,6 +561,22 @@ end);]])\format(concat(buffer, "\n"))
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
 
+    value_to_nomsu: (value)=>
+        switch type(value)
+            when "nil"
+                return "(nil)"
+            when "bool"
+                return value and "(yes)" or "(no)"
+            when "number"
+                return repr(value)
+            when "table"
+                if utils.is_list(value)
+                    return "[#{concat [@value_to_nomsu(v) for v in *value], ", "}]"
+                else
+                    return "(d{#{concat ["#{@value_to_nomsu(k)}=#{@value_to_nomsu(v)}" for k,v in pairs(value)], "; "}})"
+            else
+                error("Unsupported value_to_nomsu type: #{type(value)}")
+
     tree_to_lua: (tree)=>
         -- Return <lua code for value>, <additional lua code>
         assert tree, "No tree provided."
@@ -502,7 +588,7 @@ end);]])\format(concat(buffer, "\n"))
                 error("Should not be converting File to lua through this function.")
             
             when "Nomsu"
-                return "nomsu:parse(#{repr tree.value.src}).value[1]", nil
+                return "nomsu:parse(#{repr tree.value.src}, #{repr CURRENT_FILE}).value[1]", nil
 
             when "Thunk"
                 lua_bits = {}
@@ -518,23 +604,31 @@ return ret;
 end)]])\format(concat(lua_bits, "\n"))
 
             when "FunctionCall"
-                stub = @get_stub(tree)
-                def = @defs[stub]
+                def = @defs[tree.stub]
                 if def and def.is_macro
                     expr, statement = @run_macro(tree)
                     if def.whiteset
                         if expr
-                            expr = "(nomsu:assert_permission(#{repr stub}) and #{expr})"
+                            expr = "(nomsu:assert_permission(#{repr tree.stub}) and #{expr})"
                         if statement
-                            statement = "nomsu:assert_permission(#{repr stub});\n"..statement
+                            statement = "nomsu:assert_permission(#{repr tree.stub});\n"..statement
                     return expr, statement
-                args = {repr(stub), repr(tree.line_no)}
+                args = {repr(tree.stub), repr(tree.line_no)}
+                local arg_names, escaped_args
+                if def
+                    arg_names, escaped_args = def.arg_names, def.escaped_args
+                else
+                    arg_names, escaped_args = [w.value for w in *tree.value when w.type == "Word"], {}
+                arg_num = 1
                 for arg in *tree.value
                     if arg.type == 'Word' then continue
+                    if escaped_args[arg_names[arg_num]]
+                        arg = {type:"Nomsu", value:arg}
                     expr,statement = @tree_to_lua arg
                     if statement
                         @error "Cannot use [[#{arg.src}]] as a function argument, since it's not an expression."
                     insert args, expr
+                    arg_num += 1
                 return @@comma_separated_items("nomsu:call(", args, ")"), nil
 
             when "String"
@@ -658,27 +752,22 @@ end)]])\format(concat(lua_bits, "\n"))
     get_stub: (x)=>
         if not x
             @error "Nothing to get stub from"
-        -- Returns a single stub ("say %"), and list of arg names ({"msg"}) from a single rule def
+        -- Returns a single stub ("say %"), list of arg names ({"msg"}), and set of arg
+        -- names that should not be evaluated from a single rule def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
-            stub = x\gsub("([#{wordbreaker}]+)"," %1 ")\gsub("%%%S+","%%")\gsub("%s+"," ")\gsub("^%s*","")\gsub("%s*$","")
-            arg_names = [arg for arg in x\gmatch("%%([^%s']*)")]
-            return stub, arg_names
+            -- Standardize format to stuff separated by spaces
+            x = x\gsub("\n%s*%.%.", " ")\gsub("([#{wordbreaker}]+)", " %1 ")\gsub("%s+"," ")
+            x = x\gsub("^%s*","")\gsub("%s*$","")
+            stub = x\gsub("%%%S+","%%")\gsub("\\","")
+            arg_names = [arg for arg in x\gmatch("%%([^%s]*)")]
+            escaped_args = utils.set [arg for arg in x\gmatch("\\%%([^%s]*)")]
+            return stub, arg_names, escaped_args
+        if type(x) != 'table'
+            @error "Invalid type for getting stub: #{type(x)} for:\n#{repr x}"
         switch x.type
             when "String" then return @get_stub(x.value)
-            when "FunctionCall"
-                stub, arg_names = {}, {}, {}
-                for token in *x.value
-                    switch token.type
-                        when "Word"
-                            insert stub, token.value
-                        when "Var"
-                            insert stub, "%"
-                            if arg_names then insert arg_names, token.value
-                        else
-                            insert stub, "%"
-                            arg_names = nil
-                return concat(stub," "), arg_names
+            when "FunctionCall" then return @get_stub(x.src)
             else @error "Unsupported get stub type: #{x.type} for #{repr x}"
     
     get_stubs: (x)=>
@@ -699,31 +788,33 @@ end)]])\format(concat(lua_bits, "\n"))
             if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
 
     error: (msg)=>
-        @errorln (colored.red "ERROR!")
+        error_msg = colored.red "ERROR!"
         if msg
-            @errorln(colored.bright colored.yellow colored.onred msg)
-        @errorln("Callstack:")
+            error_msg ..= "\n" .. (colored.bright colored.yellow colored.onred msg)
+        error_msg ..= "\nCallstack:"
         maxlen = utils.max([#c[2] for c in *@callstack when c != "#macro"])
         for i=#@callstack,1,-1
             if @callstack[i] != "#macro"
-                @errorln "    #{"%-#{maxlen}s"\format @callstack[i][2]}| #{@callstack[i][1]}"
-        @errorln "    <top level>"
+                error_msg ..= "\n    #{"%-#{maxlen}s"\format @callstack[i][2]}| #{@callstack[i][1]}"
+        error_msg ..= "\n    <top level>"
         @callstack = {}
-        error!
+        error error_msg, 3
     
     typecheck: (vars, varname, desired_type)=>
         x = vars[varname]
         if type(x) == desired_type then return x
         if type(x) == 'table' and x.type == desired_type then return x
-        @error "Invalid type for %#{varname}. Expected #{desired_type}, but got #{x.type}."
+        @error "Invalid type for %#{varname}. Expected #{desired_type}, but got #{repr x}."
 
     initialize_core: =>
         -- Sets up some core functionality
-        nomsu_string_as_lua = (code)=>
+        nomsu_string_as_lua = (code, tree)=>
             concat_parts = {}
             for bit in *code.value
                 if type(bit) == "string"
                     insert concat_parts, bit
+                elseif type(bit) == "table" and bit.type == "FunctionCall" and bit.src == "__src__"
+                    insert concat_parts, repr(tree.src)
                 else
                     expr, statement = @tree_to_lua bit
                     if statement
@@ -763,9 +854,10 @@ end)]])\format(concat(lua_bits, "\n"))
         @def "run file %filename", run_file
 
         _require = (vars)=>
-            if not @loaded_files[vars.filename]
-                @loaded_files[vars.filename] = run_file(self, {filename:vars.filename}) or true
-            return @loaded_files[vars.filename]
+            loaded = @defs["#loaded_files"]
+            if not loaded[vars.filename]
+                loaded[vars.filename] = run_file(self, {filename:vars.filename}) or true
+            return loaded[vars.filename]
         @def "require %filename", _require
 
 
