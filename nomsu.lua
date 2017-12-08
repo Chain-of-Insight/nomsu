@@ -105,13 +105,13 @@ local nomsu = [=[    file <- ({{| shebang?
 
     -- Function calls need at least one word in them
     inline_functioncall <- ({(''=>line_no) {|
-            (inline_expression tok_gap)* word (tok_gap (inline_expression / word))*
+            (inline_expression %ws?)* word (%ws? (inline_expression / word))*
         |} }) -> FunctionCall
     noeol_functioncall <- ({(''=>line_no) {|
-            (noeol_expression tok_gap)* word (tok_gap (noeol_expression / word))*
+            (noeol_expression %ws?)* word (%ws? (noeol_expression / word))*
         |} }) -> FunctionCall
     functioncall <- ({(''=>line_no) {|
-            (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
+            (expression (dotdot / %ws?))* word ((dotdot / %ws?) (expression / word))*
         |} }) -> FunctionCall
 
     word <- ({ { %operator / (!number %plain_word) } }) -> Word
@@ -153,7 +153,6 @@ local nomsu = [=[    file <- ({{| shebang?
     indent <- eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
     nodent <- eol (%nl ignored_line)* %nl %nodented
     dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%] / &%operator)
     comma <- %ws? "," %ws?
     semicolon <- %ws? ";" %ws?
     dotdot <- nodent ".." %ws?
@@ -173,7 +172,6 @@ local defs = {
   indented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_indent),
   nodented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_nodent),
   dedented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_dedent),
-  prev_edge = B(S(" \t\n.,:;}])\"\\'~`!@$^&*-+=|<>?/")),
   line_no = function(src, pos)
     local line_no = 1
     for _ in src:sub(1, pos):gmatch("\n") do
