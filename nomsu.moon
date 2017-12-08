@@ -39,7 +39,7 @@ if _VERSION == "Lua 5.1"
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
 
 lpeg.setmaxstack 10000 -- whoa
-{:P,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
+{:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
 
 -- NOTE: this treats tabs as equivalent to 1 space
@@ -64,7 +64,7 @@ nomsu = [=[
         (ignored_line %nl)*
         statements (nodent statements)*
         (%nl ignored_line)* %nl?
-        (({.+} ("" -> "Unexpected end of file")) => error)? |} }) -> File
+        (({.+} ("" -> "Parse error")) => error)? |} }) -> File
 
     shebang <- "#!" [^%nl]* %nl
 
@@ -107,7 +107,7 @@ nomsu = [=[
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
 
-    word <- ({ { (%wordbreaker+) / (!number %wordchar+) } }) -> Word
+    word <- ({ { %operator / (!number %plain_word) } }) -> Word
     
     inline_string <- ({ '"' {|
         ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
@@ -123,9 +123,9 @@ nomsu = [=[
 
     number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
 
-    -- Variables can be nameless (i.e. just %) and can't contain wordbreakers like apostrophe
+    -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
     -- which is a hack to allow %'s to parse as "%" and "' s" separately
-    variable <- ({ ("%" { %wordchar* }) }) -> Var
+    variable <- ({ ("%" { %plain_word? }) }) -> Var
 
     inline_list <- ({ {|
          ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
@@ -146,7 +146,7 @@ nomsu = [=[
     indent <- eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
     nodent <- eol (%nl ignored_line)* %nl %nodented
     dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%] / &%wordbreaker)
+    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%] / &%operator)
     comma <- %ws? "," %ws?
     semicolon <- %ws? ";" %ws?
     dotdot <- nodent ".." %ws?
@@ -154,14 +154,19 @@ nomsu = [=[
 
 CURRENT_FILE = nil
 whitespace = S(" \t")^1
-wordbreaker = ("'~`!@$^&*-+=|<>?/")
+operator = S("'~`!@$^&*-+=|<>?/")^1
+utf8_continuation = R("\128\191")
+utf8_char = (
+    R("\194\223")*utf8_continuation +
+    R("\224\239")*utf8_continuation*utf8_continuation +
+    R("\240\244")*utf8_continuation*utf8_continuation*utf8_continuation)
+plain_word = (R('az','AZ','09') + S("_") + utf8_char)^1
 defs =
-    ws:whitespace, nl: P("\n"), :tonumber, wordbreaker:S(wordbreaker)
-    wordchar: P(1)-S(' \t\n\r%#:;,.{}[]()"\\'..wordbreaker)
+    ws:whitespace, nl: P("\n"), :tonumber, :operator, :plain_word
     indented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_indent)
     nodented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_nodent)
     dedented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_dedent)
-    prev_edge: B(S(" \t\n.,:;}])\"\\"..wordbreaker))
+    prev_edge: B(S(" \t\n.,:;}])\"\\'~`!@$^&*-+=|<>?/")) -- Includes "operator"
     line_no: (src, pos)->
         line_no = 1
         for _ in src\sub(1,pos)\gmatch("\n") do line_no += 1
@@ -227,13 +232,15 @@ class NomsuCompiler
             signature = @get_stubs {signature}
         elseif type(signature) == 'table' and type(signature[1]) == 'string'
             signature = @get_stubs signature
+        if @debug
+            @write colored.magenta "Defined rule #{repr signature}"
         assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
         canonical_args = nil
         canonical_escaped_args = nil
         aliases = {}
         @@def_number += 1
         def = {:thunk, :src, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
-        where_defs_go = ((getmetatable(@defs) or {}).__newindex) or @defs
+        where_defs_go = (getmetatable(@defs) or {__newindex:@defs}).__newindex
         for {stub, arg_names, escaped_args} in *signature
             assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
@@ -410,7 +417,7 @@ class NomsuCompiler
                 @writeln "#{colored.bright "RUNNING NOMSU:"}\n#{colored.bright colored.yellow statement.src}"
                 @writeln colored.bright("PARSED TO TREE:")
                 @print_tree statement
-            ok,expr,statements = pcall(@tree_to_lua, self, statement)
+            ok,expr,statements = pcall(@tree_to_lua, self, statement, filename)
             if not ok
                 @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.bright colored.yellow statement.src}"
                 error(expr)
@@ -451,8 +458,8 @@ return ret;
 end);]])\format(concat(buffer, "\n"))
         return return_value, lua_code, vars
     
-    tree_to_value: (tree, vars)=>
-        code = "return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree)};\nend);"
+    tree_to_value: (tree, vars, filename)=>
+        code = "return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree, filename)};\nend);"
         if @debug
             @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
         lua_thunk, err = load(code)
@@ -579,7 +586,7 @@ end);]])\format(concat(buffer, "\n"))
             else
                 error("Unsupported value_to_nomsu type: #{type(value)}")
 
-    tree_to_lua: (tree)=>
+    tree_to_lua: (tree, filename)=>
         -- Return <lua code for value>, <additional lua code>
         assert tree, "No tree provided."
         if not tree.type
@@ -590,12 +597,12 @@ end);]])\format(concat(buffer, "\n"))
                 error("Should not be converting File to lua through this function.")
             
             when "Nomsu"
-                return "nomsu:parse(#{repr tree.value.src}, #{repr CURRENT_FILE}).value[1]", nil
+                return "nomsu:parse(#{repr tree.value.src}, #{repr tree.line_no}).value[1]", nil
 
             when "Thunk"
                 lua_bits = {}
                 for arg in *tree.value
-                    expr,statement = @tree_to_lua arg
+                    expr,statement = @tree_to_lua arg, filename
                     if statement then insert lua_bits, statement
                     if expr then insert lua_bits, "ret = #{expr};"
                 return ([[
@@ -625,8 +632,8 @@ end)]])\format(concat(lua_bits, "\n"))
                 for arg in *tree.value
                     if arg.type == 'Word' then continue
                     if escaped_args[arg_names[arg_num]]
-                        arg = {type:"Nomsu", value:arg}
-                    expr,statement = @tree_to_lua arg
+                        arg = {type:"Nomsu", value:arg, line_no:tree.line_no}
+                    expr,statement = @tree_to_lua arg, filename
                     if statement
                         @error "Cannot use [[#{arg.src}]] as a function argument, since it's not an expression."
                     insert args, expr
@@ -646,7 +653,7 @@ end)]])\format(concat(lua_bits, "\n"))
                     if string_buffer ~= ""
                         insert concat_parts, repr(string_buffer)
                         string_buffer = ""
-                    expr, statement = @tree_to_lua bit
+                    expr, statement = @tree_to_lua bit, filename
                     if @debug
                         @writeln (colored.bright "INTERP:")
                         @print_tree bit
@@ -667,7 +674,7 @@ end)]])\format(concat(lua_bits, "\n"))
             when "List"
                 items = {}
                 for item in *tree.value
-                    expr,statement = @tree_to_lua item
+                    expr,statement = @tree_to_lua item, filename
                     if statement
                         @error "Cannot use [[#{item.src}]] as a list item, since it's not an expression."
                     insert items, expr
@@ -759,8 +766,9 @@ end)]])\format(concat(lua_bits, "\n"))
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
             -- Standardize format to stuff separated by spaces
-            x = x\gsub("\n%s*%.%.", " ")\gsub("([#{wordbreaker}]+)", " %1 ")\gsub("%s+"," ")
-            x = x\gsub("^%s*","")\gsub("%s*$","")
+            x = x\gsub("\n%s*%.%.", " ")
+            x = lpeg.Cs((operator / ((op)->" #{op} ") + 1)^0)\match(x)
+            x = x\gsub("%s+"," ")\gsub("^%s*","")\gsub("%s*$","")
             stub = x\gsub("%%%S+","%%")\gsub("\\","")
             arg_names = [arg for arg in x\gmatch("%%([^%s]*)")]
             escaped_args = utils.set [arg for arg in x\gmatch("\\%%([^%s]*)")]
@@ -797,7 +805,11 @@ end)]])\format(concat(lua_bits, "\n"))
         maxlen = utils.max([#c[2] for c in *@callstack when c != "#macro"])
         for i=#@callstack,1,-1
             if @callstack[i] != "#macro"
-                error_msg ..= "\n    #{"%-#{maxlen}s"\format @callstack[i][2]}| #{@callstack[i][1]}"
+                line_no = @callstack[i][2]
+                if line_no
+                    nums = [tonumber(n) for n in line_no\gmatch(":([0-9]+)")]
+                    line_no = line_no\gsub(":.*$", ":#{utils.sum(nums) - #nums + 1}")
+                error_msg ..= "\n    #{"%-#{maxlen}s"\format line_no}| #{@callstack[i][1]}"
         error_msg ..= "\n    <top level>"
         @callstack = {}
         error error_msg, 3
@@ -818,7 +830,7 @@ end)]])\format(concat(lua_bits, "\n"))
                 elseif type(bit) == "table" and bit.type == "FunctionCall" and bit.src == "__src__"
                     insert concat_parts, repr(@defs["#macro_tree"].src)
                 else
-                    expr, statement = @tree_to_lua bit
+                    expr, statement = @tree_to_lua bit, filename
                     if statement
                         @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, expr

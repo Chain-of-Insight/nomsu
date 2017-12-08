@@ -33,8 +33,8 @@ if _VERSION == "Lua 5.1" then
   end
 end
 lpeg.setmaxstack(10000)
-local P, V, S, Cg, C, Cp, B, Cmt
-P, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
+local P, R, V, S, Cg, C, Cp, B, Cmt
+P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
 local STRING_ESCAPES = {
   n = "\n",
   t = "\t",
@@ -71,7 +71,7 @@ local nomsu = [=[    file <- ({{| shebang?
         (ignored_line %nl)*
         statements (nodent statements)*
         (%nl ignored_line)* %nl?
-        (({.+} ("" -> "Unexpected end of file")) => error)? |} }) -> File
+        (({.+} ("" -> "Parse error")) => error)? |} }) -> File
 
     shebang <- "#!" [^%nl]* %nl
 
@@ -114,7 +114,7 @@ local nomsu = [=[    file <- ({{| shebang?
             (expression (dotdot / tok_gap))* word ((dotdot / tok_gap) (expression / word))*
         |} }) -> FunctionCall
 
-    word <- ({ { (%wordbreaker+) / (!number %wordchar+) } }) -> Word
+    word <- ({ { %operator / (!number %plain_word) } }) -> Word
     
     inline_string <- ({ '"' {|
         ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
@@ -130,9 +130,9 @@ local nomsu = [=[    file <- ({{| shebang?
 
     number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
 
-    -- Variables can be nameless (i.e. just %) and can't contain wordbreakers like apostrophe
+    -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
     -- which is a hack to allow %'s to parse as "%" and "' s" separately
-    variable <- ({ ("%" { %wordchar* }) }) -> Var
+    variable <- ({ ("%" { %plain_word? }) }) -> Var
 
     inline_list <- ({ {|
          ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
@@ -153,24 +153,27 @@ local nomsu = [=[    file <- ({{| shebang?
     indent <- eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
     nodent <- eol (%nl ignored_line)* %nl %nodented
     dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%] / &%wordbreaker)
+    tok_gap <- %ws / %prev_edge / &("[" / "\" / [.,:;{("#%] / &%operator)
     comma <- %ws? "," %ws?
     semicolon <- %ws? ";" %ws?
     dotdot <- nodent ".." %ws?
 ]=]
 local CURRENT_FILE = nil
 local whitespace = S(" \t") ^ 1
-local wordbreaker = ("'~`!@$^&*-+=|<>?/")
+local operator = S("'~`!@$^&*-+=|<>?/") ^ 1
+local utf8_continuation = R("\128\191")
+local utf8_char = (R("\194\223") * utf8_continuation + R("\224\239") * utf8_continuation * utf8_continuation + R("\240\244") * utf8_continuation * utf8_continuation * utf8_continuation)
+local plain_word = (R('az', 'AZ', '09') + S("_") + utf8_char) ^ 1
 local defs = {
   ws = whitespace,
   nl = P("\n"),
   tonumber = tonumber,
-  wordbreaker = S(wordbreaker),
-  wordchar = P(1) - S(' \t\n\r%#:;,.{}[]()"\\' .. wordbreaker),
+  operator = operator,
+  plain_word = plain_word,
   indented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_indent),
   nodented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_nodent),
   dedented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_dedent),
-  prev_edge = B(S(" \t\n.,:;}])\"\\" .. wordbreaker)),
+  prev_edge = B(S(" \t\n.,:;}])\"\\'~`!@$^&*-+=|<>?/")),
   line_no = function(src, pos)
     local line_no = 1
     for _ in src:sub(1, pos):gmatch("\n") do
@@ -263,6 +266,9 @@ do
       elseif type(signature) == 'table' and type(signature[1]) == 'string' then
         signature = self:get_stubs(signature)
       end
+      if self.debug then
+        self:write(colored.magenta("Defined rule " .. tostring(repr(signature))))
+      end
       assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
       local canonical_args = nil
       local canonical_escaped_args = nil
@@ -276,7 +282,9 @@ do
         def_number = self.__class.def_number,
         defs = self.defs
       }
-      local where_defs_go = ((getmetatable(self.defs) or { }).__newindex) or self.defs
+      local where_defs_go = (getmetatable(self.defs) or {
+        __newindex = self.defs
+      }).__newindex
       for _index_0 = 1, #signature do
         local _des_0 = signature[_index_0]
         local stub, arg_names, escaped_args
@@ -455,7 +463,10 @@ do
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
       insert(self.callstack, "#macro")
+      local old_tree
+      old_tree, self.defs["#macro_tree"] = self.defs["#macro_tree"], tree
       local expr, statement = self:call(tree.stub, tree.line_no, unpack(args))
+      self.defs["#macro_tree"] = old_tree
       remove(self.callstack)
       return expr, statement
     end,
@@ -591,7 +602,7 @@ do
           self:writeln(colored.bright("PARSED TO TREE:"))
           self:print_tree(statement)
         end
-        local ok, expr, statements = pcall(self.tree_to_lua, self, statement)
+        local ok, expr, statements = pcall(self.tree_to_lua, self, statement, filename)
         if not ok then
           self:errorln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.bright(colored.yellow(statement.src))))
           error(expr)
@@ -642,8 +653,8 @@ return ret;
 end);]]):format(concat(buffer, "\n"))
       return return_value, lua_code, vars
     end,
-    tree_to_value = function(self, tree, vars)
-      local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree)) .. ";\nend);"
+    tree_to_value = function(self, tree, vars, filename)
+      local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree, filename)) .. ";\nend);"
       if self.debug then
         self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
       end
@@ -838,7 +849,7 @@ end);]]):format(concat(buffer, "\n"))
         return error("Unsupported value_to_nomsu type: " .. tostring(type(value)))
       end
     end,
-    tree_to_lua = function(self, tree)
+    tree_to_lua = function(self, tree, filename)
       assert(tree, "No tree provided.")
       if not tree.type then
         self:errorln(debug.traceback())
@@ -848,13 +859,13 @@ end);]]):format(concat(buffer, "\n"))
       if "File" == _exp_0 then
         return error("Should not be converting File to lua through this function.")
       elseif "Nomsu" == _exp_0 then
-        return "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ", " .. tostring(repr(CURRENT_FILE)) .. ").value[1]", nil
+        return "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ", " .. tostring(repr(tree.line_no)) .. ").value[1]", nil
       elseif "Thunk" == _exp_0 then
         local lua_bits = { }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local arg = _list_0[_index_0]
-          local expr, statement = self:tree_to_lua(arg)
+          local expr, statement = self:tree_to_lua(arg, filename)
           if statement then
             insert(lua_bits, statement)
           end
@@ -916,10 +927,11 @@ end)]]):format(concat(lua_bits, "\n"))
             if escaped_args[arg_names[arg_num]] then
               arg = {
                 type = "Nomsu",
-                value = arg
+                value = arg,
+                line_no = tree.line_no
               }
             end
-            local expr, statement = self:tree_to_lua(arg)
+            local expr, statement = self:tree_to_lua(arg, filename)
             if statement then
               self:error("Cannot use [[" .. tostring(arg.src) .. "]] as a function argument, since it's not an expression.")
             end
@@ -953,7 +965,7 @@ end)]]):format(concat(lua_bits, "\n"))
               insert(concat_parts, repr(string_buffer))
               string_buffer = ""
             end
-            local expr, statement = self:tree_to_lua(bit)
+            local expr, statement = self:tree_to_lua(bit, filename)
             if self.debug then
               self:writeln((colored.bright("INTERP:")))
               self:print_tree(bit)
@@ -984,7 +996,7 @@ end)]]):format(concat(lua_bits, "\n"))
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local item = _list_0[_index_0]
-          local expr, statement = self:tree_to_lua(item)
+          local expr, statement = self:tree_to_lua(item, filename)
           if statement then
             self:error("Cannot use [[" .. tostring(item.src) .. "]] as a list item, since it's not an expression.")
           end
@@ -1088,8 +1100,11 @@ end)]]):format(concat(lua_bits, "\n"))
         self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        x = x:gsub("\n%s*%.%.", " "):gsub("([" .. tostring(wordbreaker) .. "]+)", " %1 "):gsub("%s+", " ")
-        x = x:gsub("^%s*", ""):gsub("%s*$", "")
+        x = x:gsub("\n%s*%.%.", " ")
+        x = lpeg.Cs((operator / (function(op)
+          return " " .. tostring(op) .. " "
+        end) + 1) ^ 0):match(x)
+        x = x:gsub("%s+", " "):gsub("^%s*", ""):gsub("%s*$", "")
         local stub = x:gsub("%%%S+", "%%"):gsub("\\", "")
         local arg_names
         do
@@ -1196,7 +1211,21 @@ end)]]):format(concat(lua_bits, "\n"))
       end)())
       for i = #self.callstack, 1, -1 do
         if self.callstack[i] ~= "#macro" then
-          error_msg = error_msg .. "\n    " .. tostring(("%-" .. tostring(maxlen) .. "s"):format(self.callstack[i][2])) .. "| " .. tostring(self.callstack[i][1])
+          local line_no = self.callstack[i][2]
+          if line_no then
+            local nums
+            do
+              local _accum_0 = { }
+              local _len_0 = 1
+              for n in line_no:gmatch(":([0-9]+)") do
+                _accum_0[_len_0] = tonumber(n)
+                _len_0 = _len_0 + 1
+              end
+              nums = _accum_0
+            end
+            line_no = line_no:gsub(":.*$", ":" .. tostring(utils.sum(nums) - #nums + 1))
+          end
+          error_msg = error_msg .. "\n    " .. tostring(("%-" .. tostring(maxlen) .. "s"):format(line_no)) .. "| " .. tostring(self.callstack[i][1])
         end
       end
       error_msg = error_msg .. "\n    <top level>"
@@ -1215,7 +1244,7 @@ end)]]):format(concat(lua_bits, "\n"))
     end,
     initialize_core = function(self)
       local nomsu_string_as_lua
-      nomsu_string_as_lua = function(self, code, tree)
+      nomsu_string_as_lua = function(self, code)
         local concat_parts = { }
         local _list_0 = code.value
         for _index_0 = 1, #_list_0 do
@@ -1223,9 +1252,9 @@ end)]]):format(concat(lua_bits, "\n"))
           if type(bit) == "string" then
             insert(concat_parts, bit)
           elseif type(bit) == "table" and bit.type == "FunctionCall" and bit.src == "__src__" then
-            insert(concat_parts, repr(tree.src))
+            insert(concat_parts, repr(self.defs["#macro_tree"].src))
           else
-            local expr, statement = self:tree_to_lua(bit)
+            local expr, statement = self:tree_to_lua(bit, filename)
             if statement then
               self:error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
             end
