@@ -210,6 +210,7 @@ class NomsuCompiler
             setmetatable(@defs["#vars"], {__index:parent["#vars"]})
             setmetatable(@defs["#loaded_files"], {__index:parent["#loaded_files"]})
         @callstack = {}
+        @macrostack = {}
         @debug = false
         @utils = utils
         @repr = (...)=> repr(...)
@@ -332,9 +333,11 @@ class NomsuCompiler
             @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
         insert @callstack, "#macro"
+        insert @macrostack, tree
         old_tree, @defs["#macro_tree"] = @defs["#macro_tree"], tree
         expr, statement = @call(tree.stub, tree.line_no, unpack(args))
         @defs["#macro_tree"] = old_tree
+        remove @macrostack
         remove @callstack
         return expr, statement
 
@@ -828,8 +831,6 @@ end)]])\format(concat(lua_bits, "\n"))
             for bit in *code.value
                 if type(bit) == "string"
                     insert concat_parts, bit
-                elseif bit.src == '__src__'
-                    insert concat_parts, repr(@dedent @defs["#macro_tree"].src)
                 else
                     expr, statement = @tree_to_lua bit, filename
                     if statement
@@ -847,6 +848,8 @@ end)]])\format(concat(lua_bits, "\n"))
             lua = nomsu_string_as_lua(@, vars.code)
             return lua, nil
         @defmacro "=lua %code", lua_value
+
+        @defmacro "__src__", => @repr @dedent @macrostack[#@macrostack-1].src
 
         run_file = (vars)=>
             if vars.filename\match(".*%.lua")
