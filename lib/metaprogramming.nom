@@ -5,12 +5,15 @@
 # Rule to make rules:
 lua> ".."
     |nomsu:defmacro("rule %signature = %body", (function(nomsu, vars)
-    |    local signature = nomsu:get_stubs(nomsu:typecheck(vars, "signature", "List").value);
+    |    local signature = {};
+    |    for i, alias in ipairs(nomsu:typecheck(vars, "signature", "List").value) do
+    |        signature[i] = alias.src;
+    |    end
     |    local body = nomsu:typecheck(vars, "body", "Thunk");
     |    return ([[
     |nomsu:def(%s, %s, %s)
-    |]]):format(nomsu:repr(signature), nomsu:tree_to_lua(body), nomsu:repr(\(__src__))), nil;
-    |end));
+    |]]):format(nomsu:repr(signature), nomsu:tree_to_lua(body), nomsu:repr(nomsu:dedent(nomsu.defs["#macro_tree"].src))), nil;
+    |end), \(__src__));
 
 # Rule to make nomsu macros:
 rule [parse \%shorthand as \%longhand] =:
@@ -109,10 +112,7 @@ rule [help %rule] =:
         |if not fn_def then
         |    nomsu:writeln("Rule not found: "..nomsu:repr(vars.rule));
         |else
-        |    local template = fn_def.is_macro and "compile %s to%s" or "rule %s =%s";
-        |    local src = fn_def.src or ":\\n    <unknown source code>";
-        |    if src:sub(1,1) ~= ":" and fn_def.is_macro then template = "parse %s as: %s"; end
-        |    nomsu:writeln(template:format(nomsu:repr(fn_def.stub), src));
+        |    nomsu:writeln(fn_def.src or "<unknown source code>");
         |end
 
 # Compiler tools

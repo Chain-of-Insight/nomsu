@@ -238,7 +238,7 @@ class NomsuCompiler
         aliases = {}
         @@def_number += 1
         def = {:thunk, :src, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
-        where_defs_go = (getmetatable(@defs) or {__newindex:@defs}).__newindex
+        where_defs_go = (getmetatable(@defs) or {}).__newindex or @defs
         for {stub, arg_names, escaped_args} in *signature
             assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
@@ -261,7 +261,10 @@ class NomsuCompiler
 
     scoped: (thunk)=>
         old_defs = @defs
-        @defs = setmetatable({}, {__index:old_defs})
+        new_defs =
+            ["#vars"]: setmetatable({}, {__index:@defs["#vars"]})
+            ["#loaded_files"]: setmetatable({}, {__index:@defs["#loaded_files"]})
+        @defs = setmetatable(new_defs, {__index:old_defs})
         ok, ret1, ret2 = pcall thunk, @
         @defs = old_defs
         if not ok then @error(ret1)
@@ -825,15 +828,15 @@ end)]])\format(concat(lua_bits, "\n"))
             for bit in *code.value
                 if type(bit) == "string"
                     insert concat_parts, bit
-                elseif type(bit) == "table" and bit.type == "FunctionCall" and bit.src == "__src__"
-                    insert concat_parts, repr(@defs["#macro_tree"].src)
+                elseif bit.src == '__src__'
+                    insert concat_parts, repr(@dedent @defs["#macro_tree"].src)
                 else
                     expr, statement = @tree_to_lua bit, filename
                     if statement
                         @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, expr
             return concat(concat_parts)
-
+        
         -- Uses named local functions to help out callstack readability
         lua_code = (vars)=>
             lua = nomsu_string_as_lua(@, vars.code)

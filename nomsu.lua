@@ -280,9 +280,7 @@ do
         def_number = self.__class.def_number,
         defs = self.defs
       }
-      local where_defs_go = (getmetatable(self.defs) or {
-        __newindex = self.defs
-      }).__newindex
+      local where_defs_go = (getmetatable(self.defs) or { }).__newindex or self.defs
       for _index_0 = 1, #signature do
         local _des_0 = signature[_index_0]
         local stub, arg_names, escaped_args
@@ -325,7 +323,15 @@ do
     end,
     scoped = function(self, thunk)
       local old_defs = self.defs
-      self.defs = setmetatable({ }, {
+      local new_defs = {
+        ["#vars"] = setmetatable({ }, {
+          __index = self.defs["#vars"]
+        }),
+        ["#loaded_files"] = setmetatable({ }, {
+          __index = self.defs["#loaded_files"]
+        })
+      }
+      self.defs = setmetatable(new_defs, {
         __index = old_defs
       })
       local ok, ret1, ret2 = pcall(thunk, self)
@@ -1249,8 +1255,8 @@ end)]]):format(concat(lua_bits, "\n"))
           local bit = _list_0[_index_0]
           if type(bit) == "string" then
             insert(concat_parts, bit)
-          elseif type(bit) == "table" and bit.type == "FunctionCall" and bit.src == "__src__" then
-            insert(concat_parts, repr(self.defs["#macro_tree"].src))
+          elseif bit.src == '__src__' then
+            insert(concat_parts, repr(self:dedent(self.defs["#macro_tree"].src)))
           else
             local expr, statement = self:tree_to_lua(bit, filename)
             if statement then
