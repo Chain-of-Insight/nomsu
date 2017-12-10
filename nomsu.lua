@@ -467,10 +467,12 @@ do
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
       insert(self.callstack, "#macro")
+      insert(self.macrostack, tree)
       local old_tree
       old_tree, self.defs["#macro_tree"] = self.defs["#macro_tree"], tree
       local expr, statement = self:call(tree.stub, tree.line_no, unpack(args))
       self.defs["#macro_tree"] = old_tree
+      remove(self.macrostack)
       remove(self.callstack)
       return expr, statement
     end,
@@ -1255,8 +1257,6 @@ end)]]):format(concat(lua_bits, "\n"))
           local bit = _list_0[_index_0]
           if type(bit) == "string" then
             insert(concat_parts, bit)
-          elseif bit.src == '__src__' then
-            insert(concat_parts, repr(self:dedent(self.defs["#macro_tree"].src)))
           else
             local expr, statement = self:tree_to_lua(bit, filename)
             if statement then
@@ -1279,6 +1279,9 @@ end)]]):format(concat(lua_bits, "\n"))
         return lua, nil
       end
       self:defmacro("=lua %code", lua_value)
+      self:defmacro("__src__", function(self)
+        return self:repr(self:dedent(self.macrostack[#self.macrostack - 1].src))
+      end)
       local run_file
       run_file = function(self, vars)
         if vars.filename:match(".*%.lua") then
@@ -1343,6 +1346,7 @@ end)]]):format(concat(lua_bits, "\n"))
         })
       end
       self.callstack = { }
+      self.macrostack = { }
       self.debug = false
       self.utils = utils
       self.repr = function(self, ...)
