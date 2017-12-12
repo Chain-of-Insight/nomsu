@@ -467,12 +467,7 @@ do
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
       insert(self.callstack, "#macro")
-      insert(self.macrostack, tree)
-      local old_tree
-      old_tree, self.defs["#macro_tree"] = self.defs["#macro_tree"], tree
       local expr, statement = self:call(tree.stub, tree.line_no, unpack(args))
-      self.defs["#macro_tree"] = old_tree
-      remove(self.macrostack)
       remove(self.callstack)
       return expr, statement
     end,
@@ -863,7 +858,19 @@ end);]]):format(concat(buffer, "\n"))
       end
       local _exp_0 = tree.type
       if "File" == _exp_0 then
-        return error("Should not be converting File to lua through this function.")
+        local lua_bits = { }
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local line = _list_0[_index_0]
+          local expr, statement = self:tree_to_lua(line, filename)
+          if statement then
+            insert(lua_bits, statement)
+          end
+          if expr then
+            insert(lua_bits, "ret = " .. tostring(expr) .. ";")
+          end
+        end
+        return nil, concat(lua_bits, "\n")
       elseif "Nomsu" == _exp_0 then
         return "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ", " .. tostring(repr(tree.line_no)) .. ").value[1]", nil
       elseif "Thunk" == _exp_0 then
@@ -885,6 +892,7 @@ local ret;
 return ret;
 end)]]):format(concat(lua_bits, "\n"))
       elseif "FunctionCall" == _exp_0 then
+        insert(self.compilestack, tree)
         local def = self.defs[tree.stub]
         if def and def.is_macro then
           local expr, statement = self:run_macro(tree)
@@ -896,6 +904,7 @@ end)]]):format(concat(lua_bits, "\n"))
               statement = "nomsu:assert_permission(" .. tostring(repr(tree.stub)) .. ");\n" .. statement
             end
           end
+          remove(self.compilestack)
           return expr, statement
         end
         local args = {
@@ -949,6 +958,7 @@ end)]]):format(concat(lua_bits, "\n"))
             break
           end
         end
+        remove(self.compilestack)
         return self.__class:comma_separated_items("nomsu:call(", args, ")"), nil
       elseif "String" == _exp_0 then
         if self.debug then
@@ -1248,6 +1258,12 @@ end)]]):format(concat(lua_bits, "\n"))
       end
       return self:error("Invalid type for %" .. tostring(varname) .. ". Expected " .. tostring(desired_type) .. ", but got " .. tostring(repr(x)) .. ".")
     end,
+    source_code = function(self, level)
+      if level == nil then
+        level = 0
+      end
+      return self:dedent(self.compilestack[#self.compilestack - level].src)
+    end,
     initialize_core = function(self)
       local nomsu_string_as_lua
       nomsu_string_as_lua = function(self, code)
@@ -1279,8 +1295,8 @@ end)]]):format(concat(lua_bits, "\n"))
         return lua, nil
       end
       self:defmacro("=lua %code", lua_value)
-      self:defmacro("__src__", function(self)
-        return self:repr(self:dedent(self.macrostack[#self.macrostack - 1].src))
+      self:defmacro("__src__ %level", function(self, vars)
+        return self:repr(self:source_code(self:tree_to_value(vars.level)))
       end)
       local run_file
       run_file = function(self, vars)
@@ -1346,7 +1362,7 @@ end)]]):format(concat(lua_bits, "\n"))
         })
       end
       self.callstack = { }
-      self.macrostack = { }
+      self.compilestack = { }
       self.debug = false
       self.utils = utils
       self.repr = function(self, ...)

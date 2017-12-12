@@ -37,6 +37,8 @@ if _VERSION == "Lua 5.1"
 -- type checking?
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
+-- Change longstrings to be "..\n    content\n.."
+-- Change precompiling from producing lua code to producing lua> "code" nomsu files
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -210,7 +212,7 @@ class NomsuCompiler
             setmetatable(@defs["#vars"], {__index:parent["#vars"]})
             setmetatable(@defs["#loaded_files"], {__index:parent["#loaded_files"]})
         @callstack = {}
-        @macrostack = {}
+        @compilestack = {}
         @debug = false
         @utils = utils
         @repr = (...)=> repr(...)
@@ -333,11 +335,7 @@ class NomsuCompiler
             @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
         insert @callstack, "#macro"
-        insert @macrostack, tree
-        old_tree, @defs["#macro_tree"] = @defs["#macro_tree"], tree
         expr, statement = @call(tree.stub, tree.line_no, unpack(args))
-        @defs["#macro_tree"] = old_tree
-        remove @macrostack
         remove @callstack
         return expr, statement
 
@@ -598,7 +596,12 @@ end);]])\format(concat(buffer, "\n"))
             @error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
-                error("Should not be converting File to lua through this function.")
+                lua_bits = {}
+                for line in *tree.value
+                    expr,statement = @tree_to_lua line, filename
+                    if statement then insert lua_bits, statement
+                    if expr then insert lua_bits, "ret = #{expr};"
+                return nil, concat(lua_bits, "\n")
             
             when "Nomsu"
                 return "nomsu:parse(#{repr tree.value.src}, #{repr tree.line_no}).value[1]", nil
@@ -617,6 +620,8 @@ return ret;
 end)]])\format(concat(lua_bits, "\n"))
 
             when "FunctionCall"
+                insert @compilestack, tree
+
                 def = @defs[tree.stub]
                 if def and def.is_macro
                     expr, statement = @run_macro(tree)
@@ -625,6 +630,7 @@ end)]])\format(concat(lua_bits, "\n"))
                             expr = "(nomsu:assert_permission(#{repr tree.stub}) and #{expr})"
                         if statement
                             statement = "nomsu:assert_permission(#{repr tree.stub});\n"..statement
+                    remove @compilestack
                     return expr, statement
                 args = {repr(tree.stub), repr(tree.line_no)}
                 local arg_names, escaped_args
@@ -642,6 +648,8 @@ end)]])\format(concat(lua_bits, "\n"))
                         @error "Cannot use [[#{arg.src}]] as a function argument, since it's not an expression."
                     insert args, expr
                     arg_num += 1
+
+                remove @compilestack
                 return @@comma_separated_items("nomsu:call(", args, ")"), nil
 
             when "String"
@@ -823,6 +831,9 @@ end)]])\format(concat(lua_bits, "\n"))
         if type(x) == desired_type then return x
         if type(x) == 'table' and x.type == desired_type then return x
         @error "Invalid type for %#{varname}. Expected #{desired_type}, but got #{repr x}."
+    
+    source_code: (level=0)=>
+        @dedent @compilestack[#@compilestack-level].src
 
     initialize_core: =>
         -- Sets up some core functionality
@@ -849,7 +860,8 @@ end)]])\format(concat(lua_bits, "\n"))
             return lua, nil
         @defmacro "=lua %code", lua_value
 
-        @defmacro "__src__", => @repr @dedent @macrostack[#@macrostack-1].src
+        @defmacro "__src__ %level", (vars)=>
+            @repr @source_code @tree_to_value vars.level
 
         run_file = (vars)=>
             if vars.filename\match(".*%.lua")

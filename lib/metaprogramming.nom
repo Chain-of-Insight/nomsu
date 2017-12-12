@@ -10,36 +10,11 @@ lua> ".."
     |        signature[i] = alias.src;
     |    end
     |    local body = nomsu:typecheck(vars, "body", "Thunk");
-    |    return ([[
+    |    local src = nomsu:source_code(0);
+    |    return nil, ([[
     |nomsu:def(%s, %s, %s)
-    |]]):format(nomsu:repr(signature), nomsu:tree_to_lua(body), nomsu:repr(nomsu:dedent(nomsu.defs["#macro_tree"].src))), nil;
-    |end), \(__src__));
-
-# Rule to make nomsu macros:
-rule [parse \%shorthand as \%longhand] =:
-    lua> ".."
-        |local signature = {};
-        |for i, alias in ipairs(nomsu:typecheck(vars, "shorthand", "List").value) do
-        |    signature[i] = alias.src;
-        |end
-        |local template = nomsu:typecheck(vars, "longhand", "Thunk").value;
-        |local function parsing_as(nomsu, vars)
-        # Single expression/statement
-        |    if #template == 1 then
-        |        local replacement = nomsu:replaced_vars(template[1], vars);
-        |        return nomsu:tree_to_lua(replacement);
-        |    end
-        # Multiple statements
-        |   local lua_bits = {};
-        |   for _,bit in ipairs(template) do
-        |       bit = nomsu:replaced_vars(bit, vars);
-        |       local expr, statement = nomsu:tree_to_lua(bit);
-        |       if statement then table.insert(lua_bits, statement); end
-        |       if expr then table.insert(lua_bits, "ret = "..expr..";"); end
-        |   end
-        |   return nil, table.concat(lua_bits, "\\n");
-        |end
-        |nomsu:defmacro(signature, parsing_as, \(__src__));
+    |]]):format(nomsu:repr(signature), nomsu:tree_to_lua(body), nomsu:repr(nomsu:dedent(src)));
+    |end), \(__src__ 1));
 
 # Rule to make lua macros:
 rule [compile \%macro_def to \%body] =:
@@ -61,6 +36,27 @@ rule [compile \%macro_def to code \%body] =:
         |local thunk = nomsu:tree_to_value(body);
         |local thunk_wrapper = function(nomsu, vars) return nil, thunk(nomsu, vars); end
         |nomsu:defmacro(signature, thunk_wrapper, ("compile %s\\n..to code %s"):format(vars.macro_def.src, body.src));
+
+# Rule to make nomsu macros:
+lua> ".."
+    |nomsu:defmacro("parse %shorthand as %longhand", (function(nomsu, vars)
+    |    local signature = {};
+    |    for i, alias in ipairs(nomsu:typecheck(vars, "shorthand", "List").value) do
+    |        signature[i] = alias.src;
+    |    end
+    |    local template = {};
+    |    for i, line in ipairs(nomsu:typecheck(vars, "longhand", "Thunk").value) do
+    |        template[i] = nomsu:dedent(line.src);
+    |    end
+    |    signature, template = nomsu:repr(signature), nomsu:repr(table.concat(template, "\\n"));
+    |    return nil, ([[
+    |nomsu:defmacro(%s, (function(nomsu, vars)
+    |    local template = nomsu:parse(%s, %s);
+    |    if #template.value == 1 then template = template.value[1]; end
+    |    local replacement = nomsu:replaced_vars(template, vars);
+    |    return nomsu:tree_to_lua(replacement);
+    |end), %s)]]):format(signature, template, nomsu:repr(vars.shorthand.line_no), nomsu:repr(nomsu:source_code(0)));
+    |end), \(__src__ 1));
 
 rule [remove rule %stub] =:
     lua> ".."

@@ -13,7 +13,8 @@ if [ "$FLUSH" = true ] ; then
         rm $file
     done
 fi
-for file in $(find lib/ -name "*.nom") ; do
+
+for file in $(cat compile_order.txt) ; do
     luafile="$file.lua"
     if [ ! -e "$luafile" ] || [ "$file" -nt "$luafile" ] ; then
         echo "Compiling $file into $luafile"
