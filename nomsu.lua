@@ -412,7 +412,7 @@ do
         end
       end
       for k, v in pairs(scope["#vars"] or { }) do
-        insert(buff, "<@" .. tostring(k) .. "> = " .. tostring(self:value_to_nomsu(v)))
+        insert(buff, "<%" .. tostring(k) .. "> = " .. tostring(self:value_to_nomsu(v)))
       end
       return concat(buff, "\n")
     end,
@@ -852,6 +852,14 @@ end);]]):format(concat(buffer, "\n"))
             end
             return _accum_0
           end)(), "; ")) .. "})"
+        end
+      elseif "string" == _exp_0 then
+        if value == "\n" then
+          return "'\\n'"
+        elseif not value:find([["]]) and not value:find("\n") and not value:find("\\") then
+          return "\"" .. value .. "\""
+        else
+          return '".."\n    ' .. (self:indent(value))
         end
       else
         return error("Unsupported value_to_nomsu type: " .. tostring(type(value)))

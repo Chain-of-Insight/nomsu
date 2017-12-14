@@ -37,7 +37,6 @@ if _VERSION == "Lua 5.1"
 -- type checking?
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
--- Change longstrings to be "..\n    content\n.."
 -- Change precompiling from producing lua code to producing lua> "code" nomsu files
 
 lpeg.setmaxstack 10000 -- whoa
@@ -309,7 +308,7 @@ class NomsuCompiler
                 insert buff, "using:\n    #{@indent @serialize_defs(_using)}\n..do:\n    #{@indent concat(_using_do, "\n")}"
 
         for k,v in pairs(scope["#vars"] or {})
-            insert buff, "<@#{k}> = #{@value_to_nomsu v}"
+            insert buff, "<%#{k}> = #{@value_to_nomsu v}"
 
         return concat buff, "\n"
 
@@ -591,6 +590,14 @@ end);]])\format(concat(buffer, "\n"))
                     return "[#{concat [@value_to_nomsu(v) for v in *value], ", "}]"
                 else
                     return "(d{#{concat ["#{@value_to_nomsu(k)}=#{@value_to_nomsu(v)}" for k,v in pairs(value)], "; "}})"
+            when "string"
+                if value == "\n"
+                    return "'\\n'"
+                elseif not value\find[["]] and not value\find"\n" and not value\find"\\"
+                    return "\""..value.."\""
+                else
+                    -- TODO: This might fail if it's being put inside a list or something
+                    return '".."\n    '..(@indent value)
             else
                 error("Unsupported value_to_nomsu type: #{type(value)}")
 
