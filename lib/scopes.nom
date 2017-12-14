@@ -3,7 +3,7 @@ require "lib/operators.nom"
 require "lib/control_flow.nom"
 
 compile [<%var> = %value] to code: ".."
-    |nomsu.defs['#vars'][\(repr (%var's "value"))] = \(%value as lua);
+    nomsu.defs['#vars'][\(repr (%var's "value"))] = \(%value as lua);
 
 compile [<%var>] to: "nomsu.defs['#vars'][\(repr (%var's "value"))]"
 
@@ -17,8 +17,8 @@ parse [using %scoped do %actions] as:
     with (nomsu's "defs") = %scope:
         do %scoped
         lua> ".."
-            |getmetatable(nomsu.defs).__newindex = getmetatable(nomsu.defs).__index;
-            |getmetatable(nomsu.defs["#vars"]).__newindex = getmetatable(nomsu.defs["#vars"]).__index;
+            getmetatable(nomsu.defs).__newindex = getmetatable(nomsu.defs).__index;
+            getmetatable(nomsu.defs["#vars"]).__newindex = getmetatable(nomsu.defs["#vars"]).__index;
         do %actions
 
 parse [scoped %actions] as: using %actions do {pass}

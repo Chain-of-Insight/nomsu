@@ -47,26 +47,32 @@ local STRING_ESCAPES = {
 local indent_stack = {
   0
 }
-local check_indent
-check_indent = function(subject, end_pos, spaces)
+local indent_patt = P(function(self, start)
+  local spaces = self:match("[ \t]*", start)
   if #spaces > indent_stack[#indent_stack] then
     insert(indent_stack, #spaces)
-    return end_pos
+    return start + #spaces
   end
-end
-local check_dedent
-check_dedent = function(subject, end_pos, spaces)
+end)
+local dedent_patt = P(function(self, start)
+  local spaces = self:match("[ \t]*", start)
   if #spaces < indent_stack[#indent_stack] then
     remove(indent_stack)
-    return end_pos
+    return start
   end
-end
-local check_nodent
-check_nodent = function(subject, end_pos, spaces)
+end)
+local nodent_patt = P(function(self, start)
+  local spaces = self:match("[ \t]*", start)
   if #spaces == indent_stack[#indent_stack] then
-    return end_pos
+    return start + #spaces
   end
-end
+end)
+local gt_nodent_patt = P(function(self, start)
+  local spaces = self:match("[ \t]*", start)
+  if #spaces >= indent_stack[#indent_stack] + 4 then
+    return start + indent_stack[#indent_stack] + 4
+  end
+end)
 local nomsu = [=[    file <- ({{| shebang?
         (ignored_line %nl)*
         statements (nodent statements)*
@@ -120,12 +126,12 @@ local nomsu = [=[    file <- ({{| shebang?
         ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
 ") / (!string_interpolation [^%nl"]))+ ~}
         / string_interpolation)* |} '"' }) -> String
-    indented_string <- ({ '".."' indent {|
-            indented_string_line (nodent {~ "" -> "
-" ~} indented_string_line)*
-          |} (dedent / (({.+} ("" -> "Error while parsing String")) => error))
+
+    indented_string <- ({ '".."' %ws? line_comment? %nl %gt_nodented? {|
+        ({~ (("\\" -> "\") / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\]) ~} / string_interpolation)*
+    |} ((!.) / (&(%nl+ !%gt_nodented)) / (({.+} ("" -> "Error while parsing String")) => error))
         }) -> String
-    indented_string_line <- "|" ({~ (("\\" -> "\") / (!string_interpolation [^%nl]))+ ~} / string_interpolation)*
+
     string_interpolation <- "\" ((noeol_expression dotdot?) / dotdot)
 
     number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
@@ -169,9 +175,10 @@ local defs = {
   tonumber = tonumber,
   operator = operator,
   plain_word = plain_word,
-  indented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_indent),
-  nodented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_nodent),
-  dedented = Cmt(S(" \t") ^ 0 * (#(P(1) - S(" \t\n") + (-P(1)))), check_dedent),
+  indented = indent_patt,
+  nodented = nodent_patt,
+  dedented = dedent_patt,
+  gt_nodented = gt_nodent_patt,
   line_no = function(src, pos)
     local line_no = 1
     for _ in src:sub(1, pos):gmatch("\n") do

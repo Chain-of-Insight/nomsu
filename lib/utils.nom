@@ -6,17 +6,18 @@ rule [error!, panic!, fail!, abort!] =:
 rule [error %msg] =:
     nomsu "error"[%msg]
 compile [assert %condition %msg] to code: ".."
-    |if not (\(%condition as lua)) then
-    |    nomsu:error(\(%msg as lua))
-    |end
+    if not (\(%condition as lua)) then
+        nomsu:error(\(%msg as lua))
+    end
+
 parse [assert %condition] as: assert %condition (nil)
 
 # String functions
 rule [join %strs with glue %glue] =:
     lua do> ".."
-        |local str_bits = {}
-        |for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu:stringify(bit) end
-        |return table.concat(str_bits, vars.glue)
+        local str_bits = {}
+        for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu:stringify(bit) end
+        return table.concat(str_bits, vars.glue)
 parse [join %strs] as: join %strs with glue ""
 
 compile [capitalize %str, %str capitalized] to:
@@ -29,13 +30,14 @@ compile [%str with %patt replaced with %sub %n times, %str s/%patt/%sub/%n] to:
 
 # Number ranges
 compile [%start to %stop by %step, %start to %stop via %step] to: ".."
-   |nomsu.utils.range(\(%start as lua), \(%stop as lua), \(%step as lua))
+    nomsu.utils.range(\(%start as lua), \(%stop as lua), \(%step as lua))
+
 parse [%start to %stop] as: %start to %stop by 1
 
 # Random functions
 lua> ".." # Seed
-    |math.randomseed(os.time());
-    |for i=1,20 do; math.random(); end;
+    math.randomseed(os.time());
+    for i=1,20 do; math.random(); end;
 compile [random number, random, rand] to: "math.random()"
 compile [random int %n, random integer %n, randint %n] to: "math.random(\(%n as lua))"
 compile [random from %low to %high, random number from %low to %high, rand %low %high] to:
@@ -81,52 +83,43 @@ compile [min of %items, smallest of %items, lowest of %items] to:
     "nomsu.utils.min(\(%items as lua))"
 compile [max of %items, biggest of %items, largest of %items, highest of %items] to:
     "nomsu.utils.max(\(%items as lua))"
-compile [min of %items by %value_expr] to:
-    ".."
-        |nomsu.utils.min(\(%items as lua), function(item)
-        |    local vars = setmetatable({['']=item}, {__index=vars})
-        |    return \(%value_expr as lua)
-        |end)
-compile [max of %items by %value_expr] to:
-    ".."
-        |nomsu.utils.max(\(%items as lua), function(item)
-        |    local vars = setmetatable({['']=item}, {__index=vars})
-        |    return \(%value_expr as lua)
-        |end)
+compile [min of %items by %value_expr] to: ".."
+    nomsu.utils.min(\(%items as lua), function(item)
+        local vars = setmetatable({['']=item}, {__index=vars})
+        return \(%value_expr as lua)
+    end)
+compile [max of %items by %value_expr] to: ".."
+    nomsu.utils.max(\(%items as lua), function(item)
+        local vars = setmetatable({['']=item}, {__index=vars})
+        return \(%value_expr as lua)
+    end)
 compile [sort %items] to: "table.sort(\(%items as lua))"
 rule [sort %items by %key] =: =lua ".."
-    |nomsu.utils.sort(\(%items), function(x)
-    |    return (\(%key))(nomsu, {['']=x});
-    |end)
+    nomsu.utils.sort(\(%items), function(x)
+        return (\(%key))(nomsu, {['']=x});
+    end)
 
 # String utilities
-compile [nl, newline, line feed, linefeed, lf] to: ".."
-    |"\n"
-compile [tab] to: ".."
-    |"\t"
-compile [bell] to: ".."
-    |"\a"
-compile [cr, carriage return] to: ".."
-    |"\r"
-compile [backspace] to: ".."
-    |"\b"
-compile [form feed, formfeed] to: ".."
-    |"\f"
-compile [vertical tab] to: ".."
-    |"\v"
+compile [nl, newline, line feed, linefeed, lf] to: "'\\n'"
+compile [tab] to: "'\\t'"
+compile [bell] to: "'\\a'"
+compile [cr, carriage return] to: "'\\r'"
+compile [backspace] to: "'\\b'"
+compile [form feed, formfeed] to: "'\\f'"
+compile [vertical tab] to: "'\\v'"
 
 lua> ".."
-    |do;
-    |    local colors = {
-    |        ["reset color"] = 0, bright = 1, dim = 2, underscore = 4, blink = 5,
-    |        inverse = 7, hidden = 8, black = 30, red = 31, green = 32, yellow = 33,
-    |        blue = 34, magenta = 35, cyan = 36, white = 37, ["on black"] = 40,
-    |        ["on red"] = 41, ["on green"] = 42, ["on yellow"] = 43, ["on blue"] = 44,
-    |        ["on magenta"] = 45, ["on cyan"] = 46, ["on white"] = 47,
-    |    };
-    |    for name,code in pairs(colors) do;
-    |        local escape = "\\"\\\\27["..tostring(code).."m\\""
-    |        nomsu:defmacro(name, function() return escape end, "");
-    |    end;
-    |end;
+    do
+        local colors = {
+            ["reset color"] = 0, bright = 1, dim = 2, underscore = 4, blink = 5,
+            inverse = 7, hidden = 8, black = 30, red = 31, green = 32, yellow = 33,
+            blue = 34, magenta = 35, cyan = 36, white = 37, ["on black"] = 40,
+            ["on red"] = 41, ["on green"] = 42, ["on yellow"] = 43, ["on blue"] = 44,
+            ["on magenta"] = 45, ["on cyan"] = 46, ["on white"] = 47,
+        };
+        for name,code in pairs(colors) do
+            local escape = "\\"\\\\27["..tostring(code).."m\\""
+            nomsu:defmacro(name, function() return escape end, "");
+        end
+    end
 

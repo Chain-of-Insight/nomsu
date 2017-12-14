@@ -46,17 +46,25 @@ STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
 
 -- NOTE: this treats tabs as equivalent to 1 space
 indent_stack = {0}
-check_indent = (subject,end_pos,spaces)->
+indent_patt = P (start)=>
+    spaces = @match("[ \t]*", start)
     if #spaces > indent_stack[#indent_stack]
         insert(indent_stack, #spaces)
-        return end_pos
-check_dedent = (subject,end_pos,spaces)->
+        return start + #spaces
+dedent_patt = P (start)=>
+    spaces = @match("[ \t]*", start)
     if #spaces < indent_stack[#indent_stack]
         remove(indent_stack)
-        return end_pos
-check_nodent = (subject,end_pos,spaces)->
+        return start
+nodent_patt = P (start)=>
+    spaces = @match("[ \t]*", start)
     if #spaces == indent_stack[#indent_stack]
-        return end_pos
+        return start + #spaces
+gt_nodent_patt = P (start)=>
+    -- Note! This assumes indent is 4 spaces!!!
+    spaces = @match("[ \t]*", start)
+    if #spaces >= indent_stack[#indent_stack] + 4
+        return start + indent_stack[#indent_stack] + 4
 
 -- TYPES:
 -- Number 1, "String", %Var, [List], (expression), {Thunk}, \Nomsu, FunctionCall, File
@@ -115,12 +123,12 @@ nomsu = [=[
         ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
 ") / (!string_interpolation [^%nl"]))+ ~}
         / string_interpolation)* |} '"' }) -> String
-    indented_string <- ({ '".."' indent {|
-            indented_string_line (nodent {~ "" -> "
-" ~} indented_string_line)*
-          |} (dedent / (({.+} ("" -> "Error while parsing String")) => error))
+
+    indented_string <- ({ '".."' %ws? line_comment? %nl %gt_nodented? {|
+        ({~ (("\\" -> "\") / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\]) ~} / string_interpolation)*
+    |} ((!.) / (&(%nl+ !%gt_nodented)) / (({.+} ("" -> "Error while parsing String")) => error))
         }) -> String
-    indented_string_line <- "|" ({~ (("\\" -> "\") / (!string_interpolation [^%nl]))+ ~} / string_interpolation)*
+
     string_interpolation <- "\" ((noeol_expression dotdot?) / dotdot)
 
     number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
@@ -164,9 +172,7 @@ utf8_char = (
 plain_word = (R('az','AZ','09') + S("_") + utf8_char)^1
 defs =
     ws:whitespace, nl: P("\n"), :tonumber, :operator, :plain_word
-    indented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_indent)
-    nodented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_nodent)
-    dedented: Cmt(S(" \t")^0 * (#(P(1)-S(" \t\n") + (-P(1)))), check_dedent)
+    indented: indent_patt, nodented: nodent_patt, dedented: dedent_patt, gt_nodented: gt_nodent_patt
     line_no: (src, pos)->
         line_no = 1
         for _ in src\sub(1,pos)\gmatch("\n") do line_no += 1

@@ -25,7 +25,7 @@ compile [with %assignments %action] to code:
         %var = (%tokens -> 1)
         %eq = (%tokens -> 2)
         assert (=lua "vars.eq and vars.eq.type == 'Word' and vars.eq.value == '='") ".."
-            |Invalid format for 'with' statement. List entries must have the form %var = (value)
+            Invalid format for 'with' statement. List entries must have the form %var = (value)
         %value = (%tokens -> 3)
         add (d{i=%i; var=%var; value=%value}) to %data
     %foo = (..)
@@ -34,18 +34,18 @@ compile [with %assignments %action] to code:
             ..for all %data
         ..with glue "\n    "
     ".."
-        |do
-        |    \(%foo)
-        |    local fell_through = false;
-        |    local ok, ret1, ret2 = pcall(function(nomsu, vars)
-        |        \(%action as lua statements);
-        |        fell_through = true;
-        |    end, nomsu, vars);
-        |    \(join ("\((%->"var") as lua) = old_value\(%->"i");" for all %data) with glue "\n    ")
-        |    if not ok then nomsu:error(ret1); end
-        |    if not fell_through then
-        |        return ret1, ret2;
-        |    end
-        |end
+        do
+            \(%foo)
+            local fell_through = false;
+            local ok, ret1, ret2 = pcall(function(nomsu, vars)
+                \(%action as lua statements);
+                fell_through = true;
+            end, nomsu, vars);
+            \(join ("\((%->"var") as lua) = old_value\(%->"i");" for all %data) with glue "\n    ")
+            if not ok then nomsu:error(ret1); end
+            if not fell_through then
+                return ret1, ret2;
+            end
+        end
 parse [with %thing = %value %action] as: with [%thing = %value] %action
 
