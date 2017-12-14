@@ -4,10 +4,10 @@ require "lib/metaprogramming.nom"
 rule [test tree %generated == %expected] =:
     if (%generated != %expected):
         error ".."
-            |Test Failed!
-            |Expected:
-            |\(%expected)
-            |But got:
-            |\(%generated)
+            Test Failed!
+            Expected:
+            \(%expected)
+            But got:
+            \(%generated)
 parse [test %code yields %expected] as:
     test tree (nomsu "tree_to_str" [\%code]) == %expected

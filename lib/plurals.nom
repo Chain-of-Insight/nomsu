@@ -4,19 +4,19 @@ require "lib/secrets.nom"
 # Plurals
 with secrets:
     lua do> ".."
-        |local endings = setmetatable({x="es",c="es",s="es"}, {__index=function() return "s"; end});
-        |secrets.plurals = setmetatable({}, {__index=function(self,key)
-        |    return key..endings[key:sub(-1)];
-        |end});
-        |secrets.singulars = setmetatable({}, {__index=function(self,key)
-        |    if key:sub(-2) == "es" and rawget(endings, key:sub(-3,-3)) then return key:sub(1,-3); end
-        |    if key:sub(-1) == "s" then return key:sub(1,-2); end
-        |    return key;
-        |end});
-        |secrets.canonicals = setmetatable({}, {__index=function(self,key)
-        |    if key:sub(-1) == "s" then return secrets.singulars[key]; end
-        |    return key;
-        |end});
+        local endings = setmetatable({x="es",c="es",s="es"}, {__index=function() return "s"; end});
+        secrets.plurals = setmetatable({}, {__index=function(self,key)
+            return key..endings[key:sub(-1)];
+        end});
+        secrets.singulars = setmetatable({}, {__index=function(self,key)
+            if key:sub(-2) == "es" and rawget(endings, key:sub(-3,-3)) then return key:sub(1,-3); end
+            if key:sub(-1) == "s" then return key:sub(1,-2); end
+            return key;
+        end});
+        secrets.canonicals = setmetatable({}, {__index=function(self,key)
+            if key:sub(-1) == "s" then return secrets.singulars[key]; end
+            return key;
+        end});
 
     rule [the plural of %singular is %plural] =:
         (secret %plurals)->%singular = %plural
