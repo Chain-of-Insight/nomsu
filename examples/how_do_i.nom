@@ -25,15 +25,15 @@ say "Hello world!"
 
 # Define a mutli-line string?
 %mutli_str = ".."
-    |Start with "..", then put lines below it
-    |that are indented one level and start
-    |with a |
+    Start with "..", then put lines below it
+    that are indented one level.
+    The string will continue until the indentation ends.
 
 # Format a string?
 %format_str = ".."
-    |Strings can have areas delimited with a backslash and parens like this:
-    |The value of %x is \(%x), isn't that nice?
-    |If you need to use a plain ol' backslash, you can do \\ <-- that
+    Strings can have areas delimited with a backslash and parens like this:
+    The value of %x is \(%x), isn't that nice?
+    If you need to use a plain ol' backslash, you can do \\ <-- that
 %format_str2 = "Single-line strings can contain \", \\, and \n"
 
 # Define a list?
@@ -249,7 +249,7 @@ say both (..)
 # The "lua> %" and "=lua %" macros can be used to write raw lua code: 
 rule [say the time] =:
     lua> ".."
-        |nomsu:writeln("The OS time is: "..os.time());
+        nomsu:writeln("The OS time is: "..os.time());
 say the time
 say "Math expression result is: \(=lua "(1 + 2*3 + 3*4)^2")"
 
@@ -265,9 +265,9 @@ parse [if %condition is untrue %body] as:
 
 # Or to transform nomsu code into custom lua code using "compile % to code %"
 compile [if %condition on opposite day %body] to code: ".."
-    |if not (\(%condition as lua)) then
-    |    \(%body as lua statements)
-    |end
+    if not (\(%condition as lua)) then
+        \(%body as lua statements)
+    end
 
 if (1 > 10) is untrue:
     say "Nomsu parsing macros work!"
