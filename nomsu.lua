@@ -1425,7 +1425,7 @@ if arg then
   colors = require('consolecolors')
   local parser = re.compile([[        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)
-        flag <- "-c" / "-i" / "-p" / "-f" / "--help" / "-h"
+        flag <- "-c" / "-i" / "-p" / "-O" / "--help" / "-h"
         input <- "-" / [^;]+
         output <- "-" / [^;]+
     ]], {
@@ -1434,11 +1434,11 @@ if arg then
   local args = concat(arg, ";") .. ";"
   args = parser:match(args) or { }
   if not args or not args.flags or args.flags["--help"] or args.flags["-h"] then
-    print("Usage: lua nomsu.lua [-c] [-i] [-p] [-f] [--help] [input [-o output]]")
+    print("Usage: lua nomsu.lua [-c] [-i] [-p] [-O] [--help] [input [-o output]]")
     os.exit()
   end
   local c = NomsuCompiler()
-  c.skip_precompiled = args.flags["-f"]
+  c.skip_precompiled = not args.flags["-O"]
   if args.input then
     if args.flags["-c"] and not args.output then
       args.output = args.input .. ".lua"
