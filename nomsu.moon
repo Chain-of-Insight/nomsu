@@ -903,18 +903,18 @@ if arg
     parser = re.compile([[
         args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)
-        flag <- "-c" / "-i" / "-p" / "-f" / "--help" / "-h"
+        flag <- "-c" / "-i" / "-p" / "-O" / "--help" / "-h"
         input <- "-" / [^;]+
         output <- "-" / [^;]+
     ]], {set: utils.set})
     args = concat(arg, ";")..";"
     args = parser\match(args) or {}
     if not args or not args.flags or args.flags["--help"] or args.flags["-h"]
-        print "Usage: lua nomsu.lua [-c] [-i] [-p] [-f] [--help] [input [-o output]]"
+        print "Usage: lua nomsu.lua [-c] [-i] [-p] [-O] [--help] [input [-o output]]"
         os.exit!
 
     c = NomsuCompiler()
-    c.skip_precompiled = args.flags["-f"]
+    c.skip_precompiled = not args.flags["-O"]
     if args.input
         -- Read a file or stdin and output either the printouts or the compiled lua
         if args.flags["-c"] and not args.output
