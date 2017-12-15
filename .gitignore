@@ -1,2 +1,2 @@
-*.nom.lua
-*/*.nom.lua
+*.compiled.nom
+*/*.compiled.nom
