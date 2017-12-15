@@ -579,12 +579,15 @@ do
       end
       return tree
     end,
-    run = function(self, src, filename, vars, max_operations)
+    run = function(self, src, filename, vars, max_operations, output_file)
       if vars == nil then
         vars = { }
       end
       if max_operations == nil then
         max_operations = nil
+      end
+      if output_file == nil then
+        output_file = nil
       end
       if src == "" then
         return nil, "", vars
@@ -619,6 +622,14 @@ do
 %s
 return %s;
 end);]]):format(statements or "", expr or "ret")
+        if output_file then
+          if statements and #statements > 0 then
+            output_file:write("lua> \"..\"\n    " .. tostring(self:indent(statements:gsub("\\", "\\\\"))) .. "\n")
+          end
+          if expr and #expr > 0 then
+            output_file:write("=lua \"..\"\n    " .. tostring(self:indent(expr:gsub("\\", "\\\\"))) .. "\n")
+          end
+        end
         if self.debug then
           self:writeln(tostring(colored.bright("RUNNING LUA:")) .. "\n" .. tostring(colored.blue(colored.bright(code_for_statement))))
         end
@@ -1320,14 +1331,9 @@ end)]]):format(concat(lua_bits, "\n"))
         end
         if vars.filename:match(".*%.nom") then
           if not self.skip_precompiled then
-            local file = io.open(vars.filename .. ".lua", "r")
-            if file then
-              local contents = file:read('*a')
-              file:close()
-              return load(contents)()(self, vars)
-            end
+            local file = io.open(vars.filename:gsub("%.nom", ".compiled.nom"), "r")
           end
-          local file = io.open(vars.filename)
+          local file = file or io.open(vars.filename)
           if not file then
             self:error("File does not exist: " .. tostring(vars.filename))
           end
@@ -1449,7 +1455,7 @@ if arg then
   c.skip_precompiled = not args.flags["-O"]
   if args.input then
     if args.flags["-c"] and not args.output then
-      args.output = args.input .. ".lua"
+      args.output = args.input:gsub("%.nom", ".compiled.nom")
     end
     local compiled_output = nil
     if args.flags["-p"] then
@@ -1468,10 +1474,8 @@ if arg then
       else
         input = io.open(args.input):read("*a")
       end
-      local retval, code = c:run(input, args.input)
-      if compiled_output then
-        compiled_output:write(code)
-      end
+      local vars = { }
+      local retval, code = c:run(input, args.input, vars, nil, compiled_output)
     end
     if args.flags["-p"] then
       c.write = _write

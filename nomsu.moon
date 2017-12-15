@@ -37,7 +37,6 @@ if _VERSION == "Lua 5.1"
 -- type checking?
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
--- Change precompiling from producing lua code to producing lua> "code" nomsu files
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -406,7 +405,7 @@ class NomsuCompiler
             @print_tree tree, "    "
         return tree
 
-    run: (src, filename, vars={}, max_operations=nil)=>
+    run: (src, filename, vars={}, max_operations=nil, output_file=nil)=>
         if src == "" then return nil, "", vars
         if max_operations
             timeout = ->
@@ -433,6 +432,11 @@ return (function(nomsu, vars)
 %s
 return %s;
 end);]])\format(statements or "", expr or "ret")
+            if output_file
+                if statements and #statements > 0
+                    output_file\write "lua> \"..\"\n    #{@indent statements\gsub("\\","\\\\")}\n"
+                if expr and #expr > 0
+                    output_file\write "=lua \"..\"\n    #{@indent expr\gsub("\\","\\\\")}\n"
             if @debug
                 @writeln "#{colored.bright "RUNNING LUA:"}\n#{colored.blue colored.bright(code_for_statement)}"
             lua_thunk, err = load(code_for_statement)
@@ -881,12 +885,8 @@ end)]])\format(concat(lua_bits, "\n"))
                 return dofile(vars.filename)(@, vars)
             if vars.filename\match(".*%.nom")
                 if not @skip_precompiled -- Look for precompiled version
-                    file = io.open(vars.filename..".lua", "r")
-                    if file
-                        contents = file\read('*a')
-                        file\close!
-                        return load(contents)!(@, vars)
-                file = io.open(vars.filename)
+                    file = io.open(vars.filename\gsub("%.nom", ".compiled.nom"), "r")
+                file = file or io.open(vars.filename)
                 if not file
                     @error "File does not exist: #{vars.filename}"
                 contents = file\read('*a')
@@ -925,7 +925,7 @@ if arg
     if args.input
         -- Read a file or stdin and output either the printouts or the compiled lua
         if args.flags["-c"] and not args.output
-            args.output = args.input..".lua"
+            args.output = args.input\gsub("%.nom", ".compiled.nom")
         compiled_output = nil
         if args.flags["-p"]
             _write = c.write
@@ -940,10 +940,8 @@ if arg
             input = if args.input == '-'
                 io.read('*a')
             else io.open(args.input)\read("*a")
-            retval, code = c\run(input, args.input)
-            -- Output compile lua code
-            if compiled_output
-                compiled_output\write code
+            vars = {}
+            retval, code = c\run(input, args.input, vars, nil, compiled_output)
         if args.flags["-p"]
             c.write = _write
 
