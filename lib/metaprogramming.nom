@@ -72,6 +72,10 @@ rule [%tree as value] =:
     =lua "nomsu:tree_to_value(\(%tree), vars)"
 compile [repr %obj] to:
     "nomsu:repr(\(%obj as lua))"
+compile [indented %obj] to:
+    "nomsu:indent(\(%obj as lua))"
+compile [dedented %obj] to:
+    "nomsu:dedent(\(%obj as lua))"
 compile [type %obj, type of %obj] to:
     "type(\(%obj as lua))"
 

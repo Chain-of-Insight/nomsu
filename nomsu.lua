@@ -353,8 +353,9 @@ do
         scope = nil
       end
       if after == nil then
-        after = 0
+        after = nil
       end
+      after = after or (self.core_defs or 0)
       scope = scope or self.defs
       local defs_by_num = { }
       for stub, def in pairs(scope) do

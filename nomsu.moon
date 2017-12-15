@@ -277,7 +277,8 @@ class NomsuCompiler
         if not ok then @error(ret1)
         return ret1, ret2
 
-    serialize_defs: (scope=nil, after=0)=>
+    serialize_defs: (scope=nil, after=nil)=>
+        after or= @core_defs or 0
         scope or= @defs
         defs_by_num = {}
         for stub, def in pairs(scope)
