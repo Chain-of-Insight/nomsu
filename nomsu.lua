@@ -1,7 +1,8 @@
 local re = require('re')
 local lpeg = require('lpeg')
-local utils = require('utils')
-local repr = utils.repr
+local utils = require('utils2')
+local repr, stringify, min, max, equivalent, set, is_list, sum
+repr, stringify, min, max, equivalent, set, is_list, sum = utils.repr, utils.stringify, utils.min, utils.max, utils.equivalent, utils.set, utils.is_list, utils.sum
 local colors = setmetatable({ }, {
   __index = function()
     return ""
@@ -304,12 +305,12 @@ do
           end
         end
         if canonical_args then
-          assert(utils.equivalent(utils.set(arg_names), canonical_args), "Mismatched args")
+          assert(equivalent(set(arg_names), canonical_args), "Mismatched args")
         else
-          canonical_args = utils.set(arg_names)
+          canonical_args = set(arg_names)
         end
         if canonical_escaped_args then
-          assert(utils.equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args")
+          assert(equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args")
         else
           canonical_escaped_args = escaped_args
           def.escaped_args = escaped_args
@@ -843,7 +844,7 @@ end);]]):format(concat(buffer, "\n"))
       elseif "number" == _exp_0 then
         return repr(value)
       elseif "table" == _exp_0 then
-        if utils.is_list(value) then
+        if is_list(value) then
           return "[" .. tostring(concat((function()
             local _accum_0 = { }
             local _len_0 = 1
@@ -1159,7 +1160,7 @@ end)]]):format(concat(lua_bits, "\n"))
           end
           arg_names = _accum_0
         end
-        local escaped_args = utils.set((function()
+        local escaped_args = set((function()
           local _accum_0 = { }
           local _len_0 = 1
           for arg in x:gmatch("\\%%([^%s]*)") do
@@ -1239,7 +1240,7 @@ end)]]):format(concat(lua_bits, "\n"))
         error_msg = error_msg .. ("\n" .. (colored.bright(colored.yellow(colored.onred(msg)))))
       end
       error_msg = error_msg .. "\nCallstack:"
-      local maxlen = utils.max((function()
+      local maxlen = max((function()
         local _accum_0 = { }
         local _len_0 = 1
         local _list_0 = self.callstack
@@ -1266,7 +1267,7 @@ end)]]):format(concat(lua_bits, "\n"))
               end
               nums = _accum_0
             end
-            line_no = line_no:gsub(":.*$", ":" .. tostring(utils.sum(nums) - #nums + 1))
+            line_no = line_no:gsub(":.*$", ":" .. tostring(sum(nums) - #nums + 1))
           end
           error_msg = error_msg .. "\n    " .. tostring(("%-" .. tostring(maxlen) .. "s"):format(line_no)) .. "| " .. tostring(self.callstack[i][1])
         end
@@ -1391,7 +1392,7 @@ end)]]):format(concat(lua_bits, "\n"))
         return repr(...)
       end
       self.stringify = function(self, ...)
-        return utils.stringify(...)
+        return stringify(...)
       end
       if not parent then
         return self:initialize_core()
@@ -1444,7 +1445,7 @@ if arg then
         input <- "-" / [^;]+
         output <- "-" / [^;]+
     ]], {
-    set = utils.set
+    set = set
   })
   local args = concat(arg, ";") .. ";"
   args = parser:match(args) or { }
