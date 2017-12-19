@@ -24,22 +24,28 @@ local function size(t)
     return n
 end
 
-local function repr(x)
+local function repr(x, depth)
+    -- Create a string representation of the object that is close to the lua code that will
+    -- reproduce the object (similar to Python's "repr" function)
+    depth = depth or math.huge
+    if depth == 0 then
+        return tostring(x)
+    end
     local x_type = type(x)
     if x_type == 'table' then
-        local mt = getmetatable(x)
-        if mt and mt.__tostring then
-            return mt.__tostring(x)
+        if getmetatable(x) then
+            -- If this object has a weird metatable, then don't pretend like it's a regular table
+            return tostring(x)
         elseif is_list(x) then
             local ret = {}
             for i=1,#x do
-                ret[i] = repr(x[i])
+                ret[i] = repr(x[i], depth-1)
             end
             return "{"..table.concat(ret, ", ").."}"
         else
             local ret = {}
             for k, v in pairs(x) do
-                ret[#ret+1] = "["..repr(k).."]= "..repr(v)
+                ret[#ret+1] = "["..repr(k,depth-1).."]= "..repr(v,depth-1)
             end
             return "{"..table.concat(ret, ", ").."}"
         end
@@ -67,11 +73,11 @@ local function repr(x)
     end
 end
 
-local function stringify(x)
+local function stringify(x, depth)
     if type(x) == 'string' then
         return x
     else
-        return repr(x)
+        return repr(x, depth)
     end
 end
 
