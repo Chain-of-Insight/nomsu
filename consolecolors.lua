@@ -1,3 +1,7 @@
+--
+-- This file contains the ANSI escapes for console colors
+--
+
 local colors = {
     -- attributes
     reset = 0,

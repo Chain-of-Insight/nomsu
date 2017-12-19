@@ -1,4 +1,6 @@
 #!/bin/sh
+# This file is a script that converts the .nom files in lib/ into slightly more optimized
+# precompiled versions that are only lua> ".." and =lua ".." bits which are faster to load.
 FLUSH=false
 while getopts ":f" opt; do
   case $opt in
@@ -9,15 +11,15 @@ while getopts ":f" opt; do
   esac
 done
 if [ "$FLUSH" = true ] ; then
-    for file in $(find lib/ -name "*.nom.lua") ; do
+    for file in $(find lib/ -name "*compiled.nom") ; do
         rm $file
     done
 fi
 
-for file in $(cat compile_order.txt) ; do
-    luafile="$file.lua"
-    if [ ! -e "$luafile" ] || [ "$file" -nt "$luafile" ] ; then
-        echo "Compiling $file into $luafile"
+for file in $(cat lib/core.nom | lua -e "for filename in io.read('*a'):gmatch('require \"([^\"]*)\"') do print(filename) end") ; do
+    compilefile="${file/\.nom/.compiled.nom}"
+    if [ ! -e "$compilefile" ] || [ "$file" -nt "$compilefile" ] ; then
+        echo "Compiling $file into $compilefile"
         ./nomsu.moon -c $file
     fi
 done

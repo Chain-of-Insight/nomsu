@@ -1,3 +1,6 @@
+--
+-- A collection of helper utility functions
+--
 
 local function is_list(t)
     if type(t) ~= 'table' then
