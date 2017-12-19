@@ -13,8 +13,8 @@
 
 re = require 're'
 lpeg = require 'lpeg'
-utils = require 'utils'
-repr = utils.repr
+utils = require 'utils2'
+{:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..colors.reset)})
 {:insert, :remove, :concat} = table
@@ -220,7 +220,7 @@ class NomsuCompiler
         @debug = false
         @utils = utils
         @repr = (...)=> repr(...)
-        @stringify = (...)=> utils.stringify(...)
+        @stringify = (...)=> stringify(...)
         if not parent
             @initialize_core!
     
@@ -252,10 +252,10 @@ class NomsuCompiler
             for i=1,#arg_names-1 do for j=i+1,#arg_names
                 if arg_names[i] == arg_names[j] then @error "Duplicate argument in function #{stub}: '#{arg_names[i]}'"
             if canonical_args
-                assert utils.equivalent(utils.set(arg_names), canonical_args), "Mismatched args"
-            else canonical_args = utils.set(arg_names)
+                assert equivalent(set(arg_names), canonical_args), "Mismatched args"
+            else canonical_args = set(arg_names)
             if canonical_escaped_args
-                assert utils.equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args"
+                assert equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args"
             else
                 canonical_escaped_args = escaped_args
                 def.escaped_args = escaped_args
@@ -591,7 +591,7 @@ end);]])\format(concat(buffer, "\n"))
             when "number"
                 return repr(value)
             when "table"
-                if utils.is_list(value)
+                if is_list(value)
                     return "[#{concat [@value_to_nomsu(v) for v in *value], ", "}]"
                 else
                     return "(d{#{concat ["#{@value_to_nomsu(k)}=#{@value_to_nomsu(v)}" for k,v in pairs(value)], "; "}})"
@@ -801,7 +801,7 @@ end)]])\format(concat(lua_bits, "\n"))
             x = x\gsub("%s+"," ")\gsub("^%s*","")\gsub("%s*$","")
             stub = x\gsub("%%%S+","%%")\gsub("\\","")
             arg_names = [arg for arg in x\gmatch("%%([^%s]*)")]
-            escaped_args = utils.set [arg for arg in x\gmatch("\\%%([^%s]*)")]
+            escaped_args = set [arg for arg in x\gmatch("\\%%([^%s]*)")]
             return stub, arg_names, escaped_args
         if type(x) != 'table'
             @error "Invalid type for getting stub: #{type(x)} for:\n#{repr x}"
@@ -832,13 +832,13 @@ end)]])\format(concat(lua_bits, "\n"))
         if msg
             error_msg ..= "\n" .. (colored.bright colored.yellow colored.onred msg)
         error_msg ..= "\nCallstack:"
-        maxlen = utils.max([#c[2] for c in *@callstack when c != "#macro"])
+        maxlen = max([#c[2] for c in *@callstack when c != "#macro"])
         for i=#@callstack,1,-1
             if @callstack[i] != "#macro"
                 line_no = @callstack[i][2]
                 if line_no
                     nums = [tonumber(n) for n in line_no\gmatch(":([0-9]+)")]
-                    line_no = line_no\gsub(":.*$", ":#{utils.sum(nums) - #nums + 1}")
+                    line_no = line_no\gsub(":.*$", ":#{sum(nums) - #nums + 1}")
                 error_msg ..= "\n    #{"%-#{maxlen}s"\format line_no}| #{@callstack[i][1]}"
         error_msg ..= "\n    <top level>"
         @callstack = {}
@@ -914,7 +914,7 @@ if arg
         flag <- "-c" / "-i" / "-p" / "-O" / "--help" / "-h"
         input <- "-" / [^;]+
         output <- "-" / [^;]+
-    ]], {set: utils.set})
+    ]], {:set})
     args = concat(arg, ";")..";"
     args = parser\match(args) or {}
     if not args or not args.flags or args.flags["--help"] or args.flags["-h"]
