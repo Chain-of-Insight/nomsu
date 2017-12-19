@@ -13,7 +13,7 @@
 
 re = require 're'
 lpeg = require 'lpeg'
-utils = require 'utils2'
+utils = require 'utils'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..colors.reset)})

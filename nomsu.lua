@@ -1,6 +1,6 @@
 local re = require('re')
 local lpeg = require('lpeg')
-local utils = require('utils2')
+local utils = require('utils')
 local repr, stringify, min, max, equivalent, set, is_list, sum
 repr, stringify, min, max, equivalent, set, is_list, sum = utils.repr, utils.stringify, utils.min, utils.max, utils.equivalent, utils.set, utils.is_list, utils.sum
 local colors = setmetatable({ }, {
