@@ -11,13 +11,13 @@ while getopts ":f" opt; do
   esac
 done
 if [ "$FLUSH" = true ] ; then
-    for file in $(find lib/ -name "*compiled.nom") ; do
+    for file in $(find lib/ -name "*.nomc") ; do
         rm $file
     done
 fi
 
 for file in $(cat lib/core.nom | lua -e "for filename in io.read('*a'):gmatch('require \"([^\"]*)\"') do print(filename) end") ; do
-    compilefile="${file/\.nom/.compiled.nom}"
+    compilefile="${file/\.nom/.nomc}"
     if [ ! -e "$compilefile" ] || [ "$file" -nt "$compilefile" ] ; then
         echo "Compiling $file into $compilefile"
         ./nomsu.moon -c $file
