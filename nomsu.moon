@@ -10,13 +10,12 @@
 --        nomsu:run(your_nomsu_code)
 --    Or from the command line:
 --        lua nomsu.lua [input_file [output_file or -]]
-
 re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
-colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..msg..colors.reset)})
+colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 --pcall = (fn,...)-> true, fn(...)
 if _VERSION == "Lua 5.1"
@@ -40,169 +39,99 @@ if _VERSION == "Lua 5.1"
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
+
 STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
+ESCAPE_CHAR = (P("\\")*S("ntbavfr")) / (s)->STRING_ESCAPES[s\sub(2,2)]
+OPERATOR_CHAR = S("'~`!@$^&*-+=|<>?/")
+UTF8_CHAR = (
+    R("\194\223")*R("\128\191") +
+    R("\224\239")*R("\128\191")*R("\128\191") +
+    R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
+IDENT_CHAR = R("az","AZ","09") + P("_") + UTF8_CHAR
 
--- NOTE: this treats tabs as equivalent to 1 space
-indent_stack = {0}
-indent_patt = P (start)=>
-    spaces = @match("[ \t]*", start)
-    if #spaces > indent_stack[#indent_stack]
-        insert(indent_stack, #spaces)
-        return start + #spaces
-dedent_patt = P (start)=>
-    spaces = @match("[ \t]*", start)
-    if #spaces < indent_stack[#indent_stack]
-        remove(indent_stack)
-        return start
-nodent_patt = P (start)=>
-    spaces = @match("[ \t]*", start)
-    if #spaces == indent_stack[#indent_stack]
-        return start + #spaces
-gt_nodent_patt = P (start)=>
-    -- Note! This assumes indent is 4 spaces!!!
-    spaces = @match("[ \t]*", start)
-    if #spaces >= indent_stack[#indent_stack] + 4
-        return start + indent_stack[#indent_stack] + 4
+local parse
+do
+    export parse
+    ctx = {}
+    indent_patt = P (start)=>
+        spaces = @match("[ \t]*", start)
+        if #spaces > ctx.indent_stack[#ctx.indent_stack]
+            insert(ctx.indent_stack, #spaces)
+            return start + #spaces
+    dedent_patt = P (start)=>
+        spaces = @match("[ \t]*", start)
+        if #spaces < ctx.indent_stack[#ctx.indent_stack]
+            remove(ctx.indent_stack)
+            return start
+    nodent_patt = P (start)=>
+        spaces = @match("[ \t]*", start)
+        if #spaces == ctx.indent_stack[#ctx.indent_stack]
+            return start + #spaces
+    gt_nodent_patt = P (start)=>
+        -- Note! This assumes indent is 4 spaces!!!
+        spaces = @match("[ \t]*", start)
+        if #spaces >= ctx.indent_stack[#ctx.indent_stack] + 4
+            return start + ctx.indent_stack[#ctx.indent_stack] + 4
 
--- TYPES:
--- Number 1, "String", %Var, [List], (expression), {Thunk}, \Nomsu, FunctionCall, File
+    defs =
+        nl: P("\n"), ws: S(" \t"), :tonumber, operator: OPERATOR_CHAR
+        print: (src,pos,msg)-> print(msg, pos, repr(src\sub(math.max(0,pos-16),math.max(0,pos-1)).."|"..src\sub(pos,pos+16))) or true
+        utf8_char: (
+            R("\194\223")*R("\128\191") +
+            R("\224\239")*R("\128\191")*R("\128\191") +
+            R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
+        indented: indent_patt, nodented: nodent_patt, dedented: dedent_patt
+        gt_nodented: gt_nodent_patt, escape_char:ESCAPE_CHAR
+        error: (src,pos,err_msg)->
+            if ctx.source_code\sub(pos,pos) == "\n"
+                pos += #ctx.source_code\match("[ \t\n]*", pos)
+            line_no = 1
+            while (ctx.line_starts[line_no+1] or math.huge) < pos do line_no += 1
+            prev_line = line_no > 1 and ctx.source_code\match("[^\n]*", ctx.line_starts[line_no-1]) or ""
+            err_line = ctx.source_code\match("[^\n]*", ctx.line_starts[line_no])
+            next_line = line_no < #ctx.line_starts and ctx.source_code\match("[^\n]*", ctx.line_starts[line_no+1]) or ""
+            pointer = ("-")\rep(pos-ctx.line_starts[line_no]) .. "^"
+            err_msg = (err_msg or "Parse error").." in #{ctx.filename} on line #{line_no}:\n"
+            err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"
+            error(err_msg)
+        FunctionCall: (start, value, stop)->
+            stub = concat([(t.type == "Word" and t.value or "%") for t in *value], " ")
+            line_no = 1
+            while (ctx.line_starts[line_no+1] or math.huge) < start do line_no += 1
+            src = ctx.source_code\sub(start,stop-1)
+            return {type: "FunctionCall", :src, line_no: "#{ctx.filename}:#{line_no}", :value, :stub}
 
-nomsu = [=[
-    file <- ({{| shebang?
-        (ignored_line %nl)*
-        statements (nodent statements)*
-        (%nl ignored_line)* %nl?
-        (({.+} ("" -> "Parse error")) => error)? |} }) -> File
+    setmetatable(defs, {__index:(key)=>
+        fn = (start, value, stop)->
+            {:start, :stop, :value, src:ctx.source_code\sub(start,stop-1), type: key}
+        self[key] = fn
+        return fn
+    })
 
-    shebang <- "#!" [^%nl]* %nl
+    -- Just for cleanliness, I put the language spec in its own file using a slightly modified
+    -- version of the lpeg.re syntax.
+    peg_tidier = re.compile [[
+    file <- {~ %nl* (def/comment) (%nl+ (def/comment))* %nl* ~}
+    def <- anon_def / captured_def
+    anon_def <- ({ident} (" "*) ":"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
+    captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- ({} %3 {}) -> %2"
+    ident <- [a-zA-Z_][a-zA-Z0-9_]*
+    comment <- "--" [^%nl]*
+    ]]
 
-    inline_statements <- inline_statement (semicolon inline_statement)*
-    noeol_statements <- (inline_statement semicolon)* noeol_statement
-    statements <- (inline_statement semicolon)* statement
+    nomsu = peg_tidier\match(io.open("nomsu.peg")\read("*a"))
+    nomsu = re.compile(nomsu, defs)
 
-    statement <- functioncall / expression
-    noeol_statement <- noeol_functioncall / noeol_expression
-    inline_statement <- inline_functioncall / inline_expression
-
-    inline_thunk <- ({ {| "{" %ws? inline_statements %ws? "}" |} }) -> Thunk
-    eol_thunk <- ({ {| ":" %ws? noeol_statements eol |} }) -> Thunk
-    indented_thunk <- ({ {| (":" / "{..}") indent
-                statements (nodent statements)*
-            (dedent / (({.+} ("" -> "Error while parsing thunk")) => error))
-        |} }) -> Thunk
-
-    inline_nomsu <- ({("\" inline_expression) }) -> Nomsu
-    eol_nomsu <- ({("\" noeol_expression) }) -> Nomsu
-    indented_nomsu <- ({("\" expression) }) -> Nomsu
-
-    inline_expression <- number / variable / inline_string / inline_list / inline_nomsu
-        / inline_thunk / ("(" %ws? inline_statement %ws? ")")
-    noeol_expression <- indented_string / indented_nomsu / indented_list / indented_thunk
-        / ("(..)" indent
-            statement
-        (dedent / (({.+} ("" -> "Error while parsing indented expression"))))
-        ) / inline_expression
-    expression <- eol_thunk / eol_nomsu / noeol_expression
-
-    -- Function calls need at least one word in them
-    inline_functioncall <- ({(''=>line_no) {|
-            (inline_expression %ws?)* word (%ws? (inline_expression / word))*
-        |} }) -> FunctionCall
-    noeol_functioncall <- ({(''=>line_no) {|
-            (noeol_expression %ws?)* word (%ws? (noeol_expression / word))*
-        |} }) -> FunctionCall
-    functioncall <- ({(''=>line_no) {|
-            (expression (dotdot / %ws?))* word ((dotdot / %ws?) (expression / word))*
-        |} }) -> FunctionCall
-
-    word <- ({ { %operator / (!number %plain_word) } }) -> Word
-    
-    inline_string <- ({ '"' {|
-        ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
-") / (!string_interpolation [^%nl"]))+ ~}
-        / string_interpolation)* |} '"' }) -> String
-
-    indented_string <- ({ '".."' %ws? line_comment? %nl %gt_nodented? {|
-        ({~ (("\\" -> "\") / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\]) ~} / string_interpolation)*
-    |} ((!.) / (&(%nl+ !%gt_nodented)) / (({.+} ("" -> "Error while parsing String")) => error))
-        }) -> String
-
-    string_interpolation <- "\" ((noeol_expression dotdot?) / dotdot)
-
-    number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
-
-    -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
-    -- which is a hack to allow %'s to parse as "%" and "' s" separately
-    variable <- ({ ("%" { %plain_word? }) }) -> Var
-
-    inline_list <- ({ {|
-         ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
-      |} }) -> List
-    indented_list <- ({ {|
-         ("[..]" indent
-                list_line (nodent list_line)*
-          (dedent / (({.+} ("" -> "Error while parsing list")) => error)))
-      |} }) -> List
-    list_line <- (inline_list_item comma)* ((inline_list_item %ws? ",") / (functioncall / expression))
-    inline_list_item <- inline_functioncall / inline_expression
-
-    block_comment <- "#.." [^%nl]* (%nl (%ws? &%nl))* %nl %indented [^%nl]+ (%nl ((%ws? (!. / &%nl)) / (!%dedented [^%nl]+)))*
-    line_comment  <- "#" [^%nl]*
-
-    eol <- %ws? line_comment? (!. / &%nl)
-    ignored_line <- (%nodented (block_comment / line_comment)) / (%ws? (!. / &%nl))
-    indent <- eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
-    nodent <- eol (%nl ignored_line)* %nl %nodented
-    dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-    comma <- %ws? "," %ws?
-    semicolon <- %ws? ";" %ws?
-    dotdot <- nodent ".." %ws?
-]=]
-
-CURRENT_FILE = nil
-whitespace = S(" \t")^1
-operator = S("'~`!@$^&*-+=|<>?/")^1
-utf8_continuation = R("\128\191")
-utf8_char = (
-    R("\194\223")*utf8_continuation +
-    R("\224\239")*utf8_continuation*utf8_continuation +
-    R("\240\244")*utf8_continuation*utf8_continuation*utf8_continuation)
-plain_word = (R('az','AZ','09') + S("_") + utf8_char)^1
-defs =
-    ws:whitespace, nl: P("\n"), :tonumber, :operator, :plain_word
-    indented: indent_patt, nodented: nodent_patt, dedented: dedent_patt, gt_nodented: gt_nodent_patt
-    line_no: (src, pos)->
-        line_no = 1
-        for _ in src\sub(1,pos)\gmatch("\n") do line_no += 1
-        return pos, "#{CURRENT_FILE}:#{line_no}"
-    FunctionCall: (src, line_no, value, errors)->
-        stub = concat([(t.type == "Word" and t.value or "%") for t in *value], " ")
-        {type: "FunctionCall", :src, :line_no, :value, :errors, :stub}
-    error: (src,pos,errors,err_msg)->
-        line_no = 1
-        for _ in src\sub(1,-#errors)\gmatch("\n") do line_no += 1
-        err_pos = #src - #errors + 1
-        if errors\sub(1,1) == "\n"
-            -- Indentation error
-            err_pos += #errors\match("[ \t]*", 2)
-        start_of_err_line = err_pos
-        while src\sub(start_of_err_line, start_of_err_line) != "\n" and start_of_err_line > 1
-            start_of_err_line -= 1
-        start_of_prev_line = start_of_err_line - 1
-        while src\sub(start_of_prev_line, start_of_prev_line) != "\n" and start_of_prev_line > 1
-            start_of_prev_line -= 1
-        
-        local prev_line,err_line,next_line
-        prev_line,err_line,next_line = src\match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line+1)
-
-        pointer = ("-")\rep(err_pos - start_of_err_line + 0) .. "^"
-        error("\n#{err_msg or "Parse error"} in #{CURRENT_FILE} on line #{line_no}:\n\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n")
-
-setmetatable(defs, {
-    __index: (t,key)->
-        with t[key] = (src, value, errors)-> {type: key, :src, :value, :errors} do nil
-})
-nomsu = re.compile(nomsu, defs)
+    parse = (source_code, filename)->
+        old_ctx = ctx
+        export ctx
+        ctx = {:source_code, :filename, indent_stack: {0}}
+        ctx.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*")\match(source_code)
+        tree = nomsu\match(source_code)
+        ctx = old_ctx
+        return tree
 
 class NomsuCompiler
     @def_number: 0
@@ -237,8 +166,6 @@ class NomsuCompiler
             signature = @get_stubs {signature}
         elseif type(signature) == 'table' and type(signature[1]) == 'string'
             signature = @get_stubs signature
-        if @debug
-            @write colored.magenta "Defined rule #{repr signature}"
         assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
         canonical_args = nil
         canonical_escaped_args = nil
@@ -391,16 +318,10 @@ class NomsuCompiler
 
     parse: (str, filename)=>
         if @debug
-            @writeln("#{colored.bright "PARSING:"}\n#{str}")
+            @writeln("#{colored.bright "PARSING:"}\n#{colored.yellow str}")
         str = str\gsub("\r","")
-        export indent_stack, CURRENT_FILE
-        old_file = CURRENT_FILE
-        old_indent_stack, indent_stack = indent_stack, {0}
-        CURRENT_FILE = filename
-        tree = nomsu\match(str)
-        indent_stack = old_indent_stack -- Put it back, just in case.
-        CURRENT_FILE = old_file
-        assert tree, "Failed to parse: #{str}"
+        tree = parse(str, filename)
+        assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black str}"
         if @debug
             @writeln "PARSE TREE:"
             @print_tree tree, "    "
@@ -660,20 +581,18 @@ end)]])\format(concat(lua_bits, "\n"))
                 for arg in *tree.value
                     if arg.type == 'Word' then continue
                     if escaped_args[arg_names[arg_num]]
-                        arg = {type:"Nomsu", value:arg, line_no:tree.line_no}
-                    expr,statement = @tree_to_lua arg, filename
-                    if statement
-                        @error "Cannot use [[#{arg.src}]] as a function argument, since it's not an expression."
-                    insert args, expr
+                        insert args, "nomsu:parse(#{repr arg.src}, #{repr tree.line_no}).value[1]"
+                    else
+                        expr,statement = @tree_to_lua arg, filename
+                        if statement
+                            @error "Cannot use [[#{arg.src}]] as a function argument, since it's not an expression."
+                        insert args, expr
                     arg_num += 1
 
                 remove @compilestack
                 return @@comma_separated_items("nomsu:call(", args, ")"), nil
 
             when "String"
-                if @debug
-                    @writeln (colored.bright "STRING:")
-                    @print_tree tree
                 concat_parts = {}
                 string_buffer = ""
                 for bit in *tree.value
@@ -796,12 +715,12 @@ end)]])\format(concat(lua_bits, "\n"))
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
             -- Standardize format to stuff separated by spaces
-            x = x\gsub("\n%s*%.%.", " ")
-            x = lpeg.Cs((operator / ((op)->" #{op} ") + 1)^0)\match(x)
-            x = x\gsub("%s+"," ")\gsub("^%s*","")\gsub("%s*$","")
-            stub = x\gsub("%%%S+","%%")\gsub("\\","")
-            arg_names = [arg for arg in x\gmatch("%%([^%s]*)")]
-            escaped_args = set [arg for arg in x\gmatch("\\%%([^%s]*)")]
+            patt = re.compile "{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op+})*|}",
+                id:IDENT_CHAR, op:OPERATOR_CHAR
+            spec = concat patt\match(x), " "
+            stub = spec\gsub("%%%S+","%%")\gsub("\\","")
+            arg_names = [arg for arg in spec\gmatch("%%([^%s]*)")]
+            escaped_args = set [arg for arg in spec\gmatch("\\%%(%S*)")]
             return stub, arg_names, escaped_args
         if type(x) != 'table'
             @error "Invalid type for getting stub: #{type(x)} for:\n#{repr x}"
@@ -846,9 +765,12 @@ end)]])\format(concat(lua_bits, "\n"))
     
     typecheck: (vars, varname, desired_type)=>
         x = vars[varname]
-        if type(x) == desired_type then return x
-        if type(x) == 'table' and x.type == desired_type then return x
-        @error "Invalid type for %#{varname}. Expected #{desired_type}, but got #{repr x}."
+        x_type = type(x)
+        if x_type == desired_type then return x
+        if x_type == 'table'
+            x_type = x.type or x_type
+            if x_type == desired_type then return x
+        @error "Invalid type for %#{varname}. Expected #{desired_type}, but got #{x_type}:\n#{repr x}"
     
     source_code: (level=0)=>
         @dedent @compilestack[#@compilestack-level].src
@@ -881,12 +803,16 @@ end)]])\format(concat(lua_bits, "\n"))
         @defmacro "__src__ %level", (vars)=>
             @repr @source_code @tree_to_value vars.level
 
+        @def "derp \\%foo derp \\%bar", (vars)=>
+            lua = "local x = "..repr([t.stub for t in *vars.foo.value])..";\nlocal y = "..@tree_to_lua(vars.bar)
+            print(colored.green lua)
+
         run_file = (vars)=>
             if vars.filename\match(".*%.lua")
                 return dofile(vars.filename)(@, vars)
             if vars.filename\match(".*%.nom")
                 if not @skip_precompiled -- Look for precompiled version
-                    file = io.open(vars.filename\gsub("%.nom", ".compiled.nom"), "r")
+                    file = io.open(vars.filename\gsub("%.nom", ".nomc"), "r")
                 file = file or io.open(vars.filename)
                 if not file
                     @error "File does not exist: #{vars.filename}"
@@ -922,11 +848,12 @@ if arg
         os.exit!
 
     c = NomsuCompiler()
+
     c.skip_precompiled = not args.flags["-O"]
     if args.input
         -- Read a file or stdin and output either the printouts or the compiled lua
         if args.flags["-c"] and not args.output
-            args.output = args.input\gsub("%.nom", ".compiled.nom")
+            args.output = args.input\gsub("%.nom", ".nomc")
         compiled_output = nil
         if args.flags["-p"]
             _write = c.write

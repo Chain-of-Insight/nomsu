@@ -27,6 +27,11 @@ rule [compile \%macro_def to \%body] =:
         local thunk = nomsu:tree_to_value(body);
         nomsu:defmacro(signature, thunk, ("compile %s\\n..to %s"):format(vars.macro_def.src, body.src));
 
+compile [fizz %n] to:
+    "print(\(%n as lua))"
+compile [pumpo] to:
+    "print('pumpo')"
+
 rule [compile \%macro_def to code \%body] =:
     lua> ".."
         local signature = {};

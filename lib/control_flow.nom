@@ -31,10 +31,10 @@ compile [go to %label] to code: ".."
 
 rule [tree %tree has function call %call] =:
     lua> ".."
-        local target = (\(%call)).value;
+        local target = (\(%call)).stub;
         for subtree,_ in coroutine.wrap(function() nomsu:walk_tree(\(%tree)); end) do
             if type(subtree) == 'table' and subtree.type == "FunctionCall"
-            and nomsu.utils.equivalent(subtree.value, target, 2) then
+            and subtree.stub == target then
                 return true;
             end
         end

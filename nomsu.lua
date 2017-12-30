@@ -11,7 +11,7 @@ local colors = setmetatable({ }, {
 local colored = setmetatable({ }, {
   __index = function(_, color)
     return (function(msg)
-      return colors[color] .. msg .. colors.reset
+      return colors[color] .. (msg or '') .. colors.reset
     end)
   end
 })
@@ -45,210 +45,138 @@ local STRING_ESCAPES = {
   f = "\f",
   r = "\r"
 }
-local indent_stack = {
-  0
-}
-local indent_patt = P(function(self, start)
-  local spaces = self:match("[ \t]*", start)
-  if #spaces > indent_stack[#indent_stack] then
-    insert(indent_stack, #spaces)
-    return start + #spaces
-  end
-end)
-local dedent_patt = P(function(self, start)
-  local spaces = self:match("[ \t]*", start)
-  if #spaces < indent_stack[#indent_stack] then
-    remove(indent_stack)
-    return start
-  end
-end)
-local nodent_patt = P(function(self, start)
-  local spaces = self:match("[ \t]*", start)
-  if #spaces == indent_stack[#indent_stack] then
-    return start + #spaces
-  end
-end)
-local gt_nodent_patt = P(function(self, start)
-  local spaces = self:match("[ \t]*", start)
-  if #spaces >= indent_stack[#indent_stack] + 4 then
-    return start + indent_stack[#indent_stack] + 4
-  end
-end)
-local nomsu = [=[    file <- ({{| shebang?
-        (ignored_line %nl)*
-        statements (nodent statements)*
-        (%nl ignored_line)* %nl?
-        (({.+} ("" -> "Parse error")) => error)? |} }) -> File
-
-    shebang <- "#!" [^%nl]* %nl
-
-    inline_statements <- inline_statement (semicolon inline_statement)*
-    noeol_statements <- (inline_statement semicolon)* noeol_statement
-    statements <- (inline_statement semicolon)* statement
-
-    statement <- functioncall / expression
-    noeol_statement <- noeol_functioncall / noeol_expression
-    inline_statement <- inline_functioncall / inline_expression
-
-    inline_thunk <- ({ {| "{" %ws? inline_statements %ws? "}" |} }) -> Thunk
-    eol_thunk <- ({ {| ":" %ws? noeol_statements eol |} }) -> Thunk
-    indented_thunk <- ({ {| (":" / "{..}") indent
-                statements (nodent statements)*
-            (dedent / (({.+} ("" -> "Error while parsing thunk")) => error))
-        |} }) -> Thunk
-
-    inline_nomsu <- ({("\" inline_expression) }) -> Nomsu
-    eol_nomsu <- ({("\" noeol_expression) }) -> Nomsu
-    indented_nomsu <- ({("\" expression) }) -> Nomsu
-
-    inline_expression <- number / variable / inline_string / inline_list / inline_nomsu
-        / inline_thunk / ("(" %ws? inline_statement %ws? ")")
-    noeol_expression <- indented_string / indented_nomsu / indented_list / indented_thunk
-        / ("(..)" indent
-            statement
-        (dedent / (({.+} ("" -> "Error while parsing indented expression"))))
-        ) / inline_expression
-    expression <- eol_thunk / eol_nomsu / noeol_expression
-
-    -- Function calls need at least one word in them
-    inline_functioncall <- ({(''=>line_no) {|
-            (inline_expression %ws?)* word (%ws? (inline_expression / word))*
-        |} }) -> FunctionCall
-    noeol_functioncall <- ({(''=>line_no) {|
-            (noeol_expression %ws?)* word (%ws? (noeol_expression / word))*
-        |} }) -> FunctionCall
-    functioncall <- ({(''=>line_no) {|
-            (expression (dotdot / %ws?))* word ((dotdot / %ws?) (expression / word))*
-        |} }) -> FunctionCall
-
-    word <- ({ { %operator / (!number %plain_word) } }) -> Word
-    
-    inline_string <- ({ '"' {|
-        ({~ (("\\" -> "\") / ('\"' -> '"') / ("\n" -> "
-") / (!string_interpolation [^%nl"]))+ ~}
-        / string_interpolation)* |} '"' }) -> String
-
-    indented_string <- ({ '".."' %ws? line_comment? %nl %gt_nodented? {|
-        ({~ (("\\" -> "\") / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\]) ~} / string_interpolation)*
-    |} ((!.) / (&(%nl+ !%gt_nodented)) / (({.+} ("" -> "Error while parsing String")) => error))
-        }) -> String
-
-    string_interpolation <- "\" ((noeol_expression dotdot?) / dotdot)
-
-    number <- ({ (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) }) -> Number
-
-    -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
-    -- which is a hack to allow %'s to parse as "%" and "' s" separately
-    variable <- ({ ("%" { %plain_word? }) }) -> Var
-
-    inline_list <- ({ {|
-         ("[" %ws? ((inline_list_item comma)* inline_list_item comma?)? %ws? "]")
-      |} }) -> List
-    indented_list <- ({ {|
-         ("[..]" indent
-                list_line (nodent list_line)*
-          (dedent / (({.+} ("" -> "Error while parsing list")) => error)))
-      |} }) -> List
-    list_line <- (inline_list_item comma)* ((inline_list_item %ws? ",") / (functioncall / expression))
-    inline_list_item <- inline_functioncall / inline_expression
-
-    block_comment <- "#.." [^%nl]* (%nl (%ws? &%nl))* %nl %indented [^%nl]+ (%nl ((%ws? (!. / &%nl)) / (!%dedented [^%nl]+)))*
-    line_comment  <- "#" [^%nl]*
-
-    eol <- %ws? line_comment? (!. / &%nl)
-    ignored_line <- (%nodented (block_comment / line_comment)) / (%ws? (!. / &%nl))
-    indent <- eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
-    nodent <- eol (%nl ignored_line)* %nl %nodented
-    dedent <- eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
-    comma <- %ws? "," %ws?
-    semicolon <- %ws? ";" %ws?
-    dotdot <- nodent ".." %ws?
-]=]
-local CURRENT_FILE = nil
-local whitespace = S(" \t") ^ 1
-local operator = S("'~`!@$^&*-+=|<>?/") ^ 1
-local utf8_continuation = R("\128\191")
-local utf8_char = (R("\194\223") * utf8_continuation + R("\224\239") * utf8_continuation * utf8_continuation + R("\240\244") * utf8_continuation * utf8_continuation * utf8_continuation)
-local plain_word = (R('az', 'AZ', '09') + S("_") + utf8_char) ^ 1
-local defs = {
-  ws = whitespace,
-  nl = P("\n"),
-  tonumber = tonumber,
-  operator = operator,
-  plain_word = plain_word,
-  indented = indent_patt,
-  nodented = nodent_patt,
-  dedented = dedent_patt,
-  gt_nodented = gt_nodent_patt,
-  line_no = function(src, pos)
-    local line_no = 1
-    for _ in src:sub(1, pos):gmatch("\n") do
-      line_no = line_no + 1
+local ESCAPE_CHAR = (P("\\") * S("ntbavfr")) / function(s)
+  return STRING_ESCAPES[s:sub(2, 2)]
+end
+local OPERATOR_CHAR = S("'~`!@$^&*-+=|<>?/")
+local UTF8_CHAR = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
+local IDENT_CHAR = R("az", "AZ", "09") + P("_") + UTF8_CHAR
+local parse
+do
+  local ctx = { }
+  local indent_patt = P(function(self, start)
+    local spaces = self:match("[ \t]*", start)
+    if #spaces > ctx.indent_stack[#ctx.indent_stack] then
+      insert(ctx.indent_stack, #spaces)
+      return start + #spaces
     end
-    return pos, tostring(CURRENT_FILE) .. ":" .. tostring(line_no)
-  end,
-  FunctionCall = function(src, line_no, value, errors)
-    local stub = concat((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      for _index_0 = 1, #value do
-        local t = value[_index_0]
-        _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
-        _len_0 = _len_0 + 1
+  end)
+  local dedent_patt = P(function(self, start)
+    local spaces = self:match("[ \t]*", start)
+    if #spaces < ctx.indent_stack[#ctx.indent_stack] then
+      remove(ctx.indent_stack)
+      return start
+    end
+  end)
+  local nodent_patt = P(function(self, start)
+    local spaces = self:match("[ \t]*", start)
+    if #spaces == ctx.indent_stack[#ctx.indent_stack] then
+      return start + #spaces
+    end
+  end)
+  local gt_nodent_patt = P(function(self, start)
+    local spaces = self:match("[ \t]*", start)
+    if #spaces >= ctx.indent_stack[#ctx.indent_stack] + 4 then
+      return start + ctx.indent_stack[#ctx.indent_stack] + 4
+    end
+  end)
+  local defs = {
+    nl = P("\n"),
+    ws = S(" \t"),
+    tonumber = tonumber,
+    operator = OPERATOR_CHAR,
+    print = function(src, pos, msg)
+      return print(msg, pos, repr(src:sub(math.max(0, pos - 16), math.max(0, pos - 1)) .. "|" .. src:sub(pos, pos + 16))) or true
+    end,
+    utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191")),
+    indented = indent_patt,
+    nodented = nodent_patt,
+    dedented = dedent_patt,
+    gt_nodented = gt_nodent_patt,
+    escape_char = ESCAPE_CHAR,
+    error = function(src, pos, err_msg)
+      if ctx.source_code:sub(pos, pos) == "\n" then
+        pos = pos + #ctx.source_code:match("[ \t\n]*", pos)
       end
-      return _accum_0
-    end)(), " ")
-    return {
-      type = "FunctionCall",
-      src = src,
-      line_no = line_no,
-      value = value,
-      errors = errors,
-      stub = stub
-    }
-  end,
-  error = function(src, pos, errors, err_msg)
-    local line_no = 1
-    for _ in src:sub(1, -#errors):gmatch("\n") do
-      line_no = line_no + 1
+      local line_no = 1
+      while (ctx.line_starts[line_no + 1] or math.huge) < pos do
+        line_no = line_no + 1
+      end
+      local prev_line = line_no > 1 and ctx.source_code:match("[^\n]*", ctx.line_starts[line_no - 1]) or ""
+      local err_line = ctx.source_code:match("[^\n]*", ctx.line_starts[line_no])
+      local next_line = line_no < #ctx.line_starts and ctx.source_code:match("[^\n]*", ctx.line_starts[line_no + 1]) or ""
+      local pointer = ("-"):rep(pos - ctx.line_starts[line_no]) .. "^"
+      err_msg = (err_msg or "Parse error") .. " in " .. tostring(ctx.filename) .. " on line " .. tostring(line_no) .. ":\n"
+      err_msg = err_msg .. "\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n"
+      return error(err_msg)
+    end,
+    FunctionCall = function(start, value, stop)
+      local stub = concat((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_0 = 1, #value do
+          local t = value[_index_0]
+          _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)(), " ")
+      local line_no = 1
+      while (ctx.line_starts[line_no + 1] or math.huge) < start do
+        line_no = line_no + 1
+      end
+      local src = ctx.source_code:sub(start, stop - 1)
+      return {
+        type = "FunctionCall",
+        src = src,
+        line_no = tostring(ctx.filename) .. ":" .. tostring(line_no),
+        value = value,
+        stub = stub
+      }
     end
-    local err_pos = #src - #errors + 1
-    if errors:sub(1, 1) == "\n" then
-      err_pos = err_pos + #errors:match("[ \t]*", 2)
-    end
-    local start_of_err_line = err_pos
-    while src:sub(start_of_err_line, start_of_err_line) ~= "\n" and start_of_err_line > 1 do
-      start_of_err_line = start_of_err_line - 1
-    end
-    local start_of_prev_line = start_of_err_line - 1
-    while src:sub(start_of_prev_line, start_of_prev_line) ~= "\n" and start_of_prev_line > 1 do
-      start_of_prev_line = start_of_prev_line - 1
-    end
-    local prev_line, err_line, next_line
-    prev_line, err_line, next_line = src:match("([^\n]*)\n([^\n]*)\n([^\n]*)", start_of_prev_line + 1)
-    local pointer = ("-"):rep(err_pos - start_of_err_line + 0) .. "^"
-    return error("\n" .. tostring(err_msg or "Parse error") .. " in " .. tostring(CURRENT_FILE) .. " on line " .. tostring(line_no) .. ":\n\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n")
-  end
-}
-setmetatable(defs, {
-  __index = function(t, key)
-    do
-      local _with_0
-      _with_0 = function(src, value, errors)
+  }
+  setmetatable(defs, {
+    __index = function(self, key)
+      local fn
+      fn = function(start, value, stop)
         return {
-          type = key,
-          src = src,
+          start = start,
+          stop = stop,
           value = value,
-          errors = errors
+          src = ctx.source_code:sub(start, stop - 1),
+          type = key
         }
       end
-      t[key] = _with_0
-      local _ = nil
-      return _with_0
+      self[key] = fn
+      return fn
     end
+  })
+  local peg_tidier = re.compile([[    file <- {~ %nl* (def/comment) (%nl+ (def/comment))* %nl* ~}
+    def <- anon_def / captured_def
+    anon_def <- ({ident} (" "*) ":"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
+    captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- ({} %3 {}) -> %2"
+    ident <- [a-zA-Z_][a-zA-Z0-9_]*
+    comment <- "--" [^%nl]*
+    ]])
+  local nomsu = peg_tidier:match(io.open("nomsu.peg"):read("*a"))
+  nomsu = re.compile(nomsu, defs)
+  parse = function(source_code, filename)
+    local old_ctx = ctx
+    ctx = {
+      source_code = source_code,
+      filename = filename,
+      indent_stack = {
+        0
+      }
+    }
+    ctx.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*"):match(source_code)
+    local tree = nomsu:match(source_code)
+    ctx = old_ctx
+    return tree
   end
-})
-nomsu = re.compile(nomsu, defs)
+end
 local NomsuCompiler
 do
   local _class_0
@@ -271,9 +199,6 @@ do
         })
       elseif type(signature) == 'table' and type(signature[1]) == 'string' then
         signature = self:get_stubs(signature)
-      end
-      if self.debug then
-        self:write(colored.magenta("Defined rule " .. tostring(repr(signature))))
       end
       assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
       local canonical_args = nil
@@ -562,19 +487,11 @@ do
     end,
     parse = function(self, str, filename)
       if self.debug then
-        self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(str))
+        self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(colored.yellow(str)))
       end
       str = str:gsub("\r", "")
-      local old_file = CURRENT_FILE
-      local old_indent_stack
-      old_indent_stack, indent_stack = indent_stack, {
-        0
-      }
-      CURRENT_FILE = filename
-      local tree = nomsu:match(str)
-      indent_stack = old_indent_stack
-      CURRENT_FILE = old_file
-      assert(tree, "Failed to parse: " .. tostring(str))
+      local tree = parse(str, filename)
+      assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(str))))
       if self.debug then
         self:writeln("PARSE TREE:")
         self:print_tree(tree, "    ")
@@ -744,8 +661,7 @@ end);]]):format(concat(buffer, "\n"))
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local arg = _list_0[_index_0]
-          local arg_inline
-          nomsu, arg_inline = self:tree_to_nomsu(arg, force_inline)
+          local nomsu, arg_inline = self:tree_to_nomsu(arg, force_inline)
           if sep == " " and line_len + #nomsu > 80 then
             sep = "\n.."
           end
@@ -802,8 +718,7 @@ end);]]):format(concat(buffer, "\n"))
         local longline = 0
         local inline = true
         for i, bit in ipairs(tree.value) do
-          local bit_inline
-          nomsu, bit_inline = self:tree_to_nomsu(bit, force_inline)
+          local nomsu, bit_inline = self:tree_to_nomsu(bit, force_inline)
           inline = inline and bit_inline
           if inline then
             if i > 1 then
@@ -968,17 +883,14 @@ end)]]):format(concat(lua_bits, "\n"))
               break
             end
             if escaped_args[arg_names[arg_num]] then
-              arg = {
-                type = "Nomsu",
-                value = arg,
-                line_no = tree.line_no
-              }
+              insert(args, "nomsu:parse(" .. tostring(repr(arg.src)) .. ", " .. tostring(repr(tree.line_no)) .. ").value[1]")
+            else
+              local expr, statement = self:tree_to_lua(arg, filename)
+              if statement then
+                self:error("Cannot use [[" .. tostring(arg.src) .. "]] as a function argument, since it's not an expression.")
+              end
+              insert(args, expr)
             end
-            local expr, statement = self:tree_to_lua(arg, filename)
-            if statement then
-              self:error("Cannot use [[" .. tostring(arg.src) .. "]] as a function argument, since it's not an expression.")
-            end
-            insert(args, expr)
             arg_num = arg_num + 1
             _continue_0 = true
           until true
@@ -989,10 +901,6 @@ end)]]):format(concat(lua_bits, "\n"))
         remove(self.compilestack)
         return self.__class:comma_separated_items("nomsu:call(", args, ")"), nil
       elseif "String" == _exp_0 then
-        if self.debug then
-          self:writeln((colored.bright("STRING:")))
-          self:print_tree(tree)
-        end
         local concat_parts = { }
         local string_buffer = ""
         local _list_0 = tree.value
@@ -1144,17 +1052,17 @@ end)]]):format(concat(lua_bits, "\n"))
         self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        x = x:gsub("\n%s*%.%.", " ")
-        x = lpeg.Cs((operator / (function(op)
-          return " " .. tostring(op) .. " "
-        end) + 1) ^ 0):match(x)
-        x = x:gsub("%s+", " "):gsub("^%s*", ""):gsub("%s*$", "")
-        local stub = x:gsub("%%%S+", "%%"):gsub("\\", "")
+        local patt = re.compile("{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op+})*|}", {
+          id = IDENT_CHAR,
+          op = OPERATOR_CHAR
+        })
+        local spec = concat(patt:match(x), " ")
+        local stub = spec:gsub("%%%S+", "%%"):gsub("\\", "")
         local arg_names
         do
           local _accum_0 = { }
           local _len_0 = 1
-          for arg in x:gmatch("%%([^%s]*)") do
+          for arg in spec:gmatch("%%([^%s]*)") do
             _accum_0[_len_0] = arg
             _len_0 = _len_0 + 1
           end
@@ -1163,7 +1071,7 @@ end)]]):format(concat(lua_bits, "\n"))
         local escaped_args = set((function()
           local _accum_0 = { }
           local _len_0 = 1
-          for arg in x:gmatch("\\%%([^%s]*)") do
+          for arg in spec:gmatch("\\%%(%S*)") do
             _accum_0[_len_0] = arg
             _len_0 = _len_0 + 1
           end
@@ -1278,13 +1186,17 @@ end)]]):format(concat(lua_bits, "\n"))
     end,
     typecheck = function(self, vars, varname, desired_type)
       local x = vars[varname]
-      if type(x) == desired_type then
+      local x_type = type(x)
+      if x_type == desired_type then
         return x
       end
-      if type(x) == 'table' and x.type == desired_type then
-        return x
+      if x_type == 'table' then
+        x_type = x.type or x_type
+        if x_type == desired_type then
+          return x
+        end
       end
-      return self:error("Invalid type for %" .. tostring(varname) .. ". Expected " .. tostring(desired_type) .. ", but got " .. tostring(repr(x)) .. ".")
+      return self:error("Invalid type for %" .. tostring(varname) .. ". Expected " .. tostring(desired_type) .. ", but got " .. tostring(x_type) .. ":\n" .. tostring(repr(x)))
     end,
     source_code = function(self, level)
       if level == nil then
@@ -1326,6 +1238,20 @@ end)]]):format(concat(lua_bits, "\n"))
       self:defmacro("__src__ %level", function(self, vars)
         return self:repr(self:source_code(self:tree_to_value(vars.level)))
       end)
+      self:def("derp \\%foo derp \\%bar", function(self, vars)
+        local lua = "local x = " .. repr((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = vars.foo.value
+          for _index_0 = 1, #_list_0 do
+            local t = _list_0[_index_0]
+            _accum_0[_len_0] = t.stub
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)()) .. ";\nlocal y = " .. self:tree_to_lua(vars.bar)
+        return print(colored.green(lua))
+      end)
       local run_file
       run_file = function(self, vars)
         if vars.filename:match(".*%.lua") then
@@ -1333,7 +1259,7 @@ end)]]):format(concat(lua_bits, "\n"))
         end
         if vars.filename:match(".*%.nom") then
           if not self.skip_precompiled then
-            local file = io.open(vars.filename:gsub("%.nom", ".compiled.nom"), "r")
+            local file = io.open(vars.filename:gsub("%.nom", ".nomc"), "r")
           end
           local file = file or io.open(vars.filename)
           if not file then
@@ -1457,7 +1383,7 @@ if arg then
   c.skip_precompiled = not args.flags["-O"]
   if args.input then
     if args.flags["-c"] and not args.output then
-      args.output = args.input:gsub("%.nom", ".compiled.nom")
+      args.output = args.input:gsub("%.nom", ".nomc")
     end
     local compiled_output = nil
     if args.flags["-p"] then

@@ -1,0 +1,92 @@
+file (File):
+    {| shebang?
+        (ignored_line %nl)*
+        statements (nodent statements)*
+        (%nl ignored_line)*
+    (!. / (("" -> "Parse error") => error)?) |}
+
+shebang: "#!" [^%nl]* %nl
+
+inline_statements: inline_statement (semicolon inline_statement)*
+noeol_statements: (inline_statement semicolon noeol_statements) / noeol_statement
+statements: (inline_statement semicolon statements) / statement
+
+statement: functioncall / expression
+noeol_statement: noeol_functioncall / noeol_expression
+inline_statement: inline_functioncall / inline_expression
+
+inline_thunk (Thunk): {| "{" %ws* inline_statements %ws* "}" |}
+eol_thunk (Thunk): {| ":" %ws* noeol_statements eol |}
+indented_thunk (Thunk):
+    {| (":" / "{..}") indent
+            statements (nodent statements)*
+        (dedent / (("" -> "Error while parsing thunk") => error))
+    |}
+
+inline_nomsu (Nomsu): "\" inline_expression
+eol_nomsu (Nomsu): "\" noeol_expression
+indented_nomsu (Nomsu): "\" expression
+
+inline_expression:
+    number / variable / inline_string / inline_list / inline_nomsu
+    / inline_thunk / ("(" %ws* inline_statement %ws* ")")
+noeol_expression:
+    indented_string / indented_nomsu / indented_list / indented_thunk
+    / ("(..)" indent
+        statement
+    (dedent / (("" -> "Error while parsing indented expression") => error))
+    ) / inline_expression
+expression: eol_thunk / eol_nomsu / noeol_expression
+
+-- Function calls need at least one word in them
+inline_functioncall (FunctionCall):
+    {| (inline_expression %ws*)* word (%ws* (inline_expression / word))* |}
+noeol_functioncall (FunctionCall):
+    {| (noeol_expression %ws*)* word (%ws* (noeol_expression / word))* |}
+functioncall (FunctionCall):
+    {| (expression (dotdot / %ws*))* word ((dotdot / %ws*) (expression / word))* |}
+
+word (Word): { %operator+ / (!number plain_word) }
+
+inline_string (String):
+    '"' {|
+        ({~ (('\"' -> '"') / ('\\' -> '\') / %escape_char / [^%nl\"])+ ~}
+        / string_interpolation)*
+    |} '"'
+indented_string (String):
+    '".."' %ws* line_comment? %nl %gt_nodented? {|
+        ({~ (("\\" -> "\") / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\])+ ~} / string_interpolation)*
+    |} ((!.) / (&(%nl+ !%gt_nodented)) / (("" -> "Error while parsing String") => error))
+
+string_interpolation: "\" ((noeol_expression dotdot?) / dotdot)
+
+number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
+
+-- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
+-- which is a hack to allow %'s to parse as "%" and "' s" separately
+variable (Var): "%" { plain_word? }
+
+inline_list (List):
+    "[" %ws* {| (inline_list_item (comma inline_list_item)* comma?)? |} %ws* "]"
+indented_list (List):
+    "[..]" indent {|
+        list_line (nodent list_line)*
+    |}
+    (dedent / (("" -> "Error while parsing list") => error))
+list_line:
+    (inline_list_item (comma inline_list_item)* (comma (functioncall / expression)?)?)
+    / (functioncall / expression)
+inline_list_item: inline_functioncall / inline_expression
+
+block_comment: "#.." [^%nl]* (%nl (%ws* &%nl))* %nl %indented [^%nl]+ (%nl ((%ws* ((!.) / &%nl)) / (!%dedented [^%nl]+)))*
+line_comment: "#" [^%nl]*
+
+eol: %ws* line_comment? (!. / &%nl)
+ignored_line: (%nodented (block_comment / line_comment)) / (%ws* (!. / &%nl))
+indent: eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
+nodent: eol (%nl ignored_line)* %nl %nodented
+dedent: eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
+comma: %ws* "," %ws*
+semicolon: %ws* ";" %ws*
+dotdot: nodent ".." %ws*
+plain_word: ([a-zA-Z0-9_] / %utf8_char)+

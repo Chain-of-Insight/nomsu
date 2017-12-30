@@ -190,7 +190,8 @@ local function min(list, keyFn)
             return keyTable[k]
         end
     end
-    local best, bestKey = list[1], keyFn(best)
+    local best = list[1]
+    local bestKey = keyFn(best)
     for i = 2, #list do
         local key = keyFn(list[i])
         if key < bestKey then
@@ -212,7 +213,8 @@ local function max(list, keyFn)
             return keyTable[k]
         end
     end
-    local best, bestKey = list[1], keyFn(best)
+    local best = list[1]
+    local bestKey = keyFn(best)
     for i = 2, #list do
         local key = keyFn(list[i])
         if key > bestKey then
