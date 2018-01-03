@@ -32,7 +32,17 @@ compile [..]
 compile [%obj'%key, %obj's %key, %obj -> %key] to: "(\(%obj as lua))[\(%key as lua)]"
 
 # Variable assignment operator, and += type versions
-compile [%var = %val] to code: "\(%var as lua) = \(%val as lua);"
+compile [%var = %val] to code:
+    lua> ".."
+        if \%var.type == 'List' and \%val.type == 'List' then
+            local lhs = {};
+            for i,x in ipairs(\%var.value) do lhs[i] = nomsu:tree_to_lua(x); end
+            local rhs = {};
+            for i,x in ipairs(\%val.value) do rhs[i] = nomsu:tree_to_lua(x); end
+            return table.concat(lhs, ", ").." = "..table.concat(rhs, ", ")..";";
+        else
+            return \(%var as lua).." = "..\(%val as lua)..";";
+        end
 compile [%var += %val] to code: "\(%var as lua) = \(%var as lua) + \(%val as lua);"
 compile [%var -= %val] to code: "\(%var as lua) = \(%var as lua) - \(%val as lua);"
 compile [%var *= %val] to code: "\(%var as lua) = \(%var as lua) * \(%val as lua);"
@@ -53,7 +63,7 @@ lua do> ".."
         end
         nomsu:defmacro("%a "..nomsu_alias.." %b", (function(nomsu, vars)
             return "("..nomsu:tree_to_lua(vars.a).." "..op.." "..nomsu:tree_to_lua(vars.b)..")";
-        end), [["(\\(%a) ]]..op..[[ \\(%b))"]]);
+        end), [["(\\%a ]]..op..[[ \\(%b))"]]);
     end
 
 # TODO: implement OR, XOR, AND for multiple operands

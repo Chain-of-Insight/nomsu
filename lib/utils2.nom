@@ -27,7 +27,7 @@ compile [with %assignments %action] to code:
         assert (=lua "vars.eq and vars.eq.type == 'Word' and vars.eq.value == '='") ".."
             Invalid format for 'with' statement. List entries must have the form %var = (value)
         %value = (%tokens -> 3)
-        add (d{i=%i; var=%var; value=%value}) to %data
+        add {i=%i, var=%var, value=%value} to %data
     %foo = (..)
         join (..)
             "local old_value\(%->"i") = \((%->"var") as lua); \((%->"var") as lua) = \((%->"value") as lua);"

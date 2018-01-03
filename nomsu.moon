@@ -491,6 +491,9 @@ end);]])\format(concat(buffer, "\n"))
                 else
                     return longbuff, false
 
+            when "Dict"
+                error("Sorry, not yet implemented.")
+
             when "Number"
                 return repr(tree.value), true
 
@@ -629,6 +632,26 @@ end)]])\format(concat(lua_bits, "\n"))
                     insert items, expr
                 return @@comma_separated_items("{", items, "}"), nil
 
+            when "Dict"
+                items = {}
+                for entry in *tree.value
+                    local key_expr,key_statement
+                    if entry.dict_key.type == "Word"
+                        key_expr,key_statement = repr(entry.dict_key.value),nil
+                    else
+                        key_expr,key_statement = @tree_to_lua entry.dict_key, filename
+                    if key_statement
+                        @error "Cannot use [[#{entry.dict_key.src}]] as a dict key, since it's not an expression."
+                    value_expr,value_statement = @tree_to_lua entry.dict_value, filename
+                    if value_statement
+                        @error "Cannot use [[#{entry.dict_value.src}]] as a dict value, since it's not an expression."
+                    key_str = key_expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
+                    if key_str
+                        insert items, "#{key_str}=#{value_expr}"
+                    else
+                        insert items, "[#{key_expr}]=#{value_expr}"
+                return @@comma_separated_items("{", items, "}"), nil
+
             when "Number"
                 return repr(tree.value), nil
 
@@ -649,6 +672,10 @@ end)]])\format(concat(lua_bits, "\n"))
             when "List", "File", "Thunk", "FunctionCall", "String"
                 for v in *tree.value
                     @walk_tree(v, depth+1)
+            when "Dict"
+                for e in *tree.value
+                    @walk_tree(e.dict_key, depth+1)
+                    @walk_tree(e.dict_value, depth+1)
             else @walk_tree(tree.value, depth+1)
         return nil
 
@@ -697,6 +724,17 @@ end)]])\format(concat(lua_bits, "\n"))
                 if new_value != tree.value
                     tree = {k,v for k,v in pairs(tree)}
                     tree.value = new_value
+            when "Dict"
+                dirty = false
+                replacements = {}
+                for i,e in ipairs tree.value
+                    new_key = @replaced_vars e.dict_key, vars
+                    new_value = @replaced_vars e.dict_value, vars
+                    dirty or= new_key != e.dict_key or new_value != e.dict_value
+                    replacements[i] = {dict_key:new_key, dict_value:new_value}
+                if dirty
+                    tree = {k,v for k,v in pairs(tree)}
+                    tree.value = replacements
             when nil -- Raw table, probably from one of the .value of a multi-value tree (e.g. List)
                 new_values = {}
                 any_different = false
@@ -728,7 +766,7 @@ end)]])\format(concat(lua_bits, "\n"))
             when "String" then return @get_stub(x.value)
             when "FunctionCall" then return @get_stub(x.src)
             else @error "Unsupported get stub type: #{x.type} for #{repr x}"
-    
+
     get_stubs: (x)=>
         if type(x) != 'table' then return {{@get_stub(x)}}
         switch x.type

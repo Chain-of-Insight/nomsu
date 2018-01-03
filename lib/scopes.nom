@@ -21,7 +21,7 @@ parse [using %scoped do %actions] as:
             getmetatable(nomsu.defs["#vars"]).__newindex = getmetatable(nomsu.defs["#vars"]).__index;
         do %actions
 
-parse [scoped %actions] as: using %actions do {pass}
+parse [scoped %actions] as: using %actions do (:pass)
 
 rule [from %filename import %rules] =:
     using:

@@ -740,6 +740,8 @@ end);]]):format(concat(buffer, "\n"))
         else
           return longbuff, false
         end
+      elseif "Dict" == _exp_0 then
+        return error("Sorry, not yet implemented.")
       elseif "Number" == _exp_0 then
         return repr(tree.value), true
       elseif "Var" == _exp_0 then
@@ -955,6 +957,32 @@ end)]]):format(concat(lua_bits, "\n"))
           insert(items, expr)
         end
         return self.__class:comma_separated_items("{", items, "}"), nil
+      elseif "Dict" == _exp_0 then
+        local items = { }
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local entry = _list_0[_index_0]
+          local key_expr, key_statement
+          if entry.dict_key.type == "Word" then
+            key_expr, key_statement = repr(entry.dict_key.value), nil
+          else
+            key_expr, key_statement = self:tree_to_lua(entry.dict_key, filename)
+          end
+          if key_statement then
+            self:error("Cannot use [[" .. tostring(entry.dict_key.src) .. "]] as a dict key, since it's not an expression.")
+          end
+          local value_expr, value_statement = self:tree_to_lua(entry.dict_value, filename)
+          if value_statement then
+            self:error("Cannot use [[" .. tostring(entry.dict_value.src) .. "]] as a dict value, since it's not an expression.")
+          end
+          local key_str = key_expr:match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
+          if key_str then
+            insert(items, tostring(key_str) .. "=" .. tostring(value_expr))
+          else
+            insert(items, "[" .. tostring(key_expr) .. "]=" .. tostring(value_expr))
+          end
+        end
+        return self.__class:comma_separated_items("{", items, "}"), nil
       elseif "Number" == _exp_0 then
         return repr(tree.value), nil
       elseif "Var" == _exp_0 then
@@ -981,6 +1009,13 @@ end)]]):format(concat(lua_bits, "\n"))
         for _index_0 = 1, #_list_0 do
           local v = _list_0[_index_0]
           self:walk_tree(v, depth + 1)
+        end
+      elseif "Dict" == _exp_0 then
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local e = _list_0[_index_0]
+          self:walk_tree(e.dict_key, depth + 1)
+          self:walk_tree(e.dict_value, depth + 1)
         end
       else
         self:walk_tree(tree.value, depth + 1)
@@ -1033,6 +1068,28 @@ end)]]):format(concat(lua_bits, "\n"))
             tree = _tbl_0
           end
           tree.value = new_value
+        end
+      elseif "Dict" == _exp_0 then
+        local dirty = false
+        local replacements = { }
+        for i, e in ipairs(tree.value) do
+          local new_key = self:replaced_vars(e.dict_key, vars)
+          local new_value = self:replaced_vars(e.dict_value, vars)
+          dirty = dirty or (new_key ~= e.dict_key or new_value ~= e.dict_value)
+          replacements[i] = {
+            dict_key = new_key,
+            dict_value = new_value
+          }
+        end
+        if dirty then
+          do
+            local _tbl_0 = { }
+            for k, v in pairs(tree) do
+              _tbl_0[k] = v
+            end
+            tree = _tbl_0
+          end
+          tree.value = replacements
         end
       elseif nil == _exp_0 then
         local new_values = { }

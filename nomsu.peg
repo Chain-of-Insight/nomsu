@@ -15,10 +15,10 @@ statement: functioncall / expression
 noeol_statement: noeol_functioncall / noeol_expression
 inline_statement: inline_functioncall / inline_expression
 
-inline_thunk (Thunk): {| "{" %ws* inline_statements %ws* "}" |}
+inline_thunk (Thunk): {| "(" %ws* ":" %ws* inline_statements %ws* ")" |}
 eol_thunk (Thunk): {| ":" %ws* noeol_statements eol |}
 indented_thunk (Thunk):
-    {| (":" / "{..}") indent
+    {| ":" indent
             statements (nodent statements)*
         (dedent / (("" -> "Error while parsing thunk") => error))
     |}
@@ -28,10 +28,10 @@ eol_nomsu (Nomsu): "\" noeol_expression
 indented_nomsu (Nomsu): "\" expression
 
 inline_expression:
-    number / variable / inline_string / inline_list / inline_nomsu
+    number / variable / inline_string / inline_list / inline_dict / inline_nomsu
     / inline_thunk / ("(" %ws* inline_statement %ws* ")")
 noeol_expression:
-    indented_string / indented_nomsu / indented_list / indented_thunk
+    indented_string / indented_nomsu / indented_list / indented_dict / indented_thunk
     / ("(..)" indent
         statement
     (dedent / (("" -> "Error while parsing indented expression") => error))
@@ -55,10 +55,13 @@ inline_string (String):
     |} '"'
 indented_string (String):
     '".."' %ws* line_comment? %nl %gt_nodented? {|
-        ({~ (("\\" -> "\") / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\])+ ~} / string_interpolation)*
+        ({~
+            (("\\" -> "\") / (("\" eol %nl %gt_nodented "..") -> "")
+            / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\])+
+        ~} / string_interpolation)*
     |} ((!.) / (&(%nl+ !%gt_nodented)) / (("" -> "Error while parsing String") => error))
-
-string_interpolation: "\" ((noeol_expression dotdot?) / dotdot)
+string_interpolation:
+    "\" (variable / inline_list / inline_dict / inline_thunk / ("(" %ws* inline_statement %ws* ")"))
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
@@ -77,6 +80,19 @@ list_line:
     (inline_list_item (comma inline_list_item)* (comma (functioncall / expression)?)?)
     / (functioncall / expression)
 inline_list_item: inline_functioncall / inline_expression
+
+inline_dict (Dict):
+    "{" %ws* {| (inline_dict_item (comma inline_dict_item)* comma?)? |} %ws* "}"
+indented_dict (Dict):
+    "{..}" indent {|
+        dict_line (nodent dict_line)*
+    |}
+    (dedent / (("" -> "Error while parsing dict") => error))
+dict_line:
+    (inline_dict_item (comma inline_dict_item)* (comma (functioncall / expression)?)?)
+    / {| {:dict_key: inline_expression / word :} %ws* "=" %ws* {:dict_value: functioncall / expression :} |}
+inline_dict_item:
+    {| {:dict_key: inline_expression / word :} %ws* "=" %ws* {:dict_value: inline_functioncall / inline_expression :} |}
 
 block_comment: "#.." [^%nl]* (%nl (%ws* &%nl))* %nl %indented [^%nl]+ (%nl ((%ws* ((!.) / &%nl)) / (!%dedented [^%nl]+)))*
 line_comment: "#" [^%nl]*

@@ -107,6 +107,8 @@ rule [%tree as lua statements] =:
 compile [nomsu] to: "nomsu"
 compile [nomsu's %key] to: "nomsu[\(%key as lua)]"
 compile [nomsu %method %args] to: "nomsu[\(%method as lua)](nomsu, unpack(\(%args as lua)))"
+compile [tree %tree with %replacements] to: ".."
+    nomsu:replaced_vars(\(%tree as lua), \(%replacements as lua))
 
 parse [rule %signature] as:
     (nomsu's "defs")->(nomsu "get_stub" [\%signature])

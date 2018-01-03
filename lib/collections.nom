@@ -18,15 +18,6 @@ compile [..]
 parse [first in %list, first %list] as: 1 st in %list
 parse [last in %list, last %list] as: 1 st to last in %list
 
-# Dict iteration convenience function. This could also be accomplished with: for all (entries in %dict): ...
-compile [for %key = %value in %dict %body] to code: ".."
-    do
-        for k, v in pairs(\(%dict as lua)) do
-            \(%key as lua), \(%value as lua) = k, v;
-            \(%body as lua statements)
-        end
-    end
-
 # Membership testing
 rule [%item is in %list, %list contains %item, %list has %item] =:
     for %key = %value in %list:
@@ -60,7 +51,7 @@ compile [%list ->* %indices] to:
     %ret = "\(%list as lua)"
     for %index in (%indices's "value"):
         %ret join= "[\(%index as lua)]"
-    "\(%ret)"
+    "\%ret"
 
 # Assignment
 compile [..]
@@ -87,43 +78,16 @@ rule [flatten %lists] =:
             add %item to %flat
     %flat
 
-rule [dict from entries %items] =:
+rule [dict %items] =:
     %dict = []
     for %pair in %items:
         %dict -> (%pair -> 1) = (%pair -> 2)
     %dict
 
-compile [dict %items, d %items] to:
-    if ((%items's "type") == "Thunk"):
-        %item_codes = []
-        for %func_call in (%items's "value"):
-            assert ((%func_call's "type") == "FunctionCall") ".."
-                Invalid format for 'dict' expression. Only literals are allowed.
-            %tokens = (%func_call's "value")
-            %equals = (%tokens -> 2)
-            assert (=lua "#\(%tokens) == 3 and \(%equals) and \(%equals).type == 'Word' and \(%equals).value == '='") ".."
-                Invalid format for 'dict' expression. Lines must only have the "% = %" format, not \(%func_call's "src")
-            %key = (%tokens -> 1)
-            lua> ".."
-                if \(%key).type == "Word" and \(%key).value:match("^[a-zA-Z_][a-zA-Z0-9_]*$") then
-                    \(%key_code) = \(%key).value;
-                elseif \(%key).type == "Word" then
-                    \(%key_code) = "["..nomsu:repr(\(%key).value).."]";
-                else
-                    \(\{%key_code = "[\((%key as lua))]"} as lua statements)
-                end
-            add "\(%key_code) = \((%tokens -> 3) as lua)" to %item_codes
-        return "{\(join %item_codes with glue ",\n")}"
-    ..else:
-        return (..)
-            (..)
-                nomsu "replaced_vars" [\(dict from entries %items), =lua "vars"]
-            ..as lua
-
 rule [entries in %dict] =:
     %entries = []
     for %k = %v in %dict:
-        add (dict {key = %k; value = %v}) to %entries
+        add {key=%k, value=%v} to %entries
     %entries
 
 rule [keys in %dict] =:
@@ -137,19 +101,34 @@ rule [values in %dict] =:
     %values
 
 # List Comprehension
-compile [%expression for %var in %iterable] to:
-    assert ((%var's "type") == "Var") ".."
-        List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%var's "type")
+compile [%expression for %item in %iterable] to:
+    assert ((%item's "type") == "Var") ".."
+        List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
     ".."
-        (function(game, vars);
+        (function(nomsu, vars);
             local comprehension = {};
-            for i,value in ipairs(\(%iterable as lua)) do;
-                \(%var as lua) = value;
+            for i,item in ipairs(\(%iterable as lua)) do;
+                \(%item as lua) = item;
                 comprehension[i] = \(%expression as lua);
             end;
             return comprehension;
-        end)(game, setmetatable({}, {__index=vars}))
+        end)(nomsu, setmetatable({}, {__index=vars}))
 parse [%expression for all %iterable] as: %expression for % in %iterable
+
+compile [%expression for %key = %value in %iterable] to:
+    assert ((%key's "type") == "Var") ".."
+        List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key's "type")
+    assert ((%value's "type") == "Var") ".."
+        List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value's "type")
+    ".."
+        (function(nomsu, vars);
+            local comprehension = {};
+            for key,value in pairs(\(%iterable as lua)) do;
+                \(%key as lua), \(%value as lua) = key, value;
+                comprehension[i] = \(%expression as lua);
+            end;
+            return comprehension;
+        end)(nomsu, setmetatable({}, {__index=vars}))
 
 rule [%items sorted] =:
     %copy = (% for all %items)
@@ -160,7 +139,7 @@ rule [%items sorted by %key] =:
     sort %copy by %key
     %copy
 rule [unique %items] =:
-    keys in (dict from entries ([%,yes] for all %items))
+    keys in (dict ([%,yes] for all %items))
 
 # Metatable stuff
 compile [counter] to: "setmetatable({}, {__index=function() return 0; end})"
@@ -173,17 +152,42 @@ compile [default dict] to: ".."
 rule [chain %dict to %fallback] =:
     when (type of %fallback) == ?:
         * "table":
-            =lua "setmetatable(\(%dict), \(%fallback))"
+            =lua "setmetatable(\%dict, \%fallback)"
         * "function":
-            =lua "setmetatable(\(%dict), {__index=function(self, key) return (\(%fallback))(nomsu, {['']=key, self=self}); end})"
+            =lua "setmetatable(\%dict, {__index=function(self, key) return (\%fallback)(nomsu, {['']=key, self=self}); end})"
         * else:
-            =lua "setmetatable(\(%dict), {__index=function(self, key) return (\(%fallback)); end})"
+            =lua "setmetatable(\%dict, {__index=function(self, key) return (\%fallback); end})"
 
 
 # TODO: maybe make a generator/coroutine?
 
-#.. Dict comprehensions can be accomplished okay by doing:
-    dict ([%'s "key", %'s "value"] for all (entries in %dict))
-    or something similar
-# TODO: fix compiler bugs
-pass
+# Dict comprehensions
+compile [%key = %value for %item in %iterable] to:
+    assert ((%item's "type") == "Var") ".."
+        Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
+    ".."
+        (function(nomsu, vars);
+            local comprehension = {};
+            for i,value in ipairs(\(%iterable as lua)) do;
+                \(%item as lua) = value;
+                comprehension[\(%key as lua)] = \(%value as lua);
+            end;
+            return comprehension;
+        end)(nomsu, setmetatable({}, {__index=vars}))
+parse [%key = %value for all %iterable] as: %key = %value for % in %iterable
+
+compile [%key = %value for %src_key = %src_value in %iterable] to:
+    assert ((%src_key's "type") == "Var") ".."
+        Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key's "type")
+    assert ((%src_value's "type") == "Var") ".."
+        Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value's "type")
+    ".."
+        (function(nomsu, vars);
+            local comprehension = {};
+            for key,value in pairs(\(%iterable as lua)) do;
+                \(%src_key as lua), \(%src_value as lua) = key, value;
+                comprehension[\(%key as lua)] = \(%value as lua);
+            end;
+            return comprehension;
+        end)(nomsu, setmetatable({}, {__index=vars}))
+
