@@ -28,14 +28,14 @@ compile [with %assignments %action] to code:
             Invalid format for 'with' statement. List entries must have the form %var = (value)
         %value = (%tokens -> 3)
         add {i=%i, var=%var, value=%value} to %data
-    %foo = (..)
+    %setup = (..)
         join (..)
             "local old_value\(%->"i") = \((%->"var") as lua); \((%->"var") as lua) = \((%->"value") as lua);"
             ..for all %data
         ..with glue "\n    "
     ".."
         do
-            \(%foo)
+            \%setup
             local fell_through = false;
             local ok, ret1, ret2 = pcall(function(nomsu, vars)
                 \(%action as lua statements);

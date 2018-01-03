@@ -66,15 +66,15 @@ lua> ".."
 
 rule [remove rule %stub] =:
     lua> ".."
-        local def = nomsu.defs[\(%stub)];
+        local def = nomsu.defs[\%stub];
         for _, alias in ipairs(def.aliases) do
             nomsu.defs[alias] = false;
         end
 
 rule [%tree as lua] =:
-    =lua "nomsu:tree_to_lua(\(%tree))"
+    =lua "nomsu:tree_to_lua(\%tree)"
 rule [%tree as value] =:
-    =lua "nomsu:tree_to_value(\(%tree), vars)"
+    =lua "nomsu:tree_to_value(\%tree, vars)"
 compile [repr %obj] to:
     "nomsu:repr(\(%obj as lua))"
 compile [indented %obj] to:
@@ -91,7 +91,7 @@ parse [lua do> %block] as:
 
 rule [%tree as lua statement] =:
     lua do> ".."
-        local _,statement = nomsu:tree_to_lua(\(%tree));
+        local _,statement = nomsu:tree_to_lua(\%tree);
         return statement;
 rule [%tree as lua statements] =:
     lua do> ".."
