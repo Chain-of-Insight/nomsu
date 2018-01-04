@@ -41,7 +41,10 @@ lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
 STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-ESCAPE_CHAR = (P("\\")*S("ntbavfr")) / (s)->STRING_ESCAPES[s\sub(2,2)]
+DIGIT, HEX = R('09'), R('09','af','AF')
+ESCAPE_CHAR = (P("\\")*S("xX")*C(HEX*HEX)) / => string.char(tonumber(@, 16))
+ESCAPE_CHAR += (P("\\")*C(DIGIT*(DIGIT^-2))) / => string.char(tonumber @)
+ESCAPE_CHAR += (P("\\")*C(S("ntbavfr"))) / STRING_ESCAPES
 OPERATOR_CHAR = S("'~`!@$^&*-+=|<>?/")
 UTF8_CHAR = (
     R("\194\223")*R("\128\191") +
@@ -698,7 +701,7 @@ end)]])\format(concat(lua_bits, "\n"))
         return concat(bits, "\n")
 
     @unescape_string: (str)=>
-        str\gsub("\\(.)", ((c)-> STRING_ESCAPES[c] or c))
+        Cs(((P("\\\\")/"\\") + (P("\\\"")/'"') + ESCAPE_CHAR + P(1))^0)\match(str)
 
     @comma_separated_items: (open, items, close)=>
         bits = {open}

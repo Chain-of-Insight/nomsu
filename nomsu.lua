@@ -45,9 +45,14 @@ local STRING_ESCAPES = {
   f = "\f",
   r = "\r"
 }
-local ESCAPE_CHAR = (P("\\") * S("ntbavfr")) / function(s)
-  return STRING_ESCAPES[s:sub(2, 2)]
+local DIGIT, HEX = R('09'), R('09', 'af', 'AF')
+local ESCAPE_CHAR = (P("\\") * S("xX") * C(HEX * HEX)) / function(self)
+  return string.char(tonumber(self, 16))
 end
+ESCAPE_CHAR = ESCAPE_CHAR + ((P("\\") * C(DIGIT * (DIGIT ^ -2))) / function(self)
+  return string.char(tonumber(self))
+end)
+ESCAPE_CHAR = ESCAPE_CHAR + ((P("\\") * C(S("ntbavfr"))) / STRING_ESCAPES)
 local OPERATOR_CHAR = S("'~`!@$^&*-+=|<>?/")
 local UTF8_CHAR = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
 local IDENT_CHAR = R("az", "AZ", "09") + P("_") + UTF8_CHAR
@@ -1395,9 +1400,7 @@ end)]]):format(concat(lua_bits, "\n"))
   local self = _class_0
   self.def_number = 0
   self.unescape_string = function(self, str)
-    return str:gsub("\\(.)", (function(c)
-      return STRING_ESCAPES[c] or c
-    end))
+    return Cs(((P("\\\\") / "\\") + (P("\\\"") / '"') + ESCAPE_CHAR + P(1)) ^ 0):match(str)
   end
   self.comma_separated_items = function(self, open, items, close)
     local bits = {
