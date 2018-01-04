@@ -1114,7 +1114,7 @@ end)]]):format(concat(lua_bits, "\n"))
         self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        local patt = re.compile("{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op+})*|}", {
+        local patt = re.compile("{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op})*|}", {
           id = IDENT_CHAR,
           op = OPERATOR_CHAR
         })

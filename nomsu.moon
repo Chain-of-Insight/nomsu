@@ -756,7 +756,7 @@ end)]])\format(concat(lua_bits, "\n"))
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
             -- Standardize format to stuff separated by spaces
-            patt = re.compile "{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op+})*|}",
+            patt = re.compile "{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op})*|}",
                 id:IDENT_CHAR, op:OPERATOR_CHAR
             spec = concat patt\match(x), " "
             stub = spec\gsub("%%%S+","%%")\gsub("\\","")

@@ -31,10 +31,12 @@ say "Hello world!"
 
 # Format a string?
 %format_str = ".."
-    Strings can have areas delimited with a backslash and parens like this:
-    The value of %x is \(%x), isn't that nice?
+    Strings can contain a backslash followed by a variable, list, dict, or parenthesized
+    expression. This escaped value will be converted to a readable string, like so:
+    The value of %x is \%x, isn't that nice?
+    The sum of 2 and 4 is \(2 + 4).
     If you need to use a plain ol' backslash, you can do \\ <-- that
-%format_str2 = "Single-line strings can contain \", \\, and \n"
+%format_str2 = "Single-line strings can contain escape sequences like \", \\, \n, \065, and \x0A"
 
 # Define a list?
 %my_list = [1,2,"hello"]
@@ -58,18 +60,16 @@ say (1 in %my_list)
 say (size of %my_list)
 
 # Define a dictionary/hash map?
-%my_dict = (dict {x = 99; y = 101})
-%my_dict = (..)
-    dict:
-        x = 101
-        "99 bottles" = 99
-        653 = 292
-%my_dict = (dict [["x", 99], ["y", 101]])
+%my_dict = {x = 99, y = 101}
+%my_dict = {..}
+    x = 101, y = 2
+    "99 bottles" = 99
+    653 = 292
 
 # Use a dict?
 # Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
-say (%my_dict -> "x")
-%my_dict -> "x" = 9999
+say (%my_dict->"x")
+%my_dict->"x" = 9999
 
 # Do conditional branching?
 if (1 < 10):
@@ -107,38 +107,38 @@ when 3 == ?:
 # Loop over a list (a foreach loop)?
 %list = [1,2,3]
 for %x in %list:
-    say "For %x loop #\(%x)"
+    say "For %x loop #\%x"
 # There's also a slightly more concise version that automatically populates a loop variable "%"
 for all %list:
-    say "For all loop #\(%)"
+    say "For all loop #\%"
 
 # Loop over a number range?
 # This is inclusive, so it will loop over 1,2, and 3
 for %i from 1 to 3:
-    say "For %i from 1 to 3 loop #\(%i)"
+    say "For %i from 1 to 3 loop #\%i"
 for all 1 to 3:
-    say "For all 1 to 3 loop #\(%)"
+    say "For all 1 to 3 loop #\%"
 # This will print 0,2, and 4
 for %even from 0 to 5 by 2:
-    say "Even #\(%even)"
+    say "Even #\%even"
 for %backwards from 3 to 1 by -1:
-    say "Backwards #\(%backwards)"
+    say "Backwards #\%backwards"
 
 # While loops:
 %x = 1
 repeat while (%x <= 3):
-    say "repeat while loop #\(%x)"
+    say "repeat while loop #\%x"
     %x += 1
 
 %x = 1
 repeat until (%x > 3):
-    say "repeat until loop #\(%x)"
+    say "repeat until loop #\%x"
     %x += 1
 
 # Infinite loop:
 %x = 1
 repeat:
-    say "repeat loop #\(%x)"
+    say "repeat loop #\%x"
     %x += 1
     if (%x > 3):
         stop repeat-loop
@@ -147,7 +147,7 @@ repeat:
 do:
     %x = 1
     -> %again
-    say "GOTO loop #\(%x)"
+    say "GOTO loop #\%x"
     %x += 1
     if (%x <= 3):
         go to %again
@@ -184,7 +184,7 @@ rule [..]
     I think %worse_things are worse than %better_things
     I like %better_things more than %worse_things
 ..=:
-    say "\(%better_things capitalized) rule and \(%worse_things) drool!"
+    say "\(%better_things capitalized) rule and \%worse_things drool!"
 
 I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"
@@ -210,19 +210,17 @@ rule [>> %foo_bar $$$^ --> % @& _~-^-~_~-^ %1 !] =:
 
 >> "wow" $$$^ --> "so flexible!" @& _~-^-~_~-^ "even numbers can be variables!" !
 
-#.. The all of the following are characters won't "stick" to their neighbors, so the
-    compiler treats them as solitary single-character tokens: '~`!@$^&*-+=|<>?/
-    which means you can jam things together:
-rule [%x++%y] =: 2*(%x+%y)
-(5++2) == (   5   ++   2   )
-
 # Math and logic operations are just treated the same as function calls in the syntax
 say (2 + 3)
 # So it's easy to define your own operators
 rule [%a ++ %b] =:
     2 * (%a + %b)
 
-say (2 ++ 3)
+#.. The following are characters won't "stick" to their neighbors, so the
+    compiler treats them as solitary single-character tokens: '~`!@$^&*-+=|<>?/
+    which means you can jam things together:
+(5++2) == (   5   ++   2   )
+(5 ++ 2) == (5 +   + 2)
 
 
 # Do grouping?

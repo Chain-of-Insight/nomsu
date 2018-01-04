@@ -46,7 +46,7 @@ noeol_functioncall (FunctionCall):
 functioncall (FunctionCall):
     {| (expression (dotdot / %ws*))* word ((dotdot / %ws*) (expression / word))* |}
 
-word (Word): { %operator+ / (!number plain_word) }
+word (Word): { %operator / (!number plain_word) }
 
 inline_string (String):
     '"' {|
