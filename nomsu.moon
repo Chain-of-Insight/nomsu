@@ -169,7 +169,7 @@ class NomsuCompiler
             signature = @get_stubs {signature}
         elseif type(signature) == 'table' and type(signature[1]) == 'string'
             signature = @get_stubs signature
-        assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
+        @assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
         canonical_args = nil
         canonical_escaped_args = nil
         aliases = {}
@@ -177,15 +177,15 @@ class NomsuCompiler
         def = {:thunk, :src, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
         where_defs_go = (getmetatable(@defs) or {}).__newindex or @defs
         for {stub, arg_names, escaped_args} in *signature
-            assert stub, "NO STUB FOUND: #{repr signature}"
+            @assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
             for i=1,#arg_names-1 do for j=i+1,#arg_names
                 if arg_names[i] == arg_names[j] then @error "Duplicate argument in function #{stub}: '#{arg_names[i]}'"
             if canonical_args
-                assert equivalent(set(arg_names), canonical_args), "Mismatched args"
+                @assert equivalent(set(arg_names), canonical_args), "Mismatched args"
             else canonical_args = set(arg_names)
             if canonical_escaped_args
-                assert equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args"
+                @assert equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args"
             else
                 canonical_escaped_args = escaped_args
                 def.escaped_args = escaped_args
@@ -324,7 +324,7 @@ class NomsuCompiler
             @writeln("#{colored.bright "PARSING:"}\n#{colored.yellow str}")
         str = str\gsub("\r","")
         tree = parse(str, filename)
-        assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black str}"
+        @assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black str}"
         if @debug
             @writeln "PARSE TREE:"
             @print_tree tree, "    "
@@ -338,8 +338,8 @@ class NomsuCompiler
                 @error "Execution quota exceeded. Your code took too long."
             debug.sethook timeout, "", max_operations
         tree = @parse(src, filename)
-        assert tree, "Tree failed to compile: #{src}"
-        assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
+        @assert tree, "Tree failed to compile: #{src}"
+        @assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
 
         buffer = {}
         return_value = nil
@@ -405,7 +405,7 @@ end);]])\format(concat(buffer, "\n"))
 
     tree_to_nomsu: (tree, force_inline=false)=>
         -- Return <nomsu code>, <is safe for inline use>
-        assert tree, "No tree provided."
+        @assert tree, "No tree provided."
         if not tree.type
             @errorln debug.traceback()
             @error "Invalid tree: #{repr(tree)}"
@@ -535,7 +535,7 @@ end);]])\format(concat(buffer, "\n"))
 
     tree_to_lua: (tree, filename)=>
         -- Return <lua code for value>, <additional lua code>
-        assert tree, "No tree provided."
+        @assert tree, "No tree provided."
         if not tree.type
             @errorln debug.traceback()
             @error "Invalid tree: #{repr(tree)}"
@@ -786,6 +786,10 @@ end)]])\format(concat(lua_bits, "\n"))
             var = var.value
         (var\gsub "%W", (verboten)->
             if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
+    
+    assert: (condition, msg='')=>
+        if not condition
+            @error(msg)
 
     error: (msg)=>
         error_msg = colored.red "ERROR!"

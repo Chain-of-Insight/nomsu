@@ -205,7 +205,7 @@ do
       elseif type(signature) == 'table' and type(signature[1]) == 'string' then
         signature = self:get_stubs(signature)
       end
-      assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
+      self:assert(type(thunk) == 'function', "Bad thunk: " .. tostring(repr(thunk)))
       local canonical_args = nil
       local canonical_escaped_args = nil
       local aliases = { }
@@ -223,7 +223,7 @@ do
         local _des_0 = signature[_index_0]
         local stub, arg_names, escaped_args
         stub, arg_names, escaped_args = _des_0[1], _des_0[2], _des_0[3]
-        assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
+        self:assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
         if self.debug then
           self:writeln(tostring(colored.bright("DEFINING RULE:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
         end
@@ -235,12 +235,12 @@ do
           end
         end
         if canonical_args then
-          assert(equivalent(set(arg_names), canonical_args), "Mismatched args")
+          self:assert(equivalent(set(arg_names), canonical_args), "Mismatched args")
         else
           canonical_args = set(arg_names)
         end
         if canonical_escaped_args then
-          assert(equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args")
+          self:assert(equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args")
         else
           canonical_escaped_args = escaped_args
           def.escaped_args = escaped_args
@@ -496,7 +496,7 @@ do
       end
       str = str:gsub("\r", "")
       local tree = parse(str, filename)
-      assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(str))))
+      self:assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(str))))
       if self.debug then
         self:writeln("PARSE TREE:")
         self:print_tree(tree, "    ")
@@ -525,8 +525,8 @@ do
         debug.sethook(timeout, "", max_operations)
       end
       local tree = self:parse(src, filename)
-      assert(tree, "Tree failed to compile: " .. tostring(src))
-      assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
+      self:assert(tree, "Tree failed to compile: " .. tostring(src))
+      self:assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local buffer = { }
       local return_value = nil
       local _list_0 = tree.value
@@ -611,7 +611,7 @@ end);]]):format(concat(buffer, "\n"))
       if force_inline == nil then
         force_inline = false
       end
-      assert(tree, "No tree provided.")
+      self:assert(tree, "No tree provided.")
       if not tree.type then
         self:errorln(debug.traceback())
         self:error("Invalid tree: " .. tostring(repr(tree)))
@@ -801,7 +801,7 @@ end);]]):format(concat(buffer, "\n"))
       end
     end,
     tree_to_lua = function(self, tree, filename)
-      assert(tree, "No tree provided.")
+      self:assert(tree, "No tree provided.")
       if not tree.type then
         self:errorln(debug.traceback())
         self:error("Invalid tree: " .. tostring(repr(tree)))
@@ -1198,6 +1198,14 @@ end)]]):format(concat(lua_bits, "\n"))
           return ("_%x"):format(verboten:byte())
         end
       end))
+    end,
+    assert = function(self, condition, msg)
+      if msg == nil then
+        msg = ''
+      end
+      if not condition then
+        return self:error(msg)
+      end
     end,
     error = function(self, msg)
       local error_msg = colored.red("ERROR!")
