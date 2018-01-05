@@ -169,7 +169,7 @@ compile [when %body] to code:
             Invalid format for 'when' statement. Only '*' blocks are allowed.
         %tokens = (%func_call's "value")
         %star = (%tokens -> 1)
-        assert (=lua "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
+        assert (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") ".."
             Invalid format for 'when' statement. Lines must begin with '*'
 
         %condition = (%tokens -> 2)
@@ -178,10 +178,10 @@ compile [when %body] to code:
 
         %action = (%tokens -> 3)
         if (%action == (nil)):
-            lua do> "table.insert(vars.fallthroughs, vars.condition)"
+            lua do> "table.insert(\%fallthroughs, \%condition)"
             do next %func_call
 
-        if (=lua "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
+        if (=lua "\%condition.type == 'Word' and \%condition.value == 'else'"):
             %result join= ".."
                 
                 else
@@ -213,7 +213,7 @@ compile [when %branch_value == ? %body] to code:
             Invalid format for 'when' statement. Only '*' blocks are allowed.
         %tokens = (%func_call's "value")
         %star = (%tokens -> 1)
-        assert (=lua "vars.star and vars.star.type == 'Word' and vars.star.value == '*'") ".."
+        assert (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") ".."
             Invalid format for 'when' statement. Lines must begin with '*'
 
         %condition = (%tokens -> 2)
@@ -222,10 +222,10 @@ compile [when %branch_value == ? %body] to code:
 
         %action = (%tokens -> 3)
         if (%action == (nil)):
-            lua> "table.insert(vars.fallthroughs, vars.condition)"
+            lua> "table.insert(\%fallthroughs, \%condition)"
             do next %func_call
 
-        if (=lua "vars.condition.type == 'Word' and vars.condition.value == 'else'"):
+        if (=lua "\%condition.type == 'Word' and \%condition.value == 'else'"):
             %result join= ".."
                 
                 else

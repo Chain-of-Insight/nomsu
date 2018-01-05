@@ -62,7 +62,7 @@ lua do> ".."
             nomsu_alias, op = unpack(op);
         end
         nomsu:defmacro("%a "..nomsu_alias.." %b", (function(nomsu, vars)
-            return "("..nomsu:tree_to_lua(vars.a).." "..op.." "..nomsu:tree_to_lua(vars.b)..")";
+            return "("..nomsu:tree_to_lua(\%a).." "..op.." "..nomsu:tree_to_lua(\%b)..")";
         end), [["(\\%a ]]..op..[[ \\%b)"]]);
     end
 
@@ -112,7 +112,7 @@ lua do> ".."
                 -- Chained comparisons need to be functions to avoid re-evaluating their arguments :
                 nomsu:def(spec, function(nomsu, vars)
                     for i,op in ipairs(chain) do
-                        local a, b, result = vars[i], vars[i+1];
+                        local a, b, result = vars[tostring(i)], vars[tostring(i+1)];
                         if     op == "<"  then; result = a < b;
                         elseif op == "<=" then; result = a <= b;
                         elseif op == ">"  then; result = a > b;

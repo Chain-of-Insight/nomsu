@@ -24,7 +24,7 @@ compile [with %assignments %action] to code:
         %tokens = (%assignment's "value")
         %var = (%tokens -> 1)
         %eq = (%tokens -> 2)
-        assert (=lua "vars.eq and vars.eq.type == 'Word' and vars.eq.value == '='") ".."
+        assert (=lua "\%eq and \%eq.type == 'Word' and \%eq.value == '='") ".."
             Invalid format for 'with' statement. List entries must have the form %var = (value)
         %value = (%tokens -> 3)
         add {i=%i, var=%var, value=%value} to %data

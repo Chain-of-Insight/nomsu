@@ -16,8 +16,8 @@ parse [assert %condition] as: assert %condition (nil)
 rule [join %strs with glue %glue] =:
     lua do> ".."
         local str_bits = {}
-        for i,bit in ipairs(vars.strs) do str_bits[i] = nomsu:stringify(bit) end
-        return table.concat(str_bits, vars.glue)
+        for i,bit in ipairs(\%strs) do str_bits[i] = nomsu:stringify(bit) end
+        return table.concat(str_bits, \%glue)
 parse [join %strs] as: join %strs with glue ""
 
 compile [capitalize %str, %str capitalized] to:
