@@ -748,6 +748,8 @@ end)]])\format(concat(lua_bits, "\n"))
                     tree = new_values
         return tree
 
+    @stub_patt: re.compile "{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op})*|}",
+        id:IDENT_CHAR, op:OPERATOR_CHAR
     get_stub: (x)=>
         if not x
             @error "Nothing to get stub from"
@@ -756,12 +758,10 @@ end)]])\format(concat(lua_bits, "\n"))
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
             -- Standardize format to stuff separated by spaces
-            patt = re.compile "{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op})*|}",
-                id:IDENT_CHAR, op:OPERATOR_CHAR
-            spec = concat patt\match(x), " "
+            spec = concat @@stub_patt\match(x), " "
             stub = spec\gsub("%%%S+","%%")\gsub("\\","")
-            arg_names = [arg for arg in spec\gmatch("%%([^%s]*)")]
-            escaped_args = set [arg for arg in spec\gmatch("\\%%(%S*)")]
+            arg_names = [arg for arg in spec\gmatch("%%(%S*)")]
+            escaped_args = {arg, true for arg in spec\gmatch("\\%%(%S*)")}
             return stub, arg_names, escaped_args
         if type(x) != 'table'
             @error "Invalid type for getting stub: #{type(x)} for:\n#{repr x}"

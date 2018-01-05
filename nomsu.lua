@@ -1114,31 +1114,26 @@ end)]]):format(concat(lua_bits, "\n"))
         self:error("Nothing to get stub from")
       end
       if type(x) == 'string' then
-        local patt = re.compile("{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op})*|}", {
-          id = IDENT_CHAR,
-          op = OPERATOR_CHAR
-        })
-        local spec = concat(patt:match(x), " ")
+        local spec = concat(self.__class.stub_patt:match(x), " ")
         local stub = spec:gsub("%%%S+", "%%"):gsub("\\", "")
         local arg_names
         do
           local _accum_0 = { }
           local _len_0 = 1
-          for arg in spec:gmatch("%%([^%s]*)") do
+          for arg in spec:gmatch("%%(%S*)") do
             _accum_0[_len_0] = arg
             _len_0 = _len_0 + 1
           end
           arg_names = _accum_0
         end
-        local escaped_args = set((function()
-          local _accum_0 = { }
-          local _len_0 = 1
+        local escaped_args
+        do
+          local _tbl_0 = { }
           for arg in spec:gmatch("\\%%(%S*)") do
-            _accum_0[_len_0] = arg
-            _len_0 = _len_0 + 1
+            _tbl_0[arg] = true
           end
-          return _accum_0
-        end)())
+          escaped_args = _tbl_0
+        end
         return stub, arg_names, escaped_args
       end
       if type(x) ~= 'table' then
@@ -1421,6 +1416,10 @@ end)]]):format(concat(lua_bits, "\n"))
     insert(bits, close)
     return concat(bits)
   end
+  self.stub_patt = re.compile("{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op})*|}", {
+    id = IDENT_CHAR,
+    op = OPERATOR_CHAR
+  })
   NomsuCompiler = _class_0
 end
 if arg then
