@@ -5,53 +5,61 @@
 # Rule to make rules:
 lua> ".."
     nomsu:defmacro("rule %signature = %body", (function(nomsu, vars)
+        nomsu:assert(\%signature.type == "List",
+            "Invalid type for rule definition signature. Expected List, but got: "..tostring(\%signature.type));
+        nomsu:assert(\%body.type == "Thunk",
+            "Invalid type for rule definition body. Expected Thunk, but got: "..tostring(\%body.type));
         local signature = {};
-        for i, alias in ipairs(nomsu:typecheck(vars, "signature", "List").value) do
+        for i, alias in ipairs(\%signature.value) do
             signature[i] = alias.src;
         end
-        local body = nomsu:typecheck(vars, "body", "Thunk");
         local src = nomsu:source_code(0);
         return nil, ([[
     nomsu:def(%s, %s, %s)
-    ]]):format(nomsu:repr(signature), nomsu:tree_to_lua(body), nomsu:repr(nomsu:dedent(src)));
+    ]]):format(nomsu:repr(signature), nomsu:tree_to_lua(\%body), nomsu:repr(nomsu:dedent(src)));
     end), \(__src__ 1));
 
 # Rule to make lua macros:
 rule [compile \%macro_def to \%body] =:
     lua> ".."
+        nomsu:assert(\%macro_def.type == "List",
+            "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
+        nomsu:assert(\%body.type == "Thunk",
+            "Invalid type for compile definition body. Expected Thunk, but got: "..tostring(\%body.type));
         local signature = {};
-        for i, alias in ipairs(nomsu:typecheck(vars, "macro_def", "List").value) do
+        for i, alias in ipairs(\%macro_def.value) do
             signature[i] = alias.src;
         end
-        local body = nomsu:typecheck(vars, "body", "Thunk");
-        local thunk = nomsu:tree_to_value(body);
-        nomsu:defmacro(signature, thunk, ("compile %s\\n..to %s"):format(vars.macro_def.src, body.src));
-
-compile [fizz %n] to:
-    "print(\(%n as lua))"
-compile [pumpo] to:
-    "print('pumpo')"
+        local thunk = nomsu:tree_to_value(\%body);
+        nomsu:defmacro(signature, thunk, ("compile %s\\n..to %s"):format(\%macro_def.src, \%body.src));
 
 rule [compile \%macro_def to code \%body] =:
     lua> ".."
+        nomsu:assert(\%macro_def.type == "List",
+            "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
+        nomsu:assert(\%body.type == "Thunk",
+            "Invalid type for compile definition body. Expected Thunk, but got: "..tostring(\%body.type));
         local signature = {};
-        for i, alias in ipairs(nomsu:typecheck(vars, "macro_def", "List").value) do
+        for i, alias in ipairs(\%macro_def.value) do
             signature[i] = alias.src;
         end
-        local body = nomsu:typecheck(vars, "body", "Thunk");
-        local thunk = nomsu:tree_to_value(body);
-        local thunk_wrapper = function(nomsu, vars) return nil, thunk(nomsu, vars); end
-        nomsu:defmacro(signature, thunk_wrapper, ("compile %s\\n..to code %s"):format(vars.macro_def.src, body.src));
+        local thunk = nomsu:tree_to_value(\%body);
+        local thunk_wrapper = function(...) return nil, thunk(...); end
+        nomsu:defmacro(signature, thunk_wrapper, ("compile %s\\n..to code %s"):format(\%macro_def.src, \%body.src));
 
 # Rule to make nomsu macros:
 lua> ".."
     nomsu:defmacro("parse %shorthand as %longhand", (function(nomsu, vars)
+        nomsu:assert(\%shorthand.type == "List",
+            "Invalid type for parse definition signature. Expected List, but got: "..tostring(\%shorthand.type));
+        nomsu:assert(\%longhand.type == "Thunk",
+            "Invalid type for parse definition body. Expected Thunk, but got: "..tostring(\%longhand.type));
         local signature = {};
-        for i, alias in ipairs(nomsu:typecheck(vars, "shorthand", "List").value) do
+        for i, alias in ipairs(\%shorthand.value) do
             signature[i] = alias.src;
         end
         local template = {};
-        for i, line in ipairs(nomsu:typecheck(vars, "longhand", "Thunk").value) do
+        for i, line in ipairs(\%longhand.value) do
             template[i] = nomsu:dedent(line.src);
         end
         signature, template = nomsu:repr(signature), nomsu:repr(table.concat(template, "\\n"));
@@ -61,7 +69,7 @@ lua> ".."
         if #template.value == 1 then template = template.value[1]; end
         local replacement = nomsu:replaced_vars(template, vars);
         return nomsu:tree_to_lua(replacement);
-    end), %s)]]):format(signature, template, nomsu:repr(vars.shorthand.line_no), nomsu:repr(nomsu:source_code(0)));
+    end), %s)]]):format(signature, template, nomsu:repr(\%shorthand.line_no), nomsu:repr(nomsu:source_code(0)));
     end), \(__src__ 1));
 
 rule [remove rule %stub] =:
@@ -96,8 +104,9 @@ rule [%tree as lua statement] =:
 rule [%tree as lua statements] =:
     lua do> ".."
         local lua_bits = {};
-        local statements = nomsu:typecheck(vars, "tree", "Thunk").value;
-        for _,bit in ipairs(statements) do
+        nomsu:assert(type(\%tree) == 'table' and \%tree.type == "Thunk",
+            "Invalid type. Expected Thunk.");
+        for _,bit in ipairs(\%tree.value) do
             local expr, statement = nomsu:tree_to_lua(bit);
             if statement then table.insert(lua_bits, statement); end
             if expr then table.insert(lua_bits, "ret = "..expr..";"); end
@@ -116,9 +125,9 @@ parse [rule %signature] as:
 # Get the source code for a function
 rule [help %rule] =:
     lua do> ".."
-        local fn_def = nomsu.defs[nomsu:get_stub(vars.rule)]
+        local fn_def = nomsu.defs[nomsu:get_stub(\%rule)]
         if not fn_def then
-            nomsu:writeln("Rule not found: "..nomsu:repr(vars.rule));
+            nomsu:writeln("Rule not found: "..nomsu:repr(\%rule));
         else
             nomsu:writeln(fn_def.src or "<unknown source code>");
         end
@@ -127,13 +136,13 @@ rule [help %rule] =:
 parse [eval %code, run %code] as: nomsu "run" [%code]
 rule [source code from tree %tree] =:
     lua do> ".."
-        local _,_,leading_space = vars.tree.src:find("\\n(%s*)%S");
+        local _,_,leading_space = \%tree.src:find("\\n(%s*)%S");
         if leading_space then
-            local chunk1, chunk2 = vars.tree.src:match(":%s*([^\\n]*)(\\n.*)");
+            local chunk1, chunk2 = \%tree.src:match(":%s*([^\\n]*)(\\n.*)");
             chunk2 = chunk2:gsub("\\n"..leading_space, "\\n");
             return chunk1..chunk2.."\\n";
         else
-            return vars.tree.src:match(":%s*(%S.*)").."\\n";
+            return \%tree.src:match(":%s*(%S.*)").."\\n";
         end
 parse [source code %body] as: source code from tree \%body
 
