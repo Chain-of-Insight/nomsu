@@ -210,7 +210,7 @@ compile [when %body] to code:
 
     if (%result != ""):
         %result join= "\nend"
-    %result
+    return %result
 
 # Switch statement
 compile [when %branch_value == ? %body] to code:
@@ -259,7 +259,7 @@ compile [when %branch_value == ? %body] to code:
             ..\%result
             end
             end --when == ?
-    %result
+    return %result
 
 # Try/except
 compile [..]

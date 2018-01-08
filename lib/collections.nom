@@ -51,7 +51,7 @@ compile [%list ->* %indices] to:
     %ret = "\(%list as lua)"
     for %index in (%indices's "value"):
         %ret join= "[\(%index as lua)]"
-    "\%ret"
+    return "\%ret"
 
 # Assignment
 compile [..]
@@ -76,35 +76,35 @@ rule [flatten %lists] =:
     for %list in %lists:
         for %item in %list:
             add %item to %flat
-    %flat
+    return %flat
 
 rule [dict %items] =:
     %dict = []
     for %pair in %items:
         %dict -> (%pair -> 1) = (%pair -> 2)
-    %dict
+    return %dict
 
 rule [entries in %dict] =:
     %entries = []
     for %k = %v in %dict:
         add {key=%k, value=%v} to %entries
-    %entries
+    return %entries
 
 rule [keys in %dict] =:
     %keys = []
     for %k = %v in %dict: add %k to %keys
-    %keys
+    return %keys
 
 rule [values in %dict] =:
     %values = []
     for %k = %v in %dict: add %v to %values
-    %values
+    return %values
 
 # List Comprehension
 compile [%expression for %item in %iterable] to:
     assert ((%item's "type") == "Var") ".."
         List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
-    ".."
+    return ".."
         (function(nomsu, vars);
             local comprehension = {};
             for i,item in ipairs(\(%iterable as lua)) do;
@@ -120,7 +120,7 @@ compile [%expression for %key = %value in %iterable] to:
         List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key's "type")
     assert ((%value's "type") == "Var") ".."
         List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value's "type")
-    ".."
+    return ".."
         (function(nomsu, vars);
             local comprehension = {};
             for key,value in pairs(\(%iterable as lua)) do;
@@ -133,11 +133,11 @@ compile [%expression for %key = %value in %iterable] to:
 rule [%items sorted] =:
     %copy = (% for all %items)
     sort %copy
-    %copy
+    return %copy
 rule [%items sorted by %key] =:
     %copy = (% for all %items)
     sort %copy by %key
-    %copy
+    return %copy
 rule [unique %items] =:
     keys in (dict ([%,yes] for all %items))
 
@@ -165,7 +165,7 @@ rule [chain %dict to %fallback] =:
 compile [%key = %value for %item in %iterable] to:
     assert ((%item's "type") == "Var") ".."
         Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
-    ".."
+    return ".."
         (function(nomsu, vars);
             local comprehension = {};
             for i,value in ipairs(\(%iterable as lua)) do;
@@ -181,7 +181,7 @@ compile [%key = %value for %src_key = %src_value in %iterable] to:
         Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key's "type")
     assert ((%src_value's "type") == "Var") ".."
         Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value's "type")
-    ".."
+    return ".."
         (function(nomsu, vars);
             local comprehension = {};
             for key,value in pairs(\(%iterable as lua)) do;

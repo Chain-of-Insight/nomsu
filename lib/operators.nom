@@ -12,8 +12,8 @@ compile [phi, PHI, golden ratio] to: "((1+math.sqrt(5))/2)"
 compile [nop, pass] to code: ""
 
 # Ternary operator
-#.. Note: this uses a function instead of (condition and if_expr or else_expr)
-    because that breaks if %if_expr is falsey.
+#.. Note: this uses a function instead of "(condition and if_expr or else_expr)"
+    because that breaks if %if_expr is falsey, e.g. "x < 5 and false or 99"
 compile [..]
     %when_true_expr if %condition else %when_false_expr
     %when_true_expr if %condition otherwise %when_false_expr
@@ -27,6 +27,17 @@ compile [..]
             return \(%when_false_expr as lua);
         end
     end)(nomsu, vars)
+parse [..]
+    %true if %x == %y else %false, %true if %x == %y otherwise %false
+    %false unless %x == %y else %true, %false unless %x == %y otherwise %true
+..as:
+    %true if (%x == %y) else %false
+
+parse [..]
+    %true if %x != %y else %false, %true if %x != %y otherwise %false
+    %false unless %x != %y else %true, %false unless %x != %y otherwise %true
+..as:
+    %true if (%x != %y) else %false
 
 # Indexing:
 compile [%obj'%key, %obj's %key, %obj -> %key] to: "(\(%obj as lua))[\(%key as lua)]"

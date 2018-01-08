@@ -528,7 +528,6 @@ do
       self:assert(tree, "Tree failed to compile: " .. tostring(src))
       self:assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local buffer = { }
-      local return_value = nil
       local _list_0 = tree.value
       for _index_0 = 1, #_list_0 do
         local statement = _list_0[_index_0]
@@ -544,8 +543,7 @@ do
         end
         local code_for_statement = ([[return (function(nomsu, vars)
 %s
-return %s;
-end);]]):format(statements or "", expr or "ret")
+end);]]):format(statements or ("return " .. expr .. ";"))
         if output_file then
           if statements and #statements > 0 then
             output_file:write("lua> \"..\"\n    " .. tostring(self:indent(statements:gsub("\\", "\\\\"))) .. "\n")
@@ -571,9 +569,6 @@ end);]]):format(statements or "", expr or "ret")
         local run_statement = lua_thunk()
         local ret
         ok, ret = pcall(run_statement, self, vars)
-        if expr then
-          return_value = ret
-        end
         if not ok then
           self:errorln(tostring(colored.red("Error occurred in statement:")) .. "\n" .. tostring(colored.yellow(statement.src)))
           self:errorln(debug.traceback())
@@ -583,18 +578,16 @@ end);]]):format(statements or "", expr or "ret")
           insert(buffer, statements)
         end
         if expr then
-          insert(buffer, "ret = " .. tostring(expr) .. ";")
+          insert(buffer, tostring(expr) .. ";")
         end
       end
       if max_operations then
         debug.sethook()
       end
       local lua_code = ([[return (function(nomsu, vars)
-local ret;
 %s
-return ret;
 end);]]):format(concat(buffer, "\n"))
-      return return_value, lua_code, vars
+      return nil, lua_code, vars
     end,
     tree_to_value = function(self, tree, vars, filename)
       local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree, filename)) .. ";\nend);"
@@ -817,7 +810,7 @@ end);]]):format(concat(buffer, "\n"))
             insert(lua_bits, statement)
           end
           if expr then
-            insert(lua_bits, "ret = " .. tostring(expr) .. ";")
+            insert(lua_bits, tostring(expr) .. ";")
           end
         end
         return nil, concat(lua_bits, "\n")
@@ -829,17 +822,20 @@ end);]]):format(concat(buffer, "\n"))
         for _index_0 = 1, #_list_0 do
           local arg = _list_0[_index_0]
           local expr, statement = self:tree_to_lua(arg, filename)
+          if #tree.value == 1 and expr and not statement then
+            return ([[(function(nomsu, vars)
+    return %s;
+end)]]):format(expr)
+          end
           if statement then
             insert(lua_bits, statement)
           end
           if expr then
-            insert(lua_bits, "ret = " .. tostring(expr) .. ";")
+            insert(lua_bits, tostring(expr) .. ";")
           end
         end
         return ([[(function(nomsu, vars)
-local ret;
 %s
-return ret;
 end)]]):format(concat(lua_bits, "\n"))
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
@@ -1441,7 +1437,7 @@ if arg then
   colors = require('consolecolors')
   local parser = re.compile([[        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)
-        flag <- "-c" / "-i" / "-p" / "-O" / "--help" / "-h"
+        flag <- "-c" / "-i" / "-p" / "-O" / "--help" / "-h" / "-v"
         input <- "-" / [^;]+
         output <- "-" / [^;]+
     ]], {
@@ -1454,6 +1450,9 @@ if arg then
     os.exit()
   end
   local c = NomsuCompiler()
+  if args.flags["-v"] then
+    c.debug = true
+  end
   c.skip_precompiled = not args.flags["-O"]
   if args.input then
     if args.flags["-c"] and not args.output then
