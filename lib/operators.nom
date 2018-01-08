@@ -57,84 +57,51 @@ compile [%var or= %val] to code: "\(%var as lua) = \(%var as lua) or \(%val as l
 compile [%var join= %val] to code: "\(%var as lua) = \(%var as lua) .. \(%val as lua);"
 compile [%var mod= %val] to code: "\(%var as lua) = \(%var as lua) % \(%val as lua);"
 
-# Binary Operators
-lua do> ".."
-    local binops = {"-","/","<","<=",">",">=","^",{"===","=="},{"!==","~="},{"mod","%"}};
-    for _,op in ipairs(binops) do
-        local nomsu_alias = op;
-        if type(op) == 'table' then;
-            nomsu_alias, op = unpack(op);
-        end
-        nomsu:defmacro("%a "..nomsu_alias.." %b", (function(nomsu, vars)
-            return "("..nomsu:tree_to_lua(\%a).." "..op.." "..nomsu:tree_to_lua(\%b)..")";
-        end), [["(\\%a ]]..op..[[ \\%b)"]]);
-    end
+# Math Operators
+compile [%x + %y] to: "(\(%x as lua) + \(%y as lua))"
+compile [%x - %y] to: "(\(%x as lua) - \(%y as lua))"
+compile [%x * %y] to: "(\(%x as lua) * \(%y as lua))"
+compile [%x / %y] to: "(\(%x as lua) / \(%y as lua))"
+compile [%x ^ %y] to: "(\(%x as lua) ^ \(%y as lua))"
+compile [%x mod %y] to: "(\(%x as lua) % \(%y as lua))"
 
-# TODO: implement OR, XOR, AND for multiple operands
+# Comparison Operators
+compile [%x < %y] to: "(\(%x as lua) < \(%y as lua))"
+compile [%x > %y] to: "(\(%x as lua) > \(%y as lua))"
+compile [%x <= %y] to: "(\(%x as lua) <= \(%y as lua))"
+compile [%x >= %y] to: "(\(%x as lua) >= \(%y as lua))"
+# == and != do equivalence checking, rather than identity checking
+compile [%a == %b] to: "nomsu.utils.equivalent(\(%a as lua), \(%b as lua))"
+compile [%a != %b] to: "(not nomsu.utils.equivalent(\(%a as lua), \(%b as lua)))"
+# For strict identity checking:
+compile [%x === %y] to: "(\(%x as lua) == \(%y as lua))"
+compile [%x !== %y] to: "(\(%x as lua) ~= \(%y as lua))"
+
+# 3-part chained comparisons
+# (uses a lambda to avoid re-evaluating middle value, while still being an expression)
+parse [%x <  %y <  %z] as: =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"
+parse [%x <= %y <  %z] as: =lua "(function(x,y,z) return x <= y and y <  z; end)(\%x,\%y,\%z)"
+parse [%x <  %y <= %z] as: =lua "(function(x,y,z) return x <  y and y <= z; end)(\%x,\%y,\%z)"
+parse [%x <= %y <= %z] as: =lua "(function(x,y,z) return x <= y and y <= z; end)(\%x,\%y,\%z)"
+parse [%x >  %y >  %z] as: =lua "(function(x,y,z) return x >  y and y >  z; end)(\%x,\%y,\%z)"
+parse [%x >= %y >  %z] as: =lua "(function(x,y,z) return x >= y and y >  z; end)(\%x,\%y,\%z)"
+parse [%x >  %y >= %z] as: =lua "(function(x,y,z) return x >  y and y >= z; end)(\%x,\%y,\%z)"
+parse [%x >= %y >= %z] as: =lua "(function(x,y,z) return x >= y and y >= z; end)(\%x,\%y,\%z)"
+# TODO: optimize for common case where x,y,z are all either variables or number literals
+
+# Boolean Operators
+compile [%x and %y] to: "(\(%x as lua) and \(%y as lua))"
+compile [%x or %y] to: "(\(%x as lua) or \(%y as lua))"
+
+# Bitwise Operators
 compile [%a OR %b, %a | %b] to: "bit32.bor(\(%a as lua), \(%b as lua))"
 compile [%a XOR %b] to: "bit32.bxor(\(%a as lua), \(%b as lua))"
 compile [%a AND %b, %a & %b] to: "bit32.band(\(%a as lua), \(%b as lua))"
 compile [NOT %, ~ %] to: "bit32.bnot(\(% as lua))"
 compile [%x LSHIFT %shift, %x << %shift] to: "bit32.lshift(\(%x as lua), \(%shift as lua))"
-compile [%x RSHIFT %shift] to: "bit32.rshift(\(%x as lua), \(%shift as lua))"
+compile [%x RSHIFT %shift, %x >>> %shift] to: "bit32.rshift(\(%x as lua), \(%shift as lua))"
 compile [%x ARSHIFT %shift, %x >> %shift] to: "bit32.arshift(\(%x as lua), \(%shift as lua))"
-# == and != do equivalence checking, rather than identity checking
-compile [%a == %b] to: "nomsu.utils.equivalent(\(%a as lua), \(%b as lua))"
-compile [%a != %b] to: "(not nomsu.utils.equivalent(\(%a as lua), \(%b as lua)))"
-
-# Commutative Operators defined for up to 8 operands
-# TODO: work out solution for commutative operators using more clever macros
-lua do> ".."
-    local max_operands = 8;
-    local comops = {"+","*","and","or"};
-    for _,_op in ipairs(comops) do
-        local op = _op;
-        local spec = "%1 ";
-        for n=2,max_operands do
-            spec = spec .." "..op.." %"..tostring(n);
-            nomsu:defmacro(spec, (function(nomsu, vars)
-                local bits = {};
-                for i=1,n do
-                    table.insert(bits, (nomsu:tree_to_lua(vars[tostring(i)])));
-                end
-                return "("..table.concat(bits, " "..op.." ")..")";
-            end));
-        end
-    end
-
-# Chained compairsions (e.g. x < y <= z) are defined up to 3 operands
-lua do> ".."
-    local max_operands = 3;
-    for _,chainers in ipairs({{"<","<="},{">",">="}}) do
-        local function recurse(chainers, chain)
-        -- The 1-op versions are already more efficiently defined, and a 0-op version doesnt make sense
-            if #chain >= 2 then;
-                local spec = "%1";
-                for i,op in ipairs(chain) do
-                    spec = spec .. " "..op.." %"..tostring(i+1);
-                end
-                -- Chained comparisons need to be functions to avoid re-evaluating their arguments :
-                nomsu:def(spec, function(nomsu, vars)
-                    for i,op in ipairs(chain) do
-                        local a, b, result = vars[tostring(i)], vars[tostring(i+1)];
-                        if     op == "<"  then; result = a < b;
-                        elseif op == "<=" then; result = a <= b;
-                        elseif op == ">"  then; result = a > b;
-                        elseif op == ">=" then; result = a >= b; end
-                -- Short circuit
-                        if not result then; return false; end
-                    end
-                end);
-            end
-            if #chain + 1 >= max_operands then; return; end
-            for _,c in ipairs(chainers) do
-                table.insert(chain, c);
-                recurse(chainers, chain);
-                table.remove(chain);
-            end
-        end
-        recurse(chainers, {});
-    end
+# TODO: implement OR, XOR, AND for multiple operands?
 
 # Unary operators
 compile [- %] to: "-(\(% as lua))"

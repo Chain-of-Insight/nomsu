@@ -7,10 +7,11 @@ compile [if %condition %if_body] to code: ".."
     if \(%condition as lua) then
     \(%if_body as lua statements)
     end --end if
-compile [unless %condition %body] to code: ".."
-    if not (\(%condition as lua)) then
-    \(%body as lua statements)
-    end --end if
+parse [unless %condition %unless_body] as: if (not %condition) %unless_body
+parse [if %x == %y %if_body] as: if (%x == %y) %if_body
+parse [if %x != %y %if_body] as: if (%x != %y) %if_body
+parse [unless %x == %y %if_body] as: if (%x != %y) %if_body
+parse [unless %x != %y %if_body] as: if (%x == %y) %if_body
 
 compile [if %condition %if_body else %else_body, unless %condition %else_body else %if_body] to code: ".."
     if \(%condition as lua) then
@@ -18,6 +19,10 @@ compile [if %condition %if_body else %else_body, unless %condition %else_body el
     else
     \(%else_body as lua statements)
     end --end if
+parse [if %x == %y %if_body else %else_body] as: if (%x == %y) %if_body else %else_body
+parse [if %x != %y %if_body else %else_body] as: if (%x != %y) %if_body else %else_body
+parse [unless %x == %y %if_body else %else_body] as: if (%x != %y) %if_body else %else_body
+parse [unless %x != %y %if_body else %else_body] as: if (%x == %y) %if_body else %else_body
 
 # Return
 compile [return] to code: "do return; end"
@@ -60,6 +65,10 @@ compile [repeat while %condition %body] to code:
     return %code
 parse [repeat %body] as: repeat while (true) %body
 parse [repeat until %condition %body] as: repeat while (not %condition) %body
+parse [repeat while %x == %y %body] as: repeat while (%x == %y) %body
+parse [repeat while %x != %y %body] as: repeat while (%x != %y) %body
+parse [repeat until %x == %y %body] as: repeat while (%x != %y) %body
+parse [repeat until %x != %y %body] as: repeat while (%x == %y) %body
 
 # For loop control flow:
 compile [stop for-loop] to code: "goto stop_for;"

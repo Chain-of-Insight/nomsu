@@ -73,10 +73,6 @@ compile [e] to: "math.e"
 compile [golden ratio, phi] to: "((1 + math.sqrt(5)) / 2)"
 
 # Common utility functions
-compile [sum of %items, sum %items] to: "nomsu.utils.sum(\(%items as lua))"
-compile [product of %items, product %items] to: "nomsu.utils.product(\(%items as lua))"
-compile [all of %items] to: "nomsu.utils.all(\(%items as lua))"
-compile [any of %items] to: "nomsu.utils.any(\(%items as lua))"
 rule [avg of %items, average of %items] =:
     =lua "(nomsu.utils.sum(\%items)/#\%items)"
 compile [min of %items, smallest of %items, lowest of %items] to:

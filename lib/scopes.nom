@@ -1,6 +1,7 @@
 require "lib/metaprogramming.nom"
 require "lib/operators.nom"
 require "lib/control_flow.nom"
+require "lib/collections.nom"
 
 compile [<%var> = %value] to code: ".."
     nomsu.defs['#vars'][\(repr (%var's "value"))] = \(%value as lua);
@@ -12,24 +13,29 @@ compile [str %] to: "tostring(\(% as lua))"
 compile [scope] to: "nomsu.defs"
 compile [parent scope] to: "getmetatable(nomsu.defs).__index"
 
-parse [using %scoped do %actions] as:
-    %scope = (=lua "setmetatable({['#vars']=setmetatable({}, {__index=nomsu.defs['#vars']})}, {__index=nomsu.defs})")
-    with (nomsu's "defs") = %scope:
-        do %scoped
-        lua> ".."
-            getmetatable(nomsu.defs).__newindex = getmetatable(nomsu.defs).__index;
-            getmetatable(nomsu.defs["#vars"]).__newindex = getmetatable(nomsu.defs["#vars"]).__index;
-        do %actions
+compile [using %scoped do %actions] to code: ".."
+    do
+        local old_scope, old_vars = nomsu.defs, vars;
+        local use_vars = setmetatable({}, {__index=old_scope['#vars']});
+        local scope = setmetatable({['#vars']=use_vars}, {__index=old_scope});
+        nomsu.defs = scope;
+        local ok, ret = pcall(function(nomsu, vars)
+            local ret;
+            do
+                \(%scoped as lua statements)
+            end
+            getmetatable(scope).__newindex = old_scope;
+            getmetatable(use_vars).__newindex = old_vars;
+            do
+                \(%actions as lua statements)
+            end
+            return ret;
+        end, nomsu, use_vars);
+        nomsu.defs = old_scope;
+        if not ok then nomsu:error(ret); end
+    end
 
 parse [scoped %actions] as: using %actions do (:pass)
-
-rule [from %filename import %rules] =:
-    using:
-        require %filename
-    ..do:
-        %srcs = ((%'s "src") for %_ = % in (parent scope))
-        for %src in (unique %srcs):
-            run %src
 
 parse [wrap %signature with %body] as:
     using:

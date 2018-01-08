@@ -49,3 +49,28 @@ compile [with %assignments %action] to code:
         end
 parse [with %thing = %value %action] as: with [%thing = %value] %action
 
+# Any/all/none
+compile [all of %items, all %items] to:
+    if (%items' "type") == "List":
+        "(\(join ((% as lua) for all (%items' "value")) with glue " and "))"
+    ..else:
+        "nomsu.utils.all(\(%items as lua))"
+parse [not all of %items, not all %items] as: not (all of %items)
+compile [any of %items, any %items] to:
+    if (%items' "type") == "List":
+        "(\(join ((% as lua) for all (%items' "value")) with glue " or "))"
+    ..else:
+        "nomsu.utils.any(\(%items as lua))"
+parse [none of %items, none %items] as: not (any of %items)
+
+
+compile [sum of %items, sum %items] to:
+    if (%items' "type") == "List":
+        "(\(join ((% as lua) for all (%items' "value")) with glue " + "))"
+    ..else:
+        "nomsu.utils.sum(\(%items as lua))"
+compile [product of %items, product %items] to:
+    if (%items' "type") == "List":
+        "(\(join ((% as lua) for all (%items' "value")) with glue " * "))"
+    ..else:
+        "nomsu.utils.product(\(%items as lua))"

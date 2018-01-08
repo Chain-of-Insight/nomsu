@@ -533,6 +533,7 @@ end);]])\format(concat(buffer, "\n"))
             else
                 error("Unsupported value_to_nomsu type: #{type(value)}")
 
+    @math_patt: re.compile [[ "%" (" " [*/^+-] " %")+ ]]
     tree_to_lua: (tree, filename)=>
         -- Return <lua code for value>, <additional lua code>
         @assert tree, "No tree provided."
@@ -570,13 +571,19 @@ end)]])\format(concat(lua_bits, "\n"))
                 def = @defs[tree.stub]
                 if def and def.is_macro
                     expr, statement = @run_macro(tree)
-                    if def.whiteset
-                        if expr
-                            expr = "(nomsu:assert_permission(#{repr tree.stub}) and #{expr})"
-                        if statement
-                            statement = "nomsu:assert_permission(#{repr tree.stub});\n"..statement
                     remove @compilestack
                     return expr, statement
+                elseif not def and @@math_patt\match(tree.stub)
+                    bits = {}
+                    for tok in *tree.value
+                        if tok.type == "Word"
+                            insert bits, tok.value
+                        else
+                            expr, statement = @tree_to_lua(tok, filename)
+                            @assert(statement == nil, "non-expression value inside math expression")
+                            insert bits, expr
+                    return "(#{concat bits, " "})"
+
                 args = {repr(tree.stub), repr(tree.line_no)}
                 local arg_names, escaped_args
                 if def

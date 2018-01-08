@@ -846,16 +846,22 @@ end)]]):format(concat(lua_bits, "\n"))
         local def = self.defs[tree.stub]
         if def and def.is_macro then
           local expr, statement = self:run_macro(tree)
-          if def.whiteset then
-            if expr then
-              expr = "(nomsu:assert_permission(" .. tostring(repr(tree.stub)) .. ") and " .. tostring(expr) .. ")"
-            end
-            if statement then
-              statement = "nomsu:assert_permission(" .. tostring(repr(tree.stub)) .. ");\n" .. statement
-            end
-          end
           remove(self.compilestack)
           return expr, statement
+        elseif not def and self.__class.math_patt:match(tree.stub) then
+          local bits = { }
+          local _list_0 = tree.value
+          for _index_0 = 1, #_list_0 do
+            local tok = _list_0[_index_0]
+            if tok.type == "Word" then
+              insert(bits, tok.value)
+            else
+              local expr, statement = self:tree_to_lua(tok, filename)
+              self:assert(statement == nil, "non-expression value inside math expression")
+              insert(bits, expr)
+            end
+          end
+          return "(" .. tostring(concat(bits, " ")) .. ")"
         end
         local args = {
           repr(tree.stub),
@@ -1402,6 +1408,7 @@ end)]]):format(concat(lua_bits, "\n"))
   _base_0.__class = _class_0
   local self = _class_0
   self.def_number = 0
+  self.math_patt = re.compile([[ "%" (" " [*/^+-] " %")+ ]])
   self.unescape_string = function(self, str)
     return Cs(((P("\\\\") / "\\") + (P("\\\"") / '"') + ESCAPE_CHAR + P(1)) ^ 0):match(str)
   end
