@@ -1,25 +1,21 @@
 file (File):
     {| shebang?
         (ignored_line %nl)*
-        statements (nodent statements)*
+        statement (nodent statement)*
         (%nl ignored_line)*
     (!. / (("" -> "Parse error") => error)?) |}
 
 shebang: "#!" [^%nl]* %nl
 
-inline_statements: inline_statement (semicolon inline_statement)*
-noeol_statements: (inline_statement semicolon noeol_statements) / noeol_statement
-statements: (inline_statement semicolon statements) / statement
-
 statement: functioncall / expression
 noeol_statement: noeol_functioncall / noeol_expression
 inline_statement: inline_functioncall / inline_expression
 
-inline_thunk (Thunk): {| "(" %ws* ":" %ws* inline_statements %ws* ")" |}
-eol_thunk (Thunk): {| ":" %ws* noeol_statements eol |}
+inline_thunk (Thunk): {| ":" %ws* inline_statement |}
+eol_thunk (Thunk): {| ":" %ws* noeol_statement eol |}
 indented_thunk (Thunk):
     {| ":" indent
-            statements (nodent statements)*
+            statement (nodent statement)*
         (dedent / (("" -> "Error while parsing thunk") => error))
     |}
 
@@ -29,7 +25,7 @@ indented_nomsu (Nomsu): "\" expression
 
 inline_expression:
     number / variable / inline_string / inline_list / inline_dict / inline_nomsu
-    / inline_thunk / ("(" %ws* inline_statement %ws* ")")
+    / ("(" %ws* (inline_thunk / inline_statement) %ws* ")")
 noeol_expression:
     indented_string / indented_nomsu / indented_list / indented_dict / indented_thunk
     / ("(..)" indent
@@ -40,7 +36,7 @@ expression: eol_thunk / eol_nomsu / noeol_expression
 
 -- Function calls need at least one word in them
 inline_functioncall (FunctionCall):
-    {| (inline_expression %ws*)* word (%ws* (inline_expression / word))* |}
+    {| (inline_expression %ws*)* word (%ws* (inline_expression / word))* (%ws* inline_thunk)?|}
 noeol_functioncall (FunctionCall):
     {| (noeol_expression %ws*)* word (%ws* (noeol_expression / word))* |}
 functioncall (FunctionCall):
@@ -50,7 +46,7 @@ word (Word): { %operator / (!number plain_word) }
 
 inline_string (String):
     '"' {|
-        ({~ (('\"' -> '"') / ('\\' -> '\') / %escape_char / [^%nl\"])+ ~}
+        ({~ (('\"' -> '"') / ('\\' -> '\') / ('\..' -> '..') / %escape_char / [^%nl\"])+ ~}
         / string_interpolation)*
     |} '"'
 indented_string (String):
@@ -61,7 +57,7 @@ indented_string (String):
         ~} / string_interpolation)*
     |} ((!.) / (&(%nl+ !%gt_nodented)) / (("" -> "Error while parsing String") => error))
 string_interpolation:
-    "\" (variable / inline_list / inline_dict / inline_thunk / ("(" %ws* inline_statement %ws* ")"))
+    "\" (variable / inline_list / inline_dict / inline_string / ("(" %ws* (inline_thunk / inline_statement) %ws* ")"))
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
@@ -103,6 +99,5 @@ indent: eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl
 nodent: eol (%nl ignored_line)* %nl %nodented
 dedent: eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
 comma: %ws* "," %ws*
-semicolon: %ws* ";" %ws*
 dotdot: nodent ".." %ws*
 plain_word: ([a-zA-Z0-9_] / %utf8_char)+
