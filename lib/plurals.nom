@@ -1,35 +1,24 @@
 require "lib/core.nom"
-require "lib/secrets.nom"
 
 # Plurals
-with secrets:
-    lua do> ".."
-        local endings = setmetatable({x="es",c="es",s="es"}, {__index=function() return "s"; end});
-        secrets.plurals = setmetatable({}, {__index=function(self,key)
-            return key..endings[key:sub(-1)];
-        end});
-        secrets.singulars = setmetatable({}, {__index=function(self,key)
-            if key:sub(-2) == "es" and rawget(endings, key:sub(-3,-3)) then return key:sub(1,-3); end
-            if key:sub(-1) == "s" then return key:sub(1,-2); end
-            return key;
-        end});
-        secrets.canonicals = setmetatable({}, {__index=function(self,key)
-            if key:sub(-1) == "s" then return secrets.singulars[key]; end
-            return key;
-        end});
-
+using:
+    <%endings> = (chain {x="es",c="es",s="es"} to "s")
+    <%plurals> = (chain {} to (: "\%\((<%endings>)->(%| -1|))"))
+    <%singulars> = (..)
+        chain {} to:
+            when:
+                * (((%| -2|) == "es") and (=lua"rawget(\(<%endings>), \(%| -3|))")):
+                    %|1 - -3|
+                * (%| -1| == "s"):
+                    %|1 - -2|
+                else: %
+..do:
     rule [the plural of %singular is %plural] =:
-        (secret %plurals)->%singular = %plural
-        (secret %singulars)->%plural = %singular
-        (secret %canonicals)->%plural = %singular
+        (<%plurals>)->%singular = %plural
+        (<%singulars>)->%plural = %singular
 
     rule [singular %plural] =:
-        %plural in (secret %singulars)
+        (<%singulars>)->%plural
 
     rule [plural %singular] =:
-        %singular in (secret %plurals)
-
-    rule [canonicalize %item_name] =:
-        %item_name in (secret %canonicals)
-
-    rule [rules that change plurals] =: ["the plural of % is %"]
+        (<%plurals>)->%singular
