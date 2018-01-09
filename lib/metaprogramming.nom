@@ -2,10 +2,60 @@
     This File contains rules for making rules and macros and some helper functions to make
     that easier.
 
-# Rule to make rules:
+# Rule to make macros:
 immediately:
     lua> ".."
-        nomsu:defmacro("rule %signature = %body", (function(nomsu, vars)
+        nomsu:defmacro("compile %macro_def to %body", function(nomsu, vars)
+            nomsu:assert(\%macro_def.type == "List",
+                "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
+            nomsu:assert(\%body.type == "Block",
+                "Invalid type for compile definition body. Expected Block, but got: "..tostring(\%body.type));
+            local signature = {};
+            for i, alias in ipairs(\%macro_def.value) do
+                signature[i] = alias.src;
+            end
+            local body_lua = nomsu:tree_to_lua(\%body);
+            body_lua = body_lua.statements or ("return "..body_lua.expr..";");
+            local lua = ([[
+        do
+            local function macro(nomsu, vars)
+                %s
+            end
+            local function macro_wrapper(...) return {expr=macro(...)}; end
+            nomsu:defmacro(%s, macro_wrapper, %s);
+        end]]):format(body_lua, nomsu:repr(signature), nomsu:repr(("compile %s\\n..to code %s"):format(\%macro_def.src, \%body.src)));
+            return {statements=lua};
+        end, \(__src__ 1));
+
+    lua> ".."
+        nomsu:defmacro("compile %macro_def to code %body", function(nomsu, vars)
+            nomsu:assert(\%macro_def.type == "List",
+                "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
+            nomsu:assert(\%body.type == "Block",
+                "Invalid type for compile definition body. Expected Block, but got: "..tostring(\%body.type));
+            local signature = {};
+            for i, alias in ipairs(\%macro_def.value) do
+                signature[i] = alias.src;
+            end
+            local body_lua = nomsu:tree_to_lua(\%body);
+            body_lua = body_lua.statements or ("return "..body_lua.expr..";");
+            local lua = ([[
+        do
+            local function macro(nomsu, vars)
+                %s
+            end
+            local function macro_wrapper(...) return {statements=macro(...)}; end
+            nomsu:defmacro(%s, macro_wrapper, %s);
+        end]]):format(body_lua, nomsu:repr(signature), nomsu:repr(("compile %s\\n..to code %s"):format(\%macro_def.src, \%body.src)));
+            return {statements=lua};
+        end, \(__src__ 1));
+
+compile [rand] to: "math.random()"
+
+# Rule to make rules:
+immediately:
+    compile [rule %signature = %body] to code:
+        lua> ".."
             nomsu:assert(\%signature.type == "List",
                 "Invalid type for rule definition signature. Expected List, but got: "..tostring(\%signature.type));
             nomsu:assert(\%body.type == "Block",
@@ -14,56 +64,14 @@ immediately:
             for i, alias in ipairs(\%signature.value) do
                 signature[i] = alias.src;
             end
-            local src = nomsu:source_code(0);
             local body_lua = nomsu:tree_to_lua(\%body);
-            local fn_src = ([[
-        function(nomsu, vars)
-            %s
-        end]]):format(body_lua.statements or ("return "..body_lua.expr..";"));
-            return {statements=([[
-        nomsu:def(%s, %s, %s)
-        ]]):format(nomsu:repr(signature), fn_src, nomsu:repr(nomsu:dedent(src)))};
-        end), \(__src__ 1));
-
-# Rules to make lua macros:
-immediately:
-    rule [compile \%macro_def to \%body] =:
-        lua> ".."
-            nomsu:assert(\%macro_def.type == "List",
-                "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
-            nomsu:assert(\%body.type == "Block",
-                "Invalid type for compile definition body. Expected Block, but got: "..tostring(\%body.type));
-            local signature = {};
-            for i, alias in ipairs(\%macro_def.value) do
-                signature[i] = alias.src;
-            end
-            local body_lua = nomsu:tree_to_lua(\%body);
-            local fn_src = ([[
-            function(nomsu, vars)
+            body_lua = body_lua.statements or ("return "..body_lua.expr..";");
+            local src = nomsu:dedent(nomsu:source_code(0));
+            local def_lua = ([[
+            nomsu:def(%s, function(nomsu, vars)
                 %s
-            end]]):format(body_lua.statements or ("return "..body_lua.expr..";"));
-            local fn = nomsu:run_lua("return "..fn_src..";");
-            local fn_wrapper = function(...) return {expr=fn(...)}; end;
-            nomsu:defmacro(signature, fn_wrapper, ("compile %s\\n..to %s"):format(\%macro_def.src, \%body.src));
-
-    rule [compile \%macro_def to code \%body] =:
-        lua> ".."
-            nomsu:assert(\%macro_def.type == "List",
-                "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
-            nomsu:assert(\%body.type == "Block",
-                "Invalid type for compile definition body. Expected Block, but got: "..tostring(\%body.type));
-            local signature = {};
-            for i, alias in ipairs(\%macro_def.value) do
-                signature[i] = alias.src;
-            end
-            local body_lua = nomsu:tree_to_lua(\%body);
-            local fn_src = ([[
-            function(nomsu, vars)
-                %s
-            end]]):format(body_lua.statements or ("return "..body_lua.expr..";"));
-            local fn = nomsu:run_lua("return "..fn_src..";");
-            local fn_wrapper = function(...) return {statements=fn(...)}; end;
-            nomsu:defmacro(signature, fn_wrapper, ("compile %s\\n..to code %s"):format(\%macro_def.src, \%body.src));
+            end, %s);]]):format(nomsu:repr(signature), body_lua, nomsu:repr(src));
+            return def_lua;
 
 # Rule to make nomsu macros:
 immediately:

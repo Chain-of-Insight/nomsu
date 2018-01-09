@@ -142,8 +142,8 @@ do
   }
   setmetatable(defs, {
     __index = function(self, key)
-      local fn
-      fn = function(start, value, stop)
+      local make_node
+      make_node = function(start, value, stop)
         return {
           start = start,
           stop = stop,
@@ -152,8 +152,8 @@ do
           type = key
         }
       end
-      self[key] = fn
-      return fn
+      self[key] = make_node
+      return make_node
     end
   })
   local peg_tidier = re.compile([[    file <- {~ %nl* (def/comment) (%nl+ (def/comment))* %nl* ~}
@@ -535,6 +535,7 @@ do
       self:assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local lua = self:tree_to_lua(tree)
       local lua_code = lua.statements or (lua.expr .. ";")
+      lua_code = "-- File: " .. tostring(filename) .. "\n" .. lua_code
       local ret = self:run_lua(lua_code, vars)
       if max_operations then
         debug.sethook()
@@ -571,6 +572,7 @@ end]]):format(lua_code))
     end,
     tree_to_value = function(self, tree, vars, filename)
       local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree, filename).expr) .. ";\nend);"
+      code = "-- Tree to value: " .. tostring(filename) .. "\n" .. code
       if self.debug then
         self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
       end
@@ -889,7 +891,7 @@ end]]):format(lua_code))
             else
               local lua = self:tree_to_lua(arg, filename)
               if lua.statements then
-                self:error("Cannot use [[" .. tostring(arg.src) .. "]] as a function argument, since it's not an expression.")
+                self:error("Cannot use [[" .. tostring(arg.src) .. "]] as a function argument to " .. tostring(tree.stub) .. ", since it's not an expression.")
               end
               insert(args, lua.expr)
             end
@@ -1319,9 +1321,10 @@ end]]):format(lua_code))
       self:defmacro("immediately %block", function(self, vars)
         local lua = self:tree_to_lua(vars.block)
         local lua_code = lua.statements or (lua.expr .. ";")
+        lua_code = "-- Immediately:\n" .. lua_code
         self:run_lua(lua_code, vars)
         return {
-          statements = lua_code
+          statements = ""
         }
       end)
       self:defmacro("lua> %code", function(self, vars)

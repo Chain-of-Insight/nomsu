@@ -106,10 +106,10 @@ do
             return {type: "FunctionCall", :src, line_no: "#{ctx.filename}:#{line_no}", :value, :stub}
 
     setmetatable(defs, {__index:(key)=>
-        fn = (start, value, stop)->
+        make_node = (start, value, stop)->
             {:start, :stop, :value, src:ctx.source_code\sub(start,stop-1), type: key}
-        self[key] = fn
-        return fn
+        self[key] = make_node
+        return make_node
     })
 
     -- Just for cleanliness, I put the language spec in its own file using a slightly modified
@@ -346,6 +346,7 @@ class NomsuCompiler
 
         lua = @tree_to_lua(tree)
         lua_code = lua.statements or (lua.expr..";")
+        lua_code = "-- File: #{filename}\n"..lua_code
         ret = @run_lua(lua_code, vars)
         if max_operations
             debug.sethook!
@@ -375,6 +376,7 @@ end]]\format(lua_code))
     
     tree_to_value: (tree, vars, filename)=>
         code = "return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree, filename).expr};\nend);"
+        code = "-- Tree to value: #{filename}\n"..code
         if @debug
             @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
         lua_thunk, err = load(code)
@@ -583,7 +585,7 @@ end]]\format(lua_code))
                     else
                         lua = @tree_to_lua arg, filename
                         if lua.statements
-                            @error "Cannot use [[#{arg.src}]] as a function argument, since it's not an expression."
+                            @error "Cannot use [[#{arg.src}]] as a function argument to #{tree.stub}, since it's not an expression."
                         insert args, lua.expr
                     arg_num += 1
 
@@ -835,8 +837,9 @@ end]]\format(lua_code))
         @defmacro "immediately %block", (vars)=>
             lua = @tree_to_lua(vars.block)
             lua_code = lua.statements or (lua.expr..";")
+            lua_code = "-- Immediately:\n"..lua_code
             @run_lua(lua_code, vars)
-            return statements:lua_code
+            return statements:""
 
         @defmacro "lua> %code", (vars)=>
             lua = nomsu_string_as_lua(@, vars.code)
