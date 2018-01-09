@@ -36,6 +36,7 @@ if _VERSION == "Lua 5.1"
 -- type checking?
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
+-- Do a pass on all rules to enforce parameters-are-nouns heuristic
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -164,17 +165,17 @@ class NomsuCompiler
         @write_err(...)
         @write_err("\n")
     
-    def: (signature, thunk, src, is_macro=false)=>
+    def: (signature, fn, src, is_macro=false)=>
         if type(signature) == 'string'
             signature = @get_stubs {signature}
         elseif type(signature) == 'table' and type(signature[1]) == 'string'
             signature = @get_stubs signature
-        @assert type(thunk) == 'function', "Bad thunk: #{repr thunk}"
+        @assert type(fn) == 'function', "Bad fn: #{repr fn}"
         canonical_args = nil
         canonical_escaped_args = nil
         aliases = {}
         @@def_number += 1
-        def = {:thunk, :src, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
+        def = {:fn, :src, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
         where_defs_go = (getmetatable(@defs) or {}).__newindex or @defs
         for {stub, arg_names, escaped_args} in *signature
             @assert stub, "NO STUB FOUND: #{repr signature}"
@@ -193,8 +194,8 @@ class NomsuCompiler
             stub_def = setmetatable({:stub, :arg_names, :escaped_args}, {__index:def})
             rawset(where_defs_go, stub, stub_def)
 
-    defmacro: (signature, thunk, src)=>
-        @def(signature, thunk, src, true)
+    defmacro: (signature, fn, src)=>
+        @def(signature, fn, src, true)
 
     scoped: (thunk)=>
         old_defs = @defs
@@ -253,13 +254,15 @@ class NomsuCompiler
             @error "Attempt to call undefined function: #{stub}"
         unless def.is_macro
             @assert_permission(stub)
-        {:thunk, :arg_names} = def
+        {:fn, :arg_names} = def
         args = {name, select(i,...) for i,name in ipairs(arg_names)}
         if @debug
             @write "#{colored.bright "CALLING"} #{colored.magenta(colored.underscore stub)} "
-            @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr(args)}"
+            @writeln "#{colored.bright "WITH ARGS:"}"
+            for name, value in pairs(args)
+                @writeln "  #{colored.bright "* #{name}"} = #{colored.dim repr(value)}"
         old_defs, @defs = @defs, def.defs
-        rets = {thunk(self,args)}
+        rets = {fn(self,args)}
         @defs = old_defs
         remove @callstack
         return unpack(rets)
@@ -270,9 +273,9 @@ class NomsuCompiler
             @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
         insert @callstack, "#macro"
-        expr, statement = @call(tree.stub, tree.line_no, unpack(args))
+        ret = @call(tree.stub, tree.line_no, unpack(args))
         remove @callstack
-        return expr, statement
+        return ret
 
     dedent: (code)=>
         unless code\find("\n")
@@ -290,8 +293,8 @@ class NomsuCompiler
         else
             return (code\gsub("\n"..(" ")\rep(indent_spaces), "\n    "))
 
-    indent: (code)=>
-        (code\gsub("\n","\n    "))
+    indent: (code, levels=1)=>
+        return code\gsub("\n","\n"..("    ")\rep(levels))
 
     assert_permission: (stub)=>
         fn_def = @defs[stub]
@@ -338,60 +341,40 @@ class NomsuCompiler
                 @error "Execution quota exceeded. Your code took too long."
             debug.sethook timeout, "", max_operations
         tree = @parse(src, filename)
-        @assert tree, "Tree failed to compile: #{src}"
+        @assert tree, "Failed to parse: #{src}"
         @assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
 
-        buffer = {}
-        -- TODO: handle return statements in a file
-        for statement in *tree.value
-            if @debug
-                @writeln "#{colored.bright "RUNNING NOMSU:"}\n#{colored.bright colored.yellow statement.src}"
-                @writeln colored.bright("PARSED TO TREE:")
-                @print_tree statement
-            ok,expr,statements = pcall(@tree_to_lua, self, statement, filename)
-            if not ok
-                @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.bright colored.yellow statement.src}"
-                error(expr)
-            code_for_statement = ([[
-return (function(nomsu, vars)
-%s
-end);]])\format(statements or ("return "..expr..";"))
-            if output_file
-                if statements and #statements > 0
-                    output_file\write "lua> \"..\"\n    #{@indent statements\gsub("\\","\\\\")}\n"
-                if expr and #expr > 0
-                    output_file\write "=lua \"..\"\n    #{@indent expr\gsub("\\","\\\\")}\n"
-            if @debug
-                @writeln "#{colored.bright "RUNNING LUA:"}\n#{colored.blue colored.bright(code_for_statement)}"
-            lua_thunk, err = load(code_for_statement)
-            if not lua_thunk
-                n = 1
-                fn = ->
-                    n = n + 1
-                    ("\n%-3d|")\format(n)
-                code = "1  |"..code_for_statement\gsub("\n", fn)
-                error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{err}\n\nProduced by statement:\n#{colored.bright colored.yellow statement.src}")
-            run_statement = lua_thunk!
-            ok,ret = pcall(run_statement, self, vars)
-            if not ok
-                @errorln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow statement.src}"
-                @errorln debug.traceback!
-                error(ret)
-            if statements
-                insert buffer, statements
-            if expr
-                insert buffer, "#{expr};"
-        
+        lua = @tree_to_lua(tree)
+        lua_code = lua.statements or (lua.expr..";")
+        ret = @run_lua(lua_code, vars)
         if max_operations
             debug.sethook!
-        lua_code = ([[
-return (function(nomsu, vars)
-%s
-end);]])\format(concat(buffer, "\n"))
-        return nil, lua_code, vars
+        if output_file
+            output_file\write(lua_code)
+        return ret, lua_code, vars
+
+    run_lua: (lua_code, vars={})=>
+        load_lua_fn, err = load([[
+return function(nomsu, vars)
+    %s
+end]]\format(lua_code))
+        if not load_lua_fn
+            n = 1
+            fn = ->
+                n = n + 1
+                ("\n%-3d|")\format(n)
+            code = "1  |"..lua_code\gsub("\n", fn)
+            @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{err}")
+        run_lua_fn = load_lua_fn!
+        ok,ret = pcall(run_lua_fn, self, vars)
+        if not ok
+            --@errorln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow tree.src}"
+            @errorln debug.traceback!
+            @error(ret)
+        return ret
     
     tree_to_value: (tree, vars, filename)=>
-        code = "return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree, filename)};\nend);"
+        code = "return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree, filename).expr};\nend);"
         if @debug
             @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
         lua_thunk, err = load(code)
@@ -413,9 +396,9 @@ end);]])\format(concat(buffer, "\n"))
                 inside, inline = @tree_to_nomsu(tree.value, force_inline)
                 return "\\#{inside}", inline
 
-            when "Thunk"
+            when "Block"
                 if force_inline
-                    return "{#{concat([@tree_to_nomsu(v, true) for v in *tree.value], "; ")}", true
+                    return "(:#{concat([@tree_to_nomsu(v, true) for v in *tree.value], "; ")})", true
                 else
                     return ":"..@indent("\n"..concat([@tree_to_nomsu v for v in *tree.value], "\n")), false
 
@@ -491,7 +474,8 @@ end);]])\format(concat(buffer, "\n"))
                     return longbuff, false
 
             when "Dict"
-                error("Sorry, not yet implemented.")
+                -- TODO: Implement
+                @error("Sorry, not yet implemented.")
 
             when "Number"
                 return repr(tree.value), true
@@ -517,7 +501,7 @@ end);]])\format(concat(buffer, "\n"))
                 if is_list(value)
                     return "[#{concat [@value_to_nomsu(v) for v in *value], ", "}]"
                 else
-                    return "(d{#{concat ["#{@value_to_nomsu(k)}=#{@value_to_nomsu(v)}" for k,v in pairs(value)], "; "}})"
+                    return "{#{concat ["#{@value_to_nomsu(k)}=#{@value_to_nomsu(v)}" for k,v in pairs(value)], ", "}}"
             when "string"
                 if value == "\n"
                     return "'\\n'"
@@ -538,50 +522,52 @@ end);]])\format(concat(buffer, "\n"))
             @error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
+                if #tree.value == 1
+                    return @tree_to_lua(tree.value[1], filename)
                 lua_bits = {}
                 for line in *tree.value
-                    expr,statement = @tree_to_lua line, filename
-                    if statement then insert lua_bits, statement
-                    if expr then insert lua_bits, "#{expr};"
-                return nil, concat(lua_bits, "\n")
+                    lua = @tree_to_lua line, filename
+                    if not lua
+                        @error "No lua produced by #{repr line}"
+                    if lua.statements then insert lua_bits, lua.statements
+                    if lua.expr then insert lua_bits, "#{lua.expr};"
+                return statements:concat(lua_bits, "\n")
             
             when "Nomsu"
-                return "nomsu:parse(#{repr tree.value.src}, #{repr tree.line_no}).value[1]", nil
+                return expr:"nomsu:parse(#{repr tree.value.src}, #{repr tree.line_no}).value[1]"
 
-            when "Thunk"
+            when "Block"
                 lua_bits = {}
                 for arg in *tree.value
-                    expr,statement = @tree_to_lua arg, filename
-                    if #tree.value == 1 and expr and not statement
-                        return ([[
-(function(nomsu, vars)
-    return %s;
-end)]])\format(expr)
-                    if statement then insert lua_bits, statement
-                    if expr then insert lua_bits, "#{expr};"
-                return ([[
-(function(nomsu, vars)
-%s
-end)]])\format(concat(lua_bits, "\n"))
+                    lua = @tree_to_lua arg, filename
+                    if #tree.value == 1 and lua.expr and not lua.statements
+                        return expr:lua.expr
+                    if lua.statements then insert lua_bits, lua.statements
+                    if lua.expr then insert lua_bits, "#{lua.expr};"
+                return statements:concat(lua_bits, "\n")
 
             when "FunctionCall"
                 insert @compilestack, tree
 
                 def = @defs[tree.stub]
                 if def and def.is_macro
-                    expr, statement = @run_macro(tree)
+                    lua = @run_macro(tree)
                     remove @compilestack
-                    return expr, statement
+                    return lua
                 elseif not def and @@math_patt\match(tree.stub)
+                    -- This is a bit of a hack, but this code handles arbitrarily complex
+                    -- math expressions like 2*x + 3^2 without having to define a single
+                    -- rule for every possibility.
                     bits = {}
                     for tok in *tree.value
                         if tok.type == "Word"
                             insert bits, tok.value
                         else
-                            expr, statement = @tree_to_lua(tok, filename)
-                            @assert(statement == nil, "non-expression value inside math expression")
-                            insert bits, expr
-                    return "(#{concat bits, " "})"
+                            lua = @tree_to_lua(tok, filename)
+                            @assert(lua.statements == nil, "non-expression value inside math expression")
+                            insert bits, lua.expr
+                    remove @compilestack
+                    return expr:"(#{concat bits, " "})"
 
                 args = {repr(tree.stub), repr(tree.line_no)}
                 local arg_names, escaped_args
@@ -595,14 +581,14 @@ end)]])\format(concat(lua_bits, "\n"))
                     if escaped_args[arg_names[arg_num]]
                         insert args, "nomsu:parse(#{repr arg.src}, #{repr tree.line_no}).value[1]"
                     else
-                        expr,statement = @tree_to_lua arg, filename
-                        if statement
+                        lua = @tree_to_lua arg, filename
+                        if lua.statements
                             @error "Cannot use [[#{arg.src}]] as a function argument, since it's not an expression."
-                        insert args, expr
+                        insert args, lua.expr
                     arg_num += 1
 
                 remove @compilestack
-                return @@comma_separated_items("nomsu:call(", args, ")"), nil
+                return expr:@@comma_separated_items("nomsu:call(", args, ")")
 
             when "String"
                 concat_parts = {}
@@ -614,61 +600,60 @@ end)]])\format(concat(lua_bits, "\n"))
                     if string_buffer ~= ""
                         insert concat_parts, repr(string_buffer)
                         string_buffer = ""
-                    expr, statement = @tree_to_lua bit, filename
+                    lua = @tree_to_lua bit, filename
                     if @debug
                         @writeln (colored.bright "INTERP:")
                         @print_tree bit
-                        @writeln "#{colored.bright "EXPR:"} #{expr}, #{colored.bright "STATEMENT:"} #{statement}"
-                    if statement
+                        @writeln "#{colored.bright "EXPR:"} #{lua.expr}, #{colored.bright "STATEMENT:"} #{lua.statements}"
+                    if lua.statements
                         @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
-                    insert concat_parts, "nomsu:stringify(#{expr})"
+                    insert concat_parts, "nomsu:stringify(#{lua.expr})"
 
                 if string_buffer ~= ""
                     insert concat_parts, repr(string_buffer)
 
                 if #concat_parts == 0
-                    return "''", nil
+                    return expr:"''"
                 elseif #concat_parts == 1
-                    return concat_parts[1], nil
-                else return "(#{concat(concat_parts, "..")})", nil
+                    return expr:concat_parts[1]
+                else return expr:"(#{concat(concat_parts, "..")})"
 
             when "List"
                 items = {}
                 for item in *tree.value
-                    expr,statement = @tree_to_lua item, filename
-                    if statement
+                    lua = @tree_to_lua item, filename
+                    if lua.statements
                         @error "Cannot use [[#{item.src}]] as a list item, since it's not an expression."
-                    insert items, expr
-                return @@comma_separated_items("{", items, "}"), nil
+                    insert items, lua.expr
+                return expr:@@comma_separated_items("{", items, "}")
 
             when "Dict"
                 items = {}
                 for entry in *tree.value
-                    local key_expr,key_statement
-                    if entry.dict_key.type == "Word"
-                        key_expr,key_statement = repr(entry.dict_key.value),nil
+                    key_lua = if entry.dict_key.type == "Word"
+                        {expr:repr(entry.dict_key.value)}
                     else
-                        key_expr,key_statement = @tree_to_lua entry.dict_key, filename
-                    if key_statement
+                        @tree_to_lua entry.dict_key, filename
+                    if key_lua.statements
                         @error "Cannot use [[#{entry.dict_key.src}]] as a dict key, since it's not an expression."
-                    value_expr,value_statement = @tree_to_lua entry.dict_value, filename
-                    if value_statement
+                    value_lua = @tree_to_lua entry.dict_value, filename
+                    if value_lua.statements
                         @error "Cannot use [[#{entry.dict_value.src}]] as a dict value, since it's not an expression."
-                    key_str = key_expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
+                    key_str = key_lua.expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                     if key_str
-                        insert items, "#{key_str}=#{value_expr}"
+                        insert items, "#{key_str}=#{value_lua.expr}"
                     else
-                        insert items, "[#{key_expr}]=#{value_expr}"
-                return @@comma_separated_items("{", items, "}"), nil
+                        insert items, "[#{key_lua.expr}]=#{value_lua.expr}"
+                return expr:@@comma_separated_items("{", items, "}")
 
             when "Number"
-                return repr(tree.value), nil
+                return expr:repr(tree.value)
 
             when "Var"
                 if tree.value\match("^[a-zA-Z_][a-zA-Z0-9_]*$")
-                    return "vars.#{tree.value}", nil
+                    return expr:"vars.#{tree.value}"
                 else
-                    return "vars[#{repr tree.value}]", nil
+                    return expr:"vars[#{repr tree.value}]"
 
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
@@ -678,7 +663,7 @@ end)]])\format(concat(lua_bits, "\n"))
         if type(tree) != 'table' or not tree.type
             return
         switch tree.type
-            when "List", "File", "Thunk", "FunctionCall", "String"
+            when "List", "File", "Block", "FunctionCall", "String"
                 for v in *tree.value
                     @walk_tree(v, depth+1)
             when "Dict"
@@ -728,7 +713,7 @@ end)]])\format(concat(lua_bits, "\n"))
             when "Var"
                 if vars[tree.value] ~= nil
                     tree = vars[tree.value]
-            when "File", "Nomsu", "Thunk", "List", "FunctionCall", "String"
+            when "File", "Nomsu", "Block", "List", "FunctionCall", "String"
                 new_value = @replaced_vars tree.value, vars
                 if new_value != tree.value
                     tree = {k,v for k,v in pairs(tree)}
@@ -834,29 +819,35 @@ end)]])\format(concat(lua_bits, "\n"))
                 if type(bit) == "string"
                     insert concat_parts, bit
                 else
-                    expr, statement = @tree_to_lua bit, filename
-                    if statement
+                    lua = @tree_to_lua bit, filename
+                    if lua.statements
                         @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
-                    insert concat_parts, expr
+                    insert concat_parts, lua.expr
             return concat(concat_parts)
-        
-        -- Uses named local functions to help out callstack readability
-        lua_code = (vars)=>
-            lua = nomsu_string_as_lua(@, vars.code)
-            return nil, lua
-        @defmacro "lua> %code", lua_code
 
-        lua_value = (vars)=>
+        @defmacro "do %block", (vars)=>
+            make_line = (lua)-> lua.expr and (lua.expr..";") or lua.statements
+            if vars.block.type == "Block"
+                return @tree_to_lua(vars.block)
+            else
+                return expr:"#{@tree_to_lua vars.block}(nomsu, vars)"
+        
+        @defmacro "immediately %block", (vars)=>
+            lua = @tree_to_lua(vars.block)
+            lua_code = lua.statements or (lua.expr..";")
+            @run_lua(lua_code, vars)
+            return statements:lua_code
+
+        @defmacro "lua> %code", (vars)=>
             lua = nomsu_string_as_lua(@, vars.code)
-            return lua, nil
-        @defmacro "=lua %code", lua_value
+            return statements:lua
+
+        @defmacro "=lua %code", (vars)=>
+            lua = nomsu_string_as_lua(@, vars.code)
+            return expr:lua
 
         @defmacro "__src__ %level", (vars)=>
-            @repr @source_code @tree_to_value vars.level
-
-        @def "derp \\%foo derp \\%bar", (vars)=>
-            lua = "local x = "..repr([t.stub for t in *vars.foo.value])..";\nlocal y = "..@tree_to_lua(vars.bar)
-            print(colored.green lua)
+            expr: repr(@source_code(@tree_to_value(vars.level)))
 
         run_file = (vars)=>
             if vars.filename\match(".*%.lua")
@@ -873,13 +864,13 @@ end)]])\format(concat(lua_bits, "\n"))
             else
                 @error "Invalid filetype for #{vars.filename}"
         @def "run file %filename", run_file
-
-        _require = (vars)=>
+        @defmacro "require %filename", (vars)=>
+            filename = @tree_to_value(vars.filename)
             loaded = @defs["#loaded_files"]
-            if not loaded[vars.filename]
-                loaded[vars.filename] = run_file(self, {filename:vars.filename}) or true
-            return loaded[vars.filename]
-        @def "require %filename", _require
+            if not loaded[filename]
+                loaded[filename] = run_file(self, {:filename}) or true
+            loaded[filename]
+            return statements:""
 
 
 if arg
@@ -923,7 +914,10 @@ if arg
                 io.read('*a')
             else io.open(args.input)\read("*a")
             vars = {}
-            retval, code = c\run(input, args.input, vars, nil, compiled_output)
+            retval, code = c\run(input, args.input, vars)
+            if args.output
+                compiled_output\write("lua> \"..\"\n    "..c\indent(code\gsub("\\","\\\\"), 1))
+
         if args.flags["-p"]
             c.write = _write
 

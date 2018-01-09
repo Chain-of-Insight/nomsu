@@ -51,9 +51,9 @@ compile [%var = %val] to code:
     lua> ".."
         if \%var.type == 'List' and \%val.type == 'List' then
             local lhs = {};
-            for i,x in ipairs(\%var.value) do lhs[i] = nomsu:tree_to_lua(x); end
+            for i,x in ipairs(\%var.value) do lhs[i] = nomsu:tree_to_lua(x).expr; end
             local rhs = {};
-            for i,x in ipairs(\%val.value) do rhs[i] = nomsu:tree_to_lua(x); end
+            for i,x in ipairs(\%val.value) do rhs[i] = nomsu:tree_to_lua(x).expr; end
             return table.concat(lhs, ", ").." = "..table.concat(rhs, ", ")..";";
         else
             return \(%var as lua).." = "..\(%val as lua)..";";

@@ -11,12 +11,12 @@ statement: functioncall / expression
 noeol_statement: noeol_functioncall / noeol_expression
 inline_statement: inline_functioncall / inline_expression
 
-inline_thunk (Thunk): {| ":" %ws* inline_statement |}
-eol_thunk (Thunk): {| ":" %ws* noeol_statement eol |}
-indented_thunk (Thunk):
+inline_block (Block): {| ":" %ws* inline_statement |}
+eol_block (Block): {| ":" %ws* noeol_statement eol |}
+indented_block (Block):
     {| ":" indent
             statement (nodent statement)*
-        (dedent / (("" -> "Error while parsing thunk") => error))
+        (dedent / (("" -> "Error while parsing block") => error))
     |}
 
 inline_nomsu (Nomsu): "\" inline_expression
@@ -25,18 +25,18 @@ indented_nomsu (Nomsu): "\" expression
 
 inline_expression:
     number / variable / inline_string / inline_list / inline_dict / inline_nomsu
-    / ("(" %ws* (inline_thunk / inline_statement) %ws* ")")
+    / ("(" %ws* (inline_block / inline_statement) %ws* ")")
 noeol_expression:
-    indented_string / indented_nomsu / indented_list / indented_dict / indented_thunk
+    indented_string / indented_nomsu / indented_list / indented_dict / indented_block
     / ("(..)" indent
         statement
     (dedent / (("" -> "Error while parsing indented expression") => error))
     ) / inline_expression
-expression: eol_thunk / eol_nomsu / noeol_expression
+expression: eol_block / eol_nomsu / noeol_expression
 
 -- Function calls need at least one word in them
 inline_functioncall (FunctionCall):
-    {| (inline_expression %ws*)* word (%ws* (inline_expression / word))* (%ws* inline_thunk)?|}
+    {| (inline_expression %ws*)* word (%ws* (inline_expression / word))* (%ws* inline_block)?|}
 noeol_functioncall (FunctionCall):
     {| (noeol_expression %ws*)* word (%ws* (noeol_expression / word))* |}
 functioncall (FunctionCall):
@@ -57,7 +57,7 @@ indented_string (String):
         ~} / string_interpolation)*
     |} ((!.) / (&(%nl+ !%gt_nodented)) / (("" -> "Error while parsing String") => error))
 string_interpolation:
-    "\" (variable / inline_list / inline_dict / inline_string / ("(" %ws* (inline_thunk / inline_statement) %ws* ")"))
+    "\" (variable / inline_list / inline_dict / inline_string / ("(" %ws* (inline_block / inline_statement) %ws* ")"))
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 

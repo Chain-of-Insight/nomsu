@@ -43,7 +43,7 @@ rule [tree %tree has function call %call] =:
                 return true;
             end
         end
-        do return false; end
+        return false;
 
 # While loops
 compile [do next repeat-loop] to code: "goto continue_repeat;"
@@ -100,12 +100,14 @@ compile [..]
         %stop_labels join= "\n::stop_for::;"
     if (tree %body has function call (tree \(stop %) with {""=%var})):
         %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-    if (%stop_labels != ""): ".."
-        do --for-loop label scope
-        \%code\
-        ..\%stop_labels
-        end --for-loop label scope
-    ..else: %code
+    return (..)
+        ".."
+            do --for-loop label scope
+            \%code\
+            ..\%stop_labels
+            end --for-loop label scope
+        ..if %stop_labels != "" else %code
+
 parse [for %var from %start to %stop %body] as: for %var from %start to %stop via 1 %body
 parse [..]
     for all %start to %stop by %step %body
@@ -131,11 +133,12 @@ compile [for %var in %iterable %body] to code:
         %stop_labels join= "\n::stop_for::;"
     if (tree %body has function call (tree \(stop %) with {""=%var})):
         %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-    if (%stop_labels != ""): ".."
-        do --for-loop label scope
-        \%code\%stop_labels
-        end --for-loop label scope
-    ..else: %code
+    return (..)
+        ".."
+            do --for-loop label scope
+            \%code\%stop_labels
+            end --for-loop label scope
+        ..if %stop_labels != "" else %code
 parse [for all %iterable %body] as: for % in %iterable %body
 
 # Dict iteration (lua's "pairs()")
@@ -161,12 +164,13 @@ compile [for %key = %value in %iterable %body] to code:
         %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%key])::;"
     if (tree %body has function call (tree \(stop %) with {""=%value})):
         %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%value])::;"
-    if (%stop_labels != ""): ".."
-        do --for-loop label scope
-        \%code\
-        ..\%stop_labels
-        end --for-loop label scope
-    ..else: %code
+    return (..)
+        ".."
+            do --for-loop label scope
+            \%code\
+            ..\%stop_labels
+            end --for-loop label scope
+        ..if %stop_labels != "" else %code
 
 # Switch statement/multi-branch if
 compile [when %body] to code:
