@@ -344,7 +344,7 @@ class NomsuCompiler
         @assert tree, "Failed to parse: #{src}"
         @assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
 
-        lua = @tree_to_lua(tree)
+        lua = @tree_to_lua(tree, filename)
         lua_code = lua.statements or (lua.expr..";")
         lua_code = "-- File: #{filename}\n"..lua_code
         ret = @run_lua(lua_code, vars)

@@ -533,7 +533,7 @@ do
       local tree = self:parse(src, filename)
       self:assert(tree, "Failed to parse: " .. tostring(src))
       self:assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
-      local lua = self:tree_to_lua(tree)
+      local lua = self:tree_to_lua(tree, filename)
       local lua_code = lua.statements or (lua.expr .. ";")
       lua_code = "-- File: " .. tostring(filename) .. "\n" .. lua_code
       local ret = self:run_lua(lua_code, vars)
