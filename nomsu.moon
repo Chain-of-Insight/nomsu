@@ -839,7 +839,7 @@ end]]\format(lua_code))
             lua_code = lua.statements or (lua.expr..";")
             lua_code = "-- Immediately:\n"..lua_code
             @run_lua(lua_code, vars)
-            return statements:""
+            return statements:lua_code
 
         @defmacro "lua> %code", (vars)=>
             lua = nomsu_string_as_lua(@, vars.code)
@@ -857,7 +857,9 @@ end]]\format(lua_code))
                 return dofile(vars.filename)(@, vars)
             if vars.filename\match(".*%.nom")
                 if not @skip_precompiled -- Look for precompiled version
-                    file = io.open(vars.filename\gsub("%.nom", ".nomc"), "r")
+                    file = io.open(vars.filename\gsub("%.nom", ".lua"), "r")
+                    if file
+                        return @run_lua(file\read("*a"), vars)
                 file = file or io.open(vars.filename)
                 if not file
                     @error "File does not exist: #{vars.filename}"
@@ -901,7 +903,7 @@ if arg
     if args.input
         -- Read a file or stdin and output either the printouts or the compiled lua
         if args.flags["-c"] and not args.output
-            args.output = args.input\gsub("%.nom", ".nomc")
+            args.output = args.input\gsub("%.nom", ".lua")
         compiled_output = nil
         if args.flags["-p"]
             _write = c.write
@@ -919,7 +921,7 @@ if arg
             vars = {}
             retval, code = c\run(input, args.input, vars)
             if args.output
-                compiled_output\write("lua> \"..\"\n    "..c\indent(code\gsub("\\","\\\\"), 1))
+                compiled_output\write(code)
 
         if args.flags["-p"]
             c.write = _write

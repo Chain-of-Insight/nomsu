@@ -1324,7 +1324,7 @@ end]]):format(lua_code))
         lua_code = "-- Immediately:\n" .. lua_code
         self:run_lua(lua_code, vars)
         return {
-          statements = ""
+          statements = lua_code
         }
       end)
       self:defmacro("lua> %code", function(self, vars)
@@ -1351,7 +1351,10 @@ end]]):format(lua_code))
         end
         if vars.filename:match(".*%.nom") then
           if not self.skip_precompiled then
-            local file = io.open(vars.filename:gsub("%.nom", ".nomc"), "r")
+            local file = io.open(vars.filename:gsub("%.nom", ".lua"), "r")
+            if file then
+              return self:run_lua(file:read("*a"), vars)
+            end
           end
           local file = file or io.open(vars.filename)
           if not file then
@@ -1483,7 +1486,7 @@ if arg then
   c.skip_precompiled = not args.flags["-O"]
   if args.input then
     if args.flags["-c"] and not args.output then
-      args.output = args.input:gsub("%.nom", ".nomc")
+      args.output = args.input:gsub("%.nom", ".lua")
     end
     local compiled_output = nil
     if args.flags["-p"] then
@@ -1505,7 +1508,7 @@ if arg then
       local vars = { }
       local retval, code = c:run(input, args.input, vars)
       if args.output then
-        compiled_output:write("lua> \"..\"\n    " .. c:indent(code:gsub("\\", "\\\\"), 1))
+        compiled_output:write(code)
       end
     end
     if args.flags["-p"] then
