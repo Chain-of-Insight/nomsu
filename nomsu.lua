@@ -219,10 +219,8 @@ do
         defs = self.defs
       }
       local where_defs_go = (getmetatable(self.defs) or { }).__newindex or self.defs
-      for _index_0 = 1, #signature do
-        local _des_0 = signature[_index_0]
-        local stub, arg_names, escaped_args
-        stub, arg_names, escaped_args = _des_0[1], _des_0[2], _des_0[3]
+      for sig_i = 1, #signature do
+        local stub, arg_names, escaped_args = unpack(signature[sig_i])
         self:assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
         if self.debug then
           self:writeln(tostring(colored.bright("DEFINING RULE:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
@@ -544,6 +542,43 @@ do
         output_file:write(lua_code)
       end
       return ret, lua_code, vars
+    end,
+    run_file = function(self, filename, vars)
+      if vars == nil then
+        vars = { }
+      end
+      if filename:match(".*%.lua") then
+        return dofile(filename)(self, vars)
+      end
+      if filename:match(".*%.nom") then
+        if not self.skip_precompiled then
+          local file = io.open(filename:gsub("%.nom", ".lua"), "r")
+          if file then
+            local lua_code = file:read("*a")
+            file:close()
+            return self:run_lua(lua_code, vars)
+          end
+        end
+        local file = file or io.open(filename)
+        if not file then
+          self:error("File does not exist: " .. tostring(filename))
+        end
+        local nomsu_code = file:read('*a')
+        file:close()
+        return self:run(nomsu_code, filename)
+      else
+        return self:error("Invalid filetype for " .. tostring(filename))
+      end
+    end,
+    require_file = function(self, filename, vars)
+      if vars == nil then
+        vars = { }
+      end
+      local loaded = self.defs["#loaded_files"]
+      if not loaded[filename] then
+        loaded[filename] = self:run_file(filename, vars) or true
+      end
+      return loaded[filename]
     end,
     run_lua = function(self, lua_code, vars)
       if vars == nil then
@@ -1344,41 +1379,14 @@ end]]):format(lua_code))
           expr = repr(self:source_code(self:tree_to_value(vars.level)))
         }
       end)
-      local run_file
-      run_file = function(self, vars)
-        if vars.filename:match(".*%.lua") then
-          return dofile(vars.filename)(self, vars)
-        end
-        if vars.filename:match(".*%.nom") then
-          if not self.skip_precompiled then
-            local file = io.open(vars.filename:gsub("%.nom", ".lua"), "r")
-            if file then
-              return self:run_lua(file:read("*a"), vars)
-            end
-          end
-          local file = file or io.open(vars.filename)
-          if not file then
-            self:error("File does not exist: " .. tostring(vars.filename))
-          end
-          local contents = file:read('*a')
-          file:close()
-          return self:run(contents, vars.filename)
-        else
-          return self:error("Invalid filetype for " .. tostring(vars.filename))
-        end
-      end
-      self:def("run file %filename", run_file)
+      self:def("run file %filename", function(self, vars)
+        return self:run_file(vars.filename, vars)
+      end)
       return self:defmacro("require %filename", function(self, vars)
         local filename = self:tree_to_value(vars.filename)
-        local loaded = self.defs["#loaded_files"]
-        if not loaded[filename] then
-          loaded[filename] = run_file(self, {
-            filename = filename
-          }) or true
-        end
-        local _ = loaded[filename]
+        self:require_file(filename, vars)
         return {
-          statements = ""
+          statements = "nomsu:require_file(" .. tostring(repr(filename)) .. ");"
         }
       end)
     end

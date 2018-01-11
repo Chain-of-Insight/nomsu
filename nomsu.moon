@@ -177,7 +177,8 @@ class NomsuCompiler
         @@def_number += 1
         def = {:fn, :src, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
         where_defs_go = (getmetatable(@defs) or {}).__newindex or @defs
-        for {stub, arg_names, escaped_args} in *signature
+        for sig_i=1,#signature
+            stub, arg_names, escaped_args = unpack(signature[sig_i])
             @assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
             for i=1,#arg_names-1 do for j=i+1,#arg_names
@@ -353,6 +354,31 @@ class NomsuCompiler
         if output_file
             output_file\write(lua_code)
         return ret, lua_code, vars
+
+    run_file: (filename, vars={})=>
+        if filename\match(".*%.lua")
+            return dofile(filename)(@, vars)
+        if filename\match(".*%.nom")
+            if not @skip_precompiled -- Look for precompiled version
+                file = io.open(filename\gsub("%.nom", ".lua"), "r")
+                if file
+                    lua_code = file\read("*a")
+                    file\close!
+                    return @run_lua(lua_code, vars)
+            file = file or io.open(filename)
+            if not file
+                @error "File does not exist: #{filename}"
+            nomsu_code = file\read('*a')
+            file\close!
+            return @run(nomsu_code, filename)
+        else
+            @error "Invalid filetype for #{filename}"
+    
+    require_file: (filename, vars={})=>
+        loaded = @defs["#loaded_files"]
+        if not loaded[filename]
+            loaded[filename] = @run_file(filename, vars) or true
+        return loaded[filename]
 
     run_lua: (lua_code, vars={})=>
         load_lua_fn, err = load([[
@@ -852,31 +878,13 @@ end]]\format(lua_code))
         @defmacro "__src__ %level", (vars)=>
             expr: repr(@source_code(@tree_to_value(vars.level)))
 
-        run_file = (vars)=>
-            if vars.filename\match(".*%.lua")
-                return dofile(vars.filename)(@, vars)
-            if vars.filename\match(".*%.nom")
-                if not @skip_precompiled -- Look for precompiled version
-                    file = io.open(vars.filename\gsub("%.nom", ".lua"), "r")
-                    if file
-                        return @run_lua(file\read("*a"), vars)
-                file = file or io.open(vars.filename)
-                if not file
-                    @error "File does not exist: #{vars.filename}"
-                contents = file\read('*a')
-                file\close!
-                return @run(contents, vars.filename)
-            else
-                @error "Invalid filetype for #{vars.filename}"
-        @def "run file %filename", run_file
+        @def "run file %filename", (vars)=>
+            @run_file(vars.filename, vars)
+
         @defmacro "require %filename", (vars)=>
             filename = @tree_to_value(vars.filename)
-            loaded = @defs["#loaded_files"]
-            if not loaded[filename]
-                loaded[filename] = run_file(self, {:filename}) or true
-            loaded[filename]
-            return statements:""
-
+            @require_file(filename, vars)
+            return statements:"nomsu:require_file(#{repr filename});"
 
 if arg
     export colors

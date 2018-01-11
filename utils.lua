@@ -1,6 +1,7 @@
 --
 -- A collection of helper utility functions
 --
+local lpeg, re = require("lpeg"), require("re")
 
 local function is_list(t)
     if type(t) ~= 'table' then
@@ -24,48 +25,66 @@ local function size(t)
     return n
 end
 
-local function repr(x, depth)
+local _quote_state = {}
+local max = math.max
+local _quote_patt = re.compile("(({'\n' / '\"' / \"'\" / '\\'}->mark_char) / (']' ({'='*}->mark_eq) (']' / !.)) / .)*",
+    {mark_char=function(q)
+        if q == "\n" or q == "\\" then
+            if _quote_state.min_eq == nil then
+                _quote_state.min_eq = 0
+            end
+        elseif q == "'" then
+            _quote_state["'"] = false
+        elseif q == '"' then
+            _quote_state['"'] = false
+        end
+    end,
+    mark_eq=function(eq)
+        _quote_state.min_eq = max(_quote_state.min_eq or 0, #eq+1)
+    end})
+local function repr(x)
     -- Create a string representation of the object that is close to the lua code that will
     -- reproduce the object (similar to Python's "repr" function)
-    depth = depth or math.huge
-    if depth == 0 then
-        return tostring(x)
-    end
     local x_type = type(x)
     if x_type == 'table' then
         if getmetatable(x) then
             -- If this object has a weird metatable, then don't pretend like it's a regular table
             return tostring(x)
-        elseif is_list(x) then
-            local ret = {}
-            for i=1,#x do
-                ret[i] = repr(x[i], depth-1)
-            end
-            return "{"..table.concat(ret, ", ").."}"
         else
             local ret = {}
+            local i = 1
             for k, v in pairs(x) do
-                ret[#ret+1] = "["..repr(k,depth-1).."]= "..repr(v,depth-1)
+                if k == i then
+                    ret[#ret+1] = repr(x[i])
+                    i = i + 1
+                elseif type(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
+                    ret[#ret+1] = k.."= "..repr(v)
+                else
+                    ret[#ret+1] = "["..repr(k).."]= "..repr(v)
+                end
             end
             return "{"..table.concat(ret, ", ").."}"
         end
     elseif x_type == 'string' then
         if x == "\n" then
             return "'\\n'"
-        elseif not x:find([["]]) and not x:find("\n") and not x:find("\\") then
-            return "\"" .. x .. "\""
-        elseif not x:find([[']]) and not x:find("\n") and not x:find("\\") then
+        end
+        _quote_state = {}
+        _quote_patt:match(x)
+        if _quote_state["'"] ~= false and _quote_state.min_eq == nil then
             return "\'" .. x .. "\'"
+        elseif _quote_state['"'] ~= false and _quote_state.min_eq == nil then
+            return "\"" .. x .. "\""
         else
-            for i = 0, math.huge do
-                local eq = ("="):rep(i)
-                if not x:find("%]"..eq.."%]") and x:sub(-#eq-1, -1) ~= "]"..eq then
-                    if x:sub(1, 1) == "\n" then
-                        return "["..eq.."[\n"..x.."]"..eq.."]"
-                    else
-                        return "["..eq.."["..x.."]"..eq.."]"
-                    end
-                end
+            local eq = ("="):rep(_quote_state.min_eq or 0)
+            -- Need to add parens around ([=[...]=]) so lua's parser doesn't get confused
+            -- by stuff like x[[=[...]=]], which should obviously parse as x[ ([=[...]=]) ],
+            -- but instead parses as x( [[=[...]=]] ), i.e. a function call whose argument
+            -- is a string that starts with "=[" and ends with "]="
+            if x:sub(1, 1) == "\n" then
+                return "(["..eq.."[\n"..x.."]"..eq.."])"
+            else
+                return "(["..eq.."["..x.."]"..eq.."])"
             end
         end
     else
@@ -73,11 +92,11 @@ local function repr(x, depth)
     end
 end
 
-local function stringify(x, depth)
+local function stringify(x)
     if type(x) == 'string' then
         return x
     else
-        return repr(x, depth)
+        return repr(x)
     end
 end
 
