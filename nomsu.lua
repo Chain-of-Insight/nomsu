@@ -233,7 +233,7 @@ do
         local arg_positions = { }
         self:assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
         if self.debug then
-          self:writeln(tostring(colored.bright("DEFINING RULE:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
+          self:writeln(tostring(colored.bright("DEFINING ACTION:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
         end
         for i = 1, #arg_names - 1 do
           for j = i + 1, #arg_names do

@@ -19,16 +19,16 @@ parse [first in %list, first %list] as: 1 st in %list
 parse [last in %list, last %list] as: 1 st to last in %list
 
 # Membership testing
-rule [%item is in %list, %list contains %item, %list has %item] =:
+action [%item is in %list, %list contains %item, %list has %item]:
     for %key = %value in %list:
         if (%key == %item): return (yes)
     return (no)
 
-rule [..]
+action [..]
     %item isn't in %list, %item is not in %list
     %list doesn't contain %item, %list does not contain %item
     %list doesn't have %item, %list does not have %item
-..=:
+..:
     for %key = %value in %list:
         if (%key == %item): return (no)
     return (yes)
@@ -71,31 +71,31 @@ compile [remove index %index from %list] to:
     "table.remove(\(%list as lua), \(%index as lua))"
 
 
-rule [flatten %lists] =:
+action [flatten %lists]:
     %flat = []
     for %list in %lists:
         for %item in %list:
             add %item to %flat
     return %flat
 
-rule [dict %items] =:
+action [dict %items]:
     %dict = []
     for %pair in %items:
         %dict -> (%pair -> 1) = (%pair -> 2)
     return %dict
 
-rule [entries in %dict] =:
+action [entries in %dict]:
     %entries = []
     for %k = %v in %dict:
         add {key=%k, value=%v} to %entries
     return %entries
 
-rule [keys in %dict] =:
+action [keys in %dict]:
     %keys = []
     for %k = %v in %dict: add %k to %keys
     return %keys
 
-rule [values in %dict] =:
+action [values in %dict]:
     %values = []
     for %k = %v in %dict: add %v to %values
     return %values
@@ -128,15 +128,15 @@ compile [%expression for %key = %value in %iterable] to:
             return comprehension;
         end)(nomsu)
 
-rule [%items sorted] =:
+action [%items sorted]:
     %copy = (% for all %items)
     sort %copy
     return %copy
-rule [%items sorted by %key] =:
+action [%items sorted by %key]:
     %copy = (% for all %items)
     sort %copy by %key
     return %copy
-rule [unique %items] =:
+action [unique %items]:
     keys in (dict ([%,yes] for all %items))
 
 # Metatable stuff
@@ -147,7 +147,7 @@ compile [default dict] to: ".."
         self[key] = t;
         return t;
     end})"
-rule [chain %dict to %fallback] =:
+action [chain %dict to %fallback]:
     when (type of %fallback) == ?:
         * "table":
             =lua "setmetatable(\%dict, \%fallback)"

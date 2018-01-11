@@ -39,7 +39,7 @@ immediately:
 
 # Helper function
 immediately:
-    rule [tree %tree has function call %call] =:
+    action [tree %tree has function call %call]:
         lua> ".."
             local target = (\%call).stub;
             for subtree,_ in coroutine.wrap(function() nomsu:walk_tree(\%tree); end) do

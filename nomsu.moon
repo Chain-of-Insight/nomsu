@@ -36,7 +36,7 @@ if _VERSION == "Lua 5.1"
 -- type checking?
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
--- Do a pass on all rules to enforce parameters-are-nouns heuristic
+-- Do a pass on all actions to enforce parameters-are-nouns heuristic
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -185,7 +185,7 @@ class NomsuCompiler
             stub, arg_names, escaped_args = unpack(signature[sig_i])
             arg_positions = {}
             @assert stub, "NO STUB FOUND: #{repr signature}"
-            if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
+            if @debug then @writeln "#{colored.bright "DEFINING ACTION:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
             for i=1,#arg_names-1 do for j=i+1,#arg_names
                 if arg_names[i] == arg_names[j] then @error "Duplicate argument in function #{stub}: '#{arg_names[i]}'"
             
@@ -555,7 +555,7 @@ end]]\format(lua_code))
                 elseif not def and @@math_patt\match(tree.stub)
                     -- This is a bit of a hack, but this code handles arbitrarily complex
                     -- math expressions like 2*x + 3^2 without having to define a single
-                    -- rule for every possibility.
+                    -- action for every possibility.
                     bits = {}
                     for tok in *tree.value
                         if tok.type == "Word"
@@ -735,7 +735,7 @@ end]]\format(lua_code))
         if not x
             @error "Nothing to get stub from"
         -- Returns a single stub ("say %"), list of arg names ({"msg"}), and set of arg
-        -- names that should not be evaluated from a single rule def
+        -- names that should not be evaluated from a single action def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
             -- Standardize format to stuff separated by spaces

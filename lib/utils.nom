@@ -1,9 +1,9 @@
 require "lib/metaprogramming.nom"
 
 # Error functions
-rule [error!, panic!, fail!, abort!] =:
+action [error!, panic!, fail!, abort!]:
     nomsu "error" []
-rule [error %msg] =:
+action [error %msg]:
     nomsu "error"[%msg]
 compile [assert %condition %msg] to code: ".."
     if not (\(%condition as lua)) then
@@ -13,7 +13,7 @@ compile [assert %condition %msg] to code: ".."
 parse [assert %condition] as: assert %condition (nil)
 
 # Text functions
-rule [join %strs with glue %glue] =:
+action [join %strs with glue %glue]:
     lua do> ".."
         local str_bits = {}
         for i,bit in ipairs(\%strs) do str_bits[i] = nomsu:stringify(bit) end
@@ -42,7 +42,7 @@ compile [random number, random, rand] to: "math.random()"
 compile [random int %n, random integer %n, randint %n] to: "math.random(\(%n as lua))"
 compile [random from %low to %high, random number from %low to %high, rand %low %high] to:
     "math.random(\(%low as lua), \(%high as lua))"
-rule [random choice from %elements, random choice %elements, random %elements] =:
+action [random choice from %elements, random choice %elements, random %elements]:
     =lua "\%elements[math.random(#\%elements)]"
 
 # Math functions
@@ -65,7 +65,7 @@ compile [log %, ln %, natural log %] to: "math.log(\(% as lua))"
 compile [log % base %base] to: "math.log(\(% as lua), \(%base as lua))"
 compile [floor %] to: "math.floor(\(% as lua))"
 compile [round %, % rounded] to: "math.floor(\(% as lua) + .5)"
-rule [%n rounded to the nearest %rounder] =:
+action [%n rounded to the nearest %rounder]:
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 compile [tau] to: "(2*math.pi)"
 compile [pi] to: "math.pi"
@@ -73,7 +73,7 @@ compile [e] to: "math.e"
 compile [golden ratio, phi] to: "((1 + math.sqrt(5)) / 2)"
 
 # Common utility functions
-rule [avg of %items, average of %items] =:
+action [avg of %items, average of %items]:
     =lua "(nomsu.utils.sum(\%items)/#\%items)"
 compile [min of %items, smallest of %items, lowest of %items] to:
     "nomsu.utils.min(\(%items as lua))"
