@@ -126,15 +126,13 @@ do
         end
         return _accum_0
       end)(), " ")
-      local line_no = 1
-      while (ctx.line_starts[line_no + 1] or math.huge) < start do
-        line_no = line_no + 1
-      end
       local src = ctx.source_code:sub(start, stop - 1)
       return {
+        start = start,
+        stop = stop,
         type = "FunctionCall",
         src = src,
-        line_no = tostring(ctx.filename) .. ":" .. tostring(line_no),
+        get_line_no = ctx.get_line_no,
         value = value,
         stub = stub
       }
@@ -149,6 +147,7 @@ do
           stop = stop,
           value = value,
           src = ctx.source_code:sub(start, stop - 1),
+          get_line_no = ctx.get_line_no,
           type = key
         }
       end
@@ -168,15 +167,26 @@ do
   local nomsu = peg_tidier:match(io.open("nomsu.peg"):read("*a"))
   nomsu = re.compile(nomsu, defs)
   parse = function(source_code, filename)
-    local old_ctx = ctx
-    ctx = {
+    local _ctx = {
       source_code = source_code,
       filename = filename,
       indent_stack = {
         0
       }
     }
-    ctx.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*"):match(source_code)
+    _ctx.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*"):match(source_code)
+    _ctx.get_line_no = function(self)
+      if not (self._line_no) then
+        local line_no = 1
+        while (_ctx.line_starts[line_no + 1] or math.huge) < self.start do
+          line_no = line_no + 1
+        end
+        self._line_no = tostring(_ctx.filename) .. ":" .. tostring(line_no)
+      end
+      return self._line_no
+    end
+    local old_ctx = ctx
+    ctx = _ctx
     local tree = nomsu:match(source_code)
     ctx = old_ctx
     return tree
@@ -206,8 +216,6 @@ do
         signature = self:get_stubs(signature)
       end
       self:assert(type(fn) == 'function', "Bad fn: " .. tostring(repr(fn)))
-      local canonical_args = nil
-      local canonical_escaped_args = nil
       local aliases = { }
       self.__class.def_number = self.__class.def_number + 1
       local def = {
@@ -221,6 +229,7 @@ do
       local where_defs_go = (getmetatable(self.defs) or { }).__newindex or self.defs
       for sig_i = 1, #signature do
         local stub, arg_names, escaped_args = unpack(signature[sig_i])
+        local arg_positions = { }
         self:assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
         if self.debug then
           self:writeln(tostring(colored.bright("DEFINING RULE:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
@@ -232,22 +241,34 @@ do
             end
           end
         end
-        if canonical_args then
-          self:assert(equivalent(set(arg_names), canonical_args), "Mismatched args")
-        else
-          canonical_args = set(arg_names)
-        end
-        if canonical_escaped_args then
-          self:assert(equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args")
-        else
-          canonical_escaped_args = escaped_args
+        if sig_i == 1 then
+          do
+            local _accum_0 = { }
+            local _len_0 = 1
+            for i = 1, #arg_names do
+              _accum_0[_len_0] = i
+              _len_0 = _len_0 + 1
+            end
+            arg_positions = _accum_0
+          end
+          def.args = arg_names
           def.escaped_args = escaped_args
+        else
+          self:assert(equivalent(set(def.args), set(arg_names)), "Mismatched args")
+          self:assert(equivalent(def.escaped_args, escaped_args), "Mismatched escaped args")
+          for j, a in ipairs(arg_names) do
+            for i, c_a in ipairs(def.args) do
+              if a == c_a then
+                arg_positions[j] = i
+              end
+            end
+          end
         end
         insert(def.aliases, stub)
         local stub_def = setmetatable({
           stub = stub,
           arg_names = arg_names,
-          escaped_args = escaped_args
+          arg_positions = arg_positions
         }, {
           __index = def
         })
@@ -361,27 +382,30 @@ do
       if not (def.is_macro) then
         self:assert_permission(stub)
       end
-      local fn, arg_names
-      fn, arg_names = def.fn, def.arg_names
+      local fn, arg_positions
+      fn, arg_positions = def.fn, def.arg_positions
       local args
       do
-        local _tbl_0 = { }
-        for i, name in ipairs(arg_names) do
-          _tbl_0[name] = select(i, ...)
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_0 = 1, #arg_positions do
+          local p = arg_positions[_index_0]
+          _accum_0[_len_0] = select(p, ...)
+          _len_0 = _len_0 + 1
         end
-        args = _tbl_0
+        args = _accum_0
       end
       if self.debug then
         self:write(tostring(colored.bright("CALLING")) .. " " .. tostring(colored.magenta(colored.underscore(stub))) .. " ")
         self:writeln(tostring(colored.bright("WITH ARGS:")))
-        for name, value in pairs(args) do
-          self:writeln("  " .. tostring(colored.bright("* " .. tostring(name))) .. " = " .. tostring(colored.dim(repr(value))))
+        for i, value in ipairs(args) do
+          self:writeln("  " .. tostring(colored.bright("* " .. tostring(def.args[i]))) .. " = " .. tostring(colored.dim(repr(value))))
         end
       end
       local old_defs
       old_defs, self.defs = self.defs, def.defs
       local rets = {
-        fn(self, args)
+        fn(self, unpack(args))
       }
       self.defs = old_defs
       remove(self.callstack)
@@ -407,7 +431,7 @@ do
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
       insert(self.callstack, "#macro")
-      local ret = self:call(tree.stub, tree.line_no, unpack(args))
+      local ret = self:call(tree.stub, tree:get_line_no(), unpack(args))
       remove(self.callstack)
       return ret
     end,
@@ -495,6 +519,7 @@ do
       return false
     end,
     parse = function(self, str, filename)
+      self:assert(type(filename) == "string", "Bad filename type: " .. tostring(type(filename)))
       if self.debug then
         self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(colored.yellow(str)))
       end
@@ -507,10 +532,7 @@ do
       end
       return tree
     end,
-    run = function(self, src, filename, vars, max_operations, output_file)
-      if vars == nil then
-        vars = { }
-      end
+    run = function(self, src, filename, max_operations, output_file)
       if max_operations == nil then
         max_operations = nil
       end
@@ -518,7 +540,7 @@ do
         output_file = nil
       end
       if src == "" then
-        return nil, "", vars
+        return nil, ""
       end
       if max_operations then
         local timeout
@@ -534,21 +556,18 @@ do
       local lua = self:tree_to_lua(tree, filename)
       local lua_code = lua.statements or (lua.expr .. ";")
       lua_code = "-- File: " .. tostring(filename) .. "\n" .. lua_code
-      local ret = self:run_lua(lua_code, vars)
+      local ret = self:run_lua(lua_code)
       if max_operations then
         debug.sethook()
       end
       if output_file then
         output_file:write(lua_code)
       end
-      return ret, lua_code, vars
+      return ret, lua_code
     end,
-    run_file = function(self, filename, vars)
-      if vars == nil then
-        vars = { }
-      end
+    run_file = function(self, filename)
       if filename:match(".*%.lua") then
-        return dofile(filename)(self, vars)
+        return dofile(filename)(self)
       end
       if filename:match(".*%.nom") then
         if not self.skip_precompiled then
@@ -556,7 +575,7 @@ do
           if file then
             local lua_code = file:read("*a")
             file:close()
-            return self:run_lua(lua_code, vars)
+            return self:run_lua(lua_code)
           end
         end
         local file = file or io.open(filename)
@@ -570,23 +589,20 @@ do
         return self:error("Invalid filetype for " .. tostring(filename))
       end
     end,
-    require_file = function(self, filename, vars)
-      if vars == nil then
-        vars = { }
-      end
+    require_file = function(self, filename)
       local loaded = self.defs["#loaded_files"]
       if not loaded[filename] then
-        loaded[filename] = self:run_file(filename, vars) or true
+        loaded[filename] = self:run_file(filename) or true
       end
       return loaded[filename]
     end,
-    run_lua = function(self, lua_code, vars)
-      if vars == nil then
-        vars = { }
-      end
-      local load_lua_fn, err = load(([[return function(nomsu, vars)
+    run_lua = function(self, lua_code)
+      local load_lua_fn, err = load(([[return function(nomsu)
     %s
 end]]):format(lua_code))
+      if self.debug then
+        self:writeln(tostring(colored.bright("RUNNING LUA:")) .. "\n" .. tostring(colored.blue(colored.bright(lua_code))))
+      end
       if not load_lua_fn then
         local n = 1
         local fn
@@ -598,15 +614,15 @@ end]]):format(lua_code))
         self:error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(err))
       end
       local run_lua_fn = load_lua_fn()
-      local ok, ret = pcall(run_lua_fn, self, vars)
+      local ok, ret = pcall(run_lua_fn, self)
       if not ok then
         self:errorln(debug.traceback())
         self:error(ret)
       end
       return ret
     end,
-    tree_to_value = function(self, tree, vars, filename)
-      local code = "return (function(nomsu, vars)\nreturn " .. tostring(self:tree_to_lua(tree, filename).expr) .. ";\nend);"
+    tree_to_value = function(self, tree, filename)
+      local code = "return (function(nomsu)\nreturn " .. tostring(self:tree_to_lua(tree, filename).expr) .. ";\nend);"
       code = "-- Tree to value: " .. tostring(filename) .. "\n" .. code
       if self.debug then
         self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
@@ -615,7 +631,7 @@ end]]):format(lua_code))
       if not lua_thunk then
         self:error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(colored.red(err)))
       end
-      return (lua_thunk())(self, vars or { })
+      return (lua_thunk())(self)
     end,
     tree_to_nomsu = function(self, tree, force_inline)
       if force_inline == nil then
@@ -841,7 +857,7 @@ end]]):format(lua_code))
         }
       elseif "Nomsu" == _exp_0 then
         return {
-          expr = "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ", " .. tostring(repr(tree.line_no)) .. ").value[1]"
+          expr = "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ", " .. tostring(repr(tree:get_line_no())) .. ").value[1]"
         }
       elseif "Block" == _exp_0 then
         local lua_bits = { }
@@ -891,7 +907,7 @@ end]]):format(lua_code))
         end
         local args = {
           repr(tree.stub),
-          repr(tree.line_no)
+          repr(tree:get_line_no())
         }
         local arg_names, escaped_args
         if def then
@@ -922,7 +938,7 @@ end]]):format(lua_code))
               break
             end
             if escaped_args[arg_names[arg_num]] then
-              insert(args, "nomsu:parse(" .. tostring(repr(arg.src)) .. ", " .. tostring(repr(tree.line_no)) .. ").value[1]")
+              insert(args, "nomsu:parse(" .. tostring(repr(arg.src)) .. ", " .. tostring(repr(tree:get_line_no())) .. ").value[1]")
             else
               local lua = self:tree_to_lua(arg, filename)
               if lua.statements then
@@ -1039,15 +1055,9 @@ end]]):format(lua_code))
           expr = repr(tree.value)
         }
       elseif "Var" == _exp_0 then
-        if tree.value:match("^[a-zA-Z_][a-zA-Z0-9_]*$") then
-          return {
-            expr = "vars." .. tostring(tree.value)
-          }
-        else
-          return {
-            expr = "vars[" .. tostring(repr(tree.value)) .. "]"
-          }
-        end
+        return {
+          expr = ("_" .. self:var_to_lua_identifier(tree.value))
+        }
       else
         return self:error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
@@ -1256,13 +1266,15 @@ end]]):format(lua_code))
         msg = ''
       end
       if not condition then
-        return self:error(msg)
+        return self:error("Assertion failed: " .. msg)
       end
     end,
     error = function(self, msg)
       local error_msg = colored.red("ERROR!")
-      if msg then
+      if msg and #msg > 0 then
         error_msg = error_msg .. ("\n" .. (colored.bright(colored.yellow(colored.onred(msg)))))
+      else
+        error_msg = error_msg .. "\n<no message>"
       end
       error_msg = error_msg .. "\nCallstack:"
       local maxlen = max((function()
@@ -1301,20 +1313,6 @@ end]]):format(lua_code))
       self.callstack = { }
       return error(error_msg, 3)
     end,
-    typecheck = function(self, vars, varname, desired_type)
-      local x = vars[varname]
-      local x_type = type(x)
-      if x_type == desired_type then
-        return x
-      end
-      if x_type == 'table' then
-        x_type = x.type or x_type
-        if x_type == desired_type then
-          return x
-        end
-      end
-      return self:error("Invalid type for %" .. tostring(varname) .. ". Expected " .. tostring(desired_type) .. ", but got " .. tostring(x_type) .. ":\n" .. tostring(repr(x)))
-    end,
     source_code = function(self, level)
       if level == nil then
         level = 0
@@ -1340,51 +1338,51 @@ end]]):format(lua_code))
         end
         return concat(concat_parts)
       end
-      self:defmacro("do %block", function(self, vars)
+      self:defmacro("do %block", function(self, _block)
         local make_line
         make_line = function(lua)
           return lua.expr and (lua.expr .. ";") or lua.statements
         end
-        if vars.block.type == "Block" then
-          return self:tree_to_lua(vars.block)
+        if _block.type == "Block" then
+          return self:tree_to_lua(_block)
         else
           return {
-            expr = tostring(self:tree_to_lua(vars.block)) .. "(nomsu, vars)"
+            expr = tostring(self:tree_to_lua(_block)) .. "(nomsu)"
           }
         end
       end)
-      self:defmacro("immediately %block", function(self, vars)
-        local lua = self:tree_to_lua(vars.block)
+      self:defmacro("immediately %block", function(self, _block)
+        local lua = self:tree_to_lua(_block)
         local lua_code = lua.statements or (lua.expr .. ";")
         lua_code = "-- Immediately:\n" .. lua_code
-        self:run_lua(lua_code, vars)
+        self:run_lua(lua_code)
         return {
           statements = lua_code
         }
       end)
-      self:defmacro("lua> %code", function(self, vars)
-        local lua = nomsu_string_as_lua(self, vars.code)
+      self:defmacro("lua> %code", function(self, _code)
+        local lua = nomsu_string_as_lua(self, _code)
         return {
           statements = lua
         }
       end)
-      self:defmacro("=lua %code", function(self, vars)
-        local lua = nomsu_string_as_lua(self, vars.code)
+      self:defmacro("=lua %code", function(self, _code)
+        local lua = nomsu_string_as_lua(self, _code)
         return {
           expr = lua
         }
       end)
-      self:defmacro("__src__ %level", function(self, vars)
+      self:defmacro("__src__ %level", function(self, _level)
         return {
-          expr = repr(self:source_code(self:tree_to_value(vars.level)))
+          expr = repr(self:source_code(self:tree_to_value(_level)))
         }
       end)
-      self:def("run file %filename", function(self, vars)
-        return self:run_file(vars.filename, vars)
+      self:def("run file %filename", function(self, _filename)
+        return self:run_file(_filename)
       end)
-      return self:defmacro("require %filename", function(self, vars)
-        local filename = self:tree_to_value(vars.filename)
-        self:require_file(filename, vars)
+      return self:defmacro("require %filename", function(self, _filename)
+        local filename = self:tree_to_value(_filename)
+        self:require_file(filename)
         return {
           statements = "nomsu:require_file(" .. tostring(repr(filename)) .. ");"
         }
@@ -1513,8 +1511,7 @@ if arg then
       else
         input = io.open(args.input):read("*a")
       end
-      local vars = { }
-      local retval, code = c:run(input, args.input, vars)
+      local retval, code = c:run(input, args.input)
       if args.output then
         compiled_output:write(code)
       end
@@ -1524,7 +1521,6 @@ if arg then
     end
   end
   if args.flags["-i"] then
-    local vars = { }
     c:run('require "lib/core.nom"', "stdin")
     while true do
       local buff = ""
@@ -1540,7 +1536,7 @@ if arg then
         break
       end
       local ok, ret = pcall(function()
-        return c:run(buff, "stdin", vars)
+        return c:run(buff, "stdin")
       end)
       if ok and ret ~= nil then
         print("= " .. repr(ret))

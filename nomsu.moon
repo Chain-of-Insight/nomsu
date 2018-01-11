@@ -100,14 +100,12 @@ do
             error(err_msg)
         FunctionCall: (start, value, stop)->
             stub = concat([(t.type == "Word" and t.value or "%") for t in *value], " ")
-            line_no = 1
-            while (ctx.line_starts[line_no+1] or math.huge) < start do line_no += 1
             src = ctx.source_code\sub(start,stop-1)
-            return {type: "FunctionCall", :src, line_no: "#{ctx.filename}:#{line_no}", :value, :stub}
+            return {:start, :stop, type: "FunctionCall", :src, get_line_no:ctx.get_line_no, :value, :stub}
 
     setmetatable(defs, {__index:(key)=>
         make_node = (start, value, stop)->
-            {:start, :stop, :value, src:ctx.source_code\sub(start,stop-1), type: key}
+            {:start, :stop, :value, src:ctx.source_code\sub(start,stop-1), get_line_no:ctx.get_line_no, type: key}
         self[key] = make_node
         return make_node
     })
@@ -129,10 +127,18 @@ do
     nomsu = re.compile(nomsu, defs)
 
     parse = (source_code, filename)->
+        _ctx = {:source_code, :filename, indent_stack: {0}}
+        _ctx.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*")\match(source_code)
+        _ctx.get_line_no = =>
+            unless @_line_no
+                line_no = 1
+                while (_ctx.line_starts[line_no+1] or math.huge) < @start do line_no += 1
+                @_line_no = "#{_ctx.filename}:#{line_no}"
+            return @_line_no
+
         old_ctx = ctx
         export ctx
-        ctx = {:source_code, :filename, indent_stack: {0}}
-        ctx.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*")\match(source_code)
+        ctx = _ctx
         tree = nomsu\match(source_code)
         ctx = old_ctx
         return tree
@@ -171,28 +177,31 @@ class NomsuCompiler
         elseif type(signature) == 'table' and type(signature[1]) == 'string'
             signature = @get_stubs signature
         @assert type(fn) == 'function', "Bad fn: #{repr fn}"
-        canonical_args = nil
-        canonical_escaped_args = nil
         aliases = {}
         @@def_number += 1
         def = {:fn, :src, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
         where_defs_go = (getmetatable(@defs) or {}).__newindex or @defs
         for sig_i=1,#signature
             stub, arg_names, escaped_args = unpack(signature[sig_i])
+            arg_positions = {}
             @assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug then @writeln "#{colored.bright "DEFINING RULE:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
             for i=1,#arg_names-1 do for j=i+1,#arg_names
                 if arg_names[i] == arg_names[j] then @error "Duplicate argument in function #{stub}: '#{arg_names[i]}'"
-            if canonical_args
-                @assert equivalent(set(arg_names), canonical_args), "Mismatched args"
-            else canonical_args = set(arg_names)
-            if canonical_escaped_args
-                @assert equivalent(escaped_args, canonical_escaped_args), "Mismatched escaped args"
-            else
-                canonical_escaped_args = escaped_args
+            
+            if sig_i == 1
+                arg_positions = [i for i=1,#arg_names]
+                def.args = arg_names
                 def.escaped_args = escaped_args
+            else
+                @assert equivalent(set(def.args), set(arg_names)), "Mismatched args"
+                @assert equivalent(def.escaped_args, escaped_args), "Mismatched escaped args"
+                for j,a in ipairs(arg_names)
+                    for i,c_a in ipairs(def.args)
+                        if a == c_a
+                            arg_positions[j] = i
             insert def.aliases, stub
-            stub_def = setmetatable({:stub, :arg_names, :escaped_args}, {__index:def})
+            stub_def = setmetatable({:stub, :arg_names, :arg_positions}, {__index:def})
             rawset(where_defs_go, stub, stub_def)
 
     defmacro: (signature, fn, src)=>
@@ -255,15 +264,15 @@ class NomsuCompiler
             @error "Attempt to call undefined function: #{stub}"
         unless def.is_macro
             @assert_permission(stub)
-        {:fn, :arg_names} = def
-        args = {name, select(i,...) for i,name in ipairs(arg_names)}
+        {:fn, :arg_positions} = def
+        args = [select(p, ...) for p in *arg_positions]
         if @debug
             @write "#{colored.bright "CALLING"} #{colored.magenta(colored.underscore stub)} "
             @writeln "#{colored.bright "WITH ARGS:"}"
-            for name, value in pairs(args)
-                @writeln "  #{colored.bright "* #{name}"} = #{colored.dim repr(value)}"
+            for i, value in ipairs(args)
+                @writeln "  #{colored.bright "* #{def.args[i]}"} = #{colored.dim repr(value)}"
         old_defs, @defs = @defs, def.defs
-        rets = {fn(self,args)}
+        rets = {fn(self,unpack(args))}
         @defs = old_defs
         remove @callstack
         return unpack(rets)
@@ -274,7 +283,7 @@ class NomsuCompiler
             @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
             @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
         insert @callstack, "#macro"
-        ret = @call(tree.stub, tree.line_no, unpack(args))
+        ret = @call(tree.stub, tree\get_line_no!, unpack(args))
         remove @callstack
         return ret
 
@@ -324,6 +333,7 @@ class NomsuCompiler
         return false
 
     parse: (str, filename)=>
+        @assert type(filename) == "string", "Bad filename type: #{type filename}"
         if @debug
             @writeln("#{colored.bright "PARSING:"}\n#{colored.yellow str}")
         str = str\gsub("\r","")
@@ -334,8 +344,8 @@ class NomsuCompiler
             @print_tree tree, "    "
         return tree
 
-    run: (src, filename, vars={}, max_operations=nil, output_file=nil)=>
-        if src == "" then return nil, "", vars
+    run: (src, filename, max_operations=nil, output_file=nil)=>
+        if src == "" then return nil, ""
         if max_operations
             timeout = ->
                 debug.sethook!
@@ -348,23 +358,23 @@ class NomsuCompiler
         lua = @tree_to_lua(tree, filename)
         lua_code = lua.statements or (lua.expr..";")
         lua_code = "-- File: #{filename}\n"..lua_code
-        ret = @run_lua(lua_code, vars)
+        ret = @run_lua(lua_code)
         if max_operations
             debug.sethook!
         if output_file
             output_file\write(lua_code)
-        return ret, lua_code, vars
+        return ret, lua_code
 
-    run_file: (filename, vars={})=>
+    run_file: (filename)=>
         if filename\match(".*%.lua")
-            return dofile(filename)(@, vars)
+            return dofile(filename)(@)
         if filename\match(".*%.nom")
             if not @skip_precompiled -- Look for precompiled version
                 file = io.open(filename\gsub("%.nom", ".lua"), "r")
                 if file
                     lua_code = file\read("*a")
                     file\close!
-                    return @run_lua(lua_code, vars)
+                    return @run_lua(lua_code)
             file = file or io.open(filename)
             if not file
                 @error "File does not exist: #{filename}"
@@ -374,17 +384,19 @@ class NomsuCompiler
         else
             @error "Invalid filetype for #{filename}"
     
-    require_file: (filename, vars={})=>
+    require_file: (filename)=>
         loaded = @defs["#loaded_files"]
         if not loaded[filename]
-            loaded[filename] = @run_file(filename, vars) or true
+            loaded[filename] = @run_file(filename) or true
         return loaded[filename]
 
-    run_lua: (lua_code, vars={})=>
+    run_lua: (lua_code)=>
         load_lua_fn, err = load([[
-return function(nomsu, vars)
+return function(nomsu)
     %s
 end]]\format(lua_code))
+        if @debug
+            @writeln "#{colored.bright "RUNNING LUA:"}\n#{colored.blue colored.bright(lua_code)}"
         if not load_lua_fn
             n = 1
             fn = ->
@@ -393,22 +405,22 @@ end]]\format(lua_code))
             code = "1  |"..lua_code\gsub("\n", fn)
             @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{err}")
         run_lua_fn = load_lua_fn!
-        ok,ret = pcall(run_lua_fn, self, vars)
+        ok,ret = pcall(run_lua_fn, self)
         if not ok
             --@errorln "#{colored.red "Error occurred in statement:"}\n#{colored.yellow tree.src}"
             @errorln debug.traceback!
             @error(ret)
         return ret
     
-    tree_to_value: (tree, vars, filename)=>
-        code = "return (function(nomsu, vars)\nreturn #{@tree_to_lua(tree, filename).expr};\nend);"
+    tree_to_value: (tree, filename)=>
+        code = "return (function(nomsu)\nreturn #{@tree_to_lua(tree, filename).expr};\nend);"
         code = "-- Tree to value: #{filename}\n"..code
         if @debug
             @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
         lua_thunk, err = load(code)
         if not lua_thunk
             @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{colored.red err}")
-        return (lua_thunk!)(self, vars or {})
+        return (lua_thunk!)(self)
 
     tree_to_nomsu: (tree, force_inline=false)=>
         -- Return <nomsu code>, <is safe for inline use>
@@ -562,7 +574,7 @@ end]]\format(lua_code))
                 return statements:concat(lua_bits, "\n")
             
             when "Nomsu"
-                return expr:"nomsu:parse(#{repr tree.value.src}, #{repr tree.line_no}).value[1]"
+                return expr:"nomsu:parse(#{repr tree.value.src}, #{repr tree\get_line_no!}).value[1]"
 
             when "Block"
                 lua_bits = {}
@@ -597,7 +609,7 @@ end]]\format(lua_code))
                     remove @compilestack
                     return expr:"(#{concat bits, " "})"
 
-                args = {repr(tree.stub), repr(tree.line_no)}
+                args = {repr(tree.stub), repr(tree\get_line_no!)}
                 local arg_names, escaped_args
                 if def
                     arg_names, escaped_args = def.arg_names, def.escaped_args
@@ -607,7 +619,7 @@ end]]\format(lua_code))
                 for arg in *tree.value
                     if arg.type == 'Word' then continue
                     if escaped_args[arg_names[arg_num]]
-                        insert args, "nomsu:parse(#{repr arg.src}, #{repr tree.line_no}).value[1]"
+                        insert args, "nomsu:parse(#{repr arg.src}, #{repr tree\get_line_no!}).value[1]"
                     else
                         lua = @tree_to_lua arg, filename
                         if lua.statements
@@ -678,10 +690,7 @@ end]]\format(lua_code))
                 return expr:repr(tree.value)
 
             when "Var"
-                if tree.value\match("^[a-zA-Z_][a-zA-Z0-9_]*$")
-                    return expr:"vars.#{tree.value}"
-                else
-                    return expr:"vars[#{repr tree.value}]"
+                return expr:("_"..@var_to_lua_identifier(tree.value))
 
             else
                 @error("Unknown/unimplemented thingy: #{tree.type}")
@@ -808,12 +817,14 @@ end]]\format(lua_code))
     
     assert: (condition, msg='')=>
         if not condition
-            @error(msg)
+            @error("Assertion failed: "..msg)
 
     error: (msg)=>
         error_msg = colored.red "ERROR!"
-        if msg
+        if msg and #msg > 0
             error_msg ..= "\n" .. (colored.bright colored.yellow colored.onred msg)
+        else
+            error_msg ..= "\n<no message>"
         error_msg ..= "\nCallstack:"
         maxlen = max([#c[2] for c in *@callstack when c != "#macro"])
         for i=#@callstack,1,-1
@@ -826,15 +837,6 @@ end]]\format(lua_code))
         error_msg ..= "\n    <top level>"
         @callstack = {}
         error error_msg, 3
-    
-    typecheck: (vars, varname, desired_type)=>
-        x = vars[varname]
-        x_type = type(x)
-        if x_type == desired_type then return x
-        if x_type == 'table'
-            x_type = x.type or x_type
-            if x_type == desired_type then return x
-        @error "Invalid type for %#{varname}. Expected #{desired_type}, but got #{x_type}:\n#{repr x}"
     
     source_code: (level=0)=>
         @dedent @compilestack[#@compilestack-level].src
@@ -853,37 +855,37 @@ end]]\format(lua_code))
                     insert concat_parts, lua.expr
             return concat(concat_parts)
 
-        @defmacro "do %block", (vars)=>
+        @defmacro "do %block", (_block)=>
             make_line = (lua)-> lua.expr and (lua.expr..";") or lua.statements
-            if vars.block.type == "Block"
-                return @tree_to_lua(vars.block)
+            if _block.type == "Block"
+                return @tree_to_lua(_block)
             else
-                return expr:"#{@tree_to_lua vars.block}(nomsu, vars)"
+                return expr:"#{@tree_to_lua _block}(nomsu)"
         
-        @defmacro "immediately %block", (vars)=>
-            lua = @tree_to_lua(vars.block)
+        @defmacro "immediately %block", (_block)=>
+            lua = @tree_to_lua(_block)
             lua_code = lua.statements or (lua.expr..";")
             lua_code = "-- Immediately:\n"..lua_code
-            @run_lua(lua_code, vars)
+            @run_lua(lua_code)
             return statements:lua_code
 
-        @defmacro "lua> %code", (vars)=>
-            lua = nomsu_string_as_lua(@, vars.code)
+        @defmacro "lua> %code", (_code)=>
+            lua = nomsu_string_as_lua(@, _code)
             return statements:lua
 
-        @defmacro "=lua %code", (vars)=>
-            lua = nomsu_string_as_lua(@, vars.code)
+        @defmacro "=lua %code", (_code)=>
+            lua = nomsu_string_as_lua(@, _code)
             return expr:lua
 
-        @defmacro "__src__ %level", (vars)=>
-            expr: repr(@source_code(@tree_to_value(vars.level)))
+        @defmacro "__src__ %level", (_level)=>
+            expr: repr(@source_code(@tree_to_value(_level)))
 
-        @def "run file %filename", (vars)=>
-            @run_file(vars.filename, vars)
+        @def "run file %filename", (_filename)=>
+            @run_file(_filename)
 
-        @defmacro "require %filename", (vars)=>
-            filename = @tree_to_value(vars.filename)
-            @require_file(filename, vars)
+        @defmacro "require %filename", (_filename)=>
+            filename = @tree_to_value(_filename)
+            @require_file(filename)
             return statements:"nomsu:require_file(#{repr filename});"
 
 if arg
@@ -926,8 +928,7 @@ if arg
             input = if args.input == '-'
                 io.read('*a')
             else io.open(args.input)\read("*a")
-            vars = {}
-            retval, code = c\run(input, args.input, vars)
+            retval, code = c\run(input, args.input)
             if args.output
                 compiled_output\write(code)
 
@@ -936,7 +937,6 @@ if arg
 
     if args.flags["-i"]
         -- REPL
-        vars = {}
         c\run('require "lib/core.nom"', "stdin")
         while true
             buff = ""
@@ -948,7 +948,7 @@ if arg
                 buff ..= line
             if #buff == 0
                 break
-            ok, ret = pcall(-> c\run(buff, "stdin", vars))
+            ok, ret = pcall(-> c\run(buff, "stdin"))
             if ok and ret != nil
                 print "= "..repr(ret)
 

@@ -7,7 +7,7 @@ rule [error %msg] =:
     nomsu "error"[%msg]
 compile [assert %condition %msg] to code: ".."
     if not (\(%condition as lua)) then
-        nomsu:error(\(%msg as lua))
+        nomsu:error(\(%msg as lua));
     end
 
 parse [assert %condition] as: assert %condition (nil)
@@ -80,19 +80,17 @@ compile [min of %items, smallest of %items, lowest of %items] to:
 compile [max of %items, biggest of %items, largest of %items, highest of %items] to:
     "nomsu.utils.max(\(%items as lua))"
 compile [min of %items by %value_expr] to: ".."
-    nomsu.utils.min(\(%items as lua), function(item)
-        local vars = setmetatable({['']=item}, {__index=vars})
+    nomsu.utils.min(\(%items as lua), function(\(\% as lua))
         return \(%value_expr as lua)
     end)
 compile [max of %items by %value_expr] to: ".."
-    nomsu.utils.max(\(%items as lua), function(item)
-        local vars = setmetatable({['']=item}, {__index=vars})
+    nomsu.utils.max(\(%items as lua), function(\(\% as lua))
         return \(%value_expr as lua)
     end)
 compile [sort %items] to: "table.sort(\(%items as lua))"
-rule [sort %items by %key] =: =lua ".."
-    nomsu.utils.sort(\%items, function(x)
-        return (\%key)(nomsu, {['']=x});
+compile [sort %items by %key_expr] to: ".."
+    nomsu.utils.sort(\(%items as lua), function(\(\% as lua))
+        return \(%key_expr as lua);
     end)
 
 # String utilities

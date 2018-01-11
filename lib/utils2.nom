@@ -11,7 +11,7 @@ compile [say %str] to:
 
 compile [do %action] to code:
     (%action as lua statements) if ((%action's "type") == "Thunk")
-    ..else "(\(%action as lua))(nomsu, vars);"
+    ..else "(\(%action as lua))(nomsu);"
 
 # With statement
 compile [with %assignments %action] to code:
@@ -33,10 +33,10 @@ compile [with %assignments %action] to code:
         do
             \%setup
             local fell_through = false;
-            local ok, ret1, ret2 = pcall(function(nomsu, vars)
+            local ok, ret1, ret2 = pcall(function(nomsu)
                 \(%action as lua statements);
                 fell_through = true;
-            end, nomsu, vars);
+            end, nomsu);
             \(join ("\((%->"var") as lua) = old_value\(%->"i");" for all %data) with glue "\n    ")
             if not ok then nomsu:error(ret1); end
             if not fell_through then

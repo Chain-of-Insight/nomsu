@@ -13,6 +13,8 @@ compile [str %] to: "tostring(\(% as lua))"
 compile [scope] to: "nomsu.defs"
 compile [parent scope] to: "getmetatable(nomsu.defs).__index"
 
+# TODO: fix this file
+return
 compile [using %scoped do %actions] to code: ".."
     do
         local old_scope, old_vars = nomsu.defs, vars;

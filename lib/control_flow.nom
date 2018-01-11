@@ -91,6 +91,7 @@ immediately:
         for %var from %start to %stop by %step %body
         for %var from %start to %stop via %step %body
     ..to code:
+        lua> "local \%continue_labels, \%code, \%stop_labels"
         %continue_labels = ""
         if (tree %body has function call \(do next for-loop)):
             %continue_labels join= "\n::continue_for::;"
@@ -126,6 +127,7 @@ immediately:
 
 immediately:
     compile [for %var in %iterable %body] to code:
+        lua> "local \%continue_labels, \%stop_labels, \%code, \%stop_labels"
         %continue_labels = ""
         if (tree %body has function call \(do next for-loop)):
             %continue_labels join= "\n::continue_for::;"
@@ -143,12 +145,12 @@ immediately:
             %stop_labels join= "\n::stop_for::;"
         if (tree %body has function call (tree \(stop %) with {""=%var})):
             %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-        return (..)
-            ".."
+        if %stop_labels != "":
+            %code = ".."
                 do --for-loop label scope
                 \%code\%stop_labels
                 end --for-loop label scope
-            ..if %stop_labels != "" else %code
+        return %code
     parse [for all %iterable %body] as: for % in %iterable %body
 
 # Dict iteration (lua's "pairs()")
@@ -186,10 +188,12 @@ immediately:
 # Switch statement/multi-branch if
 immediately:
     compile [when %body] to code:
+        lua> "local \%result, \%fallthroughs, \%first"
         %result = ""
         %fallthroughs = []
         %first = (yes)
         for %func_call in (%body's "value"):
+            lua> "local \%tokens, \%star, \%condition, \%action"
             assert ((%func_call's "type") == "FunctionCall") ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             %tokens = (%func_call's "value")
@@ -286,10 +290,10 @@ immediately:
     ..to code: ".."
         do
             local fell_through = false;
-            local ok, ret1, ret2 = pcall(function(nomsu, vars)
+            local ok, ret1, ret2 = pcall(function(nomsu)
                 \(%action as lua statements)
                 fell_through = true;
-            end, nomsu, vars);
+            end, nomsu);
             if ok then
                 \(%success as lua statements)
             end
@@ -313,13 +317,13 @@ immediately:
     compile [do %action then always %final_action] to code: ".."
         do
             local fell_through = false;
-            local ok, ret1, ret2 = pcall(function(nomsu, vars)
+            local ok, ret1, ret2 = pcall(function(nomsu)
                 \(%action as lua statements)
                 fell_through = true;
-            end, nomsu, vars);
-            local ok2, _ = pcall(function(nomsu, vars)
+            end, nomsu);
+            local ok2, _ = pcall(function(nomsu)
                 \(%final_action as lua statements)
-            end, nomsu, vars);
+            end, nomsu);
             if not ok then nomsu:error(ret1); end
             if not ok2 then nomsu:error(ret2); end
             if not fell_through then

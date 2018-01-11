@@ -20,13 +20,13 @@ compile [..]
     %when_false_expr unless %condition else %when_true_expr
     %when_false_expr unless %condition then %when_true_expr
 ..to: ".."
-    (function(nomsu, vars)
-        if \(%condition as lua) then
+    (function(nomsu, condition)
+        if condition then
             return \(%when_true_expr as lua);
         else
             return \(%when_false_expr as lua);
         end
-    end)(nomsu, vars)
+    end)(nomsu, \(%condition as lua))
 parse [..]
     %true if %x == %y else %false, %true if %x == %y otherwise %false
     %false unless %x == %y else %true, %false unless %x == %y otherwise %true
