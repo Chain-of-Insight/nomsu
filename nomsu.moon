@@ -26,13 +26,10 @@ if _VERSION == "Lua 5.1"
 --pcall = (fn, ...) -> xpcall(fn, debug.traceback, ...)
 
 -- TODO:
--- Maybe get GOTOs working at file scope.
--- use actual variables instead of a vars table
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- improve indentation of generated lua code
 -- better scoping?
 -- better error reporting
--- fix propagation of filename for error reporting
 -- type checking?
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
