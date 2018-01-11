@@ -35,6 +35,8 @@ if _VERSION == "Lua 5.1"
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
+-- Put function defs into a separate table so we can do nomsu.defs["foo"](nomsu, ...) directly without a ".fn"
+-- Maybe do some sort of lazy definitions of actions that defer until they're used in code
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -854,7 +856,7 @@ if arg
 
         if args.flags["-i"]
             -- REPL
-            nomsu\run('require "lib/core.nom"', "stdin")
+            nomsu\run('use "lib/core.nom"', "stdin")
             while true
                 buff = ""
                 while true

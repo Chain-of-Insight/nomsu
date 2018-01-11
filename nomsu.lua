@@ -1370,7 +1370,7 @@ if arg then
       end
     end
     if args.flags["-i"] then
-      nomsu:run('require "lib/core.nom"', "stdin")
+      nomsu:run('use "lib/core.nom"', "stdin")
       while true do
         local buff = ""
         while true do
