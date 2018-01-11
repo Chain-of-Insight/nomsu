@@ -427,7 +427,7 @@ end]]\format(lua_code))
                         buff ..= nomsu
                 return buff, inline
 
-            when "String"
+            when "Text"
                 buff = "\""
                 longbuff = "\"..\"\n    |"
                 inline = true
@@ -583,7 +583,7 @@ end]]\format(lua_code))
                 remove @compilestack
                 return expr:@@comma_separated_items("nomsu.defs[#{repr tree.stub}].fn(", args, ")")
 
-            when "String"
+            when "Text"
                 concat_parts = {}
                 string_buffer = ""
                 for bit in *tree.value
@@ -653,7 +653,7 @@ end]]\format(lua_code))
         if type(tree) != 'table' or not tree.type
             return
         switch tree.type
-            when "List", "File", "Block", "FunctionCall", "String"
+            when "List", "File", "Block", "FunctionCall", "Text"
                 for v in *tree.value
                     @walk_tree(v, depth+1)
             when "Dict"
@@ -703,7 +703,7 @@ end]]\format(lua_code))
             when "Var"
                 if vars[tree.value] ~= nil
                     tree = vars[tree.value]
-            when "File", "Nomsu", "Block", "List", "FunctionCall", "String"
+            when "File", "Nomsu", "Block", "List", "FunctionCall", "Text"
                 new_value = @replaced_vars tree.value, vars
                 if new_value != tree.value
                     tree = {k,v for k,v in pairs(tree)}
@@ -747,7 +747,7 @@ end]]\format(lua_code))
         if type(x) != 'table'
             @error "Invalid type for getting stub: #{type(x)} for:\n#{repr x}"
         switch x.type
-            when "String" then return @get_stub(x.value)
+            when "Text" then return @get_stub(x.value)
             when "FunctionCall" then return @get_stub(x.src)
             else @error "Unsupported get stub type: #{x.type} for #{repr x}"
 

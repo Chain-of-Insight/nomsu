@@ -24,10 +24,10 @@ eol_nomsu (Nomsu): "\" noeol_expression
 indented_nomsu (Nomsu): "\" expression
 
 inline_expression:
-    number / variable / inline_string / inline_list / inline_dict / inline_nomsu
+    number / variable / inline_text / inline_list / inline_dict / inline_nomsu
     / ("(" %ws* (inline_block / inline_statement) %ws* ")")
 noeol_expression:
-    indented_string / indented_nomsu / indented_list / indented_dict / indented_block
+    indented_text / indented_nomsu / indented_list / indented_dict / indented_block
     / ("(..)" indent
         statement
     (dedent / (("" -> "Error while parsing indented expression") => error))
@@ -44,20 +44,20 @@ functioncall (FunctionCall):
 
 word (Word): { %operator / (!number plain_word) }
 
-inline_string (String):
+inline_text (Text):
     '"' {|
         ({~ (('\"' -> '"') / ('\\' -> '\') / ('\..' -> '..') / %escape_char / [^%nl\"])+ ~}
-        / string_interpolation)*
+        / text_interpolation)*
     |} '"'
-indented_string (String):
+indented_text (Text):
     '".."' %ws* line_comment? %nl %gt_nodented? {|
         ({~
             (("\\" -> "\") / (("\" eol %nl %gt_nodented "..") -> "")
             / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\])+
-        ~} / string_interpolation)*
-    |} ((!.) / (&(%nl+ !%gt_nodented)) / (("" -> "Error while parsing String") => error))
-string_interpolation:
-    "\" (variable / inline_list / inline_dict / inline_string / ("(" %ws* (inline_block / inline_statement) %ws* ")"))
+        ~} / text_interpolation)*
+    |} ((!.) / (&(%nl+ !%gt_nodented)) / (("" -> "Error while parsing Text") => error))
+text_interpolation:
+    "\" (variable / inline_list / inline_dict / inline_text / ("(" %ws* (inline_block / inline_statement) %ws* ")"))
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 

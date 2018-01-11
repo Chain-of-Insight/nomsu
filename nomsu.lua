@@ -647,7 +647,7 @@ end]]):format(lua_code))
           end
         end
         return buff, inline
-      elseif "String" == _exp_0 then
+      elseif "Text" == _exp_0 then
         local buff = "\""
         local longbuff = "\"..\"\n    |"
         local inline = true
@@ -873,7 +873,7 @@ end]]):format(lua_code))
         return {
           expr = self.__class:comma_separated_items("nomsu.defs[" .. tostring(repr(tree.stub)) .. "].fn(", args, ")")
         }
-      elseif "String" == _exp_0 then
+      elseif "Text" == _exp_0 then
         local concat_parts = { }
         local string_buffer = ""
         local _list_0 = tree.value
@@ -987,7 +987,7 @@ end]]):format(lua_code))
         return 
       end
       local _exp_0 = tree.type
-      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
+      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local v = _list_0[_index_0]
@@ -1040,7 +1040,7 @@ end]]):format(lua_code))
         if vars[tree.value] ~= nil then
           tree = vars[tree.value]
         end
-      elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "String" == _exp_0 then
+      elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
         local new_value = self:replaced_vars(tree.value, vars)
         if new_value ~= tree.value then
           do
@@ -1118,7 +1118,7 @@ end]]):format(lua_code))
         self:error("Invalid type for getting stub: " .. tostring(type(x)) .. " for:\n" .. tostring(repr(x)))
       end
       local _exp_0 = x.type
-      if "String" == _exp_0 then
+      if "Text" == _exp_0 then
         return self:get_stub(x.value)
       elseif "FunctionCall" == _exp_0 then
         return self:get_stub(x.src)

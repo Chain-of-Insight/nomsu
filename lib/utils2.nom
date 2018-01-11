@@ -6,11 +6,11 @@ require "lib/collections.nom"
 
 
 compile [say %str] to:
-    "nomsu:writeln(\(%str as lua))" if ((%str's "type") == "String")
+    "nomsu:writeln(\(%str as lua))" if ((%str's "type") == "Text")
     ..else "nomsu:writeln(nomsu:stringify(\(%str as lua)))"
 
 compile [do %action] to code:
-    (%action as lua statements) if ((%action's "type") == "Thunk")
+    (%action as lua statements) if ((%action's "type") == "Block")
     ..else "(\(%action as lua))(nomsu);"
 
 # With statement

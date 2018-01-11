@@ -12,7 +12,7 @@ compile [assert %condition %msg] to code: ".."
 
 parse [assert %condition] as: assert %condition (nil)
 
-# String functions
+# Text functions
 rule [join %strs with glue %glue] =:
     lua do> ".."
         local str_bits = {}
@@ -93,7 +93,7 @@ compile [sort %items by %key_expr] to: ".."
         return \(%key_expr as lua);
     end)
 
-# String utilities
+# Text utilities
 compile [nl, newline, line feed, linefeed, lf] to: "'\\n'"
 compile [tab] to: "'\\t'"
 compile [bell] to: "'\\a'"
