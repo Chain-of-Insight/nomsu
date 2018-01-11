@@ -76,7 +76,7 @@ compile [%var ^= %val] to code: "\(%var as lua) = \(%var as lua) ^ \(%val as lua
 compile [%var and= %val] to code: "\(%var as lua) = \(%var as lua) and\(%val as lua);"
 compile [%var or= %val] to code: "\(%var as lua) = \(%var as lua) or \(%val as lua);"
 compile [%var join= %val] to code: "\(%var as lua) = \(%var as lua) .. \(%val as lua);"
-compile [%var mod= %val] to code: "\(%var as lua) = \(%var as lua) % \(%val as lua);"
+compile [wrap %var around %val] to code: "\(%var as lua) = \(%var as lua) % \(%val as lua);"
 
 # Math Operators
 compile [%x + %y] to: "(\(%x as lua) + \(%y as lua))"
@@ -84,7 +84,7 @@ compile [%x - %y] to: "(\(%x as lua) - \(%y as lua))"
 compile [%x * %y] to: "(\(%x as lua) * \(%y as lua))"
 compile [%x / %y] to: "(\(%x as lua) / \(%y as lua))"
 compile [%x ^ %y] to: "(\(%x as lua) ^ \(%y as lua))"
-compile [%x mod %y] to: "(\(%x as lua) % \(%y as lua))"
+compile [%x wrapped around %y, %x mod %y] to: "(\(%x as lua) % \(%y as lua))"
 
 # Comparison Operators
 compile [%x < %y] to: "(\(%x as lua) < \(%y as lua))"
