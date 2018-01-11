@@ -392,45 +392,6 @@ do
       end
       return code:gsub("\n", "\n" .. ("    "):rep(levels))
     end,
-    assert_permission = function(self, stub)
-      local fn_def = self.defs[stub]
-      if not (fn_def) then
-        self:error("Undefined function: " .. tostring(fn_name))
-      end
-      local whiteset = fn_def.whiteset
-      if whiteset == nil then
-        return true
-      end
-      local _list_0 = self.callstack
-      for _index_0 = 1, #_list_0 do
-        local caller = _list_0[_index_0]
-        if caller ~= "#macro" and whiteset[caller[1]] then
-          return true
-        end
-      end
-      return self:error("You do not have the authority to call: " .. tostring(stub))
-    end,
-    check_permission = function(self, fn_def)
-      if getmetatable(fn_def) ~= functiondef_mt then
-        local fn_name = fn_def
-        fn_def = self.defs[fn_name]
-        if fn_def == nil then
-          self:error("Undefined function: " .. tostring(fn_name))
-        end
-      end
-      local whiteset = fn_def.whiteset
-      if whiteset == nil then
-        return true
-      end
-      local _list_0 = self.callstack
-      for _index_0 = 1, #_list_0 do
-        local caller = _list_0[_index_0]
-        if caller ~= "#macro" and whiteset[caller[1]] then
-          return true
-        end
-      end
-      return false
-    end,
     parse = function(self, str, filename)
       self:assert(type(filename) == "string", "Bad filename type: " .. tostring(type(filename)))
       if self.debug then
