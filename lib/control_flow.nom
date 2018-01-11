@@ -84,7 +84,7 @@ immediately:
         for %var from %start to %stop by %step %body
         for %var from %start to %stop via %step %body
     ..to code:
-        lua> "local \%continue_labels, \%code, \%stop_labels"
+        local [%continue_labels, %code, %stop_labels]
         set %continue_labels = ""
         if (tree %body has function call \(do next for-loop)):
             %continue_labels join= "\n::continue_for::;"
@@ -120,7 +120,7 @@ immediately:
 
 immediately:
     compile [for %var in %iterable %body] to code:
-        lua> "local \%continue_labels, \%stop_labels, \%code, \%stop_labels"
+        local [%continue_labels, %code, %stop_labels]
         set %continue_labels = ""
         if (tree %body has function call \(do next for-loop)):
             %continue_labels join= "\n::continue_for::;"
@@ -150,7 +150,7 @@ immediately:
     compile [..]
         repeat %n times %body, repeat %n x %body
     ..to code:
-        lua> "local \%continue_labels, \%code, \%stop_labels"
+        local [%continue_labels, %code, %stop_labels]
         set %continue_labels = ""
         if (tree %body has function call \(do next repeat-loop)):
             %continue_labels join= "\n::continue_repeat::;"
@@ -206,12 +206,12 @@ immediately:
 # Switch statement/multi-branch if
 immediately:
     compile [when %body] to code:
-        lua> "local \%result, \%fallthroughs, \%first"
+        local [%result, %fallthroughs, %first]
         set %result = ""
         set %fallthroughs = []
         set %first = (yes)
         for %func_call in (%body's "value"):
-            lua> "local \%tokens, \%star, \%condition, \%action"
+            local [%tokens, %star, %condition, %action]
             assume ((%func_call's "type") == "FunctionCall") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             set %tokens = (%func_call's "value")

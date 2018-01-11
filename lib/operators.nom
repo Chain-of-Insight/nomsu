@@ -47,6 +47,14 @@ compile [%str |%start|] to: "\(%str as lua):sub(\(%start as lua), \(%start as lu
 compile [%str |%start - %stop|] to: "\(%str as lua):sub(\(%start as lua), \(%stop as lua))"
 
 # Variable assignment operator, and += type versions
+compile [local %vars] to code:
+    lua> ".."
+        local locals = \%vars.type == "List" and \%vars.value or {\%vars};
+        local identifiers = {};
+        for i,x in ipairs(locals) do
+            identifiers[i] = nomsu:tree_to_lua(x).expr;
+        end
+        return "local "..table.concat(identifiers, ", ");
 compile [set %var = %val] to code:
     lua> ".."
         if \%var.type == 'List' and \%val.type == 'List' then

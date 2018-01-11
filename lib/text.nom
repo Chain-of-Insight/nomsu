@@ -2,7 +2,7 @@ use "lib/metaprogramming.nom"
 use "lib/control_flow.nom"
 use "lib/collections.nom"
 
-lua> "local \%ansi, \%colors"
+local [%ansi, %colors]
 set %ansi = {..}
     nl="\\n", newline="\\n", tab="\\t", bell="\\a", cr="\\r", "carriage return"="\\r"
     backspace="\\b", "form feed"="\\f", formfeed="\\f", "vertical tab"="\\v"
