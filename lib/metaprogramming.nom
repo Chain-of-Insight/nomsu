@@ -20,7 +20,7 @@ immediately:
 # Macro to make macros:
 immediately:
     lua> ".."
-        nomsu:defmacro("compile %macro_def to %body", \(__line_no__), function(nomsu, \%macro_def, \%body)
+        nomsu:define_macro("compile %macro_def to %body", \(__line_no__), function(nomsu, \%macro_def, \%body)
             nomsu:assert(\%macro_def.type == "List",
                 "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
             nomsu:assert(\%body.type == "Block",
@@ -34,14 +34,14 @@ immediately:
                 %s
             end
             local function macro_wrapper(...) return {expr=macro(...)}; end
-            nomsu:defmacro(%s, %s, macro_wrapper, %s);
+            nomsu:define_macro(%s, %s, macro_wrapper, %s);
         end]]):format(args, body_lua, signature, nomsu:repr(\%macro_def:get_line_no()),
             nomsu:repr(("compile %s\\n..to code %s"):format(\%macro_def.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
 
     lua> ".."
-        nomsu:defmacro("compile %macro_def to code %body", \(__line_no__), function(nomsu, \%macro_def, \%body)
+        nomsu:define_macro("compile %macro_def to code %body", \(__line_no__), function(nomsu, \%macro_def, \%body)
             nomsu:assert(\%macro_def.type == "List",
                 "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
             nomsu:assert(\%body.type == "Block",
@@ -55,7 +55,7 @@ immediately:
                 %s
             end
             local function macro_wrapper(...) return {statements=macro(...)}; end
-            nomsu:defmacro(%s, %s, macro_wrapper, %s);
+            nomsu:define_macro(%s, %s, macro_wrapper, %s);
         end]]):format(args, body_lua, signature, nomsu:repr(\%macro_def:get_line_no()),
             nomsu:repr(("compile %s\\n..to code %s"):format(\%macro_def.src, \%body.src)));
             return {statements=lua};
@@ -74,7 +74,7 @@ immediately:
             body_lua = body_lua.statements or ("return "..body_lua.expr..";");
             local src = nomsu:dedent(nomsu:source_code(0));
             local def_lua = ([[
-            nomsu:def(%s, \(__line_no__), function(%s)
+            nomsu:define_action(%s, \(__line_no__), function(%s)
                 %s
             end, %s);]]):format(signature, args, body_lua, nomsu:repr(src));
             return def_lua;
@@ -82,7 +82,7 @@ immediately:
 # Macro to make nomsu macros:
 immediately:
     lua> ".."
-        nomsu:defmacro("parse %shorthand as %longhand", \(__line_no__), (function(nomsu, \%shorthand, \%longhand)
+        nomsu:define_macro("parse %shorthand as %longhand", \(__line_no__), (function(nomsu, \%shorthand, \%longhand)
             nomsu:assert(\%shorthand.type == "List",
                 "Invalid type for parse definition signature. Expected List, but got: "..tostring(\%shorthand.type));
             nomsu:assert(\%longhand.type == "Block",
@@ -98,7 +98,7 @@ immediately:
             for i, a in ipairs(arg_names) do replacements[i] = "["..nomsu:repr(a).."]=_"..nomsu:var_to_lua_identifier(a); end
             replacements = "{"..table.concat(replacements, ", ").."}";
             local lua_code = ([[
-        nomsu:defmacro(%s, %s, (function(%s)
+        nomsu:define_macro(%s, %s, (function(%s)
             local template = nomsu:parse(%s, %s);
             local replacement = nomsu:replaced_vars(template, %s);
             return nomsu:tree_to_lua(replacement);

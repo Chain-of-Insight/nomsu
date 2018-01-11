@@ -171,7 +171,7 @@ class NomsuCompiler
         @write_err(...)
         @write_err("\n")
     
-    def: (signature, line_no, fn, src, is_macro=false)=>
+    define_action: (signature, line_no, fn, src, is_macro=false)=>
         if type(signature) == 'string'
             signature = @get_stubs {signature}
         elseif type(signature) == 'table' and type(signature[1]) == 'string'
@@ -204,8 +204,8 @@ class NomsuCompiler
             stub_def = setmetatable({:stub, :arg_names, :arg_positions}, {__index:def})
             rawset(where_defs_go, stub, stub_def)
 
-    defmacro: (signature, line_no, fn, src)=>
-        @def(signature, line_no, fn, src, true)
+    define_macro: (signature, line_no, fn, src)=>
+        @define_action(signature, line_no, fn, src, true)
 
     serialize_defs: (scope=nil, after=nil)=>
         after or= @core_defs or 0
@@ -793,38 +793,38 @@ end]]\format(lua_code))
                     insert concat_parts, lua.expr
             return concat(concat_parts)
 
-        @defmacro "do %block", "nomsu.moon", (_block)=>
+        @define_macro "do %block", "nomsu.moon", (_block)=>
             make_line = (lua)-> lua.expr and (lua.expr..";") or lua.statements
             if _block.type == "Block"
                 return @tree_to_lua(_block)
             else
                 return expr:"#{@tree_to_lua _block}(nomsu)"
         
-        @defmacro "immediately %block", "nomsu.moon", (_block)=>
+        @define_macro "immediately %block", "nomsu.moon", (_block)=>
             lua = @tree_to_lua(_block)
             lua_code = lua.statements or (lua.expr..";")
             lua_code = "-- Immediately:\n"..lua_code
             @run_lua(lua_code)
             return statements:lua_code
 
-        @defmacro "lua> %code", "nomsu.moon", (_code)=>
+        @define_macro "lua> %code", "nomsu.moon", (_code)=>
             lua = nomsu_string_as_lua(@, _code)
             return statements:lua
 
-        @defmacro "=lua %code", "nomsu.moon", (_code)=>
+        @define_macro "=lua %code", "nomsu.moon", (_code)=>
             lua = nomsu_string_as_lua(@, _code)
             return expr:lua
 
-        @defmacro "__line_no__", "nomsu.moon", ()=>
+        @define_macro "__line_no__", "nomsu.moon", ()=>
             expr: repr(@compilestack[#@compilestack]\get_line_no!)
 
-        @defmacro "__src__ %level", "nomsu.moon", (_level)=>
+        @define_macro "__src__ %level", "nomsu.moon", (_level)=>
             expr: repr(@source_code(@tree_to_value(_level)))
 
-        @def "run file %filename", "nomsu.moon", (_filename)=>
+        @define_action "run file %filename", "nomsu.moon", (_filename)=>
             @run_file(_filename)
 
-        @defmacro "require %filename", "nomsu.moon", (_filename)=>
+        @define_macro "require %filename", "nomsu.moon", (_filename)=>
             filename = @tree_to_value(_filename)
             @require_file(filename)
             return statements:"nomsu:require_file(#{repr filename});"
