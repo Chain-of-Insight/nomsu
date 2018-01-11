@@ -1,6 +1,7 @@
 local re = require('re')
 local lpeg = require('lpeg')
 local utils = require('utils')
+local new_uuid = require('uuid')
 local repr, stringify, min, max, equivalent, set, is_list, sum
 repr, stringify, min, max, equivalent, set, is_list, sum = utils.repr, utils.stringify, utils.min, utils.max, utils.equivalent, utils.set, utils.is_list, utils.sum
 local colors = setmetatable({ }, {
@@ -427,7 +428,7 @@ do
       local tree = self:parse(src, filename)
       self:assert(tree, "Failed to parse: " .. tostring(src))
       self:assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
-      local lua = self:tree_to_lua(tree, filename)
+      local lua = self:tree_to_lua(tree)
       local lua_code = lua.statements or (lua.expr .. ";")
       lua_code = "-- File: " .. tostring(filename) .. "\n" .. lua_code
       local ret = self:run_lua(lua_code)
@@ -492,7 +493,7 @@ end]]):format(lua_code))
       return ret
     end,
     tree_to_value = function(self, tree, filename)
-      local code = "return (function(nomsu)\nreturn " .. tostring(self:tree_to_lua(tree, filename).expr) .. ";\nend);"
+      local code = "return (function(nomsu)\nreturn " .. tostring(self:tree_to_lua(tree).expr) .. ";\nend);"
       code = "-- Tree to value: " .. tostring(filename) .. "\n" .. code
       if self.debug then
         self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
@@ -695,7 +696,7 @@ end]]):format(lua_code))
         return error("Unsupported value_to_nomsu type: " .. tostring(type(value)))
       end
     end,
-    tree_to_lua = function(self, tree, filename)
+    tree_to_lua = function(self, tree)
       self:assert(tree, "No tree provided.")
       if not tree.type then
         self:error("Invalid tree: " .. tostring(repr(tree)))
@@ -703,13 +704,13 @@ end]]):format(lua_code))
       local _exp_0 = tree.type
       if "File" == _exp_0 then
         if #tree.value == 1 then
-          return self:tree_to_lua(tree.value[1], filename)
+          return self:tree_to_lua(tree.value[1])
         end
         local lua_bits = { }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local line = _list_0[_index_0]
-          local lua = self:tree_to_lua(line, filename)
+          local lua = self:tree_to_lua(line)
           if not lua then
             self:error("No lua produced by " .. tostring(repr(line)))
           end
@@ -732,7 +733,7 @@ end]]):format(lua_code))
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local arg = _list_0[_index_0]
-          local lua = self:tree_to_lua(arg, filename)
+          local lua = self:tree_to_lua(arg)
           if #tree.value == 1 and lua.expr and not lua.statements then
             return {
               expr = lua.expr
@@ -781,7 +782,7 @@ end]]):format(lua_code))
             if tok.type == "Word" then
               insert(bits, tok.value)
             else
-              local lua = self:tree_to_lua(tok, filename)
+              local lua = self:tree_to_lua(tok)
               self:assert(lua.statements == nil, "non-expression value inside math expression")
               insert(bits, lua.expr)
             end
@@ -802,7 +803,7 @@ end]]):format(lua_code))
               _continue_0 = true
               break
             end
-            local lua = self:tree_to_lua(tok, filename)
+            local lua = self:tree_to_lua(tok)
             self:assert(lua.expr, "Cannot use " .. tostring(tok.src) .. " as an argument, since it's not an expression.")
             insert(args, lua.expr)
             _continue_0 = true
@@ -848,7 +849,7 @@ end]]):format(lua_code))
               insert(concat_parts, repr(string_buffer))
               string_buffer = ""
             end
-            local lua = self:tree_to_lua(bit, filename)
+            local lua = self:tree_to_lua(bit)
             if self.debug then
               self:writeln((colored.bright("INTERP:")))
               self:print_tree(bit)
@@ -885,7 +886,7 @@ end]]):format(lua_code))
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local item = _list_0[_index_0]
-          local lua = self:tree_to_lua(item, filename)
+          local lua = self:tree_to_lua(item)
           if lua.statements then
             self:error("Cannot use [[" .. tostring(item.src) .. "]] as a list item, since it's not an expression.")
           end
@@ -905,12 +906,12 @@ end]]):format(lua_code))
               expr = repr(entry.dict_key.value)
             }
           else
-            key_lua = self:tree_to_lua(entry.dict_key, filename)
+            key_lua = self:tree_to_lua(entry.dict_key)
           end
           if key_lua.statements then
             self:error("Cannot use [[" .. tostring(entry.dict_key.src) .. "]] as a dict key, since it's not an expression.")
           end
-          local value_lua = self:tree_to_lua(entry.dict_value, filename)
+          local value_lua = self:tree_to_lua(entry.dict_value)
           if value_lua.statements then
             self:error("Cannot use [[" .. tostring(entry.dict_value.src) .. "]] as a dict value, since it's not an expression.")
           end
@@ -1163,7 +1164,7 @@ end]]):format(lua_code))
           if type(bit) == "string" then
             insert(concat_parts, bit)
           else
-            local lua = self:tree_to_lua(bit, filename)
+            local lua = self:tree_to_lua(bit)
             if lua.statements then
               self:error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
             end
@@ -1241,6 +1242,14 @@ end]]):format(lua_code))
         ["#vars"] = { },
         ["#loaded_files"] = { }
       }
+      self.ids = setmetatable({ }, {
+        __mode = "k",
+        __index = function(self, key)
+          local id = new_uuid()
+          self[key] = id
+          return id
+        end
+      })
       if parent then
         setmetatable(self.defs, {
           __index = parent.defs
@@ -1252,7 +1261,6 @@ end]]):format(lua_code))
           __index = parent["#loaded_files"]
         })
       end
-      self.callstack = { }
       self.compilestack = { }
       self.debug = false
       self.utils = utils

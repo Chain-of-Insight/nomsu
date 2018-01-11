@@ -57,7 +57,7 @@ compile [%str |%start|] to: "\(%str as lua):sub(\(%start as lua), \(%start as lu
 compile [%str |%start - %stop|] to: "\(%str as lua):sub(\(%start as lua), \(%stop as lua))"
 
 # Variable assignment operator, and += type versions
-compile [%var = %val] to code:
+compile [set %var = %val] to code:
     lua> ".."
         if \%var.type == 'List' and \%val.type == 'List' then
             local lhs = {};
@@ -92,11 +92,26 @@ compile [%x > %y] to: "(\(%x as lua) > \(%y as lua))"
 compile [%x <= %y] to: "(\(%x as lua) <= \(%y as lua))"
 compile [%x >= %y] to: "(\(%x as lua) >= \(%y as lua))"
 # == and != do equivalence checking, rather than identity checking
-compile [%a == %b] to: "nomsu.utils.equivalent(\(%a as lua), \(%b as lua))"
-compile [%a != %b] to: "(not nomsu.utils.equivalent(\(%a as lua), \(%b as lua)))"
-# For strict identity checking:
-compile [%x === %y] to: "(\(%x as lua) == \(%y as lua))"
-compile [%x !== %y] to: "(\(%x as lua) ~= \(%y as lua))"
+compile [%a is %b, %a = %b, %a == %b] to:
+    lua> ".."
+        local safe = {Text=true, Number=true};
+        local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
+        if safe[\%a.type] or safe[\%b.type] then
+            return "("..a_lua.." == "..b_lua..")";
+        else
+            return "nomsu.utils.equivalent("..a_lua..", "..b_lua..")";
+        end
+compile [%a isn't %b, %a is not %b, %a != %b] to:
+    lua> ".."
+        local safe = {Text=true, Number=true};
+        local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
+        if safe[\%a.type] or safe[\%b.type] then
+            return "("..a_lua.." ~= "..b_lua..")";
+        else
+            return "(not nomsu.utils.equivalent("..a_lua..", "..b_lua.."))";
+        end
+# For strict identity checking, use (%x's id) is (%y's id)
+compile [%'s id, id of %] to: "nomsu.ids[\(% as lua)]"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)

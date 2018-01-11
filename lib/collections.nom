@@ -48,7 +48,7 @@ compile [length of %list, size of %list, size %list, number of %list, len %list]
 compile [%list ->* %indices] to:
     assert ((%indices's "type") == "List") ".."
         Expected List for chained lookup, not \(%indices's "type")
-    %ret = "\(%list as lua)"
+    set %ret = "\(%list as lua)"
     for %index in (%indices's "value"):
         %ret join= "[\(%index as lua)]"
     return "\%ret"
@@ -72,33 +72,23 @@ compile [remove index %index from %list] to:
 
 
 action [flatten %lists]:
-    %flat = []
+    set %flat = []
     for %list in %lists:
         for %item in %list:
             add %item to %flat
     return %flat
 
 action [dict %items]:
-    %dict = []
-    for %pair in %items:
-        %dict -> (%pair -> 1) = (%pair -> 2)
-    return %dict
+    {(%->1)=(%->2) for all %items}
 
 action [entries in %dict]:
-    %entries = []
-    for %k = %v in %dict:
-        add {key=%k, value=%v} to %entries
-    return %entries
+    [{key=%k, value=%v} for %k=%v in %dict]
 
 action [keys in %dict]:
-    %keys = []
-    for %k = %v in %dict: add %k to %keys
-    return %keys
+    [%k for %k=%v in %dict]
 
 action [values in %dict]:
-    %values = []
-    for %k = %v in %dict: add %v to %values
-    return %values
+    [%v for %k=%v in %dict]
 
 # List Comprehension
 compile [%expression for %item in %iterable] to:

@@ -15,16 +15,16 @@ compile [do %action] to code:
 
 # With statement
 compile [with %assignments %action] to code:
-    %data = []
+    set %data = []
     for %i = %assignment in (%assignments' "value"):
-        %tokens = (%assignment's "value")
-        %var = (%tokens -> 1)
-        %eq = (%tokens -> 2)
+        set %tokens = (%assignment's "value")
+        set %var = (%tokens -> 1)
+        set %eq = (%tokens -> 2)
         assert (=lua "\%eq and \%eq.type == 'Word' and \%eq.value == '='") ".."
             Invalid format for 'with' statement. List entries must have the form %var = (value)
-        %value = (%tokens -> 3)
+        set %value = (%tokens -> 3)
         add {i=%i, var=%var, value=%value} to %data
-    %setup = (..)
+    set %setup = (..)
         join (..)
             "local old_value\(%->"i") = \((%->"var") as lua); \((%->"var") as lua) = \((%->"value") as lua);"
             ..for all %data

@@ -13,6 +13,7 @@
 re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
+new_uuid = require 'uuid'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
@@ -147,11 +148,17 @@ class NomsuCompiler
         @write_err = (...)=> io.stderr\write(...)
         -- Use # to prevent someone from defining a function that has a namespace collision.
         @defs = {["#vars"]:{}, ["#loaded_files"]:{}}
+        @ids = setmetatable({}, {
+            __mode: "k"
+            __index: (key)=>
+                id = new_uuid!
+                @[key] = id
+                return id
+        })
         if parent
             setmetatable(@defs, {__index:parent.defs})
             setmetatable(@defs["#vars"], {__index:parent["#vars"]})
             setmetatable(@defs["#loaded_files"], {__index:parent["#loaded_files"]})
-        @callstack = {}
         @compilestack = {}
         @debug = false
         @utils = utils
@@ -281,7 +288,7 @@ class NomsuCompiler
         @assert tree, "Failed to parse: #{src}"
         @assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
 
-        lua = @tree_to_lua(tree, filename)
+        lua = @tree_to_lua(tree)
         lua_code = lua.statements or (lua.expr..";")
         lua_code = "-- File: #{filename}\n"..lua_code
         ret = @run_lua(lua_code)
@@ -335,7 +342,7 @@ end]]\format(lua_code))
         return ret
     
     tree_to_value: (tree, filename)=>
-        code = "return (function(nomsu)\nreturn #{@tree_to_lua(tree, filename).expr};\nend);"
+        code = "return (function(nomsu)\nreturn #{@tree_to_lua(tree).expr};\nend);"
         code = "-- Tree to value: #{filename}\n"..code
         if @debug
             @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
@@ -476,7 +483,7 @@ end]]\format(lua_code))
                 error("Unsupported value_to_nomsu type: #{type(value)}")
 
     @math_patt: re.compile [[ "%" (" " [*/^+-] " %")+ ]]
-    tree_to_lua: (tree, filename)=>
+    tree_to_lua: (tree)=>
         -- Return <lua code for value>, <additional lua code>
         @assert tree, "No tree provided."
         if not tree.type
@@ -485,10 +492,10 @@ end]]\format(lua_code))
         switch tree.type
             when "File"
                 if #tree.value == 1
-                    return @tree_to_lua(tree.value[1], filename)
+                    return @tree_to_lua(tree.value[1])
                 lua_bits = {}
                 for line in *tree.value
-                    lua = @tree_to_lua line, filename
+                    lua = @tree_to_lua line
                     if not lua
                         @error "No lua produced by #{repr line}"
                     if lua.statements then insert lua_bits, lua.statements
@@ -501,7 +508,7 @@ end]]\format(lua_code))
             when "Block"
                 lua_bits = {}
                 for arg in *tree.value
-                    lua = @tree_to_lua arg, filename
+                    lua = @tree_to_lua arg
                     if #tree.value == 1 and lua.expr and not lua.statements
                         return expr:lua.expr
                     if lua.statements then insert lua_bits, lua.statements
@@ -529,7 +536,7 @@ end]]\format(lua_code))
                         if tok.type == "Word"
                             insert bits, tok.value
                         else
-                            lua = @tree_to_lua(tok, filename)
+                            lua = @tree_to_lua(tok)
                             @assert(lua.statements == nil, "non-expression value inside math expression")
                             insert bits, lua.expr
                     remove @compilestack
@@ -539,7 +546,7 @@ end]]\format(lua_code))
                 args = {}
                 for tok in *tree.value
                     if tok.type == "Word" then continue
-                    lua = @tree_to_lua(tok, filename)
+                    lua = @tree_to_lua(tok)
                     @assert(lua.expr, "Cannot use #{tok.src} as an argument, since it's not an expression.")
                     insert args, lua.expr
 
@@ -561,7 +568,7 @@ end]]\format(lua_code))
                     if string_buffer ~= ""
                         insert concat_parts, repr(string_buffer)
                         string_buffer = ""
-                    lua = @tree_to_lua bit, filename
+                    lua = @tree_to_lua bit
                     if @debug
                         @writeln (colored.bright "INTERP:")
                         @print_tree bit
@@ -582,7 +589,7 @@ end]]\format(lua_code))
             when "List"
                 items = {}
                 for item in *tree.value
-                    lua = @tree_to_lua item, filename
+                    lua = @tree_to_lua item
                     if lua.statements
                         @error "Cannot use [[#{item.src}]] as a list item, since it's not an expression."
                     insert items, lua.expr
@@ -594,10 +601,10 @@ end]]\format(lua_code))
                     key_lua = if entry.dict_key.type == "Word"
                         {expr:repr(entry.dict_key.value)}
                     else
-                        @tree_to_lua entry.dict_key, filename
+                        @tree_to_lua entry.dict_key
                     if key_lua.statements
                         @error "Cannot use [[#{entry.dict_key.src}]] as a dict key, since it's not an expression."
-                    value_lua = @tree_to_lua entry.dict_value, filename
+                    value_lua = @tree_to_lua entry.dict_value
                     if value_lua.statements
                         @error "Cannot use [[#{entry.dict_value.src}]] as a dict value, since it's not an expression."
                     key_str = key_lua.expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
@@ -755,7 +762,7 @@ end]]\format(lua_code))
                 if type(bit) == "string"
                     insert concat_parts, bit
                 else
-                    lua = @tree_to_lua bit, filename
+                    lua = @tree_to_lua bit
                     if lua.statements
                         @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, lua.expr
