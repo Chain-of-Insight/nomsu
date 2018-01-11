@@ -1,4 +1,4 @@
-require "lib/metaprogramming.nom"
+use "lib/metaprogramming.nom"
 
 # Literals
 compile [true, yes] to: "true"

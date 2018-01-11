@@ -1,4 +1,4 @@
-require "lib/metaprogramming.nom"
+use "lib/metaprogramming.nom"
 
 # Error functions
 action [error!, panic!, fail!, abort!]:

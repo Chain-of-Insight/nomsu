@@ -1,8 +1,8 @@
-require "lib/metaprogramming.nom"
-require "lib/utils.nom"
-require "lib/control_flow.nom"
-require "lib/operators.nom"
-require "lib/collections.nom"
+use "lib/metaprogramming.nom"
+use "lib/utils.nom"
+use "lib/control_flow.nom"
+use "lib/operators.nom"
+use "lib/collections.nom"
 
 
 compile [say %str] to:

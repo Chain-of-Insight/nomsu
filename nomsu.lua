@@ -1220,7 +1220,7 @@ end]]):format(lua_code))
       self:define_action("run file %filename", "nomsu.moon", function(self, _filename)
         return self:run_file(_filename)
       end)
-      return self:define_compile_action("require %filename", "nomsu.moon", function(self, _filename)
+      return self:define_compile_action("use %filename", "nomsu.moon", function(self, _filename)
         local filename = self:tree_to_value(_filename)
         self:require_file(filename)
         return {

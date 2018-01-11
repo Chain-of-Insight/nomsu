@@ -1,7 +1,7 @@
-require "lib/metaprogramming.nom"
-require "lib/operators.nom"
-require "lib/control_flow.nom"
-require "lib/collections.nom"
+use "lib/metaprogramming.nom"
+use "lib/operators.nom"
+use "lib/control_flow.nom"
+use "lib/collections.nom"
 
 compile [<%var> = %value] to code: ".."
     nomsu.defs['#vars'][\(repr (%var's "value"))] = \(%value as lua);

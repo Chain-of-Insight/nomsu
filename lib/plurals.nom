@@ -1,4 +1,4 @@
-require "lib/core.nom"
+use "lib/core.nom"
 
 # Plurals
 using:

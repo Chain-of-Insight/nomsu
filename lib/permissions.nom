@@ -1,9 +1,9 @@
-require "lib/metaprogramming.nom"
-require "lib/control_flow.nom"
-require "lib/operators.nom"
-require "lib/collections.nom"
+use "lib/metaprogramming.nom"
+use "lib/control_flow.nom"
+use "lib/operators.nom"
+use "lib/collections.nom"
 
-rule [called by %whitelist] =:
+action [called by %whitelist]:
     if ((%whitelist's "type") != "List"): %whitelist = [%whitelist]
     %defs = (..)
         dict ([(nomsu's "defs")->(nomsu "get_stub" [%]), yes] for all %whitelist)

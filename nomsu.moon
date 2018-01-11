@@ -799,7 +799,7 @@ end]]\format(lua_code))
         @define_action "run file %filename", "nomsu.moon", (_filename)=>
             @run_file(_filename)
 
-        @define_compile_action "require %filename", "nomsu.moon", (_filename)=>
+        @define_compile_action "use %filename", "nomsu.moon", (_filename)=>
             filename = @tree_to_value(_filename)
             @require_file(filename)
             return statements:"nomsu:require_file(#{repr filename});"

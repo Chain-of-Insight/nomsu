@@ -1,6 +1,6 @@
-require "lib/metaprogramming.nom"
-require "lib/operators.nom"
-require "lib/utils.nom"
+use "lib/metaprogramming.nom"
+use "lib/operators.nom"
+use "lib/utils.nom"
 
 # Conditionals
 immediately:
