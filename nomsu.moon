@@ -37,6 +37,7 @@ if _VERSION == "Lua 5.1"
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
 -- Put function defs into a separate table so we can do nomsu.defs["foo"](nomsu, ...) directly without a ".fn"
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
+-- Do automatic "local" detection of new variables and declare them as locals like moonscript does
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
