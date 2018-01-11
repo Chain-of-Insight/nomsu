@@ -1,16 +1,16 @@
 use "lib/metaprogramming.nom"
 
 # Error functions
-action [error!, panic!, fail!, abort!]:
+action [barf!]:
     nomsu "error" []
-action [error %msg]:
+action [barf %msg]:
     nomsu "error"[%msg]
-compile [assert %condition %msg] to code: ".."
+compile [assume %condition or barf %msg] to code: ".."
     if not (\(%condition as lua)) then
         nomsu:error(\(%msg as lua));
     end
 
-parse [assert %condition] as: assert %condition (nil)
+parse [assume %condition] as: assume %condition or barf (nil)
 
 # Text functions
 action [join %strs with glue %glue]:

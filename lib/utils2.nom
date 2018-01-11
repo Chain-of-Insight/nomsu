@@ -6,11 +6,11 @@ use "lib/collections.nom"
 
 
 compile [say %str] to:
-    "nomsu:writeln(\(%str as lua))" if ((%str's "type") == "Text")
+    "nomsu:writeln(\(%str as lua))" if ((%str's "type") is "Text")
     ..else "nomsu:writeln(nomsu:stringify(\(%str as lua)))"
 
 compile [do %action] to code:
-    (%action as lua statements) if ((%action's "type") == "Block")
+    (%action as lua statements) if ((%action's "type") is "Block")
     ..else "(\(%action as lua))(nomsu);"
 
 # With statement
@@ -20,7 +20,7 @@ compile [with %assignments %action] to code:
         set %tokens = (%assignment's "value")
         set %var = (%tokens -> 1)
         set %eq = (%tokens -> 2)
-        assert (=lua "\%eq and \%eq.type == 'Word' and \%eq.value == '='") ".."
+        assume (=lua "\%eq and \%eq.type == 'Word' and \%eq.value == '='") or barf ".."
             Invalid format for 'with' statement. List entries must have the form %var = (value)
         set %value = (%tokens -> 3)
         add {i=%i, var=%var, value=%value} to %data
@@ -48,16 +48,16 @@ parse [with %thing = %value %action] as: with [%thing = %value] %action
 # Any/all/none
 compile [all of %items, all %items] to:
     "(\(join ((% as lua) for all (%items' "value")) with glue " and "))"
-    ..if (%items' "type") == "List" else "nomsu.utils.all(\(%items as lua))"
+    ..if ((%items' "type") is "List") else "nomsu.utils.all(\(%items as lua))"
 parse [not all of %items, not all %items] as: not (all of %items)
 compile [any of %items, any %items] to:
     "(\(join ((% as lua) for all (%items' "value")) with glue " or "))"
-    ..if (%items' "type") == "List" else "nomsu.utils.any(\(%items as lua))"
+    ..if ((%items' "type") is "List") else "nomsu.utils.any(\(%items as lua))"
 parse [none of %items, none %items] as: not (any of %items)
 
 compile [sum of %items, sum %items] to:
     "(\(join ((% as lua) for all (%items' "value")) with glue " + "))"
-    ..if (%items' "type") == "List" else "nomsu.utils.sum(\(%items as lua))"
+    ..if ((%items' "type") is "List") else "nomsu.utils.sum(\(%items as lua))"
 compile [product of %items, product %items] to:
     "(\(join ((% as lua) for all (%items' "value")) with glue " * "))"
-    ..if (%items' "type") == "List" else "nomsu.utils.product(\(%items as lua))"
+    ..if ((%items' "type") is "List") else "nomsu.utils.product(\(%items as lua))"

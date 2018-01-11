@@ -9,10 +9,6 @@ immediately:
         \(%if_body as lua statements)
         end --end if
     parse [unless %condition %unless_body] as: if (not %condition) %unless_body
-    parse [if %x == %y %if_body] as: if (%x == %y) %if_body
-    parse [if %x != %y %if_body] as: if (%x != %y) %if_body
-    parse [unless %x == %y %if_body] as: if (%x != %y) %if_body
-    parse [unless %x != %y %if_body] as: if (%x == %y) %if_body
 
     compile [if %condition %if_body else %else_body, unless %condition %else_body else %if_body] to code: ".."
         if \(%condition as lua) then
@@ -20,10 +16,6 @@ immediately:
         else
         \(%else_body as lua statements)
         end --end if
-    parse [if %x == %y %if_body else %else_body] as: if (%x == %y) %if_body else %else_body
-    parse [if %x != %y %if_body else %else_body] as: if (%x != %y) %if_body else %else_body
-    parse [unless %x == %y %if_body else %else_body] as: if (%x != %y) %if_body else %else_body
-    parse [unless %x != %y %if_body else %else_body] as: if (%x == %y) %if_body else %else_body
 
 # Return
 immediately:
@@ -36,6 +28,11 @@ immediately:
         ::label_\(nomsu "var_to_lua_identifier" [%label])::;
     compile [go to %label] to code: ".."
         goto label_\(nomsu "var_to_lua_identifier" [%label]);
+
+# Basic loop control
+immediately:
+    compile [do next] to code: "continue;"
+    compile [stop] to code: "break;"
 
 # Helper function
 immediately:
@@ -71,10 +68,6 @@ immediately:
         return %code
     parse [repeat %body] as: repeat while (true) %body
     parse [repeat until %condition %body] as: repeat while (not %condition) %body
-    parse [repeat while %x == %y %body] as: repeat while (%x == %y) %body
-    parse [repeat while %x != %y %body] as: repeat while (%x != %y) %body
-    parse [repeat until %x == %y %body] as: repeat while (%x != %y) %body
-    parse [repeat until %x != %y %body] as: repeat while (%x == %y) %body
 
 # For loop control flow:
 immediately:
@@ -115,7 +108,7 @@ immediately:
                 \%code\
                 ..\%stop_labels
                 end --for-loop label scope
-            ..if %stop_labels != "" else %code
+            ..if (%stop_labels is not "") else %code
 
 immediately:
     parse [for %var from %start to %stop %body] as: for %var from %start to %stop via 1 %body
@@ -145,13 +138,38 @@ immediately:
             %stop_labels join= "\n::stop_for::;"
         if (tree %body has function call (tree \(stop %) with {""=%var})):
             %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-        if %stop_labels != "":
+        if (%stop_labels is not ""):
             set %code = ".."
                 do --for-loop label scope
                 \%code\%stop_labels
                 end --for-loop label scope
         return %code
     parse [for all %iterable %body] as: for % in %iterable %body
+
+immediately:
+    compile [..]
+        repeat %n times %body, repeat %n x %body
+    ..to code:
+        lua> "local \%continue_labels, \%code, \%stop_labels"
+        set %continue_labels = ""
+        if (tree %body has function call \(do next repeat-loop)):
+            %continue_labels join= "\n::continue_repeat::;"
+        # This trashes the loop variables, just like in Python.
+        set %code = ".."
+            for i=1,\(%n as lua) do
+            \(%body as lua statements)\
+            ..\%continue_labels
+            end --numeric for-loop
+        set %stop_labels = ""
+        if (tree %body has function call \(stop repeat-loop)):
+            %stop_labels join= "\n::stop_repeat::;"
+        return (..)
+            ".."
+                do --repeat-loop label scope
+                \%code\
+                ..\%stop_labels
+                end --repeat-loop label scope
+            ..if (%stop_labels is not "") else %code
 
 # Dict iteration (lua's "pairs()")
 immediately:
@@ -183,7 +201,7 @@ immediately:
                 \%code\
                 ..\%stop_labels
                 end --for-loop label scope
-            ..if %stop_labels != "" else %code
+            ..if (%stop_labels is not "") else %code
 
 # Switch statement/multi-branch if
 immediately:
@@ -194,19 +212,19 @@ immediately:
         set %first = (yes)
         for %func_call in (%body's "value"):
             lua> "local \%tokens, \%star, \%condition, \%action"
-            assert ((%func_call's "type") == "FunctionCall") ".."
+            assume ((%func_call's "type") == "FunctionCall") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             set %tokens = (%func_call's "value")
             set %star = (%tokens -> 1)
-            assert (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") ".."
+            assume (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") or barf ".."
                 Invalid format for 'when' statement. Lines must begin with '*'
 
             set %condition = (%tokens -> 2)
-            assert %condition ".."
+            assume %condition or barf ".."
                 Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
 
             set %action = (%tokens -> 3)
-            if (%action == (nil)):
+            if (%action is (nil)):
                 lua do> "table.insert(\%fallthroughs, \%condition)"
                 do next %func_call
 
@@ -234,24 +252,24 @@ immediately:
 
 # Switch statement
 immediately:
-    compile [when %branch_value == ? %body] to code:
+    compile [when %branch_value = ? %body, when %branch_value is ? %body] to code:
         set %result = ""
         set %fallthroughs = []
         set %first = (yes)
         for %func_call in (%body's "value"):
-            assert ((%func_call's "type") == "FunctionCall") ".."
+            assume ((%func_call's "type") is "FunctionCall") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             set %tokens = (%func_call's "value")
             set %star = (%tokens -> 1)
-            assert (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") ".."
+            assume (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") or barf ".."
                 Invalid format for 'when' statement. Lines must begin with '*'
 
             set %condition = (%tokens -> 2)
-            assert %condition ".."
+            assume %condition or barf ".."
                 Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
 
             set %action = (%tokens -> 3)
-            if (%action == (nil)):
+            if (%action is (nil)):
                 lua> "table.insert(\%fallthroughs, \%condition)"
                 do next %func_call
 
@@ -275,11 +293,11 @@ immediately:
 
         if (%result != ""):
             set %result = ".."
-                do --when == ?
+                do --when % = ?
                 local branch_value = \(%branch_value as lua);\
                 ..\%result
                 end
-                end --when == ?
+                end --when % = ?
         return %result
 
 # Try/except
@@ -304,13 +322,13 @@ immediately:
             end
         end
     parse [try %action] as:
-        try %action and if it succeeds: pass
-        ..or if it fails: pass
+        try %action and if it succeeds: do nothing
+        ..or if it fails: do nothing
     parse [try %action and if it fails %fallback] as:
-        try %action and if it succeeds: pass
+        try %action and if it succeeds: do nothing
         ..or if it fails %fallback
     parse [try %action and if it succeeds %success] as:
-        try %action and if it succeeds %success or if it fails: pass
+        try %action and if it succeeds %success or if it fails: do nothing
 
 # Do/finally:
 immediately:

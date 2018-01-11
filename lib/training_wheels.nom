@@ -1,0 +1,22 @@
+use "lib/core.nom"
+
+parse [%a == %b] as: %a is %b
+parse [%a ~= %b, %a != %b, %a <> %b] as: %a is not %b
+parse [%a === %b] as: (%a's id) is (%b's id)
+parse [%a !== %b] as: (%a's id) is not (%b's id)
+parse [%a mod %b] as: %a wrapped around %b
+parse [function %names %body, def %names %body] as: action %names %body
+parse [switch %branch_value %body] as: when %branch_value = ? %body
+parse [None, Null] as: nil
+parse [True, true] as: yes
+parse [False, false] as: no
+parse [pass] as: do nothing
+parse [%a || %b] as: %a or %b
+parse [%a && %b] as: %a and %b
+parse [continue] as: do next
+parse [break] as: stop
+parse [let %thing = %value in %action] as: with %thing = %value %action
+parse [let %assignments in %action] as: with %assignemnts %action
+parse [error!, panic!, fail!, abort!] as: barf!
+parse [error %, panic %, fail %, abort %] as: barf %
+parse [assert %condition %message] as: assume %condition or barf %message

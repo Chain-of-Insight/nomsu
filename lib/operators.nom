@@ -1,15 +1,15 @@
 use "lib/metaprogramming.nom"
 
 # Literals
-compile [true, yes] to: "true"
-compile [false, no] to: "false"
+compile [yes] to: "true"
+compile [no] to: "false"
 compile [nil, null] to: "nil"
-compile [inf, infinity] to: "math.huge"
-compile [nan, NaN, not a number] to: "(0/0)"
-compile [pi, PI] to: "math.pi"
-compile [tau, TAU] to: "(2*math.pi)"
-compile [phi, PHI, golden ratio] to: "((1+math.sqrt(5))/2)"
-compile [nop, pass] to code: ""
+compile [infinity, inf] to: "math.huge"
+compile [not a number, NaN, nan] to: "(0/0)"
+compile [pi, Pi, PI] to: "math.pi"
+compile [tau, Tau, TAU] to: "(2*math.pi)"
+compile [phi, Phi, PHI, golden ratio] to: "((1+math.sqrt(5))/2)"
+compile [do nothing] to code: ""
 
 # Ternary operator
 #.. Note: this uses a function instead of "(condition and if_expr or else_expr)"
@@ -37,22 +37,12 @@ compile [..]
             end
         end)(nomsu)]]):format(condition, when_true, when_false);
         end
-parse [..]
-    %true if %x == %y else %false, %true if %x == %y otherwise %false
-    %false unless %x == %y else %true, %false unless %x == %y otherwise %true
-..as:
-    %true if (%x == %y) else %false
-
-parse [..]
-    %true if %x != %y else %false, %true if %x != %y otherwise %false
-    %false unless %x != %y else %true, %false unless %x != %y otherwise %true
-..as:
-    %true if (%x != %y) else %false
 
 # Indexing:
 compile [%obj'%key, %obj's %key, %obj -> %key] to: "(\(%obj as lua))[\(%key as lua)]"
 
 # Substring
+# TODO: improve this syntax
 compile [%str |%start|] to: "\(%str as lua):sub(\(%start as lua), \(%start as lua))"
 compile [%str |%start - %stop|] to: "\(%str as lua):sub(\(%start as lua), \(%stop as lua))"
 
@@ -91,7 +81,6 @@ compile [%x < %y] to: "(\(%x as lua) < \(%y as lua))"
 compile [%x > %y] to: "(\(%x as lua) > \(%y as lua))"
 compile [%x <= %y] to: "(\(%x as lua) <= \(%y as lua))"
 compile [%x >= %y] to: "(\(%x as lua) >= \(%y as lua))"
-# == and != do equivalence checking, rather than identity checking
 compile [%a is %b, %a = %b, %a == %b] to:
     lua> ".."
         local safe = {Text=true, Number=true};
@@ -101,7 +90,7 @@ compile [%a is %b, %a = %b, %a == %b] to:
         else
             return "nomsu.utils.equivalent("..a_lua..", "..b_lua..")";
         end
-compile [%a isn't %b, %a is not %b, %a != %b] to:
+compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to:
     lua> ".."
         local safe = {Text=true, Number=true};
         local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;

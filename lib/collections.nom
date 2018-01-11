@@ -21,7 +21,7 @@ parse [last in %list, last %list] as: 1 st to last in %list
 # Membership testing
 action [%item is in %list, %list contains %item, %list has %item]:
     for %key = %value in %list:
-        if (%key == %item): return (yes)
+        if (%key is %item): return (yes)
     return (no)
 
 action [..]
@@ -30,7 +30,7 @@ action [..]
     %list doesn't have %item, %list does not have %item
 ..:
     for %key = %value in %list:
-        if (%key == %item): return (no)
+        if (%key is %item): return (no)
     return (yes)
 
 compile [%list has key %index, %list has index %index] to: ".."
@@ -46,7 +46,7 @@ compile [length of %list, size of %list, size %list, number of %list, len %list]
 
 # Chained lookup
 compile [%list ->* %indices] to:
-    assert ((%indices's "type") == "List") ".."
+    assume ((%indices's "type") is "List") or barf ".."
         Expected List for chained lookup, not \(%indices's "type")
     set %ret = "\(%list as lua)"
     for %index in (%indices's "value"):
@@ -91,32 +91,62 @@ action [values in %dict]:
     [%v for %k=%v in %dict]
 
 # List Comprehension
-compile [%expression for %item in %iterable] to:
-    assert ((%item's "type") == "Var") ".."
-        List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
-    return ".."
-        (function(nomsu);
-            local comprehension = {};
-            for i,\(%item as lua) in ipairs(\(%iterable as lua)) do;
-                comprehension[i] = \(%expression as lua);
-            end;
-            return comprehension;
-        end)(nomsu)
-parse [%expression for all %iterable] as: %expression for % in %iterable
+immediately:
+    compile [%expression for %item in %iterable] to:
+        assume ((%item's "type") is "Var") or barf ".."
+            List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
+        return ".."
+            (function(nomsu);
+                local comprehension = {};
+                for i,\(%item as lua) in ipairs(\(%iterable as lua)) do;
+                    comprehension[i] = \(%expression as lua);
+                end;
+                return comprehension;
+            end)(nomsu)
+    parse [%expression for all %iterable] as: %expression for % in %iterable
 
-compile [%expression for %key = %value in %iterable] to:
-    assert ((%key's "type") == "Var") ".."
-        List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key's "type")
-    assert ((%value's "type") == "Var") ".."
-        List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value's "type")
-    return ".."
-        (function(nomsu);
-            local comprehension = {};
-            for \(%key as lua), \(%value as lua) in pairs(\(%iterable as lua)) do;
-                comprehension[i] = \(%expression as lua);
-            end;
-            return comprehension;
-        end)(nomsu)
+    compile [%expression for %key = %value in %iterable] to:
+        assume ((%key's "type") is "Var") or barf ".."
+            List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key's "type")
+        assume ((%value's "type") is "Var") or barf ".."
+            List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value's "type")
+        return ".."
+            (function(nomsu);
+                local comprehension = {};
+                for \(%key as lua), \(%value as lua) in pairs(\(%iterable as lua)) do;
+                    comprehension[i] = \(%expression as lua);
+                end;
+                return comprehension;
+            end)(nomsu)
+
+# Dict comprehensions
+immediately:
+    compile [%key = %value for %item in %iterable] to:
+        assume ((%item's "type") is "Var") or barf ".."
+            Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
+        return ".."
+            (function(nomsu);
+                local comprehension = {};
+                for i,\(%item as lua) in ipairs(\(%iterable as lua)) do;
+                    comprehension[\(%key as lua)] = \(%value as lua);
+                end;
+                return comprehension;
+            end)(nomsu)
+    parse [%key = %value for all %iterable] as: %key = %value for % in %iterable
+
+    compile [%key = %value for %src_key = %src_value in %iterable] to:
+        assume ((%src_key's "type") is "Var") or barf ".."
+            Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key's "type")
+        assume ((%src_value's "type") is "Var") or barf ".."
+            Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value's "type")
+        return ".."
+            (function(nomsu);
+                local comprehension = {};
+                for \(%src_key as lua), \(%src_value as lua) in pairs(\(%iterable as lua)) do;
+                    comprehension[\(%key as lua)] = \(%value as lua);
+                end;
+                return comprehension;
+            end)(nomsu)
 
 action [%items sorted]:
     %copy = (% for all %items)
@@ -127,7 +157,7 @@ action [%items sorted by %key]:
     sort %copy by %key
     return %copy
 action [unique %items]:
-    keys in (dict ([%,yes] for all %items))
+    [%k for %k=%v in {%=(yes) for all %items}]
 
 # Metatable stuff
 compile [counter] to: "setmetatable({}, {__index=function() return 0; end})"
@@ -138,7 +168,7 @@ compile [default dict] to: ".."
         return t;
     end})"
 action [chain %dict to %fallback]:
-    when (type of %fallback) == ?:
+    when (type of %fallback) is ?:
         * "table":
             =lua "setmetatable(\%dict, \%fallback)"
         * "function":
@@ -148,32 +178,4 @@ action [chain %dict to %fallback]:
 
 
 # TODO: maybe make a generator/coroutine?
-
-# Dict comprehensions
-compile [%key = %value for %item in %iterable] to:
-    assert ((%item's "type") == "Var") ".."
-        Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
-    return ".."
-        (function(nomsu);
-            local comprehension = {};
-            for i,\(%item as lua) in ipairs(\(%iterable as lua)) do;
-                comprehension[\(%key as lua)] = \(%value as lua);
-            end;
-            return comprehension;
-        end)(nomsu)
-parse [%key = %value for all %iterable] as: %key = %value for % in %iterable
-
-compile [%key = %value for %src_key = %src_value in %iterable] to:
-    assert ((%src_key's "type") == "Var") ".."
-        Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key's "type")
-    assert ((%src_value's "type") == "Var") ".."
-        Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value's "type")
-    return ".."
-        (function(nomsu);
-            local comprehension = {};
-            for \(%src_key as lua), \(%src_value as lua) in pairs(\(%iterable as lua)) do;
-                comprehension[\(%key as lua)] = \(%value as lua);
-            end;
-            return comprehension;
-        end)(nomsu)
 
