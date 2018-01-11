@@ -113,7 +113,7 @@ lua> ".."
         };
         for name,code in pairs(colors) do
             local escape = "\\"\\\\27["..tostring(code).."m\\""
-            nomsu:defmacro(name, function() return escape end, "");
+            nomsu:defmacro(name, \(__line_no__), function() return escape end, "");
         end
     end
 

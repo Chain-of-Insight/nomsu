@@ -204,7 +204,7 @@ do
       self:write_err(...)
       return self:write_err("\n")
     end,
-    def = function(self, signature, fn, src, is_macro)
+    def = function(self, signature, line_no, fn, src, is_macro)
       if is_macro == nil then
         is_macro = false
       end
@@ -221,6 +221,7 @@ do
       local def = {
         fn = fn,
         src = src,
+        line_no = line_no,
         is_macro = is_macro,
         aliases = { },
         def_number = self.__class.def_number,
@@ -275,28 +276,8 @@ do
         rawset(where_defs_go, stub, stub_def)
       end
     end,
-    defmacro = function(self, signature, fn, src)
-      return self:def(signature, fn, src, true)
-    end,
-    scoped = function(self, thunk)
-      local old_defs = self.defs
-      local new_defs = {
-        ["#vars"] = setmetatable({ }, {
-          __index = self.defs["#vars"]
-        }),
-        ["#loaded_files"] = setmetatable({ }, {
-          __index = self.defs["#loaded_files"]
-        })
-      }
-      self.defs = setmetatable(new_defs, {
-        __index = old_defs
-      })
-      local ok, ret1, ret2 = pcall(thunk, self)
-      self.defs = old_defs
-      if not ok then
-        self:error(ret1)
-      end
-      return ret1, ret2
+    defmacro = function(self, signature, line_no, fn, src)
+      return self:def(signature, line_no, fn, src, true)
     end,
     serialize_defs = function(self, scope, after)
       if scope == nil then
@@ -367,50 +348,6 @@ do
       end
       return concat(buff, "\n")
     end,
-    call = function(self, stub, line_no, ...)
-      local def = self.defs[stub]
-      if def and def.is_macro and self.callstack[#self.callstack] ~= "#macro" then
-        self:error("Attempt to call macro at runtime: " .. tostring(stub) .. "\nThis can be caused by using a macro in a function that is defined before the macro.")
-      end
-      insert(self.callstack, {
-        stub,
-        line_no
-      })
-      if not (def) then
-        self:error("Attempt to call undefined function: " .. tostring(stub))
-      end
-      if not (def.is_macro) then
-        self:assert_permission(stub)
-      end
-      local fn, arg_positions
-      fn, arg_positions = def.fn, def.arg_positions
-      local args
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #arg_positions do
-          local p = arg_positions[_index_0]
-          _accum_0[_len_0] = select(p, ...)
-          _len_0 = _len_0 + 1
-        end
-        args = _accum_0
-      end
-      if self.debug then
-        self:write(tostring(colored.bright("CALLING")) .. " " .. tostring(colored.magenta(colored.underscore(stub))) .. " ")
-        self:writeln(tostring(colored.bright("WITH ARGS:")))
-        for i, value in ipairs(args) do
-          self:writeln("  " .. tostring(colored.bright("* " .. tostring(def.args[i]))) .. " = " .. tostring(colored.dim(repr(value))))
-        end
-      end
-      local old_defs
-      old_defs, self.defs = self.defs, def.defs
-      local rets = {
-        fn(self, unpack(args))
-      }
-      self.defs = old_defs
-      remove(self.callstack)
-      return unpack(rets)
-    end,
     run_macro = function(self, tree)
       local args
       do
@@ -430,10 +367,7 @@ do
         self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(tree.stub))) .. " ")
         self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
       end
-      insert(self.callstack, "#macro")
-      local ret = self:call(tree.stub, tree:get_line_no(), unpack(args))
-      remove(self.callstack)
-      return ret
+      return self.defs[tree.stub].fn(self, unpack(args))
     end,
     dedent = function(self, code)
       if not (code:find("\n")) then
@@ -614,11 +548,7 @@ end]]):format(lua_code))
         self:error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(err))
       end
       local run_lua_fn = load_lua_fn()
-      local ok, ret = pcall(run_lua_fn, self)
-      if not ok then
-        self:errorln(debug.traceback())
-        self:error(ret)
-      end
+      run_lua_fn(self)
       return ret
     end,
     tree_to_value = function(self, tree, filename)
@@ -639,7 +569,6 @@ end]]):format(lua_code))
       end
       self:assert(tree, "No tree provided.")
       if not tree.type then
-        self:errorln(debug.traceback())
         self:error("Invalid tree: " .. tostring(repr(tree)))
       end
       local _exp_0 = tree.type
@@ -829,7 +758,6 @@ end]]):format(lua_code))
     tree_to_lua = function(self, tree, filename)
       self:assert(tree, "No tree provided.")
       if not tree.type then
-        self:errorln(debug.traceback())
         self:error("Invalid tree: " .. tostring(repr(tree)))
       end
       local _exp_0 = tree.type
@@ -905,57 +833,45 @@ end]]):format(lua_code))
             expr = "(" .. tostring(concat(bits, " ")) .. ")"
           }
         end
-        local args = {
-          repr(tree.stub),
-          repr(tree:get_line_no())
-        }
-        local arg_names, escaped_args
-        if def then
-          arg_names, escaped_args = def.arg_names, def.escaped_args
-        else
-          arg_names, escaped_args = (function()
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_0 = tree.value
-            for _index_0 = 1, #_list_0 do
-              local w = _list_0[_index_0]
-              if w.type == "Word" then
-                _accum_0[_len_0] = w.value
-                _len_0 = _len_0 + 1
-              end
-            end
-            return _accum_0
-          end)(), { }
-        end
-        local arg_num = 1
+        local arg_positions = def and def.arg_positions or { }
+        local args = { }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local _continue_0 = false
           repeat
-            local arg = _list_0[_index_0]
-            if arg.type == 'Word' then
+            local tok = _list_0[_index_0]
+            if tok.type == "Word" then
               _continue_0 = true
               break
             end
-            if escaped_args[arg_names[arg_num]] then
-              insert(args, "nomsu:parse(" .. tostring(repr(arg.src)) .. ", " .. tostring(repr(tree:get_line_no())) .. ").value[1]")
-            else
-              local lua = self:tree_to_lua(arg, filename)
-              if lua.statements then
-                self:error("Cannot use [[" .. tostring(arg.src) .. "]] as a function argument to " .. tostring(tree.stub) .. ", since it's not an expression.")
-              end
-              insert(args, lua.expr)
-            end
-            arg_num = arg_num + 1
+            local lua = self:tree_to_lua(tok, filename)
+            self:assert(lua.expr, "Cannot use " .. tostring(tok.src) .. " as an argument, since it's not an expression.")
+            insert(args, lua.expr)
             _continue_0 = true
           until true
           if not _continue_0 then
             break
           end
         end
+        if def then
+          local new_args
+          do
+            local _accum_0 = { }
+            local _len_0 = 1
+            local _list_1 = def.arg_positions
+            for _index_0 = 1, #_list_1 do
+              local p = _list_1[_index_0]
+              _accum_0[_len_0] = args[p]
+              _len_0 = _len_0 + 1
+            end
+            new_args = _accum_0
+          end
+          args = new_args
+        end
+        insert(args, 1, "nomsu")
         remove(self.compilestack)
         return {
-          expr = self.__class:comma_separated_items("nomsu:call(", args, ")")
+          expr = self.__class:comma_separated_items("nomsu.defs[" .. tostring(repr(tree.stub)) .. "].fn(", args, ")")
         }
       elseif "String" == _exp_0 then
         local concat_parts = { }
@@ -1266,52 +1182,12 @@ end]]):format(lua_code))
         msg = ''
       end
       if not condition then
-        return self:error("Assertion failed: " .. msg)
+        self:error("Assertion failed: " .. msg)
       end
+      return condition
     end,
     error = function(self, msg)
-      local error_msg = colored.red("ERROR!")
-      if msg and #msg > 0 then
-        error_msg = error_msg .. ("\n" .. (colored.bright(colored.yellow(colored.onred(msg)))))
-      else
-        error_msg = error_msg .. "\n<no message>"
-      end
-      error_msg = error_msg .. "\nCallstack:"
-      local maxlen = max((function()
-        local _accum_0 = { }
-        local _len_0 = 1
-        local _list_0 = self.callstack
-        for _index_0 = 1, #_list_0 do
-          local c = _list_0[_index_0]
-          if c ~= "#macro" then
-            _accum_0[_len_0] = #c[2]
-            _len_0 = _len_0 + 1
-          end
-        end
-        return _accum_0
-      end)())
-      for i = #self.callstack, 1, -1 do
-        if self.callstack[i] ~= "#macro" then
-          local line_no = self.callstack[i][2]
-          if line_no then
-            local nums
-            do
-              local _accum_0 = { }
-              local _len_0 = 1
-              for n in line_no:gmatch(":([0-9]+)") do
-                _accum_0[_len_0] = tonumber(n)
-                _len_0 = _len_0 + 1
-              end
-              nums = _accum_0
-            end
-            line_no = line_no:gsub(":.*$", ":" .. tostring(sum(nums) - #nums + 1))
-          end
-          error_msg = error_msg .. "\n    " .. tostring(("%-" .. tostring(maxlen) .. "s"):format(line_no)) .. "| " .. tostring(self.callstack[i][1])
-        end
-      end
-      error_msg = error_msg .. "\n    <top level>"
-      self.callstack = { }
-      return error(error_msg, 3)
+      return error(msg, 0)
     end,
     source_code = function(self, level)
       if level == nil then
@@ -1338,7 +1214,7 @@ end]]):format(lua_code))
         end
         return concat(concat_parts)
       end
-      self:defmacro("do %block", function(self, _block)
+      self:defmacro("do %block", "nomsu.moon", function(self, _block)
         local make_line
         make_line = function(lua)
           return lua.expr and (lua.expr .. ";") or lua.statements
@@ -1351,7 +1227,7 @@ end]]):format(lua_code))
           }
         end
       end)
-      self:defmacro("immediately %block", function(self, _block)
+      self:defmacro("immediately %block", "nomsu.moon", function(self, _block)
         local lua = self:tree_to_lua(_block)
         local lua_code = lua.statements or (lua.expr .. ";")
         lua_code = "-- Immediately:\n" .. lua_code
@@ -1360,27 +1236,32 @@ end]]):format(lua_code))
           statements = lua_code
         }
       end)
-      self:defmacro("lua> %code", function(self, _code)
+      self:defmacro("lua> %code", "nomsu.moon", function(self, _code)
         local lua = nomsu_string_as_lua(self, _code)
         return {
           statements = lua
         }
       end)
-      self:defmacro("=lua %code", function(self, _code)
+      self:defmacro("=lua %code", "nomsu.moon", function(self, _code)
         local lua = nomsu_string_as_lua(self, _code)
         return {
           expr = lua
         }
       end)
-      self:defmacro("__src__ %level", function(self, _level)
+      self:defmacro("__line_no__", "nomsu.moon", function(self)
+        return {
+          expr = repr(self.compilestack[#self.compilestack]:get_line_no())
+        }
+      end)
+      self:defmacro("__src__ %level", "nomsu.moon", function(self, _level)
         return {
           expr = repr(self:source_code(self:tree_to_value(_level)))
         }
       end)
-      self:def("run file %filename", function(self, _filename)
+      self:def("run file %filename", "nomsu.moon", function(self, _filename)
         return self:run_file(_filename)
       end)
-      return self:defmacro("require %filename", function(self, _filename)
+      return self:defmacro("require %filename", "nomsu.moon", function(self, _filename)
         local filename = self:tree_to_value(_filename)
         self:require_file(filename)
         return {
@@ -1485,63 +1366,138 @@ if arg then
     print("Usage: lua nomsu.lua [-c] [-i] [-p] [-O] [--help] [input [-o output]]")
     os.exit()
   end
-  local c = NomsuCompiler()
-  if args.flags["-v"] then
-    c.debug = true
-  end
-  c.skip_precompiled = not args.flags["-O"]
-  if args.input then
-    if args.flags["-c"] and not args.output then
-      args.output = args.input:gsub("%.nom", ".lua")
+  local nomsu = NomsuCompiler()
+  local run
+  run = function()
+    if args.flags["-v"] then
+      nomsu.debug = true
     end
-    local compiled_output = nil
-    if args.flags["-p"] then
-      local _write = c.write
-      c.write = function() end
-      compiled_output = io.output()
-    elseif args.output then
-      compiled_output = io.open(args.output, 'w')
-    end
-    if args.input:match(".*%.lua") then
-      local retval = dofile(args.input)(c, { })
-    else
-      local input
-      if args.input == '-' then
-        input = io.read('*a')
+    nomsu.skip_precompiled = not args.flags["-O"]
+    if args.input then
+      if args.flags["-c"] and not args.output then
+        args.output = args.input:gsub("%.nom", ".lua")
+      end
+      local compiled_output = nil
+      if args.flags["-p"] then
+        local _write = nomsu.write
+        nomsu.write = function() end
+        compiled_output = io.output()
+      elseif args.output then
+        compiled_output = io.open(args.output, 'w')
+      end
+      if args.input:match(".*%.lua") then
+        local retval = dofile(args.input)(nomsu, { })
       else
-        input = io.open(args.input):read("*a")
+        local input
+        if args.input == '-' then
+          input = io.read('*a')
+        else
+          input = io.open(args.input):read("*a")
+        end
+        local retval, code = nomsu:run(input, args.input)
+        if args.output then
+          compiled_output:write(code)
+        end
       end
-      local retval, code = c:run(input, args.input)
-      if args.output then
-        compiled_output:write(code)
+      if args.flags["-p"] then
+        nomsu.write = _write
       end
     end
-    if args.flags["-p"] then
-      c.write = _write
-    end
-  end
-  if args.flags["-i"] then
-    c:run('require "lib/core.nom"', "stdin")
-    while true do
-      local buff = ""
+    if args.flags["-i"] then
+      nomsu:run('require "lib/core.nom"', "stdin")
       while true do
-        io.write(">> ")
-        local line = io.read("*L")
-        if line == "\n" or not line then
+        local buff = ""
+        while true do
+          io.write(">> ")
+          local line = io.read("*L")
+          if line == "\n" or not line then
+            break
+          end
+          buff = buff .. line
+        end
+        if #buff == 0 then
           break
         end
-        buff = buff .. line
-      end
-      if #buff == 0 then
-        break
-      end
-      local ok, ret = pcall(function()
-        return c:run(buff, "stdin")
-      end)
-      if ok and ret ~= nil then
-        print("= " .. repr(ret))
+        local ok, ret = pcall(function()
+          return nomsu:run(buff, "stdin")
+        end)
+        if ok and ret ~= nil then
+          print("= " .. repr(ret))
+        end
       end
     end
   end
+  local err_hand
+  err_hand = function(error_message)
+    print(tostring(colored.red("ERROR:")) .. " " .. tostring(colored.bright(colored.yellow(colored.onred((error_message or ""))))))
+    print("stack traceback:")
+    local to_lua
+    to_lua = require("moonscript.base").to_lua
+    local nomsu_file = io.open("nomsu.moon")
+    local nomsu_source = nomsu_file:read("*a")
+    local _, line_table = to_lua(nomsu_source)
+    nomsu_file:close()
+    local function_defs
+    do
+      local _tbl_0 = { }
+      for _, def in pairs(nomsu.defs) do
+        if def.fn then
+          _tbl_0[def.fn] = def
+        end
+      end
+      function_defs = _tbl_0
+    end
+    local level = 2
+    while true do
+      local _continue_0 = false
+      repeat
+        local calling_fn = debug.getinfo(level)
+        if not calling_fn then
+          break
+        end
+        if calling_fn.func == run then
+          break
+        end
+        level = level + 1
+        local name = calling_fn.name
+        if name == "run_lua_fn" then
+          _continue_0 = true
+          break
+        end
+        local line = nil
+        do
+          local def = function_defs[calling_fn.func]
+          if def then
+            line = colored.yellow(def.line_no)
+            name = colored.bright(colored.yellow(def.aliases[1]))
+          else
+            if calling_fn.istailcall and not name then
+              name = "<tail call>"
+            end
+            if calling_fn.short_src == "./nomsu.moon" then
+              local char = line_table[calling_fn.linedefined - 2]
+              local line_num = 3
+              for _ in nomsu_source:sub(1, char):gmatch("\n") do
+                line_num = line_num + 1
+              end
+              line = colored.cyan(tostring(calling_fn.short_src) .. ":" .. tostring(line_num))
+              name = colored.bright(colored.cyan(name or "???"))
+            else
+              line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.linedefined))
+              name = colored.bright(colored.blue(name or "???"))
+            end
+          end
+        end
+        local _from = colored.dim(colored.white("|"))
+        print(("%32s %s %s"):format(name, _from, line))
+        _continue_0 = true
+      until true
+      if not _continue_0 then
+        break
+      end
+    end
+    return os.exit(false, true)
+  end
+  xpcall(run, err_hand)
 end
 return NomsuCompiler

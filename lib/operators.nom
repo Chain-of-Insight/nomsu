@@ -19,14 +19,24 @@ compile [..]
     %when_true_expr if %condition otherwise %when_false_expr
     %when_false_expr unless %condition else %when_true_expr
     %when_false_expr unless %condition then %when_true_expr
-..to: ".."
-    (function(nomsu, condition)
-        if condition then
-            return \(%when_true_expr as lua);
+..to:
+    lua> ".."
+        local condition = nomsu:tree_to_lua(\%condition).expr;
+        local when_true = nomsu:tree_to_lua(\%when_true_expr).expr;
+        local when_false = nomsu:tree_to_lua(\%when_false_expr).expr;
+        local safe = {String=true, List=true, Dict=true, Number=true};
+        if safe[\%when_true_expr.type] then
+            return "("..condition.." and "..when_true.." or "..when_false..")";
         else
-            return \(%when_false_expr as lua);
+            return ([[
+        (function(nomsu)
+            if %s then
+                return %s;
+            else
+                return %s;
+            end
+        end)(nomsu)]]):format(condition, when_true, when_false);
         end
-    end)(nomsu, \(%condition as lua))
 parse [..]
     %true if %x == %y else %false, %true if %x == %y otherwise %false
     %false unless %x == %y else %true, %false unless %x == %y otherwise %true
