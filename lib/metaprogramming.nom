@@ -1,93 +1,93 @@
 #..
-    This File contains actions for making actions and macros and some helper functions to make
-    that easier.
+    This File contains actions for making actions and compile-time actions and some helper
+    functions to make that easier.
 
 # Helper function
 immediately:
     lua> ".."
         nomsu.parse_spec = function(nomsu, spec)
-            local signature = {};
+            local names = {};
             for i, alias in ipairs(spec.value) do
-                signature[i] = alias.src;
+                names[i] = alias.src;
             end
             local _, arg_names, _ = nomsu:get_stub(spec.value[1]);
             local args = {"nomsu"};
             for i, a in ipairs(arg_names) do args[i+1] = "_"..nomsu:var_to_lua_identifier(a); end
-            signature, args = nomsu:repr(signature), table.concat(args, ", ");
-            return signature, args;
+            names, args = nomsu:repr(names), table.concat(args, ", ");
+            return names, args;
         end
 
-# Macro to make macros:
+# Compile-time action to make compile-time actions:
 immediately:
     lua> ".."
-        nomsu:define_macro("compile %macro_def to %body", \(__line_no__), function(nomsu, \%macro_def, \%body)
-            nomsu:assert(\%macro_def.type == "List",
-                "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
+        nomsu:define_compile_action("compile %names to %body", \(__line_no__), function(nomsu, \%names, \%body)
+            nomsu:assert(\%names.type == "List",
+                "Invalid type for compile definition names. Expected List, but got: "..tostring(\%names.type));
             nomsu:assert(\%body.type == "Block",
                 "Invalid type for compile definition body. Expected Block, but got: "..tostring(\%body.type));
-            local signature, args = nomsu:parse_spec(\%macro_def);
+            local names, args = nomsu:parse_spec(\%names);
             local body_lua = nomsu:tree_to_lua(\%body);
             body_lua = body_lua.statements or ("return "..body_lua.expr..";");
             local lua = ([[
         do
-            local function macro(%s)
+            local function compile_action(%s)
                 %s
             end
-            local function macro_wrapper(...) return {expr=macro(...)}; end
-            nomsu:define_macro(%s, %s, macro_wrapper, %s);
-        end]]):format(args, body_lua, signature, nomsu:repr(\%macro_def:get_line_no()),
-            nomsu:repr(("compile %s\\n..to code %s"):format(\%macro_def.src, \%body.src)));
+            local function compile_action_wrapper(...) return {expr=compile_action(...)}; end
+            nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
+        end]]):format(args, body_lua, names, nomsu:repr(\%names:get_line_no()),
+            nomsu:repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
 
     lua> ".."
-        nomsu:define_macro("compile %macro_def to code %body", \(__line_no__), function(nomsu, \%macro_def, \%body)
-            nomsu:assert(\%macro_def.type == "List",
-                "Invalid type for compile definition signature. Expected List, but got: "..tostring(\%macro_def.type));
+        nomsu:define_compile_action("compile %names to code %body", \(__line_no__), function(nomsu, \%names, \%body)
+            nomsu:assert(\%names.type == "List",
+                "Invalid type for compile definition names. Expected List, but got: "..tostring(\%names.type));
             nomsu:assert(\%body.type == "Block",
                 "Invalid type for compile definition body. Expected Block, but got: "..tostring(\%body.type));
-            local signature, args = nomsu:parse_spec(\%macro_def);
+            local names, args = nomsu:parse_spec(\%names);
             local body_lua = nomsu:tree_to_lua(\%body);
             body_lua = body_lua.statements or ("return "..body_lua.expr..";");
             local lua = ([[
         do
-            local function macro(%s)
+            local function compile_action(%s)
                 %s
             end
-            local function macro_wrapper(...) return {statements=macro(...)}; end
-            nomsu:define_macro(%s, %s, macro_wrapper, %s);
-        end]]):format(args, body_lua, signature, nomsu:repr(\%macro_def:get_line_no()),
-            nomsu:repr(("compile %s\\n..to code %s"):format(\%macro_def.src, \%body.src)));
+            local function compile_action_wrapper(...) return {statements=compile_action(...)}; end
+            nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
+        end]]):format(args, body_lua, names, nomsu:repr(\%names:get_line_no()),
+            nomsu:repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
 
-# Macro to make actions:
+# Compile-time action to make actions
 immediately:
-    compile [action %signature %body] to code:
+    compile [action %names %body] to code:
         lua> ".."
-            nomsu:assert(\%signature.type == "List",
-                "Invalid type for action definition signature. Expected List, but got: "..tostring(\%signature.type));
+            nomsu:assert(\%names.type == "List",
+                "Invalid type for action definition names. Expected List, but got: "..tostring(\%names.type));
             nomsu:assert(\%body.type == "Block",
                 "Invalid type for action definition body. Expected Block, but got: "..tostring(\%body.type));
-            local signature, args = nomsu:parse_spec(\%signature);
+            local names, args = nomsu:parse_spec(\%names);
             local body_lua = nomsu:tree_to_lua(\%body);
             body_lua = body_lua.statements or ("return "..body_lua.expr..";");
             local src = nomsu:dedent(nomsu:source_code(0));
             local def_lua = ([[
             nomsu:define_action(%s, \(__line_no__), function(%s)
                 %s
-            end, %s);]]):format(signature, args, body_lua, nomsu:repr(src));
+            end, %s);]]):format(names, args, body_lua, nomsu:repr(src));
             return def_lua;
 
 # Macro to make nomsu macros:
 immediately:
     lua> ".."
-        nomsu:define_macro("parse %shorthand as %longhand", \(__line_no__), (function(nomsu, \%shorthand, \%longhand)
+        nomsu:define_compile_action("parse %shorthand as %longhand", \(__line_no__), (function(nomsu, \%shorthand, \%longhand)
             nomsu:assert(\%shorthand.type == "List",
-                "Invalid type for parse definition signature. Expected List, but got: "..tostring(\%shorthand.type));
+                "Invalid type for parse definition shorthand. Expected List, but got: "..tostring(\%shorthand.type));
             nomsu:assert(\%longhand.type == "Block",
                 "Invalid type for parse definition body. Expected Block, but got: "..tostring(\%longhand.type));
-            local signature, args = nomsu:parse_spec(\%shorthand);
+            local names, args = nomsu:parse_spec(\%shorthand);
             local template = {};
             for i, line in ipairs(\%longhand.value) do
                 template[i] = nomsu:dedent(line.src);
@@ -98,11 +98,11 @@ immediately:
             for i, a in ipairs(arg_names) do replacements[i] = "["..nomsu:repr(a).."]=_"..nomsu:var_to_lua_identifier(a); end
             replacements = "{"..table.concat(replacements, ", ").."}";
             local lua_code = ([[
-        nomsu:define_macro(%s, %s, (function(%s)
+        nomsu:define_compile_action(%s, %s, (function(%s)
             local template = nomsu:parse(%s, %s);
             local replacement = nomsu:replaced_vars(template, %s);
             return nomsu:tree_to_lua(replacement);
-        end), %s)]]):format(signature, nomsu:repr(\%shorthand:get_line_no()), args, template,
+        end), %s)]]):format(names, nomsu:repr(\%shorthand:get_line_no()), args, template,
             nomsu:repr(\%shorthand:get_line_no()), replacements, nomsu:repr(nomsu:source_code(0)));
             return {statements=lua_code};
         end), \(__src__ 1));
@@ -145,8 +145,8 @@ compile [nomsu %method %args] to: "nomsu[\(%method as lua)](nomsu, unpack(\(%arg
 compile [tree %tree with %replacements] to: ".."
     nomsu:replaced_vars(\(%tree as lua), \(%replacements as lua))
 
-parse [action %signature] as:
-    (nomsu's "defs")->(nomsu "get_stub" [\%signature])
+parse [action %names] as:
+    (nomsu's "defs")->(nomsu "get_stub" [\%names])
 
 # Get the source code for a function
 action [help %action]:

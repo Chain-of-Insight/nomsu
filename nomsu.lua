@@ -204,9 +204,9 @@ do
       self:write_err(...)
       return self:write_err("\n")
     end,
-    def = function(self, signature, line_no, fn, src, is_macro)
-      if is_macro == nil then
-        is_macro = false
+    define_action = function(self, signature, line_no, fn, src, compile_time)
+      if compile_time == nil then
+        compile_time = false
       end
       if type(signature) == 'string' then
         signature = self:get_stubs({
@@ -222,7 +222,7 @@ do
         fn = fn,
         src = src,
         line_no = line_no,
-        is_macro = is_macro,
+        compile_time = compile_time,
         aliases = { },
         def_number = self.__class.def_number,
         defs = self.defs
@@ -276,8 +276,8 @@ do
         rawset(where_defs_go, stub, stub_def)
       end
     end,
-    defmacro = function(self, signature, line_no, fn, src)
-      return self:def(signature, line_no, fn, src, true)
+    define_compile_action = function(self, signature, line_no, fn, src)
+      return self:define_action(signature, line_no, fn, src, true)
     end,
     serialize_defs = function(self, scope, after)
       if scope == nil then
@@ -347,27 +347,6 @@ do
         insert(buff, "<%" .. tostring(k) .. "> = " .. tostring(self:value_to_nomsu(v)))
       end
       return concat(buff, "\n")
-    end,
-    run_macro = function(self, tree)
-      local args
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local arg = _list_0[_index_0]
-          if arg.type ~= "Word" then
-            _accum_0[_len_0] = arg
-            _len_0 = _len_0 + 1
-          end
-        end
-        args = _accum_0
-      end
-      if self.debug then
-        self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(tree.stub))) .. " ")
-        self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
-      end
-      return self.defs[tree.stub].fn(self, unpack(args))
     end,
     dedent = function(self, code)
       if not (code:find("\n")) then
@@ -811,8 +790,26 @@ end]]):format(lua_code))
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
         local def = self.defs[tree.stub]
-        if def and def.is_macro then
-          local lua = self:run_macro(tree)
+        if def and def.compile_time then
+          local args
+          do
+            local _accum_0 = { }
+            local _len_0 = 1
+            local _list_0 = tree.value
+            for _index_0 = 1, #_list_0 do
+              local arg = _list_0[_index_0]
+              if arg.type ~= "Word" then
+                _accum_0[_len_0] = arg
+                _len_0 = _len_0 + 1
+              end
+            end
+            args = _accum_0
+          end
+          if self.debug then
+            self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(tree.stub))) .. " ")
+            self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
+          end
+          local lua = self.defs[tree.stub].fn(self, unpack(args))
           remove(self.compilestack)
           return lua
         elseif not def and self.__class.math_patt:match(tree.stub) then
@@ -1214,7 +1211,7 @@ end]]):format(lua_code))
         end
         return concat(concat_parts)
       end
-      self:defmacro("do %block", "nomsu.moon", function(self, _block)
+      self:define_compile_action("do %block", "nomsu.moon", function(self, _block)
         local make_line
         make_line = function(lua)
           return lua.expr and (lua.expr .. ";") or lua.statements
@@ -1227,7 +1224,7 @@ end]]):format(lua_code))
           }
         end
       end)
-      self:defmacro("immediately %block", "nomsu.moon", function(self, _block)
+      self:define_compile_action("immediately %block", "nomsu.moon", function(self, _block)
         local lua = self:tree_to_lua(_block)
         local lua_code = lua.statements or (lua.expr .. ";")
         lua_code = "-- Immediately:\n" .. lua_code
@@ -1236,32 +1233,32 @@ end]]):format(lua_code))
           statements = lua_code
         }
       end)
-      self:defmacro("lua> %code", "nomsu.moon", function(self, _code)
+      self:define_compile_action("lua> %code", "nomsu.moon", function(self, _code)
         local lua = nomsu_string_as_lua(self, _code)
         return {
           statements = lua
         }
       end)
-      self:defmacro("=lua %code", "nomsu.moon", function(self, _code)
+      self:define_compile_action("=lua %code", "nomsu.moon", function(self, _code)
         local lua = nomsu_string_as_lua(self, _code)
         return {
           expr = lua
         }
       end)
-      self:defmacro("__line_no__", "nomsu.moon", function(self)
+      self:define_compile_action("__line_no__", "nomsu.moon", function(self)
         return {
           expr = repr(self.compilestack[#self.compilestack]:get_line_no())
         }
       end)
-      self:defmacro("__src__ %level", "nomsu.moon", function(self, _level)
+      self:define_compile_action("__src__ %level", "nomsu.moon", function(self, _level)
         return {
           expr = repr(self:source_code(self:tree_to_value(_level)))
         }
       end)
-      self:def("run file %filename", "nomsu.moon", function(self, _filename)
+      self:define_action("run file %filename", "nomsu.moon", function(self, _filename)
         return self:run_file(_filename)
       end)
-      return self:defmacro("require %filename", "nomsu.moon", function(self, _filename)
+      return self:define_compile_action("require %filename", "nomsu.moon", function(self, _filename)
         local filename = self:tree_to_value(_filename)
         self:require_file(filename)
         return {

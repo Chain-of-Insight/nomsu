@@ -171,7 +171,7 @@ class NomsuCompiler
         @write_err(...)
         @write_err("\n")
     
-    define_action: (signature, line_no, fn, src, is_macro=false)=>
+    define_action: (signature, line_no, fn, src, compile_time=false)=>
         if type(signature) == 'string'
             signature = @get_stubs {signature}
         elseif type(signature) == 'table' and type(signature[1]) == 'string'
@@ -179,7 +179,7 @@ class NomsuCompiler
         @assert type(fn) == 'function', "Bad fn: #{repr fn}"
         aliases = {}
         @@def_number += 1
-        def = {:fn, :src, :line_no, :is_macro, aliases:{}, def_number:@@def_number, defs:@defs}
+        def = {:fn, :src, :line_no, :compile_time, aliases:{}, def_number:@@def_number, defs:@defs}
         where_defs_go = (getmetatable(@defs) or {}).__newindex or @defs
         for sig_i=1,#signature
             stub, arg_names, escaped_args = unpack(signature[sig_i])
@@ -204,7 +204,7 @@ class NomsuCompiler
             stub_def = setmetatable({:stub, :arg_names, :arg_positions}, {__index:def})
             rawset(where_defs_go, stub, stub_def)
 
-    define_macro: (signature, line_no, fn, src)=>
+    define_compile_action: (signature, line_no, fn, src)=>
         @define_action(signature, line_no, fn, src, true)
 
     serialize_defs: (scope=nil, after=nil)=>
@@ -242,13 +242,6 @@ class NomsuCompiler
 
         return concat buff, "\n"
 
-    run_macro: (tree)=>
-        args = [arg for arg in *tree.value when arg.type != "Word"]
-        if @debug
-            @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
-            @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
-        return @defs[tree.stub].fn(self, unpack(args))
-
     dedent: (code)=>
         unless code\find("\n")
             return code
@@ -267,32 +260,6 @@ class NomsuCompiler
 
     indent: (code, levels=1)=>
         return code\gsub("\n","\n"..("    ")\rep(levels))
-
-    assert_permission: (stub)=>
-        fn_def = @defs[stub]
-        unless fn_def
-            @error "Undefined function: #{fn_name}"
-        whiteset = fn_def.whiteset
-        if whiteset == nil then return true
-        -- TODO: maybe optimize this by making the callstack a Counter and using a 
-        --    move-to-front optimization on the whitelist to check most likely candidates sooner
-        for caller in *@callstack
-            if caller != "#macro" and whiteset[caller[1]] then return true
-        @error "You do not have the authority to call: #{stub}"
-
-    check_permission: (fn_def)=>
-        if getmetatable(fn_def) != functiondef_mt
-            fn_name = fn_def
-            fn_def = @defs[fn_name]
-            if fn_def == nil
-                @error "Undefined function: #{fn_name}"
-        whiteset = fn_def.whiteset
-        if whiteset == nil then return true
-        -- TODO: maybe optimize this by making the callstack a Counter and using a 
-        --    move-to-front optimization on the whitelist to check most likely candidates sooner
-        for caller in *@callstack
-            if caller != "#macro" and whiteset[caller[1]] then return true
-        return false
 
     parse: (str, filename)=>
         @assert type(filename) == "string", "Bad filename type: #{type filename}"
@@ -548,8 +515,12 @@ end]]\format(lua_code))
                 insert @compilestack, tree
 
                 def = @defs[tree.stub]
-                if def and def.is_macro
-                    lua = @run_macro(tree)
+                if def and def.compile_time
+                    args = [arg for arg in *tree.value when arg.type != "Word"]
+                    if @debug
+                        @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
+                        @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
+                    lua = @defs[tree.stub].fn(self, unpack(args))
                     remove @compilestack
                     return lua
                 elseif not def and @@math_patt\match(tree.stub)
@@ -793,38 +764,38 @@ end]]\format(lua_code))
                     insert concat_parts, lua.expr
             return concat(concat_parts)
 
-        @define_macro "do %block", "nomsu.moon", (_block)=>
+        @define_compile_action "do %block", "nomsu.moon", (_block)=>
             make_line = (lua)-> lua.expr and (lua.expr..";") or lua.statements
             if _block.type == "Block"
                 return @tree_to_lua(_block)
             else
                 return expr:"#{@tree_to_lua _block}(nomsu)"
         
-        @define_macro "immediately %block", "nomsu.moon", (_block)=>
+        @define_compile_action "immediately %block", "nomsu.moon", (_block)=>
             lua = @tree_to_lua(_block)
             lua_code = lua.statements or (lua.expr..";")
             lua_code = "-- Immediately:\n"..lua_code
             @run_lua(lua_code)
             return statements:lua_code
 
-        @define_macro "lua> %code", "nomsu.moon", (_code)=>
+        @define_compile_action "lua> %code", "nomsu.moon", (_code)=>
             lua = nomsu_string_as_lua(@, _code)
             return statements:lua
 
-        @define_macro "=lua %code", "nomsu.moon", (_code)=>
+        @define_compile_action "=lua %code", "nomsu.moon", (_code)=>
             lua = nomsu_string_as_lua(@, _code)
             return expr:lua
 
-        @define_macro "__line_no__", "nomsu.moon", ()=>
+        @define_compile_action "__line_no__", "nomsu.moon", ()=>
             expr: repr(@compilestack[#@compilestack]\get_line_no!)
 
-        @define_macro "__src__ %level", "nomsu.moon", (_level)=>
+        @define_compile_action "__src__ %level", "nomsu.moon", (_level)=>
             expr: repr(@source_code(@tree_to_value(_level)))
 
         @define_action "run file %filename", "nomsu.moon", (_filename)=>
             @run_file(_filename)
 
-        @define_macro "require %filename", "nomsu.moon", (_filename)=>
+        @define_compile_action "require %filename", "nomsu.moon", (_filename)=>
             filename = @tree_to_value(_filename)
             @require_file(filename)
             return statements:"nomsu:require_file(#{repr filename});"
