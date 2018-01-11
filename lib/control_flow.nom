@@ -183,7 +183,7 @@ immediately:
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%value])::;"
         # This trashes the loop variables, just like in Python.
         set %code = ".."
-            for key,value in ipairs(\(%iterable as lua)) do
+            for key,value in pairs(\(%iterable as lua)) do
             \(%key as lua), \(%value as lua) = key, value;
             \(%body as lua statements)\
             ..\%continue_labels
