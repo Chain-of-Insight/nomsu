@@ -176,3 +176,23 @@ parse [parse tree %code] as: nomsu "tree_to_str" [\%code]
 
 parse [enable debugging] as: lua> "nomsu.debug = true"
 parse [disable debugging] as: lua> "nomsu.debug = false"
+
+compile [say %str] to:
+    lua> ".."
+        if \%str.type == "Text" then
+            return "nomsu:writeln("..\(%str as lua)..")";
+        else
+            return "nomsu:writeln(nomsu:stringify("..\(%str as lua).."))";
+        end
+
+# Error functions
+compile [barf!] to: "error(nil, 0)"
+compile [barf %msg] to: "error(\(%msg as lua), 0)"
+compile [assume %condition] to: "assert(\(%condition as lua))"
+compile [assume %condition or barf %msg] to: "assert(\(%condition as lua), \(%msg as lua))"
+
+# Literals
+compile [yes] to: "true"
+compile [no] to: "false"
+compile [nothing, nil, null] to: "nil"
+

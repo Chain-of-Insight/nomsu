@@ -1,32 +1,89 @@
+#..
+    This file contains some definitions of text escape sequences, including ANSI console
+    color codes.
+
 use "lib/metaprogramming.nom"
-use "lib/control_flow.nom"
-use "lib/collections.nom"
 
-local [%ansi, %colors]
-set %ansi = {..}
-    nl="\\n", newline="\\n", tab="\\t", bell="\\a", cr="\\r", "carriage return"="\\r"
-    backspace="\\b", "form feed"="\\f", formfeed="\\f", "vertical tab"="\\v"
-
-set %colors = {..}
-    "reset color"="\\27[0m", bright="\\27[1m", dim="\\27[2m", underscore="\\27[4m"
-    blink="\\27[5m", inverse="\\27[7m", hidden="\\27[8m"
-
-    black="\\27[30m", red="\\27[31m", green="\\27[32m", yellow="\\27[33m", blue="\\27[34m"
-    magenta="\\27[35m", cyan="\\27[36m", white="\\27[37m"
-
-    "on black"="\\27[40m", "on red"="\\27[41m", "on green"="\\27[42m", "on yellow"="\\27[43m"
-    "on blue"="\\27[44m", "on magenta"="\\27[45m", "on cyan"="\\27[46m", "on white"="\\27[47m"
-
-for %name=%str in %ansi:
+# Text functions
+action [join %strs with %glue]:
     lua> ".."
-        local e = "'"..\%str.."'";
-        nomsu:define_compile_action(\%name, \(__line_no__), function(nomsu) return {expr=e}; end, \(__src__ 1));
+        local str_bits = {}
+        for i,bit in ipairs(\%strs) do str_bits[i] = nomsu:stringify(bit) end
+        return table.concat(str_bits, \%glue)
+parse [join %strs] as: join %strs with ""
 
-for %name=%str in %colors:
-    lua> ".."
-        local e = "'"..\%str.."'";
-        local reset = "'"..\(%colors->"reset color").."'";
-        nomsu:define_compile_action(\%name, \(__line_no__), function(nomsu) return {expr=e}; end, \(__src__ 1));
-        nomsu:define_compile_action(\%name.." %", \(__line_no__), function(nomsu, _)
-            return {expr=e..".."..nomsu:tree_to_lua(_).expr..".."..reset};
+compile [capitalize %str, %str capitalized] to:
+    "(\(%str as lua)):gsub('%l', string.upper, 1)"
+
+compile [%str with %patt replaced with %sub, %str s/%patt/%sub] to:
+    "((\(%str as lua)):gsub(\(%patt as lua), \(%sub as lua)))"
+compile [%str with %patt replaced with %sub %n times, %str s/%patt/%sub/%n] to:
+    "((\(%str as lua)):gsub(\(%patt as lua), \(%sub as lua), \(%n as lua)))"
+
+# Substring
+# TODO: improve this syntax
+compile [%str |%start|] to: "\(%str as lua):sub(\(%start as lua), \(%start as lua))"
+compile [%str |%start - %stop|] to: "\(%str as lua):sub(\(%start as lua), \(%stop as lua))"
+
+# Text literals
+lua do> ".."
+    local escapes = {
+        nl="\\\\n", newline="\\\\n", tab="\\\\t", bell="\\\\a", cr="\\\\r", ["carriage return"]="\\\\r",
+        backspace="\\\\b", ["form feed"]="\\\\f", formfeed="\\\\f", ["vertical tab"]="\\\\v",
+    };
+    local colors = {
+        ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
+        blink="\\\\27[5m", inverse="\\\\27[7m", hidden="\\\\27[8m",
+
+        black="\\\\27[30m", red="\\\\27[31m", green="\\\\27[32m", yellow="\\\\27[33m", blue="\\\\27[34m",
+        magenta="\\\\27[35m", cyan="\\\\27[36m", white="\\\\27[37m",
+
+        ["on black"]="\\\\27[40m", ["on red"]="\\\\27[41m", ["on green"]="\\\\27[42m", ["on yellow"]="\\\\27[43m",
+        ["on blue"]="\\\\27[44m", ["on magenta"]="\\\\27[45m", ["on cyan"]="\\\\27[46m", ["on white"]="\\\\27[47m",
+    };
+    for name, e in pairs(escapes) do
+        local lua = "'"..e.."'";
+        nomsu:define_compile_action(name, \(__line_no__), function() return {expr=str}; end, \(__src__ 1));
+    end
+    for name, c in pairs(colors) do
+        local color = "'"..c.."'";
+        local reset = "'"..colors["reset color"].."'";
+        nomsu:define_compile_action(name, \(__line_no__), function() return {expr=color}; end, \(__src__ 1));
+        nomsu:define_compile_action(name.." %", \(__line_no__), function(nomsu, _)
+            return {expr=color..".."..nomsu:tree_to_lua(_).expr..".."..reset};
         end, \(__src__ 1));
+    end
+
+#..
+    use "lib/control_flow.nom"
+    use "lib/collections.nom"
+    local [%ansi, %colors]
+    set %ansi = {..}
+        nl="\\n", newline="\\n", tab="\\t", bell="\\a", cr="\\r", "carriage return"="\\r"
+        backspace="\\b", "form feed"="\\f", formfeed="\\f", "vertical tab"="\\v"
+
+    set %colors = {..}
+        "reset color"="\\27[0m", bright="\\27[1m", dim="\\27[2m", underscore="\\27[4m"
+        blink="\\27[5m", inverse="\\27[7m", hidden="\\27[8m"
+
+        black="\\27[30m", red="\\27[31m", green="\\27[32m", yellow="\\27[33m", blue="\\27[34m"
+        magenta="\\27[35m", cyan="\\27[36m", white="\\27[37m"
+
+        "on black"="\\27[40m", "on red"="\\27[41m", "on green"="\\27[42m", "on yellow"="\\27[43m"
+        "on blue"="\\27[44m", "on magenta"="\\27[45m", "on cyan"="\\27[46m", "on white"="\\27[47m"
+
+    for %name=%str in %ansi:
+        lua> ".."
+            local e = "'"..\%str.."'";
+            nomsu:define_compile_action(\%name, \(__line_no__), function(nomsu) return {expr=e}; end, \(__src__ 1));
+
+    for %name=%str in %colors:
+        lua> ".."
+            local e = "'"..\%str.."'";
+            local reset = "'"..\(%colors->"reset color").."'";
+            nomsu:define_compile_action(\%name, \(__line_no__), function(nomsu) return {expr=e}; end, \(__src__ 1));
+            nomsu:define_compile_action(\%name.." %", \(__line_no__), function(nomsu, _)
+                return {expr=e..".."..nomsu:tree_to_lua(_).expr..".."..reset};
+            end, \(__src__ 1));
+
+# FIXME

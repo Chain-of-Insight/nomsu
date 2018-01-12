@@ -1,6 +1,19 @@
+#..
+    This file contains compile-time actions that define basic control flow structures
+    like "if" statements and loops.
+
 use "lib/metaprogramming.nom"
+use "lib/text.nom"
 use "lib/operators.nom"
-use "lib/utils.nom"
+
+# No-Op
+immediately:
+    compile [do nothing] to code: ""
+
+# Return
+immediately:
+    compile [return] to code: "do return; end"
+    compile [return %return_value] to code: "do return \(%return_value as lua); end"
 
 # Conditionals
 immediately:
@@ -17,10 +30,33 @@ immediately:
         \(%else_body as lua statements)
         end --end if
 
-# Return
+# Conditional expression (ternary operator)
+#.. Note: this uses a function instead of "(condition and if_expr or else_expr)"
+    because that breaks if %if_expr is falsey, e.g. "x < 5 and false or 99"
 immediately:
-    compile [return] to code: "do return; end"
-    compile [return %return_value] to code: "do return \(%return_value as lua); end"
+    compile [..]
+        %when_true_expr if %condition else %when_false_expr
+        %when_true_expr if %condition otherwise %when_false_expr
+        %when_false_expr unless %condition else %when_true_expr
+        %when_false_expr unless %condition then %when_true_expr
+    ..to:
+        local %safe
+        #.. If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
+            equivalent of a conditional expression: (cond and if_true or if_false)
+        if ({Text=yes, List=yes, Dict=yes, Number=yes}->(%when_true_expr's "type")):
+            return "(\(%condition as lua) and \(%when_true_expr as lua) or \(%when_false_expr as lua))"
+        ..else:
+            #.. Otherwise, need to do an anonymous inline function (yuck, too bad lua 
+                doesn't have a proper ternary operator!)
+                To see why this is necessary consider: (random()<.5 and false or 99)
+            return ".."
+                (function(nomsu)
+                    if \(%condition as lua) then
+                        return \(%when_true_expr as lua);
+                    else
+                        return \(%when_false_expr as lua);
+                    end
+                end)(nomsu)
 
 # GOTOs
 immediately:
@@ -212,7 +248,7 @@ immediately:
         set %first = (yes)
         for %func_call in (%body's "value"):
             local [%tokens, %star, %condition, %action]
-            assume ((%func_call's "type") == "FunctionCall") or barf ".."
+            assume ((%func_call's "type") is "FunctionCall") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             set %tokens = (%func_call's "value")
             set %star = (%tokens -> 1)
@@ -308,7 +344,7 @@ immediately:
     ..to code: ".."
         do
             local fell_through = false;
-            local ok, ret1, ret2 = pcall(function(nomsu)
+            local ok, ret = pcall(function(nomsu)
                 \(%action as lua statements)
                 fell_through = true;
             end, nomsu);
@@ -318,7 +354,7 @@ immediately:
             if not ok then
                 \(%fallback as lua statements)
             elseif not fell_through then
-                return ret1, ret2;
+                return ret;
             end
         end
     parse [try %action] as:
@@ -332,20 +368,48 @@ immediately:
 
 # Do/finally:
 immediately:
+    compile [do %action] to code:
+        (%action as lua statements) if ((%action's "type") is "Block")
+        ..else "(\(%action as lua))(nomsu);"
+
     compile [do %action then always %final_action] to code: ".."
         do
             local fell_through = false;
-            local ok, ret1, ret2 = pcall(function(nomsu)
+            local ok, ret1 = pcall(function(nomsu)
                 \(%action as lua statements)
                 fell_through = true;
             end, nomsu);
-            local ok2, _ = pcall(function(nomsu)
+            local ok2, ret2 = pcall(function(nomsu)
                 \(%final_action as lua statements)
             end, nomsu);
             if not ok then nomsu:error(ret1); end
             if not ok2 then nomsu:error(ret2); end
             if not fell_through then
-                return ret1, ret2;
+                return ret1;
             end
         end
+
+immediately:
+    compile [with %assignments %action] to code:
+        local [%lua, %olds, %old_vals, %new_vals]
+        set {%temp_vars=[], %old_vals=[], %new_vals=[]}
+        for %i=%assignment in (%assignments' "value"):
+            set (%temp_vars->%i) = "temp\%i"
+            set (%old_vals->%i) = ((%assignment's "dict_key") as lua)
+            set (%new_vals->%i) = ((%assignment's "dict_value") as lua)
+        return ".."
+            do
+                local \(join %temp_vars with ", ") = \(join %old_vals with ", ");
+                \(join %old_vals with ", ") = \(join %new_vals with ", ");
+                local fell_through = false;
+                local ok, ret = pcall(function(nomsu)
+                    do
+                        \(%action as lua statements)
+                    end
+                    fell_through = true;
+                end, nomsu);
+                \(join %old_vals with ", ") = \(join %temp_vars with ", ");
+                if not ok then error(ret, 0); end
+                if not fell_through then return ret end
+            end
 

@@ -1,71 +1,61 @@
+#..
+    This file contains definitions of operators like "+" and "and".
+
 use "lib/metaprogramming.nom"
 
-# Literals
-compile [yes] to: "true"
-compile [no] to: "false"
-compile [nil, null] to: "nil"
-compile [infinity, inf] to: "math.huge"
-compile [not a number, NaN, nan] to: "(0/0)"
-compile [pi, Pi, PI] to: "math.pi"
-compile [tau, Tau, TAU] to: "(2*math.pi)"
-compile [phi, Phi, PHI, golden ratio] to: "((1+math.sqrt(5))/2)"
-compile [do nothing] to code: ""
-
-# Ternary operator
-#.. Note: this uses a function instead of "(condition and if_expr or else_expr)"
-    because that breaks if %if_expr is falsey, e.g. "x < 5 and false or 99"
-compile [..]
-    %when_true_expr if %condition else %when_false_expr
-    %when_true_expr if %condition otherwise %when_false_expr
-    %when_false_expr unless %condition else %when_true_expr
-    %when_false_expr unless %condition then %when_true_expr
-..to:
-    lua> ".."
-        local condition = nomsu:tree_to_lua(\%condition).expr;
-        local when_true = nomsu:tree_to_lua(\%when_true_expr).expr;
-        local when_false = nomsu:tree_to_lua(\%when_false_expr).expr;
-        local safe = {Text=true, List=true, Dict=true, Number=true};
-        if safe[\%when_true_expr.type] then
-            return "("..condition.." and "..when_true.." or "..when_false..")";
-        else
-            return ([[
-        (function(nomsu)
-            if %s then
-                return %s;
-            else
-                return %s;
-            end
-        end)(nomsu)]]):format(condition, when_true, when_false);
-        end
-
 # Indexing:
-compile [%obj'%key, %obj's %key, %obj -> %key] to: "(\(%obj as lua))[\(%key as lua)]"
+immediately:
+    compile [%obj'%key, %obj's %key, %obj -> %key] to: "(\(%obj as lua))[\(%key as lua)]"
 
-# Substring
-# TODO: improve this syntax
-compile [%str |%start|] to: "\(%str as lua):sub(\(%start as lua), \(%start as lua))"
-compile [%str |%start - %stop|] to: "\(%str as lua):sub(\(%start as lua), \(%stop as lua))"
+# Comparison Operators
+immediately:
+    compile [%x < %y] to: "(\(%x as lua) < \(%y as lua))"
+    compile [%x > %y] to: "(\(%x as lua) > \(%y as lua))"
+    compile [%x <= %y] to: "(\(%x as lua) <= \(%y as lua))"
+    compile [%x >= %y] to: "(\(%x as lua) >= \(%y as lua))"
+    compile [%a is %b, %a = %b, %a == %b] to:
+        lua> ".."
+            local safe = {Text=true, Number=true};
+            local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
+            if safe[\%a.type] or safe[\%b.type] then
+                return "("..a_lua.." == "..b_lua..")";
+            else
+                return "nomsu.utils.equivalent("..a_lua..", "..b_lua..")";
+            end
+    compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to:
+        lua> ".."
+            local safe = {Text=true, Number=true};
+            local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
+            if safe[\%a.type] or safe[\%b.type] then
+                return "("..a_lua.." ~= "..b_lua..")";
+            else
+                return "(not nomsu.utils.equivalent("..a_lua..", "..b_lua.."))";
+            end
+    # For strict identity checking, use (%x's id) is (%y's id)
+    compile [%'s id, id of %] to: "nomsu.ids[\(% as lua)]"
 
 # Variable assignment operator, and += type versions
-compile [local %vars] to code:
-    lua> ".."
-        local locals = \%vars.type == "List" and \%vars.value or {\%vars};
-        local identifiers = {};
-        for i,x in ipairs(locals) do
-            identifiers[i] = nomsu:tree_to_lua(x).expr;
-        end
-        return "local "..table.concat(identifiers, ", ");
-compile [set %var = %val] to code:
-    lua> ".."
-        if \%var.type == 'List' and \%val.type == 'List' then
-            local lhs = {};
-            for i,x in ipairs(\%var.value) do lhs[i] = nomsu:tree_to_lua(x).expr; end
-            local rhs = {};
-            for i,x in ipairs(\%val.value) do rhs[i] = nomsu:tree_to_lua(x).expr; end
+immediately:
+    compile [local %vars] to code:
+        lua> ".."
+            local locals = \%vars.type == "List" and \%vars.value or {\%vars};
+            local identifiers = {};
+            for i,x in ipairs(locals) do
+                identifiers[i] = nomsu:tree_to_lua(x).expr;
+            end
+            return "local "..table.concat(identifiers, ", ");
+    compile [set %var = %val] to code: "\(%var as lua) = \(%val as lua);"
+    compile [set %assignments] to code:
+        assume ((%assignments' "type") is "Dict") or barf "Expected Dict, but got \(%assignments' "type")"
+        lua> ".."
+            local lhs, rhs = {}, {};
+            for i,entry in ipairs(\%assignments.value) do
+                lhs[i] = nomsu:tree_to_lua(entry.dict_key).expr;
+                rhs[i] = nomsu:tree_to_lua(entry.dict_value).expr;
+            end
             return table.concat(lhs, ", ").." = "..table.concat(rhs, ", ")..";";
-        else
-            return \(%var as lua).." = "..\(%val as lua)..";";
-        end
+
+# Update assignment operators
 compile [%var += %val] to code: "\(%var as lua) = \(%var as lua) + \(%val as lua);"
 compile [%var -= %val] to code: "\(%var as lua) = \(%var as lua) - \(%val as lua);"
 compile [%var *= %val] to code: "\(%var as lua) = \(%var as lua) * \(%val as lua);"
@@ -83,32 +73,6 @@ compile [%x * %y] to: "(\(%x as lua) * \(%y as lua))"
 compile [%x / %y] to: "(\(%x as lua) / \(%y as lua))"
 compile [%x ^ %y] to: "(\(%x as lua) ^ \(%y as lua))"
 compile [%x wrapped around %y, %x mod %y] to: "(\(%x as lua) % \(%y as lua))"
-
-# Comparison Operators
-compile [%x < %y] to: "(\(%x as lua) < \(%y as lua))"
-compile [%x > %y] to: "(\(%x as lua) > \(%y as lua))"
-compile [%x <= %y] to: "(\(%x as lua) <= \(%y as lua))"
-compile [%x >= %y] to: "(\(%x as lua) >= \(%y as lua))"
-compile [%a is %b, %a = %b, %a == %b] to:
-    lua> ".."
-        local safe = {Text=true, Number=true};
-        local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
-        if safe[\%a.type] or safe[\%b.type] then
-            return "("..a_lua.." == "..b_lua..")";
-        else
-            return "nomsu.utils.equivalent("..a_lua..", "..b_lua..")";
-        end
-compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to:
-    lua> ".."
-        local safe = {Text=true, Number=true};
-        local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
-        if safe[\%a.type] or safe[\%b.type] then
-            return "("..a_lua.." ~= "..b_lua..")";
-        else
-            return "(not nomsu.utils.equivalent("..a_lua..", "..b_lua.."))";
-        end
-# For strict identity checking, use (%x's id) is (%y's id)
-compile [%'s id, id of %] to: "nomsu.ids[\(% as lua)]"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)

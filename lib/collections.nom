@@ -1,5 +1,8 @@
+#..
+    This file contains code that supports manipulating and using collections like lists
+    and dictionaries.
+
 use "lib/metaprogramming.nom"
-use "lib/utils.nom"
 use "lib/control_flow.nom"
 use "lib/operators.nom"
 
@@ -148,6 +151,13 @@ immediately:
                 return comprehension;
             end)(nomsu)
 
+# Sorting:
+compile [sort %items] to: "table.sort(\(%items as lua))"
+compile [sort %items by %key_expr] to: ".."
+    nomsu.utils.sort(\(%items as lua), function(\(\% as lua))
+        return \(%key_expr as lua);
+    end)
+
 action [%items sorted]:
     %copy = (% for all %items)
     sort %copy
@@ -156,6 +166,7 @@ action [%items sorted by %key]:
     %copy = (% for all %items)
     sort %copy by %key
     return %copy
+
 action [unique %items]:
     [%k for %k=%v in {%=(yes) for all %items}]
 

@@ -1,7 +1,11 @@
+#..
+    This file imports all the commonly used library files, which can be convenient for
+    avoiding retyping the whole list.
+
 use "lib/metaprogramming.nom"
-use "lib/utils.nom"
+use "lib/text.nom"
 use "lib/operators.nom"
 use "lib/control_flow.nom"
+use "lib/math.nom"
 use "lib/collections.nom"
-use "lib/utils2.nom"
 lua> "nomsu.core_defs = nomsu.__class.def_number;"

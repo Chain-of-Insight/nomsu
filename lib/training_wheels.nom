@@ -1,3 +1,7 @@
+#..
+    This file contains a set of definitions that bring some familiar language features
+    from other languages into nomsu (e.g. "==" and "continue")
+
 use "lib/core.nom"
 
 parse [%a == %b] as: %a is %b
@@ -20,3 +24,4 @@ parse [let %assignments in %action] as: with %assignemnts %action
 parse [error!, panic!, fail!, abort!] as: barf!
 parse [error %, panic %, fail %, abort %] as: barf %
 parse [assert %condition %message] as: assume %condition or barf %message
+parse [%cond ? %if_true %if_false] as: %if_true if %cond else %if_false
