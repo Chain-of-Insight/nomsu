@@ -85,8 +85,10 @@ indented_dict (Dict):
     |}
     (dedent / (("" -> "Error while parsing dict") => error))
 dict_line:
-    (inline_dict_item (comma inline_dict_item)* (comma (functioncall / expression)?)?)
-    / {| {:dict_key: inline_expression / word :} %ws* "=" %ws* {:dict_value: functioncall / expression :} |}
+    (inline_dict_item comma)* (
+        (inline_dict_item comma)
+        /{| {:dict_key: inline_expression / word :} %ws* "=" %ws* {:dict_value: functioncall / expression :} |}
+    )
 inline_dict_item:
     {| {:dict_key: inline_expression / word :} %ws* "=" %ws* {:dict_value: inline_functioncall / inline_expression :} |}
 
