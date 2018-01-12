@@ -526,7 +526,7 @@ end]]\format(lua_code))
                     args = [arg for arg in *tree.value when arg.type != "Word"]
                     if @debug
                         @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
-                        @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr args}"
+                        @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr [(repr a)\sub(1,50) for a in *args]}"
                     lua = @defs[tree.stub].fn(self, unpack(args))
                     remove @compilestack
                     return lua

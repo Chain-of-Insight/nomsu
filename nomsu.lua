@@ -769,7 +769,16 @@ end]]):format(lua_code))
           end
           if self.debug then
             self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(tree.stub))) .. " ")
-            self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr(args))))
+            self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr((function()
+              local _accum_0 = { }
+              local _len_0 = 1
+              for _index_0 = 1, #args do
+                local a = args[_index_0]
+                _accum_0[_len_0] = (repr(a)):sub(1, 50)
+                _len_0 = _len_0 + 1
+              end
+              return _accum_0
+            end)()))))
           end
           local lua = self.defs[tree.stub].fn(self, unpack(args))
           remove(self.compilestack)
