@@ -20,6 +20,9 @@ compile [%str with %patt replaced with %sub, %str s/%patt/%sub] to:
 compile [%str with %patt replaced with %sub %n times, %str s/%patt/%sub/%n] to:
     "((\(%str as lua)):gsub(\(%patt as lua), \(%sub as lua), \(%n as lua)))"
 
+compile [indent %str] to: "\%str:gsub('\\n','\\n'..('    '))"
+compile [indent %str %n times, indent %str %n x] to: "\%str:gsub('\\n','\\n'..('    '):rep(\%n))"
+
 # Substring
 # TODO: improve this syntax
 compile [%str |%start|] to: "\(%str as lua):sub(\(%start as lua), \(%start as lua))"
