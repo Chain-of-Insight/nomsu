@@ -677,14 +677,14 @@ class NomsuCompiler
         insert bits, close
         return concat(bits)
 
-    replaced_vars: (tree, vars)=>
+    tree_with_replaced_vars: (tree, replacements)=>
         if type(tree) != 'table' then return tree
         switch tree.type
             when "Var"
-                if vars[tree.value] ~= nil
-                    tree = vars[tree.value]
+                if replacements[tree.value] ~= nil
+                    tree = replacements[tree.value]
             when "File", "Nomsu", "Block", "List", "FunctionCall", "Text"
-                new_value = @replaced_vars tree.value, vars
+                new_value = @tree_with_replaced_vars tree.value, replacements
                 if new_value != tree.value
                     tree = {k,v for k,v in pairs(tree)}
                     tree.value = new_value
@@ -692,8 +692,8 @@ class NomsuCompiler
                 dirty = false
                 replacements = {}
                 for i,e in ipairs tree.value
-                    new_key = @replaced_vars e.dict_key, vars
-                    new_value = @replaced_vars e.dict_value, vars
+                    new_key = @tree_with_replaced_vars e.dict_key, replacements
+                    new_value = @tree_with_replaced_vars e.dict_value, replacements
                     dirty or= new_key != e.dict_key or new_value != e.dict_value
                     replacements[i] = {dict_key:new_key, dict_value:new_value}
                 if dirty
@@ -703,7 +703,7 @@ class NomsuCompiler
                 new_values = {}
                 any_different = false
                 for k,v in pairs tree
-                    new_values[k] = @replaced_vars v, vars
+                    new_values[k] = @tree_with_replaced_vars v, replacements
                     any_different or= (new_values[k] != tree[k])
                 if any_different
                     tree = new_values

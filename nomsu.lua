@@ -996,17 +996,17 @@ do
       end
       return concat(bits, "\n")
     end,
-    replaced_vars = function(self, tree, vars)
+    tree_with_replaced_vars = function(self, tree, replacements)
       if type(tree) ~= 'table' then
         return tree
       end
       local _exp_0 = tree.type
       if "Var" == _exp_0 then
-        if vars[tree.value] ~= nil then
-          tree = vars[tree.value]
+        if replacements[tree.value] ~= nil then
+          tree = replacements[tree.value]
         end
       elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
-        local new_value = self:replaced_vars(tree.value, vars)
+        local new_value = self:tree_with_replaced_vars(tree.value, replacements)
         if new_value ~= tree.value then
           do
             local _tbl_0 = { }
@@ -1019,10 +1019,10 @@ do
         end
       elseif "Dict" == _exp_0 then
         local dirty = false
-        local replacements = { }
+        replacements = { }
         for i, e in ipairs(tree.value) do
-          local new_key = self:replaced_vars(e.dict_key, vars)
-          local new_value = self:replaced_vars(e.dict_value, vars)
+          local new_key = self:tree_with_replaced_vars(e.dict_key, replacements)
+          local new_value = self:tree_with_replaced_vars(e.dict_value, replacements)
           dirty = dirty or (new_key ~= e.dict_key or new_value ~= e.dict_value)
           replacements[i] = {
             dict_key = new_key,
@@ -1043,7 +1043,7 @@ do
         local new_values = { }
         local any_different = false
         for k, v in pairs(tree) do
-          new_values[k] = self:replaced_vars(v, vars)
+          new_values[k] = self:tree_with_replaced_vars(v, replacements)
           any_different = any_different or (new_values[k] ~= tree[k])
         end
         if any_different then

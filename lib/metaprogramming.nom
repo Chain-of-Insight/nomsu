@@ -100,7 +100,7 @@ immediately:
             local lua_code = ([[
         nomsu:define_compile_action(%s, %s, (function(%s)
             local template = nomsu:parse(%s, %s);
-            local replacement = nomsu:replaced_vars(template, %s);
+            local replacement = nomsu:tree_with_replaced_vars(template, %s);
             return nomsu:tree_to_lua(replacement);
         end), %s)]]):format(names, repr(\%shorthand:get_line_no()), args, template,
             repr(\%shorthand:get_line_no()), replacements, repr(nomsu:source_code(0)));
@@ -143,7 +143,7 @@ compile [nomsu] to: "nomsu"
 compile [nomsu's %key] to: "nomsu[\(%key as lua)]"
 compile [nomsu %method %args] to: "nomsu[\(%method as lua)](nomsu, unpack(\(%args as lua)))"
 compile [tree %tree with %replacements] to: ".."
-    nomsu:replaced_vars(\(%tree as lua), \(%replacements as lua))
+    nomsu:tree_with_replaced_vars(\(%tree as lua), \(%replacements as lua))
 
 parse [action %names] as:
     (nomsu's "defs")->(nomsu "get_stub" [\%names])
