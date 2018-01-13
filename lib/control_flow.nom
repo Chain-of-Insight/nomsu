@@ -120,16 +120,22 @@ immediately:
         for %var from %start to %stop by %step %body
         for %var from %start to %stop via %step %body
     ..to code:
-        local [%continue_labels, %code, %stop_labels]
+        local [%continue_labels, %code, %stop_labels, %loop_var, %loop_var_shim]
         set %continue_labels = ""
         if (tree %body has function call \(do next for-loop)):
             %continue_labels join= "\n::continue_for::;"
         if (tree %body has function call (tree \(do next %) with {""=%var})):
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+        if ((%var's "type") is "Var"):
+            set %loop_var = (%var as lua)
+            set %loop_var_shim = ""
+        ..else:
+            set %loop_var = "i"
+            set %loop_var_shim = "\n\(%var as lua) = i;"
         # This trashes the loop variables, just like in Python.
         set %code = ".."
-            for i=\(%start as lua),\(%stop as lua),\(%step as lua) do
-            \(%var as lua) = i;
+            for \(%loop_var)=\(%start as lua),\(%stop as lua),\(%step as lua) do\
+            ..\%loop_var_shim
             \(%body as lua statements)\
             ..\%continue_labels
             end --numeric for-loop
@@ -156,16 +162,22 @@ immediately:
 
 immediately:
     compile [for %var in %iterable %body] to code:
-        local [%continue_labels, %code, %stop_labels]
+        local [%continue_labels, %code, %stop_labels, %loop_var, %loop_var_shim]
         set %continue_labels = ""
         if (tree %body has function call \(do next for-loop)):
             %continue_labels join= "\n::continue_for::;"
         if (tree %body has function call (tree \(do next %) with {""=%var})):
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+        if ((%var's "type") is "Var"):
+            set %loop_var = (%var as lua)
+            set %loop_var_shim = ""
+        ..else:
+            set %loop_var = "value"
+            set %loop_var_shim = "\n\(%var as lua) = value;"
         # This trashes the loop variables, just like in Python.
         set %code = ".."
-            for i,value in ipairs(\(%iterable as lua)) do
-            \(%var as lua) = value;
+            for i,\%loop_var in ipairs(\(%iterable as lua)) do\
+            ..\%loop_var_shim
             \(%body as lua statements)\
             ..\%continue_labels
             end --foreach-loop
@@ -210,6 +222,9 @@ immediately:
 # Dict iteration (lua's "pairs()")
 immediately:
     compile [for %key = %value in %iterable %body] to code:
+        local [..]
+            %continue_labels, %code, %stop_labels, %key_loop_var, %key_loop_var_shim,
+            %value_loop_var, %value_loop_var_shim
         set %continue_labels = ""
         if (tree %body has function call \(do next for-loop)):
             %continue_labels join= "\n::continue_for::;"
@@ -217,10 +232,22 @@ immediately:
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%key])::;"
         if (tree %body has function call (tree \(do next %) with {""=%value})):
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%value])::;"
+        if ((%key's "type") is "Var"):
+            set %key_loop_var = (%key as lua)
+            set %key_loop_var_shim = ""
+        ..else:
+            set %key_loop_var = "key"
+            set %key_loop_var_shim = "\n\(%key as lua) = key;"
+        if ((%value's "type") is "Var"):
+            set %value_loop_var = (%value as lua)
+            set %value_loop_var_shim = ""
+        ..else:
+            set %value_loop_var = "value"
+            set %value_loop_var_shim = "\n\(%value as lua) = value;"
         # This trashes the loop variables, just like in Python.
         set %code = ".."
-            for key,value in pairs(\(%iterable as lua)) do
-            \(%key as lua), \(%value as lua) = key, value;
+            for \%key_loop_var,\%value_loop_var in pairs(\(%iterable as lua)) do\
+            ..\%key_loop_var_shim\%value_loop_var_shim
             \(%body as lua statements)\
             ..\%continue_labels
             end --foreach-loop
