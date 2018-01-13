@@ -864,7 +864,7 @@ do
             if lua.statements then
               self:error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
             end
-            insert(concat_parts, "nomsu:stringify(" .. tostring(lua.expr) .. ")")
+            insert(concat_parts, "stringify(" .. tostring(lua.expr) .. ")")
             _continue_0 = true
           until true
           if not _continue_0 then
@@ -1270,12 +1270,6 @@ do
       end
       self.compilestack = { }
       self.debug = false
-      self.repr = function(self, ...)
-        return repr(...)
-      end
-      self.stringify = function(self, ...)
-        return stringify(...)
-      end
       self.environment = {
         nomsu = self,
         repr = repr,
