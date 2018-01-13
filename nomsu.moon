@@ -18,13 +18,11 @@ new_uuid = require 'uuid'
 colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
---pcall = (fn,...)-> true, fn(...)
 if _VERSION == "Lua 5.1"
     xp = xpcall
     xpcall = (f, errhandler, ...)->
         args = {n:select("#", ...), ...}
         return xp((...)-> f(unpack(args,1,args.n))), errhandler
---pcall = (fn, ...) -> xpcall(fn, debug.traceback, ...)
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
