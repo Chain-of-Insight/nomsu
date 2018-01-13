@@ -12,7 +12,7 @@ immediately:
             end
             local _, arg_names, _ = nomsu:get_stub(spec.value[1]);
             local args = {};
-            for i, a in ipairs(arg_names) do args[i] = "_"..nomsu:var_to_lua_identifier(a); end
+            for i, a in ipairs(arg_names) do args[i] = nomsu:var_to_lua_identifier(a); end
             names, args = repr(names), table.concat(args, ", ");
             return names, args;
         end
@@ -33,9 +33,9 @@ immediately:
             local function compile_action(%s)
                 %s
             end
-            local function compile_action_wrapper(...) return {expr=compile_action(...)}; end
+            local function compile_action_wrapper(%s) return {expr=compile_action(%s)}; end
             nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
-        end]]):format(args, body_lua, names, repr(\%names:get_line_no()),
+        end]]):format(args, body_lua, args, args, names, repr(\%names:get_line_no()),
             repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
@@ -54,9 +54,9 @@ immediately:
             local function compile_action(%s)
                 %s
             end
-            local function compile_action_wrapper(...) return {statements=compile_action(...)}; end
+            local function compile_action_wrapper(%s) return {statements=compile_action(%s)}; end
             nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
-        end]]):format(args, body_lua, names, repr(\%names:get_line_no()),
+        end]]):format(args, body_lua, args, args, names, repr(\%names:get_line_no()),
             repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
@@ -95,7 +95,7 @@ immediately:
             template = repr(table.concat(template, "\\n"));
             local _, arg_names, _ = nomsu:get_stub(\%shorthand.value[1]);
             local replacements = {};
-            for i, a in ipairs(arg_names) do replacements[i] = "["..repr(a).."]=_"..nomsu:var_to_lua_identifier(a); end
+            for i, a in ipairs(arg_names) do replacements[i] = "["..repr(a).."]="..nomsu:var_to_lua_identifier(a); end
             replacements = "{"..table.concat(replacements, ", ").."}";
             local lua_code = ([[
         nomsu:define_compile_action(%s, %s, (function(%s)
@@ -109,10 +109,13 @@ immediately:
 
 action [remove action %stub]:
     lua> ".."
-        local def = nomsu.defs[\%stub];
-        for _, alias in ipairs(def.aliases) do
-            nomsu.defs[alias] = false;
+        local fn = ACTIONS[\%stub];
+        local metadata = ACTION_METADATA[fn];
+        for i=#metadata.aliases,1,-1 do
+            metadata.arg_orders[metadata.aliases[i]] = nil;
+            table.remove(metadata.aliases, i);
         end
+        ACTIONS[\%stub] = nil;
 
 immediately:
     action [%tree as lua]:
@@ -145,17 +148,17 @@ compile [nomsu %method %args] to: "nomsu[\(%method as lua)](nomsu, unpack(\(%arg
 compile [tree %tree with %replacements] to: ".."
     nomsu:tree_with_replaced_vars(\(%tree as lua), \(%replacements as lua))
 
-parse [action %names] as:
-    (nomsu's "defs")->(nomsu "get_stub" [\%names])
+action [action %names metadata]:
+        =lua "ACTION_METADATA[ACTIONS[\%names]]"
 
 # Get the source code for a function
 action [help %action]:
     lua> ".."
-        local fn_def = nomsu.defs[nomsu:get_stub(\%action)]
-        if not fn_def then
+        local metadata = \(action %action metadata);
+        if not metadata then
             nomsu:writeln("Action not found: "..repr(\%action));
         else
-            nomsu:writeln(fn_def.src or "<unknown source code>");
+            nomsu:writeln(metadata.src or "<unknown source code>");
         end
 
 # Compiler tools

@@ -33,7 +33,6 @@ if _VERSION == "Lua 5.1"
 -- Fix compiler bug that breaks when file ends with a block comment
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
--- Put function defs into a separate table so we can do nomsu.defs["foo"](nomsu, ...) directly without a ".fn"
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
 -- Do automatic "local" detection of new variables and declare them as locals like moonscript does
 
@@ -148,7 +147,6 @@ class NomsuCompiler
         @write = (...)=> io.write(...)
         @write_err = (...)=> io.stderr\write(...)
         -- Use # to prevent someone from defining a function that has a namespace collision.
-        @defs = {["#vars"]:{}, ["#loaded_files"]:{}}
         @ids = setmetatable({}, {
             __mode: "k"
             __index: (key)=>
@@ -157,15 +155,16 @@ class NomsuCompiler
                 return id
         })
         if parent
-            setmetatable(@defs, {__index:parent.defs})
-            setmetatable(@defs["#vars"], {__index:parent["#vars"]})
-            setmetatable(@defs["#loaded_files"], {__index:parent["#loaded_files"]})
+            -- TODO: Implement
+            error("Not implemented")
         @compilestack = {}
         @debug = false
 
+        @action_metadata = setmetatable({}, {__mode:"k"})
         @environment = {
             -- Discretionary/convenience stuff
             nomsu:self, repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re,
+            ACTIONS:{}, ACTION_METADATA:@action_metadata, LOADED:{},
             -- Lua stuff:
             :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
             :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
@@ -189,38 +188,37 @@ class NomsuCompiler
             signature = @get_stubs {signature}
         elseif type(signature) == 'table' and type(signature[1]) == 'string'
             signature = @get_stubs signature
-        @assert type(fn) == 'function', "Bad fn: #{repr fn}"
+        assert type(fn) == 'function', "Bad fn: #{repr fn}"
         aliases = {}
         @@def_number += 1
-        def = {:fn, :src, :line_no, :compile_time, aliases:{}, def_number:@@def_number, defs:@defs}
-        where_defs_go = (getmetatable(@defs) or {}).__newindex or @defs
+
+        fn_info = debug.getinfo(fn, "u")
+        fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
+        arg_orders = {} -- Map from stub -> index where each arg in the stub goes in the function call
         for sig_i=1,#signature
-            stub, arg_names, escaped_args = unpack(signature[sig_i])
-            arg_positions = {}
-            @assert stub, "NO STUB FOUND: #{repr signature}"
-            if @debug then @writeln "#{colored.bright "DEFINING ACTION:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
-            for i=1,#arg_names-1 do for j=i+1,#arg_names
-                if arg_names[i] == arg_names[j] then @error "Duplicate argument in function #{stub}: '#{arg_names[i]}'"
-            
-            if sig_i == 1
-                arg_positions = [i for i=1,#arg_names]
-                def.args = arg_names
-                def.escaped_args = escaped_args
-            else
-                @assert equivalent(set(def.args), set(arg_names)), "Mismatched args"
-                @assert equivalent(def.escaped_args, escaped_args), "Mismatched escaped args"
-                for j,a in ipairs(arg_names)
-                    for i,c_a in ipairs(def.args)
-                        if a == c_a
-                            arg_positions[j] = i
-            insert def.aliases, stub
-            stub_def = setmetatable({:stub, :arg_names, :arg_positions}, {__index:def})
-            rawset(where_defs_go, stub, stub_def)
+            stub, arg_names = unpack(signature[sig_i])
+            arg_positions = [fn_arg_positions[@var_to_lua_identifier(a)] for a in *arg_names]
+            -- TODO: better error checking?
+            assert(#arg_positions == #arg_names,
+                "Mismatch in args between lua function's #{repr fn_arg_positions} and stub's #{repr arg_names}")
+            -- TODO: use debug.getupvalue instead of @environment.ACTIONS?
+            @environment.ACTIONS[stub] = fn
+            assert stub, "NO STUB FOUND: #{repr signature}"
+            if @debug
+                @writeln "#{colored.bright "DEFINING ACTION:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
+            arg_orders[stub] = arg_positions
+        
+        @action_metadata[fn] = {
+            :fn, :src, :line_no, :aliases, :arg_orders, def_number:@@def_number,
+        }
 
     define_compile_action: (signature, line_no, fn, src)=>
         @define_action(signature, line_no, fn, src, true)
+        @action_metadata[fn].compile_time = true
 
     serialize_defs: (scope=nil, after=nil)=>
+        -- TODO: repair
+        error("Not currently functional.")
         after or= @core_defs or 0
         scope or= @defs
         defs_by_num = {}
@@ -275,12 +273,12 @@ class NomsuCompiler
         return code\gsub("\n","\n"..("    ")\rep(levels))
 
     parse: (str, filename)=>
-        @assert type(filename) == "string", "Bad filename type: #{type filename}"
+        assert type(filename) == "string", "Bad filename type: #{type filename}"
         if @debug
             @writeln("#{colored.bright "PARSING:"}\n#{colored.yellow str}")
         str = str\gsub("\r","")
         tree = parse(str, filename)
-        @assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black str}"
+        assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black str}"
         if @debug
             @writeln "PARSE TREE:"
             @print_tree tree, "    "
@@ -291,11 +289,11 @@ class NomsuCompiler
         if max_operations
             timeout = ->
                 debug.sethook!
-                @error "Execution quota exceeded. Your code took too long."
+                error "Execution quota exceeded. Your code took too long."
             debug.sethook timeout, "", max_operations
         tree = @parse(src, filename)
-        @assert tree, "Failed to parse: #{src}"
-        @assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
+        assert tree, "Failed to parse: #{src}"
+        assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
 
         lua = @tree_to_lua(tree)
         lua_code = lua.statements or (lua.expr..";")
@@ -322,15 +320,15 @@ class NomsuCompiler
                     return @run_lua(lua_code)
             file = file or io.open(filename)
             if not file
-                @error "File does not exist: #{filename}"
+                error "File does not exist: #{filename}"
             nomsu_code = file\read('*a')
             file\close!
             return @run(nomsu_code, filename)
         else
-            @error "Invalid filetype for #{filename}"
+            error "Invalid filetype for #{filename}"
     
     require_file: (filename)=>
-        loaded = @defs["#loaded_files"]
+        loaded = @environment.LOADED
         if not loaded[filename]
             loaded[filename] = @run_file(filename) or true
         return loaded[filename]
@@ -345,7 +343,7 @@ class NomsuCompiler
                 n = n + 1
                 ("\n%-3d|")\format(n)
             code = "1  |"..lua_code\gsub("\n", fn)
-            @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{err}")
+            error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{err}")
         return run_lua_fn!
     
     tree_to_value: (tree, filename)=>
@@ -354,15 +352,14 @@ class NomsuCompiler
             @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
         lua_thunk, err = load(code, nil, nil, @environment)
         if not lua_thunk
-            @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{colored.red err}")
+            error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{colored.red err}")
         return lua_thunk!
 
     tree_to_nomsu: (tree, force_inline=false)=>
         -- Return <nomsu code>, <is safe for inline use>
-        @assert tree, "No tree provided."
+        assert tree, "No tree provided."
         if not tree.type
-            --@errorln debug.traceback()
-            @error "Invalid tree: #{repr(tree)}"
+            error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
                 return concat([@tree_to_nomsu(v, force_inline) for v in *tree.value], "\n"), false
@@ -450,7 +447,7 @@ class NomsuCompiler
 
             when "Dict"
                 -- TODO: Implement
-                @error("Sorry, not yet implemented.")
+                error("Sorry, not yet implemented.")
 
             when "Number"
                 return repr(tree.value), true
@@ -462,7 +459,7 @@ class NomsuCompiler
                 return tree.value, true
 
             else
-                @error("Unknown/unimplemented thingy: #{tree.type}")
+                error("Unknown/unimplemented thingy: #{tree.type}")
 
     value_to_nomsu: (value)=>
         switch type(value)
@@ -491,10 +488,9 @@ class NomsuCompiler
     @math_patt: re.compile [[ "%" (" " [*/^+-] " %")+ ]]
     tree_to_lua: (tree)=>
         -- Return <lua code for value>, <additional lua code>
-        @assert tree, "No tree provided."
+        assert tree, "No tree provided."
         if not tree.type
-            --@errorln debug.traceback()
-            @error "Invalid tree: #{repr(tree)}"
+            error "Invalid tree: #{repr(tree)}"
         switch tree.type
             when "File"
                 if #tree.value == 1
@@ -503,7 +499,7 @@ class NomsuCompiler
                 for line in *tree.value
                     lua = @tree_to_lua line
                     if not lua
-                        @error "No lua produced by #{repr line}"
+                        error "No lua produced by #{repr line}"
                     if lua.statements then insert lua_bits, lua.statements
                     if lua.expr then insert lua_bits, "#{lua.expr};"
                 return statements:concat(lua_bits, "\n")
@@ -524,16 +520,20 @@ class NomsuCompiler
             when "FunctionCall"
                 insert @compilestack, tree
 
-                def = @defs[tree.stub]
-                if def and def.compile_time
+                fn = @environment.ACTIONS[tree.stub]
+                metadata = @environment.ACTION_METADATA[fn]
+                if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
+                    if metadata
+                        new_args = [args[p] for p in *metadata.arg_orders[tree.stub]]
+                        args = new_args
                     if @debug
                         @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
                         @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr [(repr a)\sub(1,50) for a in *args]}"
-                    lua = @defs[tree.stub].fn(unpack(args))
+                    lua = fn(unpack(args))
                     remove @compilestack
                     return lua
-                elseif not def and @@math_patt\match(tree.stub)
+                elseif not metadata and @@math_patt\match(tree.stub)
                     -- This is a bit of a hack, but this code handles arbitrarily complex
                     -- math expressions like 2*x + 3^2 without having to define a single
                     -- action for every possibility.
@@ -543,25 +543,24 @@ class NomsuCompiler
                             insert bits, tok.value
                         else
                             lua = @tree_to_lua(tok)
-                            @assert(lua.statements == nil, "non-expression value inside math expression")
+                            assert(lua.statements == nil, "non-expression value inside math expression")
                             insert bits, lua.expr
                     remove @compilestack
                     return expr:"(#{concat bits, " "})"
 
-                arg_positions = def and def.arg_positions or {}
                 args = {}
                 for tok in *tree.value
                     if tok.type == "Word" then continue
                     lua = @tree_to_lua(tok)
-                    @assert(lua.expr, "Cannot use #{tok.src} as an argument, since it's not an expression.")
+                    assert(lua.expr, "Cannot use #{tok.src} as an argument, since it's not an expression.")
                     insert args, lua.expr
 
-                if def
-                    new_args = [args[p] for p in *def.arg_positions]
+                if metadata
+                    new_args = [args[p] for p in *metadata.arg_orders[tree.stub]]
                     args = new_args
                 
                 remove @compilestack
-                return expr:@@comma_separated_items("nomsu.defs[#{repr tree.stub}].fn(", args, ")")
+                return expr:@@comma_separated_items("ACTIONS[#{repr tree.stub}](", args, ")")
 
             when "Text"
                 concat_parts = {}
@@ -579,7 +578,7 @@ class NomsuCompiler
                         @print_tree bit
                         @writeln "#{colored.bright "EXPR:"} #{lua.expr}, #{colored.bright "STATEMENT:"} #{lua.statements}"
                     if lua.statements
-                        @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
+                        error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, "stringify(#{lua.expr})"
 
                 if string_buffer ~= ""
@@ -596,7 +595,7 @@ class NomsuCompiler
                 for item in *tree.value
                     lua = @tree_to_lua item
                     if lua.statements
-                        @error "Cannot use [[#{item.src}]] as a list item, since it's not an expression."
+                        error "Cannot use [[#{item.src}]] as a list item, since it's not an expression."
                     insert items, lua.expr
                 return expr:@@comma_separated_items("{", items, "}")
 
@@ -608,10 +607,10 @@ class NomsuCompiler
                     else
                         @tree_to_lua entry.dict_key
                     if key_lua.statements
-                        @error "Cannot use [[#{entry.dict_key.src}]] as a dict key, since it's not an expression."
+                        error "Cannot use [[#{entry.dict_key.src}]] as a dict key, since it's not an expression."
                     value_lua = @tree_to_lua entry.dict_value
                     if value_lua.statements
-                        @error "Cannot use [[#{entry.dict_value.src}]] as a dict value, since it's not an expression."
+                        error "Cannot use [[#{entry.dict_value.src}]] as a dict value, since it's not an expression."
                     key_str = key_lua.expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                     if key_str
                         insert items, "#{key_str}=#{value_lua.expr}"
@@ -623,10 +622,10 @@ class NomsuCompiler
                 return expr:repr(tree.value)
 
             when "Var"
-                return expr:("_"..@var_to_lua_identifier(tree.value))
+                return expr:@var_to_lua_identifier(tree.value)
 
             else
-                @error("Unknown/unimplemented thingy: #{tree.type}")
+                error("Unknown/unimplemented thingy: #{tree.type}")
     
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
@@ -709,27 +708,28 @@ class NomsuCompiler
                     tree = new_values
         return tree
 
-    @stub_patt: re.compile "{|(' '+ / '\n..' / {'\\'? '%' %id*} / {%id+} / {%op})*|}",
+    @stub_patt: re.compile "{|(' '+ / '\n..' / {'%' %id*} / {%id+} / {%op})*|}",
         id:IDENT_CHAR, op:OPERATOR_CHAR
     get_stub: (x)=>
         if not x
-            @error "Nothing to get stub from"
+            error "Nothing to get stub from"
         -- Returns a single stub ("say %"), list of arg names ({"msg"}), and set of arg
         -- names that should not be evaluated from a single action def
         --   (e.g. "say %msg") or function call (e.g. FunctionCall({Word("say"), Var("msg")))
         if type(x) == 'string'
             -- Standardize format to stuff separated by spaces
             spec = concat @@stub_patt\match(x), " "
-            stub = spec\gsub("%%%S+","%%")\gsub("\\","")
-            arg_names = [arg for arg in spec\gmatch("%%(%S*)")]
-            escaped_args = {arg, true for arg in spec\gmatch("\\%%(%S*)")}
-            return stub, arg_names, escaped_args
+            arg_names = {}
+            stub = spec\gsub "%%(%S+)", (arg)->
+                insert(arg_names, arg)
+                return "%"
+            return stub, arg_names
         if type(x) != 'table'
-            @error "Invalid type for getting stub: #{type(x)} for:\n#{repr x}"
+            error "Invalid type for getting stub: #{type(x)} for:\n#{repr x}"
         switch x.type
             when "Text" then return @get_stub(x.value)
             when "FunctionCall" then return @get_stub(x.src)
-            else @error "Unsupported get stub type: #{x.type} for #{repr x}"
+            else error "Unsupported get stub type: #{x.type} for #{repr x}"
 
     get_stubs: (x)=>
         if type(x) != 'table' then return {{@get_stub(x)}}
@@ -745,16 +745,8 @@ class NomsuCompiler
         -- characters with escape sequences
         if type(var) == 'table' and var.type == "Var"
             var = var.value
-        (var\gsub "%W", (verboten)->
+        "_"..(var\gsub "%W", (verboten)->
             if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
-    
-    assert: (condition, msg='')=>
-        if not condition
-            @error("Assertion failed: "..msg)
-        return condition
-
-    error: (msg)=>
-        error msg, 0
     
     source_code: (level=0)=>
         @dedent @compilestack[#@compilestack-level].src
@@ -773,13 +765,6 @@ class NomsuCompiler
                         error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, lua.expr
             return concat(concat_parts)
-
-        @define_compile_action "do %block", "nomsu.moon", (_block)->
-            make_line = (lua)-> lua.expr and (lua.expr..";") or lua.statements
-            if _block.type == "Block"
-                return nomsu\tree_to_lua(_block)
-            else
-                return expr:"#{nomsu\tree_to_lua _block}(nomsu)"
         
         @define_compile_action "immediately %block", "nomsu.moon", (_block)->
             lua = nomsu\tree_to_lua(_block)
@@ -876,6 +861,7 @@ if arg
                     print "= "..repr(ret)
     
     err_hand = (error_message)->
+        -- TODO: write properly to stderr
         print("#{colored.red "ERROR:"} #{colored.bright colored.yellow colored.onred (error_message or "")}")
         print("stack traceback:")
 
@@ -885,7 +871,6 @@ if arg
         _, line_table = to_lua(nomsu_source)
         nomsu_file\close!
 
-        function_defs = {def.fn, def for _,def in pairs(nomsu.defs) when def.fn}
         level = 2
         while true
             calling_fn = debug.getinfo(level)
@@ -895,9 +880,9 @@ if arg
             name = calling_fn.name
             if name == "run_lua_fn" then continue
             line = nil
-            if def = function_defs[calling_fn.func]
-                line = colored.yellow(def.line_no)
-                name = colored.bright(colored.yellow(def.aliases[1]))
+            if metadata = nomsu.action_metadata[calling_fn.func]
+                line = colored.yellow(metadata.line_no)
+                name = colored.bright(colored.yellow(metadata.aliases[1]))
             else
                 if calling_fn.istailcall and not name
                     name = "<tail call>"
