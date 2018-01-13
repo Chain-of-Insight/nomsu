@@ -20,7 +20,7 @@ immediately:
             if safe[\%a.type] or safe[\%b.type] then
                 return "("..a_lua.." == "..b_lua..")";
             else
-                return "nomsu.utils.equivalent("..a_lua..", "..b_lua..")";
+                return "utils.equivalent("..a_lua..", "..b_lua..")";
             end
     compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to:
         lua> ".."
@@ -29,7 +29,7 @@ immediately:
             if safe[\%a.type] or safe[\%b.type] then
                 return "("..a_lua.." ~= "..b_lua..")";
             else
-                return "(not nomsu.utils.equivalent("..a_lua..", "..b_lua.."))";
+                return "(not utils.equivalent("..a_lua..", "..b_lua.."))";
             end
     # For strict identity checking, use (%x's id) is (%y's id)
     compile [%'s id, id of %] to: "nomsu.ids[\(% as lua)]"

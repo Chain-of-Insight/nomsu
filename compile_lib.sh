@@ -16,7 +16,7 @@ if [ "$FLUSH" = true ] ; then
     done
 fi
 
-for file in $(cat lib/core.nom | lua -e "for filename in io.read('*a'):gmatch('require \"([^\"]*)\"') do print(filename) end") ; do
+for file in $(cat lib/core.nom | lua -e "for filename in io.read('*a'):gmatch('use \"([^\"]*)\"') do print(filename) end") ; do
     compilefile="${file/\.nom/.lua}"
     if [ ! -e "$compilefile" ] || [ "$file" -nt "$compilefile" ] ; then
         echo "Compiling $file into $compilefile"

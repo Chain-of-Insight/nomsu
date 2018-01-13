@@ -38,30 +38,30 @@ action [%n to the nearest %rounder]:
 # Any/all/none
 compile [all of %items, all %items] to:
     "(\(join ((% as lua) for all (%items' "value")) with " and "))"
-    ..if ((%items' "type") is "List") else "nomsu.utils.all(\(%items as lua))"
+    ..if ((%items' "type") is "List") else "utils.all(\(%items as lua))"
 parse [not all of %items, not all %items] as: not (all of %items)
 compile [any of %items, any %items] to:
     "(\(join ((% as lua) for all (%items' "value")) with " or "))"
-    ..if ((%items' "type") is "List") else "nomsu.utils.any(\(%items as lua))"
+    ..if ((%items' "type") is "List") else "utils.any(\(%items as lua))"
 parse [none of %items, none %items] as: not (any of %items)
 compile [sum of %items, sum %items] to:
     "(\(join ((% as lua) for all (%items' "value")) with " + "))"
-    ..if ((%items' "type") is "List") else "nomsu.utils.sum(\(%items as lua))"
+    ..if ((%items' "type") is "List") else "utils.sum(\(%items as lua))"
 compile [product of %items, product %items] to:
     "(\(join ((% as lua) for all (%items' "value")) with " * "))"
-    ..if ((%items' "type") is "List") else "nomsu.utils.product(\(%items as lua))"
+    ..if ((%items' "type") is "List") else "utils.product(\(%items as lua))"
 action [avg of %items, average of %items]:
-    =lua "(nomsu.utils.sum(\%items)/#\%items)"
+    =lua "(utils.sum(\%items)/#\%items)"
 compile [min of %items, smallest of %items, lowest of %items] to:
-    "nomsu.utils.min(\(%items as lua))"
+    "utils.min(\(%items as lua))"
 compile [max of %items, biggest of %items, largest of %items, highest of %items] to:
-    "nomsu.utils.max(\(%items as lua))"
+    "utils.max(\(%items as lua))"
 compile [min of %items by %value_expr] to: ".."
-    nomsu.utils.min(\(%items as lua), function(\(\% as lua))
+    utils.min(\(%items as lua), function(\(\% as lua))
         return \(%value_expr as lua)
     end)
 compile [max of %items by %value_expr] to: ".."
-    nomsu.utils.max(\(%items as lua), function(\(\% as lua))
+    utils.max(\(%items as lua), function(\(\% as lua))
         return \(%value_expr as lua)
     end)
 

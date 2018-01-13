@@ -16,7 +16,7 @@ parse [..]
 compile [..]
     %index st to last in %list, %index nd to last in %list, %index rd to last in %list
     %index th to last in %list
-..to: "nomsu.utils.nth_to_last(\(%list as lua), \(%index as lua))"
+..to: "utils.nth_to_last(\(%list as lua), \(%index as lua))"
 
 parse [first in %list, first %list] as: 1 st in %list
 parse [last in %list, last %list] as: 1 st to last in %list
@@ -45,7 +45,7 @@ compile [..]
 ..to: "((\(%list as lua))[\(%index as lua)] ~= nil)"
 
 compile [length of %list, size of %list, size %list, number of %list, len %list] to:
-    "nomsu.utils.size(\(%list as lua))"
+    "utils.size(\(%list as lua))"
 
 # Chained lookup
 compile [%list ->* %indices] to:
@@ -99,13 +99,13 @@ immediately:
         assume ((%item's "type") is "Var") or barf ".."
             List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
         return ".."
-            (function(nomsu);
+            (function();
                 local comprehension = {};
                 for i,\(%item as lua) in ipairs(\(%iterable as lua)) do;
                     comprehension[i] = \(%expression as lua);
                 end;
                 return comprehension;
-            end)(nomsu)
+            end)()
     parse [%expression for all %iterable] as: %expression for % in %iterable
 
     compile [%expression for %key = %value in %iterable] to:
@@ -114,13 +114,13 @@ immediately:
         assume ((%value's "type") is "Var") or barf ".."
             List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value's "type")
         return ".."
-            (function(nomsu);
+            (function();
                 local comprehension = {};
                 for \(%key as lua), \(%value as lua) in pairs(\(%iterable as lua)) do;
                     comprehension[i] = \(%expression as lua);
                 end;
                 return comprehension;
-            end)(nomsu)
+            end)()
 
 # Dict comprehensions
 immediately:
@@ -128,13 +128,13 @@ immediately:
         assume ((%item's "type") is "Var") or barf ".."
             Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
         return ".."
-            (function(nomsu);
+            (function();
                 local comprehension = {};
                 for i,\(%item as lua) in ipairs(\(%iterable as lua)) do;
                     comprehension[\(%key as lua)] = \(%value as lua);
                 end;
                 return comprehension;
-            end)(nomsu)
+            end)()
     parse [%key = %value for all %iterable] as: %key = %value for % in %iterable
 
     compile [%key = %value for %src_key = %src_value in %iterable] to:
@@ -143,18 +143,18 @@ immediately:
         assume ((%src_value's "type") is "Var") or barf ".."
             Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value's "type")
         return ".."
-            (function(nomsu);
+            (function();
                 local comprehension = {};
                 for \(%src_key as lua), \(%src_value as lua) in pairs(\(%iterable as lua)) do;
                     comprehension[\(%key as lua)] = \(%value as lua);
                 end;
                 return comprehension;
-            end)(nomsu)
+            end)()
 
 # Sorting:
 compile [sort %items] to: "table.sort(\(%items as lua))"
 compile [sort %items by %key_expr] to: ".."
-    nomsu.utils.sort(\(%items as lua), function(\(\% as lua))
+    utils.sort(\(%items as lua), function(\(\% as lua))
         return \(%key_expr as lua);
     end)
 

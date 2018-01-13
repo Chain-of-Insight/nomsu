@@ -42,9 +42,12 @@ local _quote_patt = re.compile("(({'\n' / '\"' / \"'\" / '\\'}->mark_char) / (']
     mark_eq=function(eq)
         _quote_state.min_eq = max(_quote_state.min_eq or 0, #eq+1)
     end})
-local function repr(x)
+local function repr(x, depth)
     -- Create a string representation of the object that is close to the lua code that will
     -- reproduce the object (similar to Python's "repr" function)
+    depth = depth or 10
+    if depth == 0 then return "..." end
+    depth = depth - 1
     local x_type = type(x)
     if x_type == 'table' then
         if getmetatable(x) then
@@ -55,12 +58,12 @@ local function repr(x)
             local i = 1
             for k, v in pairs(x) do
                 if k == i then
-                    ret[#ret+1] = repr(x[i])
+                    ret[#ret+1] = repr(x[i], depth)
                     i = i + 1
                 elseif type(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
-                    ret[#ret+1] = k.."= "..repr(v)
+                    ret[#ret+1] = k.."= "..repr(v,depth)
                 else
-                    ret[#ret+1] = "["..repr(k).."]= "..repr(v)
+                    ret[#ret+1] = "["..repr(k,depth).."]= "..repr(v,depth)
                 end
             end
             return "{"..table.concat(ret, ", ").."}"

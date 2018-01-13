@@ -50,13 +50,13 @@ immediately:
                 doesn't have a proper ternary operator!)
                 To see why this is necessary consider: (random()<.5 and false or 99)
             return ".."
-                (function(nomsu)
+                (function()
                     if \(%condition as lua) then
                         return \(%when_true_expr as lua);
                     else
                         return \(%when_false_expr as lua);
                     end
-                end)(nomsu)
+                end)()
 
 # GOTOs
 immediately:
@@ -344,10 +344,10 @@ immediately:
     ..to code: ".."
         do
             local fell_through = false;
-            local ok, ret = pcall(function(nomsu)
+            local ok, ret = pcall(function()
                 \(%action as lua statements)
                 fell_through = true;
-            end, nomsu);
+            end);
             if ok then
                 \(%success as lua statements)
             end
@@ -375,15 +375,15 @@ immediately:
     compile [do %action then always %final_action] to code: ".."
         do
             local fell_through = false;
-            local ok, ret1 = pcall(function(nomsu)
+            local ok, ret1 = pcall(function()
                 \(%action as lua statements)
                 fell_through = true;
-            end, nomsu);
-            local ok2, ret2 = pcall(function(nomsu)
+            end);
+            local ok2, ret2 = pcall(function()
                 \(%final_action as lua statements)
-            end, nomsu);
-            if not ok then nomsu:error(ret1); end
-            if not ok2 then nomsu:error(ret2); end
+            end);
+            if not ok then error(ret1); end
+            if not ok2 then error(ret2); end
             if not fell_through then
                 return ret1;
             end
@@ -402,12 +402,12 @@ immediately:
                 local \(join %temp_vars with ", ") = \(join %old_vals with ", ");
                 \(join %old_vals with ", ") = \(join %new_vals with ", ");
                 local fell_through = false;
-                local ok, ret = pcall(function(nomsu)
+                local ok, ret = pcall(function()
                     do
                         \(%action as lua statements)
                     end
                     fell_through = true;
-                end, nomsu);
+                end);
                 \(join %old_vals with ", ") = \(join %temp_vars with ", ");
                 if not ok then error(ret, 0); end
                 if not fell_through then return ret end

@@ -442,7 +442,10 @@ do
     end,
     run_file = function(self, filename)
       if filename:match(".*%.lua") then
-        return dofile(filename)(self)
+        local file = io.open(filename)
+        local contents = file:read("*a")
+        file:close()
+        return assert(load(contents, nil, nil, self.environment))()
       end
       if filename:match(".*%.nom") then
         if not self.skip_precompiled then
@@ -472,13 +475,11 @@ do
       return loaded[filename]
     end,
     run_lua = function(self, lua_code)
-      local load_lua_fn, err = load(([[return function(nomsu)
-    %s
-end]]):format(lua_code))
+      local run_lua_fn, err = load(lua_code, nil, nil, self.environment)
       if self.debug then
         self:writeln(tostring(colored.bright("RUNNING LUA:")) .. "\n" .. tostring(colored.blue(colored.bright(lua_code))))
       end
-      if not load_lua_fn then
+      if not run_lua_fn then
         local n = 1
         local fn
         fn = function()
@@ -488,21 +489,18 @@ end]]):format(lua_code))
         local code = "1  |" .. lua_code:gsub("\n", fn)
         self:error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(err))
       end
-      local run_lua_fn = load_lua_fn()
-      run_lua_fn(self)
-      return ret
+      return run_lua_fn()
     end,
     tree_to_value = function(self, tree, filename)
-      local code = "return (function(nomsu)\nreturn " .. tostring(self:tree_to_lua(tree).expr) .. ";\nend);"
-      code = "-- Tree to value: " .. tostring(filename) .. "\n" .. code
+      local code = "return " .. tostring(self:tree_to_lua(tree).expr) .. ";"
       if self.debug then
         self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
       end
-      local lua_thunk, err = load(code)
+      local lua_thunk, err = load(code, nil, nil, self.environment)
       if not lua_thunk then
         self:error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(colored.red(err)))
       end
-      return (lua_thunk())(self)
+      return lua_thunk()
     end,
     tree_to_nomsu = function(self, tree, force_inline)
       if force_inline == nil then
@@ -780,7 +778,7 @@ end]]):format(lua_code))
               return _accum_0
             end)()))))
           end
-          local lua = self.defs[tree.stub].fn(self, unpack(args))
+          local lua = self.defs[tree.stub].fn(unpack(args))
           remove(self.compilestack)
           return lua
         elseif not def and self.__class.math_patt:match(tree.stub) then
@@ -836,7 +834,6 @@ end]]):format(lua_code))
           end
           args = new_args
         end
-        insert(args, 1, "nomsu")
         remove(self.compilestack)
         return {
           expr = self.__class:comma_separated_items("nomsu.defs[" .. tostring(repr(tree.stub)) .. "].fn(", args, ")")
@@ -1164,8 +1161,9 @@ end]]):format(lua_code))
       return self:dedent(self.compilestack[#self.compilestack - level].src)
     end,
     initialize_core = function(self)
+      local nomsu = self
       local nomsu_string_as_lua
-      nomsu_string_as_lua = function(self, code)
+      nomsu_string_as_lua = function(code)
         local concat_parts = { }
         local _list_0 = code.value
         for _index_0 = 1, #_list_0 do
@@ -1173,65 +1171,65 @@ end]]):format(lua_code))
           if type(bit) == "string" then
             insert(concat_parts, bit)
           else
-            local lua = self:tree_to_lua(bit)
+            local lua = nomsu:tree_to_lua(bit)
             if lua.statements then
-              self:error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
+              error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
             end
             insert(concat_parts, lua.expr)
           end
         end
         return concat(concat_parts)
       end
-      self:define_compile_action("do %block", "nomsu.moon", function(self, _block)
+      self:define_compile_action("do %block", "nomsu.moon", function(_block)
         local make_line
         make_line = function(lua)
           return lua.expr and (lua.expr .. ";") or lua.statements
         end
         if _block.type == "Block" then
-          return self:tree_to_lua(_block)
+          return nomsu:tree_to_lua(_block)
         else
           return {
-            expr = tostring(self:tree_to_lua(_block)) .. "(nomsu)"
+            expr = tostring(nomsu:tree_to_lua(_block)) .. "(nomsu)"
           }
         end
       end)
-      self:define_compile_action("immediately %block", "nomsu.moon", function(self, _block)
-        local lua = self:tree_to_lua(_block)
+      self:define_compile_action("immediately %block", "nomsu.moon", function(_block)
+        local lua = nomsu:tree_to_lua(_block)
         local lua_code = lua.statements or (lua.expr .. ";")
         lua_code = "-- Immediately:\n" .. lua_code
-        self:run_lua(lua_code)
+        nomsu:run_lua(lua_code)
         return {
           statements = lua_code
         }
       end)
-      self:define_compile_action("lua> %code", "nomsu.moon", function(self, _code)
-        local lua = nomsu_string_as_lua(self, _code)
+      self:define_compile_action("lua> %code", "nomsu.moon", function(_code)
+        local lua = nomsu_string_as_lua(_code)
         return {
           statements = lua
         }
       end)
-      self:define_compile_action("=lua %code", "nomsu.moon", function(self, _code)
-        local lua = nomsu_string_as_lua(self, _code)
+      self:define_compile_action("=lua %code", "nomsu.moon", function(_code)
+        local lua = nomsu_string_as_lua(_code)
         return {
           expr = lua
         }
       end)
-      self:define_compile_action("__line_no__", "nomsu.moon", function(self)
+      self:define_compile_action("__line_no__", "nomsu.moon", function()
         return {
-          expr = repr(self.compilestack[#self.compilestack]:get_line_no())
+          expr = repr(nomsu.compilestack[#nomsu.compilestack]:get_line_no())
         }
       end)
-      self:define_compile_action("__src__ %level", "nomsu.moon", function(self, _level)
+      self:define_compile_action("__src__ %level", "nomsu.moon", function(_level)
         return {
-          expr = repr(self:source_code(self:tree_to_value(_level)))
+          expr = repr(nomsu:source_code(nomsu:tree_to_value(_level)))
         }
       end)
-      self:define_action("run file %filename", "nomsu.moon", function(self, _filename)
-        return self:run_file(_filename)
+      self:define_action("run file %filename", "nomsu.moon", function(_filename)
+        return nomus:run_file(_filename)
       end)
-      return self:define_compile_action("use %filename", "nomsu.moon", function(self, _filename)
-        local filename = self:tree_to_value(_filename)
-        self:require_file(filename)
+      return self:define_compile_action("use %filename", "nomsu.moon", function(_filename)
+        local filename = nomsu:tree_to_value(_filename)
+        nomsu:require_file(filename)
         return {
           statements = "nomsu:require_file(" .. tostring(repr(filename)) .. ");"
         }
@@ -1272,13 +1270,56 @@ end]]):format(lua_code))
       end
       self.compilestack = { }
       self.debug = false
-      self.utils = utils
       self.repr = function(self, ...)
         return repr(...)
       end
       self.stringify = function(self, ...)
         return stringify(...)
       end
+      self.environment = {
+        nomsu = self,
+        repr = repr,
+        stringify = stringify,
+        utils = utils,
+        lpeg = lpeg,
+        re = re,
+        next = next,
+        unpack = unpack,
+        setmetatable = setmetatable,
+        coroutine = coroutine,
+        rawequal = rawequal,
+        getmetatable = getmetatable,
+        pcall = pcall,
+        error = error,
+        package = package,
+        os = os,
+        require = require,
+        tonumber = tonumber,
+        tostring = tostring,
+        string = string,
+        xpcall = xpcall,
+        module = module,
+        print = print,
+        loadfile = loadfile,
+        rawset = rawset,
+        _VERSION = _VERSION,
+        collectgarbage = collectgarbage,
+        rawget = rawget,
+        bit32 = bit32,
+        rawlen = rawlen,
+        table = table,
+        assert = assert,
+        dofile = dofile,
+        loadstring = loadstring,
+        type = type,
+        select = select,
+        debug = debug,
+        math = math,
+        io = io,
+        pairs = pairs,
+        load = load,
+        ipairs = ipairs
+      }
       if not parent then
         return self:initialize_core()
       end

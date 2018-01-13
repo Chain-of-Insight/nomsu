@@ -8,7 +8,7 @@ use "lib/metaprogramming.nom"
 action [join %strs with %glue]:
     lua> ".."
         local str_bits = {}
-        for i,bit in ipairs(\%strs) do str_bits[i] = nomsu:stringify(bit) end
+        for i,bit in ipairs(\%strs) do str_bits[i] = stringify(bit) end
         return table.concat(str_bits, \%glue)
 parse [join %strs] as: join %strs with ""
 
@@ -49,7 +49,7 @@ lua do> ".."
         local color = "'"..c.."'";
         local reset = "'"..colors["reset color"].."'";
         nomsu:define_compile_action(name, \(__line_no__), function() return {expr=color}; end, \(__src__ 1));
-        nomsu:define_compile_action(name.." %", \(__line_no__), function(nomsu, _)
+        nomsu:define_compile_action(name.." %", \(__line_no__), function(_)
             return {expr=color..".."..nomsu:tree_to_lua(_).expr..".."..reset};
         end, \(__src__ 1));
     end

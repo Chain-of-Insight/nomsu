@@ -11,19 +11,19 @@ immediately:
                 names[i] = alias.src;
             end
             local _, arg_names, _ = nomsu:get_stub(spec.value[1]);
-            local args = {"nomsu"};
-            for i, a in ipairs(arg_names) do args[i+1] = "_"..nomsu:var_to_lua_identifier(a); end
-            names, args = nomsu:repr(names), table.concat(args, ", ");
+            local args = {};
+            for i, a in ipairs(arg_names) do args[i] = "_"..nomsu:var_to_lua_identifier(a); end
+            names, args = repr(names), table.concat(args, ", ");
             return names, args;
         end
 
 # Compile-time action to make compile-time actions:
 immediately:
     lua> ".."
-        nomsu:define_compile_action("compile %names to %body", \(__line_no__), function(nomsu, \%names, \%body)
-            nomsu:assert(\%names.type == "List",
+        nomsu:define_compile_action("compile %names to %body", \(__line_no__), function(\%names, \%body)
+            assert(\%names.type == "List",
                 "Invalid type for compile definition names. Expected List, but got: "..tostring(\%names.type));
-            nomsu:assert(\%body.type == "Block",
+            assert(\%body.type == "Block",
                 "Invalid type for compile definition body. Expected Block, but got: "..tostring(\%body.type));
             local names, args = nomsu:parse_spec(\%names);
             local body_lua = nomsu:tree_to_lua(\%body);
@@ -35,16 +35,16 @@ immediately:
             end
             local function compile_action_wrapper(...) return {expr=compile_action(...)}; end
             nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
-        end]]):format(args, body_lua, names, nomsu:repr(\%names:get_line_no()),
-            nomsu:repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
+        end]]):format(args, body_lua, names, repr(\%names:get_line_no()),
+            repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
 
     lua> ".."
-        nomsu:define_compile_action("compile %names to code %body", \(__line_no__), function(nomsu, \%names, \%body)
-            nomsu:assert(\%names.type == "List",
+        nomsu:define_compile_action("compile %names to code %body", \(__line_no__), function(\%names, \%body)
+            assert(\%names.type == "List",
                 "Invalid type for compile definition names. Expected List, but got: "..tostring(\%names.type));
-            nomsu:assert(\%body.type == "Block",
+            assert(\%body.type == "Block",
                 "Invalid type for compile definition body. Expected Block, but got: "..tostring(\%body.type));
             local names, args = nomsu:parse_spec(\%names);
             local body_lua = nomsu:tree_to_lua(\%body);
@@ -56,8 +56,8 @@ immediately:
             end
             local function compile_action_wrapper(...) return {statements=compile_action(...)}; end
             nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
-        end]]):format(args, body_lua, names, nomsu:repr(\%names:get_line_no()),
-            nomsu:repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
+        end]]):format(args, body_lua, names, repr(\%names:get_line_no()),
+            repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
 
@@ -65,9 +65,9 @@ immediately:
 immediately:
     compile [action %names %body] to code:
         lua> ".."
-            nomsu:assert(\%names.type == "List",
+            assert(\%names.type == "List",
                 "Invalid type for action definition names. Expected List, but got: "..tostring(\%names.type));
-            nomsu:assert(\%body.type == "Block",
+            assert(\%body.type == "Block",
                 "Invalid type for action definition body. Expected Block, but got: "..tostring(\%body.type));
             local names, args = nomsu:parse_spec(\%names);
             local body_lua = nomsu:tree_to_lua(\%body);
@@ -76,34 +76,34 @@ immediately:
             local def_lua = ([[
             nomsu:define_action(%s, \(__line_no__), function(%s)
                 %s
-            end, %s);]]):format(names, args, body_lua, nomsu:repr(src));
+            end, %s);]]):format(names, args, body_lua, repr(src));
             return def_lua;
 
 # Macro to make nomsu macros:
 immediately:
     lua> ".."
-        nomsu:define_compile_action("parse %shorthand as %longhand", \(__line_no__), (function(nomsu, \%shorthand, \%longhand)
-            nomsu:assert(\%shorthand.type == "List",
+        nomsu:define_compile_action("parse %shorthand as %longhand", \(__line_no__), (function(\%shorthand, \%longhand)
+            assert(\%shorthand.type == "List",
                 "Invalid type for parse definition shorthand. Expected List, but got: "..tostring(\%shorthand.type));
-            nomsu:assert(\%longhand.type == "Block",
+            assert(\%longhand.type == "Block",
                 "Invalid type for parse definition body. Expected Block, but got: "..tostring(\%longhand.type));
             local names, args = nomsu:parse_spec(\%shorthand);
             local template = {};
             for i, line in ipairs(\%longhand.value) do
                 template[i] = nomsu:dedent(line.src);
             end
-            template = nomsu:repr(table.concat(template, "\\n"));
+            template = repr(table.concat(template, "\\n"));
             local _, arg_names, _ = nomsu:get_stub(\%shorthand.value[1]);
             local replacements = {};
-            for i, a in ipairs(arg_names) do replacements[i] = "["..nomsu:repr(a).."]=_"..nomsu:var_to_lua_identifier(a); end
+            for i, a in ipairs(arg_names) do replacements[i] = "["..repr(a).."]=_"..nomsu:var_to_lua_identifier(a); end
             replacements = "{"..table.concat(replacements, ", ").."}";
             local lua_code = ([[
         nomsu:define_compile_action(%s, %s, (function(%s)
             local template = nomsu:parse(%s, %s);
             local replacement = nomsu:replaced_vars(template, %s);
             return nomsu:tree_to_lua(replacement);
-        end), %s)]]):format(names, nomsu:repr(\%shorthand:get_line_no()), args, template,
-            nomsu:repr(\%shorthand:get_line_no()), replacements, nomsu:repr(nomsu:source_code(0)));
+        end), %s)]]):format(names, repr(\%shorthand:get_line_no()), args, template,
+            repr(\%shorthand:get_line_no()), replacements, repr(nomsu:source_code(0)));
             return {statements=lua_code};
         end), \(__src__ 1));
 
@@ -124,7 +124,7 @@ immediately:
     action [%tree as value]:
         =lua "nomsu:tree_to_value(\%tree)"
     compile [repr %obj] to:
-        "nomsu:repr(\(%obj as lua))"
+        "repr(\(%obj as lua))"
     compile [indented %obj] to:
         "nomsu:indent(\(%obj as lua))"
     compile [dedented %obj] to:
@@ -153,7 +153,7 @@ action [help %action]:
     lua> ".."
         local fn_def = nomsu.defs[nomsu:get_stub(\%action)]
         if not fn_def then
-            nomsu:writeln("Action not found: "..nomsu:repr(\%action));
+            nomsu:writeln("Action not found: "..repr(\%action));
         else
             nomsu:writeln(fn_def.src or "<unknown source code>");
         end
@@ -182,7 +182,7 @@ compile [say %str] to:
         if \%str.type == "Text" then
             return "nomsu:writeln("..\(%str as lua)..")";
         else
-            return "nomsu:writeln(nomsu:stringify("..\(%str as lua).."))";
+            return "nomsu:writeln(stringify("..\(%str as lua).."))";
         end
 
 # Error functions

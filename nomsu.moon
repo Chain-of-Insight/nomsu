@@ -164,9 +164,17 @@ class NomsuCompiler
             setmetatable(@defs["#loaded_files"], {__index:parent["#loaded_files"]})
         @compilestack = {}
         @debug = false
-        @utils = utils
-        @repr = (...)=> repr(...)
-        @stringify = (...)=> stringify(...)
+
+        @environment = {
+            -- Discretionary/convenience stuff
+            nomsu:self, repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re,
+            -- Lua stuff:
+            :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
+            :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
+            :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :bit32, :rawlen,
+            :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :pairs,
+            :load, :ipairs,
+        }
         if not parent
             @initialize_core!
     
@@ -303,7 +311,10 @@ class NomsuCompiler
 
     run_file: (filename)=>
         if filename\match(".*%.lua")
-            return dofile(filename)(@)
+            file = io.open(filename)
+            contents = file\read("*a")
+            file\close!
+            return assert(load(contents, nil, nil, @environment))!
         if filename\match(".*%.nom")
             if not @skip_precompiled -- Look for precompiled version
                 file = io.open(filename\gsub("%.nom", ".lua"), "r")
@@ -327,32 +338,26 @@ class NomsuCompiler
         return loaded[filename]
 
     run_lua: (lua_code)=>
-        load_lua_fn, err = load([[
-return function(nomsu)
-    %s
-end]]\format(lua_code))
+        run_lua_fn, err = load(lua_code, nil, nil, @environment)
         if @debug
             @writeln "#{colored.bright "RUNNING LUA:"}\n#{colored.blue colored.bright(lua_code)}"
-        if not load_lua_fn
+        if not run_lua_fn
             n = 1
             fn = ->
                 n = n + 1
                 ("\n%-3d|")\format(n)
             code = "1  |"..lua_code\gsub("\n", fn)
             @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{err}")
-        run_lua_fn = load_lua_fn!
-        run_lua_fn(self)
-        return ret
+        return run_lua_fn!
     
     tree_to_value: (tree, filename)=>
-        code = "return (function(nomsu)\nreturn #{@tree_to_lua(tree).expr};\nend);"
-        code = "-- Tree to value: #{filename}\n"..code
+        code = "return #{@tree_to_lua(tree).expr};"
         if @debug
             @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
-        lua_thunk, err = load(code)
+        lua_thunk, err = load(code, nil, nil, @environment)
         if not lua_thunk
             @error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{colored.red err}")
-        return (lua_thunk!)(self)
+        return lua_thunk!
 
     tree_to_nomsu: (tree, force_inline=false)=>
         -- Return <nomsu code>, <is safe for inline use>
@@ -527,7 +532,7 @@ end]]\format(lua_code))
                     if @debug
                         @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
                         @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr [(repr a)\sub(1,50) for a in *args]}"
-                    lua = @defs[tree.stub].fn(self, unpack(args))
+                    lua = @defs[tree.stub].fn(unpack(args))
                     remove @compilestack
                     return lua
                 elseif not def and @@math_patt\match(tree.stub)
@@ -557,7 +562,6 @@ end]]\format(lua_code))
                     new_args = [args[p] for p in *def.arg_positions]
                     args = new_args
                 
-                insert args, 1, "nomsu"
                 remove @compilestack
                 return expr:@@comma_separated_items("nomsu.defs[#{repr tree.stub}].fn(", args, ")")
 
@@ -578,7 +582,7 @@ end]]\format(lua_code))
                         @writeln "#{colored.bright "EXPR:"} #{lua.expr}, #{colored.bright "STATEMENT:"} #{lua.statements}"
                     if lua.statements
                         @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
-                    insert concat_parts, "nomsu:stringify(#{lua.expr})"
+                    insert concat_parts, "stringify(#{lua.expr})"
 
                 if string_buffer ~= ""
                     insert concat_parts, repr(string_buffer)
@@ -759,52 +763,53 @@ end]]\format(lua_code))
 
     initialize_core: =>
         -- Sets up some core functionality
-        nomsu_string_as_lua = (code)=>
+        nomsu = self
+        nomsu_string_as_lua = (code)->
             concat_parts = {}
             for bit in *code.value
                 if type(bit) == "string"
                     insert concat_parts, bit
                 else
-                    lua = @tree_to_lua bit
+                    lua = nomsu\tree_to_lua bit
                     if lua.statements
-                        @error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
+                        error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, lua.expr
             return concat(concat_parts)
 
-        @define_compile_action "do %block", "nomsu.moon", (_block)=>
+        @define_compile_action "do %block", "nomsu.moon", (_block)->
             make_line = (lua)-> lua.expr and (lua.expr..";") or lua.statements
             if _block.type == "Block"
-                return @tree_to_lua(_block)
+                return nomsu\tree_to_lua(_block)
             else
-                return expr:"#{@tree_to_lua _block}(nomsu)"
+                return expr:"#{nomsu\tree_to_lua _block}(nomsu)"
         
-        @define_compile_action "immediately %block", "nomsu.moon", (_block)=>
-            lua = @tree_to_lua(_block)
+        @define_compile_action "immediately %block", "nomsu.moon", (_block)->
+            lua = nomsu\tree_to_lua(_block)
             lua_code = lua.statements or (lua.expr..";")
             lua_code = "-- Immediately:\n"..lua_code
-            @run_lua(lua_code)
+            nomsu\run_lua(lua_code)
             return statements:lua_code
 
-        @define_compile_action "lua> %code", "nomsu.moon", (_code)=>
-            lua = nomsu_string_as_lua(@, _code)
+        @define_compile_action "lua> %code", "nomsu.moon", (_code)->
+            lua = nomsu_string_as_lua(_code)
             return statements:lua
 
-        @define_compile_action "=lua %code", "nomsu.moon", (_code)=>
-            lua = nomsu_string_as_lua(@, _code)
+        @define_compile_action "=lua %code", "nomsu.moon", (_code)->
+            lua = nomsu_string_as_lua(_code)
             return expr:lua
 
-        @define_compile_action "__line_no__", "nomsu.moon", ()=>
-            expr: repr(@compilestack[#@compilestack]\get_line_no!)
+        @define_compile_action "__line_no__", "nomsu.moon", ->
+            expr: repr(nomsu.compilestack[#nomsu.compilestack]\get_line_no!)
 
-        @define_compile_action "__src__ %level", "nomsu.moon", (_level)=>
-            expr: repr(@source_code(@tree_to_value(_level)))
+        @define_compile_action "__src__ %level", "nomsu.moon", (_level)->
+            expr: repr(nomsu\source_code(nomsu\tree_to_value(_level)))
 
-        @define_action "run file %filename", "nomsu.moon", (_filename)=>
-            @run_file(_filename)
+        @define_action "run file %filename", "nomsu.moon", (_filename)->
+            nomus\run_file(_filename)
 
-        @define_compile_action "use %filename", "nomsu.moon", (_filename)=>
-            filename = @tree_to_value(_filename)
-            @require_file(filename)
+        @define_compile_action "use %filename", "nomsu.moon", (_filename)->
+            filename = nomsu\tree_to_value(_filename)
+            nomsu\require_file(filename)
             return statements:"nomsu:require_file(#{repr filename});"
 
 if arg
