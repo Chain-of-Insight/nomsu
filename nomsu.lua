@@ -510,6 +510,12 @@ do
       elseif "Nomsu" == _exp_0 then
         local inside, inline = self:tree_to_nomsu(tree.value, force_inline)
         return "\\" .. tostring(inside), inline
+      elseif "Comment" == _exp_0 then
+        if tree.value:find("\n") then
+          return "#.." .. tostring(self:indent(tree.value)), false
+        else
+          return "#" .. tostring(tree.value), false
+        end
       elseif "Block" == _exp_0 then
         if force_inline then
           return "(:" .. tostring(concat((function()
@@ -705,6 +711,10 @@ do
         end
         return {
           statements = concat(lua_bits, "\n")
+        }
+      elseif "Comment" == _exp_0 then
+        return {
+          statements = "--" .. tree.value:gsub("\n", "\n--")
         }
       elseif "Nomsu" == _exp_0 then
         return {

@@ -92,8 +92,8 @@ dict_line:
 inline_dict_item:
     {| {:dict_key: inline_expression / word :} %ws* "=" %ws* {:dict_value: inline_functioncall / inline_expression :} |}
 
-block_comment: "#.." [^%nl]* (%nl (%ws* &%nl))* %nl %indented [^%nl]+ (%nl ((%ws* ((!.) / &%nl)) / (!%dedented [^%nl]+)))*
-line_comment: "#" [^%nl]*
+block_comment(Comment): "#.." { [^%nl]* (%nl (%ws* &%nl))* %nl %indented [^%nl]+ (%nl ((%ws* ((!.) / &%nl)) / (!%dedented [^%nl]+)))* }
+line_comment(Comment): "#" { [^%nl]* }
 
 eol: %ws* line_comment? (!. / &%nl)
 ignored_line: (%nodented (block_comment / line_comment)) / (%ws* (!. / &%nl))

@@ -368,6 +368,12 @@ class NomsuCompiler
                 inside, inline = @tree_to_nomsu(tree.value, force_inline)
                 return "\\#{inside}", inline
 
+            when "Comment"
+                if tree.value\find("\n")
+                    return "#..#{@indent tree.value}", false
+                else
+                    return "##{tree.value}", false
+
             when "Block"
                 if force_inline
                     return "(:#{concat([@tree_to_nomsu(v, true) for v in *tree.value], "; ")})", true
@@ -503,6 +509,9 @@ class NomsuCompiler
                     if lua.statements then insert lua_bits, lua.statements
                     if lua.expr then insert lua_bits, "#{lua.expr};"
                 return statements:concat(lua_bits, "\n")
+            
+            when "Comment"
+                return statements:"--"..tree.value\gsub("\n","\n--")
             
             when "Nomsu"
                 return expr:"nomsu:parse(#{repr tree.value.src}, #{repr tree\get_line_no!}).value[1]"
