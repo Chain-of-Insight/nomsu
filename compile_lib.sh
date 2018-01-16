@@ -16,10 +16,11 @@ if [ "$FLUSH" = true ] ; then
     done
 fi
 
+echo -n "Compiling lib/core.nom ..."
+./nomsu.moon -c lib/core.nom
+echo "done."
 for file in $(cat lib/core.nom | lua -e "for filename in io.read('*a'):gmatch('use \"([^\"]*)\"') do print(filename) end") ; do
-    compilefile="${file/\.nom/.lua}"
-    if [ ! -e "$compilefile" ] || [ "$file" -nt "$compilefile" ] ; then
-        echo "Compiling $file into $compilefile"
-        ./nomsu.moon -c $file
-    fi
+    echo -n "Compiling $file ..."
+    ./nomsu.moon -c $file
+    echo "done."
 done
