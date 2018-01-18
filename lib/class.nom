@@ -1,0 +1,116 @@
+use "lib/core.nom"
+
+compile [@%var] to:
+    lua> ".."
+        local key_lua = repr(\%var.value);
+        local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
+                       or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
+        if key_attr then
+            return "_me."..key_attr;
+        elseif key_lua:sub(1,1) == "[" then
+            key_lua = " "..key_lua.." ";
+        end
+        return "_me["..key_lua.."]";
+
+compile [set @%var = %val] to code:
+    lua> ".."
+        local val_lua = \(%val as lua);
+        local key_lua = repr(\%var.value);
+        local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
+                       or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
+        if key_attr then
+            return "_me."..key_attr.." = "..val_lua..";";
+        elseif key_lua:sub(1,1) == "[" then
+            key_lua = " "..key_lua.." ";
+        end
+        return "_me["..key_lua.."] = "..val_lua..";";
+
+compile [object %classname %class_body] to:
+    local [%methods]
+    set %methods = []
+    for %line in (%class_body's "value"):
+        if ((%line's "type") == "Comment"): do next %line
+        assume (((%line's "type") == "FunctionCall") and ((%line's "stub") == "action % %"))
+        ..or barf "Only action definitions are supported inside 'object % %', not \(%line's "src")"
+        lua> ".."
+            assert(\%line.value[3].type == "Block",
+                "Invalid type for action definition body. Expected Block, but got: "..tostring(\%line.value[3].type));
+            local names, args = nomsu:parse_spec(\%line.value[2]);
+            local stub = nomsu:get_stub(names[1]);
+            local body_lua = nomsu:tree_to_lua(\%line.value[3]);
+            body_lua = body_lua.statements or ("return "..body_lua.expr..";");
+            table.insert(\%methods, ([[
+            {   aliases=%s,
+                        line=%s,
+                        source=%s,
+                        action=function(%s)
+                            %s
+                        end,
+                        compile_to=function(%s)
+                            return {expr="("..nomsu:tree_to_lua(_me).expr..")[ "..%s.."]("..nomsu:tree_to_lua(%s).expr..")"};
+                        end,
+                    }]]):format(repr(names), repr(\%line:get_line_no()), repr(nomsu:dedent(\%line.src)),
+                        table.concat(args, ", "), body_lua,
+                        table.concat(args, ", "), repr(repr(stub)), table.concat(args, ").expr..nomsu:tree_to_lua(")));
+    
+    local %class_identifier
+    set %class_identifier = (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
+    if (%class_identifier == ""):
+        set %class_identifier = "class"
+
+    return ".."
+        do -- \%class_identifier
+            -- Create the class object:
+            local \%class_identifier = setmetatable({
+                name=\(%classname as lua), instances=setmetatable({}, {__mode="k"}),
+            }, {
+                __tostring=function(c) return c.name; end,
+                __call=function(cls, inst)
+                    inst = inst or {};
+                    inst.id = tostring(inst):match('table: (.*)');
+                    setmetatable(inst, cls.instance_metatable);
+                    cls.instances[inst] = true;
+                    if inst['set % up'] then
+                        inst['set % up'](inst);
+                    end
+                    return inst;
+                end,
+            });
+            \%class_identifier.class = \%class_identifier;
+
+            -- Define the methods:
+            \%class_identifier.methods = {
+                \(join %methods with ",\n        ")
+            }
+
+            -- Define nomsu compile time actions that rewrite "%foo baz %x" to %foo['% baz %'](%foo, %x)
+            -- so classes can have overlapping method names:
+            for i,method in ipairs(\%class_identifier.methods) do
+                for a_i, alias in ipairs(method.aliases) do
+                    \%class_identifier[nomsu:get_stub(alias)] = method.action;
+                end
+                ACTION_METADATA[method.action] = {
+                    fn=method.action, src=method.source, line_no=method.line, aliases=method.aliases,
+                };
+                nomsu:define_compile_action(method.aliases, method.line, method.compile_to, method.source);
+            end
+
+            -- Define class methods for instantiating and accessing instances:
+            \%class_identifier.instance_metatable = {
+                __index=\%class_identifier,
+                __tostring=\%class_identifier['% as text'] or function(inst)
+                    return "<"..inst.class.name..": "..inst.id..">";
+                end,
+            };
+            nomsu:define_action("instances of "..\%class_identifier.name, "lib/class.nom", function()
+                return utils.keys(\%class_identifier.instances);
+            end, "");
+            nomsu:define_action("new "..\%class_identifier.name.." %instance", "lib/class.nom", function(_instance)
+                return \%class_identifier(_instance);
+            end, "");
+            nomsu:define_action("new "..\%class_identifier.name, "lib/class.nom", function()
+                return \%class_identifier({});
+            end, "");
+        end -- End of definition of \%class_identifier
+        \("\n\n")
+    

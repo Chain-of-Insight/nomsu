@@ -80,14 +80,15 @@ local function repr(x, depth)
             return "\"" .. x .. "\""
         else
             local eq = ("="):rep(_quote_state.min_eq or 0)
-            -- Need to add parens around ([=[...]=]) so lua's parser doesn't get confused
-            -- by stuff like x[[=[...]=]], which should obviously parse as x[ ([=[...]=]) ],
-            -- but instead parses as x( [[=[...]=]] ), i.e. a function call whose argument
-            -- is a string that starts with "=[" and ends with "]="
+            -- BEWARE!!!
+            -- Lua's parser and syntax are dumb, so Lua interprets x[[=[asdf]=]] as
+            -- a function call to x (i.e. x("=[asdf]=")), instead of indexing x
+            -- (i.e. x["asdf"]), which it obviously should be. This can be fixed by
+            -- slapping spaces or parens around the [=[asdf]=].
             if x:sub(1, 1) == "\n" then
-                return "(["..eq.."[\n"..x.."]"..eq.."])"
+                return "["..eq.."[\n"..x.."]"..eq.."]"
             else
-                return "(["..eq.."["..x.."]"..eq.."])"
+                return "["..eq.."["..x.."]"..eq.."]"
             end
         end
     else

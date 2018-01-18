@@ -193,28 +193,33 @@ class NomsuCompiler
         @@def_number += 1
 
         fn_info = debug.getinfo(fn, "u")
-        fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
-        arg_orders = {} -- Map from stub -> index where each arg in the stub goes in the function call
+        local fn_arg_positions, arg_orders
+        unless fn_info.isvararg
+            fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
+            arg_orders = {} -- Map from stub -> index where each arg in the stub goes in the function call
         for sig_i=1,#signature
             stub, arg_names = unpack(signature[sig_i])
-            arg_positions = [fn_arg_positions[@var_to_lua_identifier(a)] for a in *arg_names]
-            -- TODO: better error checking?
-            assert(#arg_positions == #arg_names,
-                "Mismatch in args between lua function's #{repr fn_arg_positions} and stub's #{repr arg_names}")
-            -- TODO: use debug.getupvalue instead of @environment.ACTIONS?
-            @environment.ACTIONS[stub] = fn
             assert stub, "NO STUB FOUND: #{repr signature}"
             if @debug
-                @writeln "#{colored.bright "DEFINING ACTION:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)}"
-            arg_orders[stub] = arg_positions
+                @writeln "#{colored.bright "DEFINING ACTION:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(arg_names)} ON: #{@environment.ACTIONS}"
+            -- TODO: use debug.getupvalue instead of @environment.ACTIONS?
+            @environment.ACTIONS[stub] = fn
+            unless fn_info.isvararg
+                arg_positions = [fn_arg_positions[@var_to_lua_identifier(a)] for a in *arg_names]
+                -- TODO: better error checking?
+                assert(#arg_positions == #arg_names,
+                    "Mismatch in args between lua function's #{repr fn_arg_positions} and stub's #{repr arg_names}")
+                arg_orders[stub] = arg_positions
         
         @action_metadata[fn] = {
-            :fn, :src, :line_no, :aliases, :arg_orders, def_number:@@def_number,
+            :fn, :src, :line_no, :aliases, :arg_orders, arg_positions:fn_arg_positions, def_number:@@def_number,
         }
 
     define_compile_action: (signature, line_no, fn, src)=>
         @define_action(signature, line_no, fn, src, true)
         @action_metadata[fn].compile_time = true
+        if @debug
+            @writeln "#{colored.bright colored.green "(it was compile time)"}"
 
     serialize_defs: (scope=nil, after=nil)=>
         -- TODO: repair
@@ -644,7 +649,7 @@ class NomsuCompiler
                 metadata = @environment.ACTION_METADATA[fn]
                 if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
-                    if metadata
+                    if metadata and metadata.arg_orders
                         new_args = [args[p] for p in *metadata.arg_orders[tree.stub]]
                         args = new_args
                     if @debug
@@ -675,7 +680,7 @@ class NomsuCompiler
                     assert(lua.expr, "Cannot use #{tok.src} as an argument, since it's not an expression.")
                     insert args, lua.expr
 
-                if metadata
+                if metadata and metadata.arg_orders
                     new_args = [args[p] for p in *metadata.arg_orders[tree.stub]]
                     args = new_args
                 
@@ -840,7 +845,7 @@ class NomsuCompiler
             -- Standardize format to stuff separated by spaces
             spec = concat @@stub_patt\match(x), " "
             arg_names = {}
-            stub = spec\gsub "%%(%S+)", (arg)->
+            stub = spec\gsub "%%(%S*)", (arg)->
                 insert(arg_names, arg)
                 return "%"
             return stub, arg_names

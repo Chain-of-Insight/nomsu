@@ -5,7 +5,27 @@ use "lib/metaprogramming.nom"
 
 # Indexing:
 immediately:
-    compile [%obj'%key, %obj's %key, %obj -> %key] to: "(\(%obj as lua))[\(%key as lua)]"
+    #.. NOTE!!! It's critical that there are spaces around %key if it's a string,
+        otherwise, Lua will get confused and interpret %obj[[[foo]]] as %obj("[foo]")
+        instead of %obj[ "foo" ].
+        It's also critical to have parens around %obj, otherwise Lua is too dumb to
+        realize that {x=1}["x"] is the same as ({x=1})["x"] or that
+        {x=1}.x is the same as ({x=1}).x
+    compile [%obj'%key, %obj's %key, %obj -> %key] to:
+        lua> ".."
+            local obj_lua = \(%obj as lua);
+            if not obj_lua:sub(-1,-1):match("[a-zA-Z)]") then
+                obj_lua = "("..obj_lua..")";
+            end
+            local key_lua = \(%key as lua);
+            local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
+                           or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
+            if key_attr then
+                return obj_lua.."."..key_attr;
+            elseif key_lua:sub(1,1) == "[" then
+                key_lua = " "..key_lua.." ";
+            end
+            return obj_lua.."["..key_lua.."]";
 
 # Comparison Operators
 immediately:

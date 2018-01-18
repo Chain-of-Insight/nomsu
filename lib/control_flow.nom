@@ -75,7 +75,7 @@ immediately:
     action [tree %tree has function call %call]:
         lua> ".."
             local target = (\%call).stub;
-            for subtree,_ in coroutine.wrap(function() nomsu:walk_tree(\%tree); end) do
+            for subtree,depth in coroutine.wrap(function() nomsu:walk_tree(\%tree); end) do
                 if type(subtree) == 'table' and subtree.type == "FunctionCall"
                 and subtree.stub == target then
                     return true;
@@ -397,7 +397,7 @@ immediately:
 # Do/finally:
 immediately:
     compile [do %action] to code:
-        (%action as lua statements) if ((%action's "type") is "Block")
+        "do\n    \(%action as lua statements)\nend" if ((%action's "type") is "Block")
         ..else "(\(%action as lua))(nomsu);"
 
     compile [do %action then always %final_action] to code: ".."

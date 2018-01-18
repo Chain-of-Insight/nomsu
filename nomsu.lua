@@ -220,35 +220,39 @@ do
       local aliases = { }
       self.__class.def_number = self.__class.def_number + 1
       local fn_info = debug.getinfo(fn, "u")
-      local fn_arg_positions
-      do
-        local _tbl_0 = { }
-        for i = 1, fn_info.nparams do
-          _tbl_0[debug.getlocal(fn, i)] = i
+      local fn_arg_positions, arg_orders
+      if not (fn_info.isvararg) then
+        do
+          local _tbl_0 = { }
+          for i = 1, fn_info.nparams do
+            _tbl_0[debug.getlocal(fn, i)] = i
+          end
+          fn_arg_positions = _tbl_0
         end
-        fn_arg_positions = _tbl_0
+        arg_orders = { }
       end
-      local arg_orders = { }
       for sig_i = 1, #signature do
         local stub, arg_names = unpack(signature[sig_i])
-        local arg_positions
-        do
-          local _accum_0 = { }
-          local _len_0 = 1
-          for _index_0 = 1, #arg_names do
-            local a = arg_names[_index_0]
-            _accum_0[_len_0] = fn_arg_positions[self:var_to_lua_identifier(a)]
-            _len_0 = _len_0 + 1
-          end
-          arg_positions = _accum_0
-        end
-        assert(#arg_positions == #arg_names, "Mismatch in args between lua function's " .. tostring(repr(fn_arg_positions)) .. " and stub's " .. tostring(repr(arg_names)))
-        self.environment.ACTIONS[stub] = fn
         assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
         if self.debug then
-          self:writeln(tostring(colored.bright("DEFINING ACTION:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))))
+          self:writeln(tostring(colored.bright("DEFINING ACTION:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))) .. " ON: " .. tostring(self.environment.ACTIONS))
         end
-        arg_orders[stub] = arg_positions
+        self.environment.ACTIONS[stub] = fn
+        if not (fn_info.isvararg) then
+          local arg_positions
+          do
+            local _accum_0 = { }
+            local _len_0 = 1
+            for _index_0 = 1, #arg_names do
+              local a = arg_names[_index_0]
+              _accum_0[_len_0] = fn_arg_positions[self:var_to_lua_identifier(a)]
+              _len_0 = _len_0 + 1
+            end
+            arg_positions = _accum_0
+          end
+          assert(#arg_positions == #arg_names, "Mismatch in args between lua function's " .. tostring(repr(fn_arg_positions)) .. " and stub's " .. tostring(repr(arg_names)))
+          arg_orders[stub] = arg_positions
+        end
       end
       self.action_metadata[fn] = {
         fn = fn,
@@ -256,12 +260,16 @@ do
         line_no = line_no,
         aliases = aliases,
         arg_orders = arg_orders,
+        arg_positions = fn_arg_positions,
         def_number = self.__class.def_number
       }
     end,
     define_compile_action = function(self, signature, line_no, fn, src)
       self:define_action(signature, line_no, fn, src, true)
       self.action_metadata[fn].compile_time = true
+      if self.debug then
+        return self:writeln(tostring(colored.bright(colored.green("(it was compile time)"))))
+      end
     end,
     serialize_defs = function(self, scope, after)
       if scope == nil then
@@ -939,7 +947,7 @@ do
             end
             args = _accum_0
           end
-          if metadata then
+          if metadata and metadata.arg_orders then
             local new_args
             do
               local _accum_0 = { }
@@ -1007,7 +1015,7 @@ do
             break
           end
         end
-        if metadata then
+        if metadata and metadata.arg_orders then
           local new_args
           do
             local _accum_0 = { }
@@ -1247,7 +1255,7 @@ do
       if type(x) == 'string' then
         local spec = concat(self.__class.stub_patt:match(x), " ")
         local arg_names = { }
-        local stub = spec:gsub("%%(%S+)", function(arg)
+        local stub = spec:gsub("%%(%S*)", function(arg)
           insert(arg_names, arg)
           return "%"
         end)

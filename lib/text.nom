@@ -52,8 +52,8 @@ lua do> ".."
         local color = "'"..c.."'";
         local reset = "'"..colors["reset color"].."'";
         nomsu:define_compile_action(name, \(__line_no__), function() return {expr=color}; end, \(__src__ 1));
-        nomsu:define_compile_action(name.." %", \(__line_no__), function(_)
-            return {expr=color..".."..nomsu:tree_to_lua(_).expr..".."..reset};
+        nomsu:define_compile_action(name.." %", \(__line_no__), function(\%)
+            return {expr=color..".."..nomsu:tree_to_lua(\%).expr..".."..reset};
         end, \(__src__ 1));
     end
 
@@ -85,8 +85,8 @@ lua do> ".."
             local e = "'"..\%str.."'";
             local reset = "'"..\(%colors->"reset color").."'";
             nomsu:define_compile_action(\%name, \(__line_no__), function(nomsu) return {expr=e}; end, \(__src__ 1));
-            nomsu:define_compile_action(\%name.." %", \(__line_no__), function(nomsu, _)
-                return {expr=e..".."..nomsu:tree_to_lua(_).expr..".."..reset};
+            nomsu:define_compile_action(\%name.." %", \(__line_no__), function(nomsu, \%)
+                return {expr=e..".."..nomsu:tree_to_lua(\%).expr..".."..reset};
             end, \(__src__ 1));
 
 # FIXME
