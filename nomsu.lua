@@ -486,160 +486,331 @@ do
       end
       return lua_thunk()
     end,
-    tree_to_nomsu = function(self, tree, force_inline)
-      if force_inline == nil then
-        force_inline = false
+    tree_to_nomsu = function(self, tree, indentation, max_line, expr_type)
+      if indentation == nil then
+        indentation = ""
       end
-      assert(tree, "No tree provided.")
-      if not tree.type then
-        error("Invalid tree: " .. tostring(repr(tree)))
+      if max_line == nil then
+        max_line = 80
       end
-      local _exp_0 = tree.type
-      if "File" == _exp_0 then
-        return concat((function()
-          local _accum_0 = { }
-          local _len_0 = 1
+      if expr_type == nil then
+        expr_type = nil
+      end
+      assert(tree, "No tree provided to tree_to_nomsu.")
+      assert(tree.type, "Invalid tree: " .. tostring(repr(tree)))
+      local join_lines
+      join_lines = function(lines)
+        for _index_0 = 1, #lines do
+          local line = lines[_index_0]
+          if #indentation + #line > max_line then
+            return nil
+          end
+        end
+        return concat(lines, "\n" .. indentation)
+      end
+      local is_operator
+      is_operator = function(tok)
+        return tok and tok.type == "Word" and OPERATOR_CHAR:match(tok.value)
+      end
+      local inline_expression, noeol_expression, expression
+      inline_expression = function(tok)
+        local _exp_0 = tok.type
+        if "Block" == _exp_0 then
+          if #tok.value > 1 then
+            return nil
+          end
+          local nomsu = inline_expression(tok.value)
+          return nomsu and "(: " .. tostring(nomsu) .. ")"
+        elseif "FunctionCall" == _exp_0 then
+          local buff = ""
+          for i, bit in ipairs(tok.value) do
+            if bit.type == "Word" then
+              if i == 1 or (is_operator(bit) and is_operator(tok.value[i - 1])) then
+                buff = buff .. bit.value
+              else
+                buff = buff .. (" " .. bit.value)
+              end
+            else
+              local nomsu = inline_expression(bit)
+              if not (nomsu) then
+                return nil
+              end
+              if not (i == 1 or bit.type == "Block") then
+                buff = buff .. " "
+              end
+              buff = buff .. (function()
+                if bit.type == "FunctionCall" then
+                  return "(" .. nomsu .. ")"
+                else
+                  return nomsu
+                end
+              end)()
+            end
+          end
+          return buff
+        elseif "List" == _exp_0 then
+          local bits = { }
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
+            local nomsu = inline_expression(bit)
+            if not (nomsu) then
+              return nil
+            end
+            insert(bits, nomsu)
+          end
+          return "[" .. concat(bits, ", ") .. "]"
+        elseif "Dict" == _exp_0 then
+          local bits = { }
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
+            local key_nomsu
+            if bit.dict_key.type == "Word" then
+              key_nomsu = bit.dict_key.value
+            else
+              key_nomsu = inline_expression(bit.dict_key)
+            end
+            if not (key_nomsu) then
+              return nil
+            end
+            if bit.dict_key.type == "FunctionCall" then
+              key_nomsu = "(" .. key_nomsu .. ")"
+            end
+            local value_nomsu = inline_expression(bit.dict_value)
+            if not (value_nomsu) then
+              return nil
+            end
+            insert(bits, key_nomsu .. "=" .. value_nomsu)
+          end
+          return "{" .. concat(bits, ", ") .. "}"
+        elseif "Text" == _exp_0 then
+          local buff = '"'
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
+            if type(bit) == 'string' then
+              if bit:find("\n") then
+                return nil
+              end
+              buff = buff .. bit:gsub("\\", "\\\\"):gsub("\n", "\\n")
+            else
+              local nomsu = inline_expression(bit)
+              if not (nomsu) then
+                return nil
+              end
+              buff = buff .. (function()
+                if nomsu.type == "Var" or nomsu.type == "List" or nomsu.type == "Dict" then
+                  return "\\" .. nomsu
+                else
+                  return "\\(" .. nomsu .. ")"
+                end
+              end)()
+            end
+            if #buff > max_line then
+              return nil
+            end
+          end
+          return buff .. '"'
+        elseif "Nomsu" == _exp_0 then
+          local nomsu = inline_expression(tok.value)
+          if not nomsu then
+            return nil
+          end
+          return "\\(" .. nomsu .. ")"
+        elseif "Number" == _exp_0 then
+          return tostring(tok.value)
+        elseif "Var" == _exp_0 then
+          return "%" .. tok.value
+        else
+          return nil
+        end
+      end
+      noeol_expression = function(tok)
+        local nomsu = inline_expression(tok)
+        if nomsu and #nomsu < max_line then
+          return nomsu
+        end
+        local _exp_0 = tok.type
+        if "Block" == _exp_0 then
+          local buff = ":"
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local line = _list_0[_index_0]
+            nomsu = expression(line)
+            if not (nomsu) then
+              return nil
+            end
+            buff = buff .. ("\n    " .. self:indent(nomsu))
+          end
+          return buff
+        elseif "FunctionCall" == _exp_0 then
+          nomsu = expression(tok)
+          if not (nomsu) then
+            return nil
+          end
+          return "(..)\n    " .. self:indent(nomsu)
+        elseif "List" == _exp_0 then
+          local buff = "[..]"
+          local line = "\n    "
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
+            nomsu = inline_expression(bit)
+            local sep = line == "\n    " and "" or ", "
+            if nomsu and #nomsu + #line < max_line then
+              line = line .. (sep .. nomsu)
+              if #line >= max_line then
+                buff = buff .. line
+                line = "\n    "
+              end
+            else
+              line = line .. (sep .. expression(bit))
+              buff = buff .. line
+              line = "\n    "
+            end
+          end
+          if line ~= "\n    " then
+            buff = buff .. line
+          end
+          return buff
+        elseif "Dict" == _exp_0 then
+          local buff = "{..}"
+          local line = "\n    "
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
+            local key_nomsu = inline_expression(bit.dict_key)
+            if not (key_nomsu) then
+              return nil
+            end
+            if bit.dict_key.type == "FunctionCall" then
+              key_nomsu = "(" .. key_nomsu .. ")"
+            end
+            local value_nomsu = inline_expression(bit.dict_value)
+            if value_nomsu and #key_nomsu + #value_nomsu < max_line then
+              line = line .. (key_nomsu .. "=" .. value_nomsu .. ",")
+              if #line >= max_line then
+                buff = buff .. line
+                line = "\n    "
+              end
+            else
+              line = line .. (key_nomsu .. "=" .. expression(bit.dict_value))
+              buff = buff .. line
+              line = "\n    "
+            end
+          end
+          if line ~= "\n    " then
+            buff = buff .. line
+          end
+          return buff
+        elseif "Text" == _exp_0 then
+          local buff = '".."\n    '
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
+            if type(bit) == 'string' then
+              buff = buff .. bit:gsub("\\", "\\\\"):gsub("\n", "\n    ")
+            else
+              nomsu = inline_expression(bit)
+              if not (nomsu) then
+                return nil
+              end
+              buff = buff .. (function()
+                if nomsu.type == "Var" or nomsu.type == "List" or nomsu.type == "Dict" then
+                  return "\\" .. nomsu
+                else
+                  return "\\(" .. nomsu .. ")"
+                end
+              end)()
+            end
+          end
+          return buff
+        elseif "Nomsu" == _exp_0 then
+          nomsu = expression(tok.value)
+          if not nomsu then
+            return nil
+          end
+          return "\\(..)\n    " .. self:indent(nomsu)
+        elseif "Comment" == _exp_0 then
+          if tok.value:find("\n") then
+            return "#.." .. tok.value:gsub("\n", "\n    ")
+          else
+            return "#" .. tok.value
+          end
+        else
+          return inline_expression(tok)
+        end
+      end
+      expression = function(tok)
+        local nomsu = inline_expression(tok)
+        if nomsu and #nomsu < max_line then
+          return nomsu
+        end
+        local _exp_0 = tok.type
+        if "Block" == _exp_0 then
+          if #tok.value == 1 then
+            nomsu = noeol_expression(tok.value[1])
+            if nomsu and #(nomsu:match("[^\n]*")) < max_line then
+              return ": " .. nomsu
+            end
+          end
+          return noeol_expression(tok)
+        elseif "FunctionCall" == _exp_0 then
+          local buff = ""
+          for i, bit in ipairs(tok.value) do
+            if bit.type == "Word" then
+              if i == 1 or (is_operator(bit) and is_operator(tok.value[i - 1])) or buff:sub(-2, -1) == ".." then
+                buff = buff .. bit.value
+              else
+                buff = buff .. (" " .. bit.value)
+              end
+            else
+              nomsu = inline_expression(bit)
+              if nomsu and #nomsu < max_line then
+                if bit.type == "FunctionCall" then
+                  nomsu = "(" .. nomsu .. ")"
+                end
+              else
+                nomsu = expression(bit)
+                if not (nomsu) then
+                  return nil
+                end
+                if bit.type == "FunctionCall" then
+                  nomsu = "(..)\n    " .. self:indent(nomsu)
+                end
+                if i < #tok.value then
+                  nomsu = nomsu .. "\n.."
+                end
+              end
+              if not (i == 1 or bit.type == "Block") then
+                buff = buff .. " "
+              end
+              buff = buff .. nomsu
+            end
+          end
+          return buff
+        elseif "File" == _exp_0 then
+          local lines = { }
           local _list_0 = tree.value
           for _index_0 = 1, #_list_0 do
-            local v = _list_0[_index_0]
-            _accum_0[_len_0] = self:tree_to_nomsu(v, force_inline)
-            _len_0 = _len_0 + 1
+            local line = _list_0[_index_0]
+            nomsu = expression(line)
+            assert(nomsu, "Failed to produce output for:\n" .. tostring(colored.yellow(line.src)))
+            insert(lines, nomsu)
           end
-          return _accum_0
-        end)(), "\n"), false
-      elseif "Nomsu" == _exp_0 then
-        local inside, inline = self:tree_to_nomsu(tree.value, force_inline)
-        return "\\" .. tostring(inside), inline
-      elseif "Comment" == _exp_0 then
-        if tree.value:find("\n") then
-          return "#.." .. tostring(self:indent(tree.value)), false
-        else
-          return "#" .. tostring(tree.value), false
-        end
-      elseif "Block" == _exp_0 then
-        if force_inline then
-          return "(:" .. tostring(concat((function()
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_0 = tree.value
-            for _index_0 = 1, #_list_0 do
-              local v = _list_0[_index_0]
-              _accum_0[_len_0] = self:tree_to_nomsu(v, true)
-              _len_0 = _len_0 + 1
-            end
-            return _accum_0
-          end)(), "; ")) .. ")", true
-        else
-          return ":" .. self:indent("\n" .. concat((function()
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_0 = tree.value
-            for _index_0 = 1, #_list_0 do
-              local v = _list_0[_index_0]
-              _accum_0[_len_0] = self:tree_to_nomsu(v)
-              _len_0 = _len_0 + 1
-            end
-            return _accum_0
-          end)(), "\n")), false
-        end
-      elseif "FunctionCall" == _exp_0 then
-        local buff = ""
-        local sep = ""
-        local inline = true
-        local line_len = 0
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local arg = _list_0[_index_0]
-          local nomsu, arg_inline = self:tree_to_nomsu(arg, force_inline)
-          if sep == " " and line_len + #nomsu > 80 then
-            sep = "\n.."
-          end
-          if not (sep == " " and not arg_inline and nomsu:sub(1, 1) == ":") then
-            buff = buff .. sep
-          end
-          if arg_inline then
-            sep = " "
-            line_len = line_len + (1 + #nomsu)
+          return concat(lines, "\n")
+        elseif "Comment" == _exp_0 then
+          if tok.value:find("\n") then
+            return "#.." .. tok.value:gsub("\n", "\n    ")
           else
-            line_len = 0
-            inline = false
-            sep = "\n.."
+            return "#" .. tok.value
           end
-          if arg.type == 'FunctionCall' then
-            if arg_inline then
-              buff = buff .. "(" .. tostring(nomsu) .. ")"
-            else
-              buff = buff .. "(..)\n    " .. tostring(self:indent(nomsu))
-            end
-          else
-            buff = buff .. nomsu
-          end
-        end
-        return buff, inline
-      elseif "Text" == _exp_0 then
-        local buff = "\""
-        local longbuff = "\"..\"\n    |"
-        local inline = true
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local bit = _list_0[_index_0]
-          if type(bit) == "string" then
-            bit = bit:gsub("\\", "\\\\")
-            buff = buff .. bit:gsub("\n", "\\n"):gsub("\"", "\\\"")
-            longbuff = longbuff .. bit:gsub("\n", "\n    |")
-          else
-            local inside, bit_inline = self:tree_to_nomsu(bit, force_inline)
-            inline = inline and bit_inline
-            buff = buff .. "\\(" .. tostring(inside) .. ")"
-            longbuff = longbuff .. "\\(" .. tostring(inside) .. ")"
-          end
-        end
-        buff = buff .. "\""
-        if force_inline or (inline and #buff <= 90) then
-          return buff, true
         else
-          return longbuff, false
+          return noeol_expression(tok)
         end
-      elseif "List" == _exp_0 then
-        local buff = "["
-        local longbuff = "[..]\n    "
-        local longsep = ""
-        local longline = 0
-        local inline = true
-        for i, bit in ipairs(tree.value) do
-          local nomsu, bit_inline = self:tree_to_nomsu(bit, force_inline)
-          inline = inline and bit_inline
-          if inline then
-            if i > 1 then
-              buff = buff .. ", "
-            end
-            buff = buff .. nomsu
-          end
-          longbuff = longbuff .. (longsep .. nomsu)
-          longline = longline + #nomsu
-          if bit_inline and longline <= 90 then
-            longsep = ", "
-          else
-            longsep = "\n    "
-          end
-        end
-        buff = buff .. "]"
-        if force_inline or (inline and #buff <= 90) then
-          return buff, true
-        else
-          return longbuff, false
-        end
-      elseif "Dict" == _exp_0 then
-        return error("Sorry, not yet implemented.")
-      elseif "Number" == _exp_0 then
-        return repr(tree.value), true
-      elseif "Var" == _exp_0 then
-        return "%" .. tostring(tree.value), true
-      elseif "Word" == _exp_0 then
-        return tree.value, true
-      else
-        return error("Unknown/unimplemented thingy: " .. tostring(tree.type))
       end
+      return expression(tree)
     end,
     value_to_nomsu = function(self, value)
       local _exp_0 = type(value)

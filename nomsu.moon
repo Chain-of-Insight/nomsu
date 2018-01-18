@@ -355,117 +355,222 @@ class NomsuCompiler
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{colored.red err}")
         return lua_thunk!
 
-    tree_to_nomsu: (tree, force_inline=false)=>
-        -- Return <nomsu code>, <is safe for inline use>
-        assert tree, "No tree provided."
-        if not tree.type
-            error "Invalid tree: #{repr(tree)}"
-        switch tree.type
-            when "File"
-                return concat([@tree_to_nomsu(v, force_inline) for v in *tree.value], "\n"), false
-            
-            when "Nomsu"
-                inside, inline = @tree_to_nomsu(tree.value, force_inline)
-                return "\\#{inside}", inline
+    tree_to_nomsu: (tree, indentation="", max_line=80, expr_type=nil)=>
+        -- Convert a tree into nomsu code that satisfies the max line requirement or nil
+        -- if that's not possible
+        -- expr_type is either:
+        --   nil for code that goes at the top level and can contain anything
+        --   "noeol" for code that can contain anything except an end-of-line component
+        --       like a colon (i.e. it already occurs after a colon on the same line)
+        --   "inline" for code that cannot contain indented code or an end-of-line component
+        --       e.g. code that is meant to go inside parentheses
+        assert tree, "No tree provided to tree_to_nomsu."
+        assert tree.type, "Invalid tree: #{repr(tree)}"
+        join_lines = (lines)->
+            for line in *lines
+                if #indentation + #line > max_line
+                    return nil
+            return concat(lines, "\n"..indentation)
 
-            when "Comment"
-                if tree.value\find("\n")
-                    return "#..#{@indent tree.value}", false
-                else
-                    return "##{tree.value}", false
+        is_operator = (tok)-> tok and tok.type == "Word" and OPERATOR_CHAR\match(tok.value)
 
-            when "Block"
-                if force_inline
-                    return "(:#{concat([@tree_to_nomsu(v, true) for v in *tree.value], "; ")})", true
-                else
-                    return ":"..@indent("\n"..concat([@tree_to_nomsu v for v in *tree.value], "\n")), false
-
-            when "FunctionCall"
-                buff = ""
-                sep = ""
-                inline = true
-                line_len = 0
-                for arg in *tree.value
-                    nomsu, arg_inline = @tree_to_nomsu(arg, force_inline)
-                    if sep == " " and line_len + #nomsu > 80
-                        sep = "\n.."
-                    unless sep == " " and not arg_inline and nomsu\sub(1,1) == ":"
-                        buff ..= sep
-                    if arg_inline
-                        sep = " "
-                        line_len += 1 + #nomsu
-                    else
-                        line_len = 0
-                        inline = false
-                        sep = "\n.."
-                    if arg.type == 'FunctionCall'
-                        if arg_inline
-                            buff ..= "(#{nomsu})"
+        local inline_expression, noeol_expression, expression
+        inline_expression = (tok)->
+            switch tok.type
+                when "Block"
+                    if #tok.value > 1 then return nil
+                    nomsu = inline_expression tok.value
+                    return nomsu and "(: #{nomsu})"
+                when "FunctionCall"
+                    buff = ""
+                    for i,bit in ipairs tok.value
+                        if bit.type == "Word"
+                            if i == 1 or (is_operator(bit) and is_operator(tok.value[i-1]))
+                                buff ..= bit.value
+                            else buff ..= " "..bit.value
                         else
-                            buff ..= "(..)\n    #{@indent nomsu}"
+                            nomsu = inline_expression bit
+                            return nil unless nomsu
+                            unless i == 1 or bit.type == "Block"
+                                buff ..= " "
+                            buff ..= if bit.type == "FunctionCall"
+                                "("..nomsu..")"
+                            else nomsu
+                    return buff
+                when "List"
+                    bits = {}
+                    for bit in *tok.value
+                        nomsu = inline_expression bit
+                        return nil unless nomsu
+                        insert bits, nomsu
+                    return "["..concat(bits, ", ").."]"
+                when "Dict"
+                    bits = {}
+                    for bit in *tok.value
+                        key_nomsu = if bit.dict_key.type == "Word"
+                            bit.dict_key.value
+                        else inline_expression bit.dict_key
+                        return nil unless key_nomsu
+                        if bit.dict_key.type == "FunctionCall"
+                            key_nomsu = "("..key_nomsu..")"
+                        value_nomsu = inline_expression bit.dict_value
+                        return nil unless value_nomsu
+                        insert bits, key_nomsu.."="..value_nomsu
+                    return "{"..concat(bits, ", ").."}"
+                when "Text"
+                    buff = '"'
+                    for bit in *tok.value
+                        if type(bit) == 'string'
+                            -- Force indented text
+                            return nil if bit\find("\n")
+                            buff ..= bit\gsub("\\","\\\\")\gsub("\n","\\n")
+                        else
+                            nomsu = inline_expression(bit)
+                            return nil unless nomsu
+                            buff ..= if nomsu.type == "Var" or nomsu.type == "List" or nomsu.type == "Dict"
+                                "\\"..nomsu
+                            else "\\("..nomsu..")"
+                        if #buff > max_line then return nil
+                    return buff..'"'
+                when "Nomsu"
+                    nomsu = inline_expression(tok.value)
+                    return nil if not nomsu
+                    return "\\("..nomsu..")"
+                when "Number" then tostring(tok.value)
+                when "Var" then "%"..tok.value
+                else return nil
+
+        noeol_expression = (tok)->
+            nomsu = inline_expression(tok)
+            if nomsu and #nomsu < max_line
+                return nomsu
+            switch tok.type
+                when "Block"
+                    buff = ":"
+                    for line in *tok.value
+                        nomsu = expression(line)
+                        return nil unless nomsu
+                        buff ..= "\n    "..@indent(nomsu)
+                    return buff
+                when "FunctionCall"
+                    nomsu = expression(tok)
+                    return nil unless nomsu
+                    return "(..)\n    "..@indent(nomsu)
+                when "List"
+                    buff = "[..]"
+                    line = "\n    "
+                    for bit in *tok.value
+                        nomsu = inline_expression bit
+                        sep = line == "\n    " and "" or ", "
+                        if nomsu and #nomsu + #line < max_line
+                            line ..= sep..nomsu
+                            if #line >= max_line
+                                buff ..= line
+                                line = "\n    "
+                        else
+                            line ..= sep..expression(bit)
+                            buff ..= line
+                            line = "\n    "
+                    if line ~= "\n    "
+                        buff ..= line
+                    return buff
+                when "Dict"
+                    buff = "{..}"
+                    line = "\n    "
+                    for bit in *tok.value
+                        key_nomsu = inline_expression bit.dict_key
+                        return nil unless key_nomsu
+                        if bit.dict_key.type == "FunctionCall"
+                            key_nomsu = "("..key_nomsu..")"
+                        value_nomsu = inline_expression bit.dict_value
+                        if value_nomsu and #key_nomsu + #value_nomsu < max_line
+                            line ..= key_nomsu.."="..value_nomsu..","
+                            if #line >= max_line
+                                buff ..= line
+                                line = "\n    "
+                        else
+                            line ..= key_nomsu.."="..expression(bit.dict_value)
+                            buff ..= line
+                            line = "\n    "
+                    if line ~= "\n    "
+                        buff ..= line
+                    return buff
+                when "Text"
+                    buff = '".."\n    '
+                    for bit in *tok.value
+                        if type(bit) == 'string'
+                            buff ..= bit\gsub("\\","\\\\")\gsub("\n","\n    ")
+                        else
+                            nomsu = inline_expression(bit)
+                            return nil unless nomsu
+                            buff ..= if nomsu.type == "Var" or nomsu.type == "List" or nomsu.type == "Dict"
+                                "\\"..nomsu
+                            else "\\("..nomsu..")"
+                    return buff
+                when "Nomsu"
+                    nomsu = expression(tok.value)
+                    return nil if not nomsu
+                    return "\\(..)\n    "..@indent(nomsu)
+                when "Comment"
+                    if tok.value\find("\n")
+                        return "#.."..tok.value\gsub("\n","\n    ")
                     else
-                        buff ..= nomsu
-                return buff, inline
+                        return "#"..tok.value
+                else return inline_expression(tok)
 
-            when "Text"
-                buff = "\""
-                longbuff = "\"..\"\n    |"
-                inline = true
-                for bit in *tree.value
-                    if type(bit) == "string"
-                        bit = bit\gsub("\\","\\\\")
-                        buff ..= bit\gsub("\n","\\n")\gsub("\"","\\\"")
-                        longbuff ..= bit\gsub("\n","\n    |")
+        expression = (tok)->
+            nomsu = inline_expression(tok)
+            if nomsu and #nomsu < max_line
+                return nomsu
+            switch tok.type
+                when "Block"
+                    if #tok.value == 1
+                        nomsu = noeol_expression(tok.value[1])
+                        if nomsu and #(nomsu\match("[^\n]*")) < max_line
+                            return ": "..nomsu
+                    return noeol_expression(tok)
+                when "FunctionCall"
+                    -- The hard task
+                    buff = ""
+                    for i,bit in ipairs tok.value
+                        if bit.type == "Word"
+                            if i == 1 or (is_operator(bit) and is_operator(tok.value[i-1])) or buff\sub(-2,-1) == ".."
+                                buff ..= bit.value
+                            else
+                                buff ..= " "..bit.value
+                        else
+                            nomsu = inline_expression(bit)
+                            if nomsu and #nomsu < max_line
+                                if bit.type == "FunctionCall"
+                                    nomsu = "("..nomsu..")"
+                            else
+                                nomsu = expression(bit)
+                                return nil unless nomsu
+                                if bit.type == "FunctionCall"
+                                    nomsu = "(..)\n    "..@indent(nomsu)
+                                if i < #tok.value
+                                    nomsu ..= "\n.."
+                            unless i == 1 or bit.type == "Block"
+                                buff ..= " "
+                            buff ..= nomsu
+                    return buff
+                when "File"
+                    lines = {}
+                    for line in *tree.value
+                        nomsu = expression(line)
+                        assert nomsu, "Failed to produce output for:\n#{colored.yellow line.src}"
+                        
+                        insert lines, nomsu
+                    return concat lines, "\n"
+                when "Comment"
+                    if tok.value\find("\n")
+                        return "#.."..tok.value\gsub("\n","\n    ")
                     else
-                        inside, bit_inline = @tree_to_nomsu(bit, force_inline)
-                        inline and= bit_inline
-                        buff ..= "\\(#{inside})"
-                        longbuff ..= "\\(#{inside})"
-                buff ..= "\""
-                if force_inline or (inline and #buff <= 90)
-                    return buff, true
-                else
-                    return longbuff, false
+                        return "#"..tok.value
+                else return noeol_expression(tok)
 
-            when "List"
-                buff = "["
-                longbuff = "[..]\n    "
-                longsep = ""
-                longline = 0
-                inline = true
-                for i,bit in ipairs tree.value
-                    nomsu, bit_inline = @tree_to_nomsu(bit, force_inline)
-                    inline and= bit_inline
-                    if inline
-                        if i > 1
-                            buff ..= ", "
-                        buff ..= nomsu
-                    longbuff ..= longsep .. nomsu
-                    longline += #nomsu
-                    longsep = if bit_inline and longline <= 90
-                        ", "
-                    else "\n    "
-                buff ..= "]"
-                if force_inline or (inline and #buff <= 90)
-                    return buff, true
-                else
-                    return longbuff, false
+        return expression(tree)
 
-            when "Dict"
-                -- TODO: Implement
-                error("Sorry, not yet implemented.")
-
-            when "Number"
-                return repr(tree.value), true
-
-            when "Var"
-                return "%#{tree.value}", true
-
-            when "Word"
-                return tree.value, true
-
-            else
-                error("Unknown/unimplemented thingy: #{tree.type}")
 
     value_to_nomsu: (value)=>
         switch type(value)

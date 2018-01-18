@@ -89,7 +89,8 @@ immediately:
     compile [stop repeat-loop] to code: "goto stop_repeat;"
     compile [repeat while %condition %body] to code:
         set %continue_labels = (..)
-            "\n::continue_repeat::;" if (tree %body has function call \(do next repeat-loop)) else ""
+            "\n::continue_repeat::;"
+            ..if (tree %body has function call \(do next repeat-loop)) else ""
         set %code = ".."
             while \(%condition as lua) do
             \(%body as lua statements)\
