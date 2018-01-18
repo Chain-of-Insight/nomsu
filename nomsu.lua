@@ -600,7 +600,7 @@ do
                 return nil
               end
               buff = buff .. (function()
-                if nomsu.type == "Var" or nomsu.type == "List" or nomsu.type == "Dict" then
+                if bit.type == "Var" or bit.type == "List" or bit.type == "Dict" then
                   return "\\" .. nomsu
                 else
                   return "\\(" .. nomsu .. ")"
@@ -657,8 +657,12 @@ do
           for _index_0 = 1, #_list_0 do
             local bit = _list_0[_index_0]
             nomsu = inline_expression(bit)
+            if line ~= "\n    " and #line + #", " + #nomsu > max_line then
+              buff = buff .. line
+              line = "\n    "
+            end
             local sep = line == "\n    " and "" or ", "
-            if nomsu and #nomsu + #line < max_line then
+            if nomsu then
               line = line .. (sep .. nomsu)
               if #line >= max_line then
                 buff = buff .. line
@@ -717,7 +721,7 @@ do
                 return nil
               end
               buff = buff .. (function()
-                if nomsu.type == "Var" or nomsu.type == "List" or nomsu.type == "Dict" then
+                if bit.type == "Var" or bit.type == "List" or bit.type == "Dict" then
                   return "\\" .. nomsu
                 else
                   return "\\(" .. nomsu .. ")"
@@ -750,7 +754,11 @@ do
         local _exp_0 = tok.type
         if "Block" == _exp_0 then
           if #tok.value == 1 then
-            nomsu = noeol_expression(tok.value[1])
+            if tok.value[1].type == "FunctionCall" then
+              nomsu = inline_expression(tok.value[1])
+            else
+              nomsu = noeol_expression(tok.value[1])
+            end
             if nomsu and #(nomsu:match("[^\n]*")) < max_line then
               return ": " .. nomsu
             end

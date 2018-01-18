@@ -427,7 +427,7 @@ class NomsuCompiler
                         else
                             nomsu = inline_expression(bit)
                             return nil unless nomsu
-                            buff ..= if nomsu.type == "Var" or nomsu.type == "List" or nomsu.type == "Dict"
+                            buff ..= if bit.type == "Var" or bit.type == "List" or bit.type == "Dict"
                                 "\\"..nomsu
                             else "\\("..nomsu..")"
                         if #buff > max_line then return nil
@@ -461,8 +461,11 @@ class NomsuCompiler
                     line = "\n    "
                     for bit in *tok.value
                         nomsu = inline_expression bit
+                        if line != "\n    " and #line + #", " + #nomsu > max_line
+                            buff ..= line
+                            line = "\n    "
                         sep = line == "\n    " and "" or ", "
-                        if nomsu and #nomsu + #line < max_line
+                        if nomsu
                             line ..= sep..nomsu
                             if #line >= max_line
                                 buff ..= line
@@ -503,7 +506,7 @@ class NomsuCompiler
                         else
                             nomsu = inline_expression(bit)
                             return nil unless nomsu
-                            buff ..= if nomsu.type == "Var" or nomsu.type == "List" or nomsu.type == "Dict"
+                            buff ..= if bit.type == "Var" or bit.type == "List" or bit.type == "Dict"
                                 "\\"..nomsu
                             else "\\("..nomsu..")"
                     return buff
@@ -525,7 +528,10 @@ class NomsuCompiler
             switch tok.type
                 when "Block"
                     if #tok.value == 1
-                        nomsu = noeol_expression(tok.value[1])
+                        nomsu = if tok.value[1].type == "FunctionCall"
+                            inline_expression(tok.value[1])
+                        else
+                            noeol_expression(tok.value[1])
                         if nomsu and #(nomsu\match("[^\n]*")) < max_line
                             return ": "..nomsu
                     return noeol_expression(tok)
