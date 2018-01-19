@@ -1007,7 +1007,7 @@ do
               break
             end
             local lua = self:tree_to_lua(tok)
-            assert(lua.expr, "Cannot use " .. tostring(tok.src) .. " as an argument, since it's not an expression.")
+            assert(lua.expr, "Cannot use " .. tostring(tok.src) .. " as an argument, since it's not an expression, it produces: " .. tostring(repr(lua)))
             insert(args, lua.expr)
             _continue_0 = true
           until true

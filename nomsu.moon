@@ -677,7 +677,7 @@ class NomsuCompiler
                 for tok in *tree.value
                     if tok.type == "Word" then continue
                     lua = @tree_to_lua(tok)
-                    assert(lua.expr, "Cannot use #{tok.src} as an argument, since it's not an expression.")
+                    assert(lua.expr, "Cannot use #{tok.src} as an argument, since it's not an expression, it produces: #{repr lua}")
                     insert args, lua.expr
 
                 if metadata and metadata.arg_orders
