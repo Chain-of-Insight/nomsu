@@ -739,6 +739,8 @@ class NomsuCompiler
                     key_str = key_lua.expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                     if key_str
                         insert items, "#{key_str}=#{value_lua.expr}"
+                    elseif key_lua.expr\sub(1,1) == "["
+                        insert items, "[ #{key_lua.expr}]=#{value_lua.expr}"
                     else
                         insert items, "[#{key_lua.expr}]=#{value_lua.expr}"
                 return expr:@@comma_separated_items("{", items, "}")

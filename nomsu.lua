@@ -1120,6 +1120,8 @@ do
           local key_str = key_lua.expr:match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
           if key_str then
             insert(items, tostring(key_str) .. "=" .. tostring(value_lua.expr))
+          elseif key_lua.expr:sub(1, 1) == "[" then
+            insert(items, "[ " .. tostring(key_lua.expr) .. "]=" .. tostring(value_lua.expr))
           else
             insert(items, "[" .. tostring(key_lua.expr) .. "]=" .. tostring(value_lua.expr))
           end
