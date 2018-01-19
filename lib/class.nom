@@ -26,7 +26,10 @@ compile [set @%var = %val] to code:
         return "_me["..key_lua.."] = "..val_lua..";";
 
 compile [object %classname %class_body] to:
-    local [%methods]
+    local [%methods, %class_identifier]
+    set %class_identifier = (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
+    if (%class_identifier == ""):
+        set %class_identifier = "class"
     set %methods = []
     for %line in (%class_body's "value"):
         if ((%line's "type") == "Comment"): do next %line
@@ -39,24 +42,23 @@ compile [object %classname %class_body] to:
             local stub = nomsu:get_stub(names[1]);
             local body_lua = nomsu:tree_to_lua(\%line.value[3]);
             body_lua = body_lua.statements or ("return "..body_lua.expr..";");
-            table.insert(\%methods, ([[
-            {   aliases=%s,
-                        line=%s,
-                        source=%s,
-                        action=function(%s)
-                            %s
-                        end,
-                        compile_to=function(%s)
-                            return {expr="("..nomsu:tree_to_lua(_me).expr..")[ "..%s.."]("..nomsu:tree_to_lua(%s).expr..")"};
-                        end,
-                    }]]):format(repr(names), repr(\%line:get_line_no()), repr(nomsu:dedent(\%line.src)),
-                        table.concat(args, ", "), body_lua,
-                        table.concat(args, ", "), repr(repr(stub)), table.concat(args, ").expr..nomsu:tree_to_lua(")));
-    
-    local %class_identifier
-    set %class_identifier = (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
-    if (%class_identifier == ""):
-        set %class_identifier = "class"
+            local arg_nomsus = {};
+            for i, arg in ipairs(args) do arg_nomsus[i] = "nomsu:tree_to_lua("..arg..").expr"; end
+            table.insert(\%methods, ([==[
+                %s[ %s] = function(%s)
+                    %s
+                end
+                nomsu:define_compile_action(%s, %s, function(%s)
+                    return {expr="("..nomsu:tree_to_lua(_me).expr..")[ "..%s.."]("..%s..")"};
+                end, %s);
+                ACTION_METADATA[%s[ %s]] = ACTION_METADATA[ACTIONS[ %s]];
+            ]==]):format(
+                \%class_identifier, repr(stub), table.concat(args, ", "),
+                    body_lua,
+                repr(names), repr(\%line:get_line_no()), table.concat(args, ", "),
+                    repr(repr(stub)), table.concat(arg_nomsus, ".."),
+                repr(nomsu:dedent(\%line.src)),
+                \%class_identifier, repr(stub), repr(stub)));
 
     return ".."
         do -- \%class_identifier
@@ -79,21 +81,7 @@ compile [object %classname %class_body] to:
             \%class_identifier.class = \%class_identifier;
 
             -- Define the methods:
-            \%class_identifier.methods = {
-                \(join %methods with ",\n        ")
-            }
-
-            -- Define nomsu compile time actions that rewrite "%foo baz %x" to %foo['% baz %'](%foo, %x)
-            -- so classes can have overlapping method names:
-            for i,method in ipairs(\%class_identifier.methods) do
-                for a_i, alias in ipairs(method.aliases) do
-                    \%class_identifier[nomsu:get_stub(alias)] = method.action;
-                end
-                ACTION_METADATA[method.action] = {
-                    fn=method.action, src=method.source, line_no=method.line, aliases=method.aliases,
-                };
-                nomsu:define_compile_action(method.aliases, method.line, method.compile_to, method.source);
-            end
+        \(join %methods with "\n")
 
             -- Define class methods for instantiating and accessing instances:
             \%class_identifier.instance_metatable = {
