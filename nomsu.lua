@@ -21,141 +21,135 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-if _VERSION == "Lua 5.1" then
-  local xp = xpcall
-  local xpcall
-  xpcall = function(f, errhandler, ...)
-    local args = {
-      n = select("#", ...),
-      ...
-    }
-    return xp(function(...)
-      return f(unpack(args, 1, args.n))
-    end), errhandler
-  end
-end
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt
 P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
-local STRING_ESCAPES = {
-  n = "\n",
-  t = "\t",
-  b = "\b",
-  a = "\a",
-  v = "\v",
-  f = "\f",
-  r = "\r"
-}
-local DIGIT, HEX = R('09'), R('09', 'af', 'AF')
-local ESCAPE_CHAR = (P("\\") * S("xX") * C(HEX * HEX)) / function(self)
-  return string.char(tonumber(self, 16))
-end
-ESCAPE_CHAR = ESCAPE_CHAR + ((P("\\") * C(DIGIT * (DIGIT ^ -2))) / function(self)
-  return string.char(tonumber(self))
-end)
-ESCAPE_CHAR = ESCAPE_CHAR + ((P("\\") * C(S("ntbavfr"))) / STRING_ESCAPES)
-local OPERATOR_CHAR = S("'~`!@$^&*-+=|<>?/")
-local UTF8_CHAR = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
-local IDENT_CHAR = R("az", "AZ", "09") + P("_") + UTF8_CHAR
-local parse
+local NOMSU_DEFS
 do
-  local ctx = { }
-  local indent_patt = P(function(self, start)
+  local _with_0 = { }
+  _with_0.nl = P("\n")
+  _with_0.ws = S(" \t")
+  _with_0.tonumber = tonumber
+  _with_0.print = function(src, pos, msg)
+    print(msg, pos, repr(src:sub(math.max(0, pos - 16), math.max(0, pos - 1)) .. "|" .. src:sub(pos, pos + 16)))
+    return true
+  end
+  local string_escapes = {
+    n = "\n",
+    t = "\t",
+    b = "\b",
+    a = "\a",
+    v = "\v",
+    f = "\f",
+    r = "\r"
+  }
+  local digit, hex = R('09'), R('09', 'af', 'AF')
+  _with_0.escaped_char = (P("\\") * S("xX") * C(hex * hex)) / function(self)
+    return string.char(tonumber(self, 16))
+  end
+  _with_0.escaped_char = _with_0.escaped_char + ((P("\\") * C(digit * (digit ^ -2))) / function(self)
+    return string.char(tonumber(self))
+  end)
+  _with_0.escaped_char = _with_0.escaped_char + ((P("\\") * C(S("ntbavfr"))) / string_escapes)
+  _with_0.operator_char = S("'~`!@$^&*-+=|<>?/")
+  _with_0.operator = _with_0.operator_char ^ 1
+  _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
+  _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
+  _with_0.indent = P(function(self, start)
     local spaces = self:match("[ \t]*", start)
-    if #spaces > ctx.indent_stack[#ctx.indent_stack] then
-      insert(ctx.indent_stack, #spaces)
+    if #spaces > lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] then
+      insert(lpeg.userdata.indent_stack, #spaces)
       return start + #spaces
     end
   end)
-  local dedent_patt = P(function(self, start)
+  _with_0.dedent = P(function(self, start)
     local spaces = self:match("[ \t]*", start)
-    if #spaces < ctx.indent_stack[#ctx.indent_stack] then
-      remove(ctx.indent_stack)
+    if #spaces < lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] then
+      remove(lpeg.userdata.indent_stack)
       return start
     end
   end)
-  local nodent_patt = P(function(self, start)
+  _with_0.nodent = P(function(self, start)
     local spaces = self:match("[ \t]*", start)
-    if #spaces == ctx.indent_stack[#ctx.indent_stack] then
+    if #spaces == lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] then
       return start + #spaces
     end
   end)
-  local gt_nodent_patt = P(function(self, start)
+  _with_0.gt_nodent = P(function(self, start)
     local spaces = self:match("[ \t]*", start)
-    if #spaces >= ctx.indent_stack[#ctx.indent_stack] + 4 then
-      return start + ctx.indent_stack[#ctx.indent_stack] + 4
+    if #spaces >= lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] + 4 then
+      return start + lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] + 4
     end
   end)
-  local defs = {
-    nl = P("\n"),
-    ws = S(" \t"),
-    tonumber = tonumber,
-    operator = OPERATOR_CHAR,
-    print = function(src, pos, msg)
-      return print(msg, pos, repr(src:sub(math.max(0, pos - 16), math.max(0, pos - 1)) .. "|" .. src:sub(pos, pos + 16))) or true
-    end,
-    utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191")),
-    indented = indent_patt,
-    nodented = nodent_patt,
-    dedented = dedent_patt,
-    gt_nodented = gt_nodent_patt,
-    escape_char = ESCAPE_CHAR,
-    error = function(src, pos, err_msg)
-      if ctx.source_code:sub(pos, pos) == "\n" then
-        pos = pos + #ctx.source_code:match("[ \t\n]*", pos)
+  _with_0.error = function(src, pos, err_msg)
+    if lpeg.userdata.source_code:sub(pos, pos) == "\n" then
+      pos = pos + #lpeg.userdata.source_code:match("[ \t\n]*", pos)
+    end
+    local line_no = 1
+    while (lpeg.userdata.line_starts[line_no + 1] or math.huge) < pos do
+      line_no = line_no + 1
+    end
+    local prev_line
+    if line_no > 1 then
+      prev_line = lpeg.userdata.source_code:match("[^\n]*", lpeg.userdata.line_starts[line_no - 1])
+    else
+      prev_line = ""
+    end
+    local err_line = lpeg.userdata.source_code:match("[^\n]*", lpeg.userdata.line_starts[line_no])
+    local next_line
+    if line_no < #lpeg.userdata.line_starts then
+      next_line = lpeg.userdata.source_code:match("[^\n]*", lpeg.userdata.line_starts[line_no + 1])
+    else
+      next_line = ""
+    end
+    local pointer = ("-"):rep(pos - lpeg.userdata.line_starts[line_no]) .. "^"
+    err_msg = (err_msg or "Parse error") .. " in " .. tostring(lpeg.userdata.filename) .. " on line " .. tostring(line_no) .. ":\n"
+    err_msg = err_msg .. "\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n"
+    return error(err_msg)
+  end
+  _with_0.FunctionCall = function(start, value, stop)
+    local stub = concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #value do
+        local t = value[_index_0]
+        _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
+        _len_0 = _len_0 + 1
       end
-      local line_no = 1
-      while (ctx.line_starts[line_no + 1] or math.huge) < pos do
-        line_no = line_no + 1
-      end
-      local prev_line = line_no > 1 and ctx.source_code:match("[^\n]*", ctx.line_starts[line_no - 1]) or ""
-      local err_line = ctx.source_code:match("[^\n]*", ctx.line_starts[line_no])
-      local next_line = line_no < #ctx.line_starts and ctx.source_code:match("[^\n]*", ctx.line_starts[line_no + 1]) or ""
-      local pointer = ("-"):rep(pos - ctx.line_starts[line_no]) .. "^"
-      err_msg = (err_msg or "Parse error") .. " in " .. tostring(ctx.filename) .. " on line " .. tostring(line_no) .. ":\n"
-      err_msg = err_msg .. "\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n"
-      return error(err_msg)
-    end,
-    FunctionCall = function(start, value, stop)
-      local stub = concat((function()
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #value do
-          local t = value[_index_0]
-          _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
-          _len_0 = _len_0 + 1
-        end
-        return _accum_0
-      end)(), " ")
-      local src = ctx.source_code:sub(start, stop - 1)
+      return _accum_0
+    end)(), " ")
+    local src = lpeg.userdata.source_code:sub(start, stop - 1)
+    return {
+      start = start,
+      stop = stop,
+      type = "FunctionCall",
+      src = src,
+      get_line_no = lpeg.userdata.get_line_no,
+      value = value,
+      stub = stub
+    }
+  end
+  NOMSU_DEFS = _with_0
+end
+setmetatable(NOMSU_DEFS, {
+  __index = function(self, key)
+    local make_node
+    make_node = function(start, value, stop)
       return {
         start = start,
         stop = stop,
-        type = "FunctionCall",
-        src = src,
-        get_line_no = ctx.get_line_no,
         value = value,
-        stub = stub
+        src = lpeg.userdata.source_code:sub(start, stop - 1),
+        get_line_no = lpeg.userdata.get_line_no,
+        type = key
       }
     end
-  }
-  setmetatable(defs, {
-    __index = function(self, key)
-      local make_node
-      make_node = function(start, value, stop)
-        return {
-          start = start,
-          stop = stop,
-          value = value,
-          src = ctx.source_code:sub(start, stop - 1),
-          get_line_no = ctx.get_line_no,
-          type = key
-        }
-      end
-      self[key] = make_node
-      return make_node
-    end
-  })
+    self[key] = make_node
+    return make_node
+  end
+})
+local NOMSU
+do
   local peg_tidier = re.compile([[    file <- {~ %nl* (def/comment) (%nl+ (def/comment))* %nl* ~}
     def <- anon_def / captured_def
     anon_def <- ({ident} (" "*) ":"
@@ -165,33 +159,8 @@ do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]])
-  local nomsu = peg_tidier:match(io.open("nomsu.peg"):read("*a"))
-  nomsu = re.compile(nomsu, defs)
-  parse = function(source_code, filename)
-    local _ctx = {
-      source_code = source_code,
-      filename = filename,
-      indent_stack = {
-        0
-      }
-    }
-    _ctx.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*"):match(source_code)
-    _ctx.get_line_no = function(self)
-      if not (self._line_no) then
-        local line_no = 1
-        while (_ctx.line_starts[line_no + 1] or math.huge) < self.start do
-          line_no = line_no + 1
-        end
-        self._line_no = tostring(_ctx.filename) .. ":" .. tostring(line_no)
-      end
-      return self._line_no
-    end
-    local old_ctx = ctx
-    ctx = _ctx
-    local tree = nomsu:match(source_code)
-    ctx = old_ctx
-    return tree
-  end
+  local nomsu_peg = peg_tidier:match(io.open("nomsu.peg"):read("*a"))
+  NOMSU = re.compile(nomsu_peg, NOMSU_DEFS)
 end
 local NomsuCompiler
 do
@@ -385,14 +354,39 @@ do
       end
       return code:gsub("\n", "\n" .. ("    "):rep(levels))
     end,
-    parse = function(self, str, filename)
+    parse = function(self, nomsu_code, filename)
       assert(type(filename) == "string", "Bad filename type: " .. tostring(type(filename)))
       if self.debug then
-        self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(colored.yellow(str)))
+        self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(colored.yellow(nomsu_code)))
       end
-      str = str:gsub("\r", "")
-      local tree = parse(str, filename)
-      assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(str))))
+      nomsu_code = nomsu_code:gsub("\r", "")
+      local userdata
+      do
+        local _with_0 = {
+          source_code = nomsu_code,
+          filename = filename,
+          indent_stack = {
+            0
+          }
+        }
+        _with_0.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*"):match(nomsu_code)
+        _with_0.get_line_no = function(self)
+          if not (self._line_no) then
+            local line_no = 1
+            while (_with_0.line_starts[line_no + 1] or math.huge) < self.start do
+              line_no = line_no + 1
+            end
+            self._line_no = tostring(_with_0.filename) .. ":" .. tostring(line_no)
+          end
+          return self._line_no
+        end
+        userdata = _with_0
+      end
+      local old_userdata
+      old_userdata, lpeg.userdata = lpeg.userdata, userdata
+      local tree = NOMSU:match(nomsu_code)
+      lpeg.userdata = old_userdata
+      assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
       if self.debug then
         self:writeln("PARSE TREE:")
         self:print_tree(tree, "    ")
@@ -518,7 +512,7 @@ do
       end
       local is_operator
       is_operator = function(tok)
-        return tok and tok.type == "Word" and OPERATOR_CHAR:match(tok.value)
+        return tok and tok.type == "Word" and NOMSU_DEFS.operator:match(tok.value)
       end
       local inline_expression, noeol_expression, expression
       inline_expression = function(tok)
@@ -930,7 +924,7 @@ do
         }
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
-        local fn = self.environment.ACTIONS[tree.stub]
+        local fn = rawget(self.environment.ACTIONS, tree.stub)
         local metadata = self.environment.ACTION_METADATA[fn]
         if metadata and metadata.compile_time then
           local args
@@ -1397,7 +1391,7 @@ do
   }
   _base_0.__index = _base_0
   _class_0 = setmetatable({
-    __init = function(self, parent)
+    __init = function(self)
       self.write = function(self, ...)
         return io.write(...)
       end
@@ -1412,14 +1406,8 @@ do
           return id
         end
       })
-      if parent then
-        error("Not implemented")
-      end
       self.compilestack = { }
       self.debug = false
-      self.action_metadata = setmetatable({ }, {
-        __mode = "k"
-      })
       self.environment = {
         nomsu = self,
         repr = repr,
@@ -1427,9 +1415,6 @@ do
         utils = utils,
         lpeg = lpeg,
         re = re,
-        ACTIONS = { },
-        ACTION_METADATA = self.action_metadata,
-        LOADED = { },
         next = next,
         unpack = unpack,
         setmetatable = setmetatable,
@@ -1467,9 +1452,17 @@ do
         load = load,
         ipairs = ipairs
       }
-      if not parent then
-        return self:initialize_core()
-      end
+      self.environment.ACTIONS = setmetatable({ }, {
+        __index = function(self, key)
+          return error("Attempt to run undefined action: " .. tostring(key), 0)
+        end
+      })
+      self.action_metadata = setmetatable({ }, {
+        __mode = "k"
+      })
+      self.environment.ACTION_METADATA = self.action_metadata
+      self.environment.LOADED = { }
+      return self:initialize_core()
     end,
     __base = _base_0,
     __name = "NomsuCompiler"
@@ -1486,7 +1479,7 @@ do
   self.def_number = 0
   self.math_patt = re.compile([[ "%" (" " [*/^+-] " %")+ ]])
   self.unescape_string = function(self, str)
-    return Cs(((P("\\\\") / "\\") + (P("\\\"") / '"') + ESCAPE_CHAR + P(1)) ^ 0):match(str)
+    return Cs(((P("\\\\") / "\\") + (P("\\\"") / '"') + NOMSU_DEFS.escaped_char + P(1)) ^ 0):match(str)
   end
   self.comma_separated_items = function(self, open, items, close)
     local bits = {
@@ -1508,8 +1501,8 @@ do
     return concat(bits)
   end
   self.stub_patt = re.compile("{|(' '+ / '\n..' / {'%' %id*} / {%id+} / {%op})*|}", {
-    id = IDENT_CHAR,
-    op = OPERATOR_CHAR
+    id = NOMSU_DEFS.ident_char,
+    op = NOMSU_DEFS.operator
   })
   NomsuCompiler = _class_0
 end
@@ -1628,15 +1621,15 @@ if arg then
               name = "<tail call>"
             end
             if calling_fn.short_src == "./nomsu.moon" then
-              local char = line_table[calling_fn.linedefined - 2]
-              local line_num = 3
+              local char = line_table[calling_fn.currentline]
+              local line_num = 1
               for _ in nomsu_source:sub(1, char):gmatch("\n") do
                 line_num = line_num + 1
               end
               line = colored.cyan(tostring(calling_fn.short_src) .. ":" .. tostring(line_num))
               name = colored.bright(colored.cyan(name or "???"))
             else
-              line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.linedefined))
+              line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline))
               name = colored.bright(colored.blue(name or "???"))
             end
           end

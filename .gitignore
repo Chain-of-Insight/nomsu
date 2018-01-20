@@ -1,2 +1,3 @@
 lib/*.lua
+scratch/*
 .pending-post-commit
