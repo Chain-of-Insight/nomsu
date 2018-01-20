@@ -7,23 +7,23 @@ use "lib/text.nom"
 use "lib/operators.nom"
 
 # No-Op
-immediately:
-    compile [do nothing] to code: ""
+immediately
+    compile [do nothing] to code ""
 
 # Return
-immediately:
-    compile [return] to code: "do return; end"
-    compile [return %return_value] to code: "do return \(%return_value as lua); end"
+immediately
+    compile [return] to code "do return; end"
+    compile [return %return_value] to code "do return \(%return_value as lua); end"
 
 # Conditionals
-immediately:
-    compile [if %condition %if_body] to code: ".."
+immediately
+    compile [if %condition %if_body] to code ".."
         if \(%condition as lua) then
         \(%if_body as lua statements)
         end --end if
     parse [unless %condition %unless_body] as: if (not %condition) %unless_body
 
-    compile [if %condition %if_body else %else_body, unless %condition %else_body else %if_body] to code: ".."
+    compile [if %condition %if_body else %else_body, unless %condition %else_body else %if_body] to code ".."
         if \(%condition as lua) then
         \(%if_body as lua statements)
         else
@@ -33,19 +33,19 @@ immediately:
 # Conditional expression (ternary operator)
 #.. Note: this uses a function instead of "(condition and if_expr or else_expr)"
     because that breaks if %if_expr is falsey, e.g. "x < 5 and false or 99"
-immediately:
+immediately
     compile [..]
         %when_true_expr if %condition else %when_false_expr
         %when_true_expr if %condition otherwise %when_false_expr
         %when_false_expr unless %condition else %when_true_expr
         %when_false_expr unless %condition then %when_true_expr
-    ..to:
+    ..to
         local %safe
         #.. If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
             equivalent of a conditional expression: (cond and if_true or if_false)
-        if ({Text=yes, List=yes, Dict=yes, Number=yes}->(%when_true_expr's "type")):
+        if: {Text:yes, List:yes, Dict:yes, Number:yes}->(%when_true_expr's "type")
             return "(\(%condition as lua) and \(%when_true_expr as lua) or \(%when_false_expr as lua))"
-        ..else:
+        ..else
             #.. Otherwise, need to do an anonymous inline function (yuck, too bad lua 
                 doesn't have a proper ternary operator!)
                 To see why this is necessary consider: (random()<.5 and false or 99)
@@ -59,20 +59,20 @@ immediately:
                 end)()
 
 # GOTOs
-immediately:
-    compile [-> %label] to code: ".."
+immediately
+    compile [-> %label] to code ".."
         ::label_\(nomsu "var_to_lua_identifier" [%label])::;
-    compile [go to %label] to code: ".."
+    compile [go to %label] to code ".."
         goto label_\(nomsu "var_to_lua_identifier" [%label]);
 
 # Basic loop control
-immediately:
-    compile [do next] to code: "continue;"
-    compile [stop] to code: "break;"
+immediately
+    compile [do next] to code "continue;"
+    compile [stop] to code "break;"
 
 # Helper function
-immediately:
-    action [tree %tree has function call %call]:
+immediately
+    action [tree %tree has function call %call]
         lua> ".."
             local target = (\%call).stub;
             for subtree,depth in coroutine.wrap(function() nomsu:walk_tree(\%tree); end) do
@@ -84,11 +84,11 @@ immediately:
             return false;
 
 # While loops
-immediately:
-    compile [do next repeat-loop] to code: "goto continue_repeat;"
-    compile [stop repeat-loop] to code: "goto stop_repeat;"
-    compile [repeat while %condition %body] to code:
-        set %continue_labels = (..)
+immediately
+    compile [do next repeat-loop] to code "goto continue_repeat;"
+    compile [stop repeat-loop] to code "goto stop_repeat;"
+    compile [repeat while %condition %body] to code
+        set %continue_labels =
             "\n::continue_repeat::;"
             ..if (tree %body has function call \(do next repeat-loop)) else ""
         set %code = ".."
@@ -96,7 +96,7 @@ immediately:
             \(%body as lua statements)\
             ..\%continue_labels
             end --while-loop
-        if (tree %body has function call \(stop repeat-loop)):
+        if: tree %body has function call \(stop repeat-loop)
             return ".."
                 do --while-loop label scope
                 \%code
@@ -107,30 +107,30 @@ immediately:
     parse [repeat until %condition %body] as: repeat while (not %condition) %body
 
 # For loop control flow:
-immediately:
-    compile [stop for-loop] to code: "goto stop_for;"
-    compile [stop %var] to code: ".."
+immediately
+    compile [stop for-loop] to code "goto stop_for;"
+    compile [stop %var] to code ".."
         goto stop_\(nomsu "var_to_lua_identifier" [%var]);
-    compile [do next for-loop] to code: "goto continue_for;"
-    compile [do next %var] to code: ".."
+    compile [do next for-loop] to code "goto continue_for;"
+    compile [do next %var] to code ".."
         goto continue_\(nomsu "var_to_lua_identifier" [%var]);
 
 # Numeric range for loops
-immediately:
+immediately
     compile [..]
         for %var from %start to %stop by %step %body
         for %var from %start to %stop via %step %body
-    ..to code:
+    ..to code
         local [%continue_labels, %code, %stop_labels, %loop_var, %loop_var_shim]
         set %continue_labels = ""
-        if (tree %body has function call \(do next for-loop)):
+        if: tree %body has function call \(do next for-loop)
             %continue_labels join= "\n::continue_for::;"
-        if (tree %body has function call (tree \(do next %) with {""=%var})):
+        if: tree %body has function call (tree \(do next %) with {"":%var})
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
-        if ((%var's "type") is "Var"):
+        if: (%var's "type") is "Var"
             set %loop_var = (%var as lua)
             set %loop_var_shim = ""
-        ..else:
+        ..else
             set %loop_var = "i"
             set %loop_var_shim = "\n\(%var as lua) = i;"
         # This trashes the loop variables, just like in Python.
@@ -141,11 +141,11 @@ immediately:
             ..\%continue_labels
             end --numeric for-loop
         set %stop_labels = ""
-        if (tree %body has function call \(stop for-loop)):
+        if: tree %body has function call \(stop for-loop)
             %stop_labels join= "\n::stop_for::;"
-        if (tree %body has function call (tree \(stop %) with {""=%var})):
+        if: tree %body has function call (tree \(stop %) with {"":%var})
             %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-        return (..)
+        return
             ".."
                 do --for-loop label scope
                 \%code\
@@ -153,7 +153,7 @@ immediately:
                 end --for-loop label scope
             ..if (%stop_labels is not "") else %code
 
-immediately:
+immediately
     parse [for %var from %start to %stop %body] as: for %var from %start to %stop via 1 %body
     parse [..]
         for all %start to %stop by %step %body
@@ -161,18 +161,18 @@ immediately:
     ..as: for % from %start to %stop via %step %body
     parse [for all %start to %stop %body] as: for all %start to %stop via 1 %body
 
-immediately:
-    compile [for %var in %iterable %body] to code:
+immediately
+    compile [for %var in %iterable %body] to code
         local [%continue_labels, %code, %stop_labels, %loop_var, %loop_var_shim]
         set %continue_labels = ""
-        if (tree %body has function call \(do next for-loop)):
+        if: tree %body has function call \(do next for-loop)
             %continue_labels join= "\n::continue_for::;"
-        if (tree %body has function call (tree \(do next %) with {""=%var})):
+        if: tree %body has function call (tree \(do next %) with {"":%var})
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
-        if ((%var's "type") is "Var"):
+        if: (%var's "type") is "Var"
             set %loop_var = (%var as lua)
             set %loop_var_shim = ""
-        ..else:
+        ..else
             set %loop_var = "value"
             set %loop_var_shim = "\n\(%var as lua) = value;"
         # This trashes the loop variables, just like in Python.
@@ -183,11 +183,11 @@ immediately:
             ..\%continue_labels
             end --foreach-loop
         set %stop_labels = ""
-        if (tree %body has function call \(stop for-loop)):
+        if: tree %body has function call \(stop for-loop)
             %stop_labels join= "\n::stop_for::;"
-        if (tree %body has function call (tree \(stop %) with {""=%var})):
+        if: tree %body has function call (tree \(stop %) with {"":%var})
             %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-        if (%stop_labels is not ""):
+        if: %stop_labels is not ""
             set %code = ".."
                 do --for-loop label scope
                 \%code\%stop_labels
@@ -195,13 +195,13 @@ immediately:
         return %code
     parse [for all %iterable %body] as: for % in %iterable %body
 
-immediately:
+immediately
     compile [..]
         repeat %n times %body, repeat %n x %body
-    ..to code:
+    ..to code
         local [%continue_labels, %code, %stop_labels]
         set %continue_labels = ""
-        if (tree %body has function call \(do next repeat-loop)):
+        if: tree %body has function call \(do next repeat-loop)
             %continue_labels join= "\n::continue_repeat::;"
         # This trashes the loop variables, just like in Python.
         set %code = ".."
@@ -210,9 +210,9 @@ immediately:
             ..\%continue_labels
             end --numeric for-loop
         set %stop_labels = ""
-        if (tree %body has function call \(stop repeat-loop)):
+        if: tree %body has function call \(stop repeat-loop)
             %stop_labels join= "\n::stop_repeat::;"
-        return (..)
+        return
             ".."
                 do --repeat-loop label scope
                 \%code\
@@ -221,28 +221,28 @@ immediately:
             ..if (%stop_labels is not "") else %code
 
 # Dict iteration (lua's "pairs()")
-immediately:
-    compile [for %key = %value in %iterable %body] to code:
+immediately
+    compile [for %key = %value in %iterable %body] to code
         local [..]
             %continue_labels, %code, %stop_labels, %key_loop_var, %key_loop_var_shim,
             %value_loop_var, %value_loop_var_shim
         set %continue_labels = ""
-        if (tree %body has function call \(do next for-loop)):
+        if: tree %body has function call \(do next for-loop)
             %continue_labels join= "\n::continue_for::;"
-        if (tree %body has function call (tree \(do next %x) with {x=%key})):
+        if: tree %body has function call (tree \(do next %) with {"":%key})
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%key])::;"
-        if (tree %body has function call (tree \(do next %) with {""=%value})):
+        if: tree %body has function call (tree \(do next %) with {"":%value})
             %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%value])::;"
-        if ((%key's "type") is "Var"):
+        if: (%key's "type") is "Var"
             set %key_loop_var = (%key as lua)
             set %key_loop_var_shim = ""
-        ..else:
+        ..else
             set %key_loop_var = "key"
             set %key_loop_var_shim = "\n\(%key as lua) = key;"
-        if ((%value's "type") is "Var"):
+        if: (%value's "type") is "Var"
             set %value_loop_var = (%value as lua)
             set %value_loop_var_shim = ""
-        ..else:
+        ..else
             set %value_loop_var = "value"
             set %value_loop_var_shim = "\n\(%value as lua) = value;"
         # This trashes the loop variables, just like in Python.
@@ -253,13 +253,13 @@ immediately:
             ..\%continue_labels
             end --foreach-loop
         set %stop_labels = ""
-        if (tree %body has function call \(stop for-loop)):
+        if: tree %body has function call \(stop for-loop)
             %stop_labels join= "\n::stop_for::;"
-        if (tree %body has function call (tree \(stop %) with {""=%key})):
+        if: tree %body has function call (tree \(stop %) with {"":%key})
             %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%key])::;"
-        if (tree %body has function call (tree \(stop %) with {""=%value})):
+        if: tree %body has function call (tree \(stop %) with {"":%value})
             %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%value])::;"
-        return (..)
+        return
             ".."
                 do --for-loop label scope
                 \%code\
@@ -268,13 +268,13 @@ immediately:
             ..if (%stop_labels is not "") else %code
 
 # Switch statement/multi-branch if
-immediately:
-    compile [when %body] to code:
+immediately
+    compile [when %body] to code
         local [%result, %fallthroughs, %first]
         set %result = ""
         set %fallthroughs = []
         set %first = (yes)
-        for %func_call in (%body's "value"):
+        for %func_call in (%body's "value")
             local [%tokens, %star, %condition, %action]
             assume ((%func_call's "type") is "FunctionCall") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
@@ -288,19 +288,19 @@ immediately:
                 Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
 
             set %action = (%tokens -> 3)
-            if (%action is (nil)):
+            if: %action is (nil)
                 lua do> "table.insert(\%fallthroughs, \%condition)"
                 do next %func_call
 
-            if (=lua "\%condition.type == 'Word' and \%condition.value == 'else'"):
+            if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
                 %result join= ".."
                     
                     else
                     \(%action as lua statements)
                 stop for-loop
-            ..else:
+            ..else
                 set %condition = (%condition as lua)
-                for all %fallthroughs:
+                for all %fallthroughs
                     %condition join= " or \(% as lua)"
                 %result join= ".."
                     
@@ -310,17 +310,17 @@ immediately:
             set %fallthroughs = []
             set %first = (no)
 
-        if (%result != ""):
+        if: %result is not ""
             %result join= "\nend"
         return %result
 
 # Switch statement
-immediately:
-    compile [when %branch_value = ? %body, when %branch_value is ? %body] to code:
+immediately
+    compile [when %branch_value = ? %body, when %branch_value is ? %body] to code
         set %result = ""
         set %fallthroughs = []
         set %first = (yes)
-        for %func_call in (%body's "value"):
+        for %func_call in (%body's "value")
             assume ((%func_call's "type") is "FunctionCall") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             set %tokens = (%func_call's "value")
@@ -333,19 +333,19 @@ immediately:
                 Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
 
             set %action = (%tokens -> 3)
-            if (%action is (nil)):
+            if: %action is (nil)
                 lua> "table.insert(\%fallthroughs, \%condition)"
                 do next %func_call
 
-            if (=lua "\%condition.type == 'Word' and \%condition.value == 'else'"):
+            if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
                 %result join= ".."
                     
                     else
                     \(%action as lua statements)
                 stop for-loop
-            ..else:
+            ..else
                 set %condition = "branch_value == (\(%condition as lua))"
-                for all %fallthroughs:
+                for all %fallthroughs
                     %condition join= " or (branch_value == \(% as lua))"
                 %result join= ".."
                     
@@ -355,7 +355,7 @@ immediately:
             set %fallthroughs = []
             set %first = (no)
 
-        if (%result != ""):
+        if: %result is not ""
             set %result = ".."
                 do --when % = ?
                 local branch_value = \(%branch_value as lua);\
@@ -365,11 +365,11 @@ immediately:
         return %result
 
 # Try/except
-immediately:
+immediately
     compile [..]
         try %action and if it succeeds %success or if it fails %fallback
         try %action and if it fails %fallback or if it succeeds %success
-    ..to code: ".."
+    ..to code ".."
         do
             local fell_through = false;
             local ok, ret = pcall(function()
@@ -385,22 +385,22 @@ immediately:
                 return ret;
             end
         end
-    parse [try %action] as:
+    parse [try %action] as
         try %action and if it succeeds: do nothing
         ..or if it fails: do nothing
-    parse [try %action and if it fails %fallback] as:
+    parse [try %action and if it fails %fallback] as
         try %action and if it succeeds: do nothing
         ..or if it fails %fallback
-    parse [try %action and if it succeeds %success] as:
+    parse [try %action and if it succeeds %success] as
         try %action and if it succeeds %success or if it fails: do nothing
 
 # Do/finally:
-immediately:
-    compile [do %action] to code:
+immediately
+    compile [do %action] to code
         "do\n    \(%action as lua statements)\nend" if ((%action's "type") is "Block")
         ..else "(\(%action as lua))(nomsu);"
 
-    compile [do %action then always %final_action] to code: ".."
+    compile [do %action then always %final_action] to code ".."
         do
             local fell_through = false;
             local ok, ret1 = pcall(function()
@@ -417,11 +417,11 @@ immediately:
             end
         end
 
-immediately:
-    compile [with %assignments %action] to code:
+immediately
+    compile [with %assignments %action] to code
         local [%lua, %olds, %old_vals, %new_vals]
-        set {%temp_vars=[], %old_vals=[], %new_vals=[]}
-        for %i=%assignment in (%assignments' "value"):
+        set {%temp_vars:[], %old_vals:[], %new_vals:[]}
+        for %i=%assignment in (%assignments' "value")
             set (%temp_vars->%i) = "temp\%i"
             set (%old_vals->%i) = ((%assignment's "dict_key") as lua)
             set (%new_vals->%i) = ((%assignment's "dict_value") as lua)

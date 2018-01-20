@@ -4,14 +4,14 @@
 use "lib/metaprogramming.nom"
 
 # Indexing:
-immediately:
+immediately
     #.. NOTE!!! It's critical that there are spaces around %key if it's a string,
         otherwise, Lua will get confused and interpret %obj[[[foo]]] as %obj("[foo]")
         instead of %obj[ "foo" ].
         It's also critical to have parens around %obj, otherwise Lua is too dumb to
         realize that {x=1}["x"] is the same as ({x=1})["x"] or that
         {x=1}.x is the same as ({x=1}).x
-    compile [%obj'%key, %obj's %key, %obj -> %key] to:
+    compile [%obj'%key, %obj's %key, %obj -> %key] to
         lua> ".."
             local obj_lua = \(%obj as lua);
             if not obj_lua:sub(-1,-1):match("[a-zA-Z)]") then
@@ -28,12 +28,12 @@ immediately:
             return obj_lua.."["..key_lua.."]";
 
 # Comparison Operators
-immediately:
-    compile [%x < %y] to: "(\(%x as lua) < \(%y as lua))"
-    compile [%x > %y] to: "(\(%x as lua) > \(%y as lua))"
-    compile [%x <= %y] to: "(\(%x as lua) <= \(%y as lua))"
-    compile [%x >= %y] to: "(\(%x as lua) >= \(%y as lua))"
-    compile [%a is %b, %a = %b, %a == %b] to:
+immediately
+    compile [%x < %y] to "(\(%x as lua) < \(%y as lua))"
+    compile [%x > %y] to "(\(%x as lua) > \(%y as lua))"
+    compile [%x <= %y] to "(\(%x as lua) <= \(%y as lua))"
+    compile [%x >= %y] to "(\(%x as lua) >= \(%y as lua))"
+    compile [%a is %b, %a = %b, %a == %b] to
         lua> ".."
             local safe = {Text=true, Number=true};
             local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
@@ -42,7 +42,7 @@ immediately:
             else
                 return "utils.equivalent("..a_lua..", "..b_lua..")";
             end
-    compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to:
+    compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
         lua> ".."
             local safe = {Text=true, Number=true};
             local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
@@ -52,11 +52,11 @@ immediately:
                 return "(not utils.equivalent("..a_lua..", "..b_lua.."))";
             end
     # For strict identity checking, use (%x's id) is (%y's id)
-    compile [%'s id, id of %] to: "nomsu.ids[\(% as lua)]"
+    compile [%'s id, id of %] to "nomsu.ids[\(% as lua)]"
 
 # Variable assignment operator, and += type versions
-immediately:
-    compile [local %vars] to code:
+immediately
+    compile [local %vars] to code
         lua> ".."
             local locals = \%vars.type == "List" and \%vars.value or {\%vars};
             local identifiers = {};
@@ -64,8 +64,8 @@ immediately:
                 identifiers[i] = nomsu:tree_to_lua(x).expr;
             end
             return "local "..table.concat(identifiers, ", ");
-    compile [set %var = %val] to code: "\(%var as lua) = \(%val as lua);"
-    compile [set %assignments] to code:
+    compile [set %var = %val] to code "\(%var as lua) = \(%val as lua);"
+    compile [set %assignments] to code
         assume ((%assignments' "type") is "Dict") or barf "Expected Dict, but got \(%assignments' "type")"
         lua> ".."
             local lhs, rhs = {}, {};
@@ -76,23 +76,23 @@ immediately:
             return table.concat(lhs, ", ").." = "..table.concat(rhs, ", ")..";";
 
 # Update assignment operators
-compile [%var += %val] to code: "\(%var as lua) = \(%var as lua) + \(%val as lua);"
-compile [%var -= %val] to code: "\(%var as lua) = \(%var as lua) - \(%val as lua);"
-compile [%var *= %val] to code: "\(%var as lua) = \(%var as lua) * \(%val as lua);"
-compile [%var /= %val] to code: "\(%var as lua) = \(%var as lua) / \(%val as lua);"
-compile [%var ^= %val] to code: "\(%var as lua) = \(%var as lua) ^ \(%val as lua);"
-compile [%var and= %val] to code: "\(%var as lua) = \(%var as lua) and\(%val as lua);"
-compile [%var or= %val] to code: "\(%var as lua) = \(%var as lua) or \(%val as lua);"
-compile [%var join= %val] to code: "\(%var as lua) = \(%var as lua) .. \(%val as lua);"
-compile [wrap %var around %val] to code: "\(%var as lua) = \(%var as lua) % \(%val as lua);"
+compile [%var += %val] to code "\(%var as lua) = \(%var as lua) + \(%val as lua);"
+compile [%var -= %val] to code "\(%var as lua) = \(%var as lua) - \(%val as lua);"
+compile [%var *= %val] to code "\(%var as lua) = \(%var as lua) * \(%val as lua);"
+compile [%var /= %val] to code "\(%var as lua) = \(%var as lua) / \(%val as lua);"
+compile [%var ^= %val] to code "\(%var as lua) = \(%var as lua) ^ \(%val as lua);"
+compile [%var and= %val] to code "\(%var as lua) = \(%var as lua) and\(%val as lua);"
+compile [%var or= %val] to code "\(%var as lua) = \(%var as lua) or \(%val as lua);"
+compile [%var join= %val] to code "\(%var as lua) = \(%var as lua) .. \(%val as lua);"
+compile [wrap %var around %val] to code "\(%var as lua) = \(%var as lua) % \(%val as lua);"
 
 # Math Operators
-compile [%x + %y] to: "(\(%x as lua) + \(%y as lua))"
-compile [%x - %y] to: "(\(%x as lua) - \(%y as lua))"
-compile [%x * %y] to: "(\(%x as lua) * \(%y as lua))"
-compile [%x / %y] to: "(\(%x as lua) / \(%y as lua))"
-compile [%x ^ %y] to: "(\(%x as lua) ^ \(%y as lua))"
-compile [%x wrapped around %y, %x mod %y] to: "(\(%x as lua) % \(%y as lua))"
+compile [%x + %y] to "(\(%x as lua) + \(%y as lua))"
+compile [%x - %y] to "(\(%x as lua) - \(%y as lua))"
+compile [%x * %y] to "(\(%x as lua) * \(%y as lua))"
+compile [%x / %y] to "(\(%x as lua) / \(%y as lua))"
+compile [%x ^ %y] to "(\(%x as lua) ^ \(%y as lua))"
+compile [%x wrapped around %y, %x mod %y] to "(\(%x as lua) % \(%y as lua))"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
@@ -107,19 +107,19 @@ parse [%x >= %y >= %z] as: =lua "(function(x,y,z) return x >= y and y >= z; end)
 # TODO: optimize for common case where x,y,z are all either variables or number literals
 
 # Boolean Operators
-compile [%x and %y] to: "(\(%x as lua) and \(%y as lua))"
-compile [%x or %y] to: "(\(%x as lua) or \(%y as lua))"
+compile [%x and %y] to "(\(%x as lua) and \(%y as lua))"
+compile [%x or %y] to "(\(%x as lua) or \(%y as lua))"
 
 # Bitwise Operators
-compile [%a OR %b, %a | %b] to: "bit32.bor(\(%a as lua), \(%b as lua))"
-compile [%a XOR %b] to: "bit32.bxor(\(%a as lua), \(%b as lua))"
-compile [%a AND %b, %a & %b] to: "bit32.band(\(%a as lua), \(%b as lua))"
-compile [NOT %, ~ %] to: "bit32.bnot(\(% as lua))"
-compile [%x LSHIFT %shift, %x << %shift] to: "bit32.lshift(\(%x as lua), \(%shift as lua))"
-compile [%x RSHIFT %shift, %x >>> %shift] to: "bit32.rshift(\(%x as lua), \(%shift as lua))"
-compile [%x ARSHIFT %shift, %x >> %shift] to: "bit32.arshift(\(%x as lua), \(%shift as lua))"
+compile [%a OR %b, %a | %b] to "bit32.bor(\(%a as lua), \(%b as lua))"
+compile [%a XOR %b] to "bit32.bxor(\(%a as lua), \(%b as lua))"
+compile [%a AND %b, %a & %b] to "bit32.band(\(%a as lua), \(%b as lua))"
+compile [NOT %, ~ %] to "bit32.bnot(\(% as lua))"
+compile [%x LSHIFT %shift, %x << %shift] to "bit32.lshift(\(%x as lua), \(%shift as lua))"
+compile [%x RSHIFT %shift, %x >>> %shift] to "bit32.rshift(\(%x as lua), \(%shift as lua))"
+compile [%x ARSHIFT %shift, %x >> %shift] to "bit32.arshift(\(%x as lua), \(%shift as lua))"
 # TODO: implement OR, XOR, AND for multiple operands?
 
 # Unary operators
-compile [- %] to: "-(\(% as lua))"
-compile [not %] to: "not (\(% as lua))"
+compile [- %] to "-(\(% as lua))"
+compile [not %] to "not (\(% as lua))"

@@ -16,14 +16,14 @@ parse [..]
 compile [..]
     %index st to last in %list, %index nd to last in %list, %index rd to last in %list
     %index th to last in %list
-..to: "utils.nth_to_last(\(%list as lua), \(%index as lua))"
+..to "utils.nth_to_last(\(%list as lua), \(%index as lua))"
 
 parse [first in %list, first %list] as: 1 st in %list
 parse [last in %list, last %list] as: 1 st to last in %list
 
 # Membership testing
-action [%item is in %list, %list contains %item, %list has %item]:
-    for %key = %value in %list:
+action [%item is in %list, %list contains %item, %list has %item]
+    for %key = %value in %list
         if (%key is %item): return (yes)
     return (no)
 
@@ -31,28 +31,28 @@ action [..]
     %item isn't in %list, %item is not in %list
     %list doesn't contain %item, %list does not contain %item
     %list doesn't have %item, %list does not have %item
-..:
-    for %key = %value in %list:
+..
+    for %key = %value in %list
         if (%key is %item): return (no)
     return (yes)
 
-compile [%list has key %index, %list has index %index] to: ".."
+compile [%list has key %index, %list has index %index] to ".."
     ((\(%list as lua))[\(%index as lua)] ~= nil)
 
 compile [..]
     %list doesn't have key %index, %list does not have key %index
     %list doesn't have index %index, %list does not have index %index
-..to: "((\(%list as lua))[\(%index as lua)] ~= nil)"
+..to "((\(%list as lua))[\(%index as lua)] ~= nil)"
 
-compile [length of %list, size of %list, size %list, number of %list, len %list] to:
+compile [length of %list, size of %list, size %list, number of %list, len %list] to
     "utils.size(\(%list as lua))"
 
 # Chained lookup
-compile [%list ->* %indices] to:
+compile [%list ->* %indices] to
     assume ((%indices's "type") is "List") or barf ".."
         Expected List for chained lookup, not \(%indices's "type")
     set %ret = "\(%list as lua)"
-    for %index in (%indices's "value"):
+    for %index in (%indices's "value")
         %ret join= "[\(%index as lua)]"
     return "\%ret"
 
@@ -61,41 +61,41 @@ compile [..]
     %list's %index = %new_value, %index st in %list = %new_value, %index nd in %list = %new_value
     %index rd in %list = %new_value, %index th in %list = %new_value, %index in %list = %new_value
     %list -> %index = %new_value
-..to code:
+..to code
     "(\(%list as lua))[\(%index as lua)] = \(%new_value as lua);"
 
-compile [append %item to %list, add %item to %list] to:
+compile [append %item to %list, add %item to %list] to
     "table.insert(\(%list as lua), \(%item as lua))"
 
-compile [pop from %list, remove last from %list] to:
+compile [pop from %list, remove last from %list] to
     "table.remove(\(%list as lua))"
 
-compile [remove index %index from %list] to:
+compile [remove index %index from %list] to
     "table.remove(\(%list as lua), \(%index as lua))"
 
 
-action [flatten %lists]:
+action [flatten %lists]
     set %flat = []
-    for %list in %lists:
-        for %item in %list:
+    for %list in %lists
+        for %item in %list
             add %item to %flat
     return %flat
 
-action [dict %items]:
-    {(%->1)=(%->2) for all %items}
+action [dict %items]
+    (%->1)=(%->2) for all %items
 
-action [entries in %dict]:
-    [{key=%k, value=%v} for %k=%v in %dict]
+action [entries in %dict]
+    [{key:%k, value:%v} for %k=%v in %dict]
 
-action [keys in %dict]:
+action [keys in %dict]
     [%k for %k=%v in %dict]
 
-action [values in %dict]:
+action [values in %dict]
     [%v for %k=%v in %dict]
 
 # List Comprehension
-immediately:
-    compile [%expression for %item in %iterable] to:
+immediately
+    compile [%expression for %item in %iterable] to
         assume ((%item's "type") is "Var") or barf ".."
             List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
         return ".."
@@ -108,7 +108,7 @@ immediately:
             end)()
     parse [%expression for all %iterable] as: %expression for % in %iterable
 
-    compile [%expression for %key = %value in %iterable] to:
+    compile [%expression for %key = %value in %iterable] to
         assume ((%key's "type") is "Var") or barf ".."
             List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key's "type")
         assume ((%value's "type") is "Var") or barf ".."
@@ -123,8 +123,8 @@ immediately:
             end)()
 
 # Dict comprehensions
-immediately:
-    compile [%key = %value for %item in %iterable] to:
+immediately
+    compile [%key = %value for %item in %iterable] to
         assume ((%item's "type") is "Var") or barf ".."
             Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
         return ".."
@@ -137,7 +137,7 @@ immediately:
             end)()
     parse [%key = %value for all %iterable] as: %key = %value for % in %iterable
 
-    compile [%key = %value for %src_key = %src_value in %iterable] to:
+    compile [%key = %value for %src_key = %src_value in %iterable] to
         assume ((%src_key's "type") is "Var") or barf ".."
             Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key's "type")
         assume ((%src_value's "type") is "Var") or barf ".."
@@ -152,39 +152,39 @@ immediately:
             end)()
 
 # Sorting:
-compile [sort %items] to: "table.sort(\(%items as lua))"
-compile [sort %items by %key_expr] to: ".."
+compile [sort %items] to "table.sort(\(%items as lua))"
+compile [sort %items by %key_expr] to ".."
     utils.sort(\(%items as lua), function(\(\% as lua))
         return \(%key_expr as lua);
     end)
 
-action [%items sorted]:
+action [%items sorted]
     %copy = (% for all %items)
     sort %copy
     return %copy
-action [%items sorted by %key]:
+action [%items sorted by %key]
     %copy = (% for all %items)
     sort %copy by %key
     return %copy
 
-action [unique %items]:
-    [%k for %k=%v in {%=(yes) for all %items}]
+action [unique %items]
+    [%k for %k=%v in (%=(yes) for all %items)]
 
 # Metatable stuff
-compile [counter] to: "setmetatable({}, {__index=function() return 0; end})"
-compile [default dict] to: ".."
+compile [counter] to "setmetatable({}, {__index=function() return 0; end})"
+compile [default dict] to ".."
     setmetatable({}, {__index=function(self, key)
         t = {};
         self[key] = t;
         return t;
     end})"
-action [chain %dict to %fallback]:
-    when (type of %fallback) is ?:
-        * "table":
+action [chain %dict to %fallback]
+    when (type of %fallback) is ?
+        * "table"
             =lua "setmetatable(\%dict, \%fallback)"
-        * "function":
+        * "function"
             =lua "setmetatable(\%dict, {__index=function(self, key) return (\%fallback)(nomsu, {['']=key, self=self}); end})"
-        * else:
+        * else
             =lua "setmetatable(\%dict, {__index=function(self, key) return (\%fallback); end})"
 
 

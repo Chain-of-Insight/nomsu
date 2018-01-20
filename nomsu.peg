@@ -8,56 +8,49 @@ file (File):
 shebang: "#!" [^%nl]* %nl
 
 statement: functioncall / expression
-noeol_statement: noeol_functioncall / noeol_expression
 inline_statement: inline_functioncall / inline_expression
 
-inline_block (Block): {| ":" %ws* inline_statement |}
-eol_block (Block): {| ":" %ws* noeol_statement eol |}
 indented_block (Block):
-    {| ":" indent
+    {| indent
             statement (nodent statement)*
         (dedent / (("" -> "Error while parsing block") => error))
     |}
 
 inline_nomsu (Nomsu): "\" inline_expression
-eol_nomsu (Nomsu): "\" noeol_expression
 indented_nomsu (Nomsu): "\" expression
 
 inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
-    / ("(" %ws* (inline_block / inline_statement) %ws* ")")
-noeol_expression:
+    / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")")
+indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict / indented_block
-    / ("(..)" indent
-        statement
-    (dedent / (("" -> "Error while parsing indented expression") => error))
-    ) / inline_expression
-expression: eol_block / eol_nomsu / noeol_expression
+expression:
+    inline_expression / (":" %ws* (inline_functioncall / inline_expression)) / indented_expression
 
 -- Function calls need at least one word in them
 inline_functioncall (FunctionCall):
-    {| (inline_expression %ws*)* word (%ws* (inline_expression / word))* (%ws* inline_block)?|}
-noeol_functioncall (FunctionCall):
-    {| (noeol_expression %ws*)* word (%ws* (noeol_expression / word))* |}
+    {| (inline_expression %ws*)* word (%ws* (inline_expression / word))*
+        (%ws* ":" %ws* (inline_functioncall / inline_expression))?|}
 functioncall (FunctionCall):
     {| (expression (dotdot / %ws*))* word ((dotdot / %ws*) (expression / word))* |}
 
 word (Word): { %operator / (!number plain_word) }
 
 inline_text (Text):
+    !('".."')
     '"' {|
-        ({~ (('\"' -> '"') / ('\\' -> '\') / ('\..' -> '..') / %escape_char / [^%nl\"])+ ~}
+        ({~ (('\"' -> '"') / ('\\' -> '\') / ('\..' -> '..') / %escaped_char / [^%nl\"])+ ~}
         / text_interpolation)*
     |} '"'
 indented_text (Text):
-    '".."' %ws* line_comment? %nl %gt_nodented? {|
+    '".."' %ws* line_comment? %nl %gt_nodent? {|
         ({~
-            (("\\" -> "\") / (("\" eol %nl %gt_nodented "..") -> "")
-            / (%nl+ {~ %gt_nodented -> "" ~}) / [^%nl\])+
+            (("\\" -> "\") / (("\" eol %nl %gt_nodent "..") -> "")
+            / (%nl+ {~ %gt_nodent -> "" ~}) / [^%nl\])+
         ~} / text_interpolation)*
-    |} ((!.) / (&(%nl+ !%gt_nodented)) / (("" -> "Error while parsing Text") => error))
+    |} ((!.) / (&(%nl+ !%gt_nodent)) / (("" -> "Error while parsing Text") => error))
 text_interpolation:
-    "\" (variable / inline_list / inline_dict / inline_text / ("(" %ws* (inline_block / inline_statement) %ws* ")"))
+    "\" (variable / inline_list / inline_dict / inline_text / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")"))
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
@@ -66,6 +59,7 @@ number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonum
 variable (Var): "%" { plain_word? }
 
 inline_list (List):
+    !('[..]')
     "[" %ws* {| (inline_list_item (comma inline_list_item)* comma?)? |} %ws* "]"
 indented_list (List):
     "[..]" indent {|
@@ -73,11 +67,12 @@ indented_list (List):
     |}
     (dedent / (("" -> "Error while parsing list") => error))
 list_line:
-    (inline_list_item (comma inline_list_item)* (comma (functioncall / expression)?)?)
-    / (functioncall / expression)
+     ((functioncall / expression) !comma)
+     / (inline_list_item (comma list_line?)?)
 inline_list_item: inline_functioncall / inline_expression
 
 inline_dict (Dict):
+    !('{..}')
     "{" %ws* {| (inline_dict_item (comma inline_dict_item)* comma?)? |} %ws* "}"
 indented_dict (Dict):
     "{..}" indent {|
@@ -85,21 +80,19 @@ indented_dict (Dict):
     |}
     (dedent / (("" -> "Error while parsing dict") => error))
 dict_line:
-    (inline_dict_item comma)* (
-        (inline_dict_item comma)
-        /{| {:dict_key: inline_expression / word :} %ws* "=" %ws* {:dict_value: functioncall / expression :} |}
-    )
+    ({| {:dict_key: inline_expression / word :} %ws* ":" %ws* {:dict_value: functioncall / expression :} |} !comma)
+    / (inline_dict_item (comma dict_line?)?)
 inline_dict_item:
-    {| {:dict_key: inline_expression / word :} %ws* "=" %ws* {:dict_value: inline_functioncall / inline_expression :} |}
+    {| {:dict_key: inline_expression / word :} %ws* ":" %ws* {:dict_value: inline_functioncall / inline_expression :} |}
 
-block_comment(Comment): "#.." { [^%nl]* (%nl (%ws* &%nl))* %nl %indented [^%nl]+ (%nl ((%ws* ((!.) / &%nl)) / (!%dedented [^%nl]+)))* }
+block_comment(Comment): "#.." { [^%nl]* (%nl %gt_nodent [^%nl]*)* }
 line_comment(Comment): "#" { [^%nl]* }
 
 eol: %ws* line_comment? (!. / &%nl)
-ignored_line: (%nodented (block_comment / line_comment)) / (%ws* (!. / &%nl))
-indent: eol (%nl ignored_line)* %nl %indented ((block_comment/line_comment) (%nl ignored_line)* nodent)?
-nodent: eol (%nl ignored_line)* %nl %nodented
-dedent: eol (%nl ignored_line)* (((!.) &%dedented) / (&(%nl %dedented)))
+ignored_line: (%nodent (block_comment / line_comment)) / (%ws* (!. / &%nl))
+indent: eol (%nl ignored_line)* %nl %indent ((block_comment/line_comment) (%nl ignored_line)* nodent)?
+nodent: eol (%nl ignored_line)* %nl %nodent
+dedent: eol (%nl ignored_line)* (((!.) &%dedent) / (&(%nl %dedent)))
 comma: %ws* "," %ws*
 dotdot: nodent ".." %ws*
 plain_word: ([a-zA-Z0-9_] / %utf8_char)+

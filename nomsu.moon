@@ -18,11 +18,6 @@ new_uuid = require 'uuid'
 colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
-if _VERSION == "Lua 5.1"
-    xp = xpcall
-    xpcall = (f, errhandler, ...)->
-        args = {n:select("#", ...), ...}
-        return xp((...)-> f(unpack(args,1,args.n))), errhandler
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -39,75 +34,84 @@ if _VERSION == "Lua 5.1"
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
-STRING_ESCAPES = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-DIGIT, HEX = R('09'), R('09','af','AF')
-ESCAPE_CHAR = (P("\\")*S("xX")*C(HEX*HEX)) / => string.char(tonumber(@, 16))
-ESCAPE_CHAR += (P("\\")*C(DIGIT*(DIGIT^-2))) / => string.char(tonumber @)
-ESCAPE_CHAR += (P("\\")*C(S("ntbavfr"))) / STRING_ESCAPES
-OPERATOR_CHAR = S("'~`!@$^&*-+=|<>?/")
-UTF8_CHAR = (
-    R("\194\223")*R("\128\191") +
-    R("\224\239")*R("\128\191")*R("\128\191") +
-    R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
-IDENT_CHAR = R("az","AZ","09") + P("_") + UTF8_CHAR
+NOMSU_DEFS = with {}
+    .nl = P("\n")
+    .ws = S(" \t")
+    .tonumber = tonumber
+    .print = (src,pos,msg)->
+        print(msg, pos, repr(src\sub(math.max(0,pos-16),math.max(0,pos-1)).."|"..src\sub(pos,pos+16)))
+        return true
+    string_escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
+    digit, hex = R('09'), R('09','af','AF')
+    .escaped_char = (P("\\")*S("xX")*C(hex*hex)) / => string.char(tonumber(@, 16))
+    .escaped_char += (P("\\")*C(digit*(digit^-2))) / => string.char(tonumber @)
+    .escaped_char += (P("\\")*C(S("ntbavfr"))) / string_escapes
+    .operator_char = S("'~`!@$^&*-+=|<>?/")
+    .operator = .operator_char^1
+    .utf8_char = (
+        R("\194\223")*R("\128\191") +
+        R("\224\239")*R("\128\191")*R("\128\191") +
+        R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
+    .ident_char = R("az","AZ","09") + P("_") + .utf8_char
 
-local parse
-do
-    export parse
-    ctx = {}
-    indent_patt = P (start)=>
+    -- If the number of leading space characters is greater than number in the top of the
+    -- stack, this pattern matches and pushes the number onto the stack.
+    .indent = P (start)=>
         spaces = @match("[ \t]*", start)
-        if #spaces > ctx.indent_stack[#ctx.indent_stack]
-            insert(ctx.indent_stack, #spaces)
+        if #spaces > lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+            insert(lpeg.userdata.indent_stack, #spaces)
             return start + #spaces
-    dedent_patt = P (start)=>
+    -- If the number of leading space characters is less than number in the top of the
+    -- stack, this pattern matches and pops off the top of the stack exactly once.
+    .dedent = P (start)=>
         spaces = @match("[ \t]*", start)
-        if #spaces < ctx.indent_stack[#ctx.indent_stack]
-            remove(ctx.indent_stack)
+        if #spaces < lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+            remove(lpeg.userdata.indent_stack)
             return start
-    nodent_patt = P (start)=>
+    -- If the number of leading space characters is equal to the number on the top of the
+    -- stack, this pattern matches and does not modify the stack.
+    .nodent = P (start)=>
         spaces = @match("[ \t]*", start)
-        if #spaces == ctx.indent_stack[#ctx.indent_stack]
+        if #spaces == lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
             return start + #spaces
-    gt_nodent_patt = P (start)=>
-        -- Note! This assumes indent is 4 spaces!!!
+    -- If the number of leading space characters is 4+ more than the number on the top of the
+    -- stack, this pattern matches the first n+4 spaces and does not modify the stack.
+    .gt_nodent = P (start)=>
+        -- Note! This assumes indent is exactly 4 spaces!!!
         spaces = @match("[ \t]*", start)
-        if #spaces >= ctx.indent_stack[#ctx.indent_stack] + 4
-            return start + ctx.indent_stack[#ctx.indent_stack] + 4
+        if #spaces >= lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] + 4
+            return start + lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] + 4
 
-    defs =
-        nl: P("\n"), ws: S(" \t"), :tonumber, operator: OPERATOR_CHAR
-        print: (src,pos,msg)-> print(msg, pos, repr(src\sub(math.max(0,pos-16),math.max(0,pos-1)).."|"..src\sub(pos,pos+16))) or true
-        utf8_char: (
-            R("\194\223")*R("\128\191") +
-            R("\224\239")*R("\128\191")*R("\128\191") +
-            R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
-        indented: indent_patt, nodented: nodent_patt, dedented: dedent_patt
-        gt_nodented: gt_nodent_patt, escape_char:ESCAPE_CHAR
-        error: (src,pos,err_msg)->
-            if ctx.source_code\sub(pos,pos) == "\n"
-                pos += #ctx.source_code\match("[ \t\n]*", pos)
-            line_no = 1
-            while (ctx.line_starts[line_no+1] or math.huge) < pos do line_no += 1
-            prev_line = line_no > 1 and ctx.source_code\match("[^\n]*", ctx.line_starts[line_no-1]) or ""
-            err_line = ctx.source_code\match("[^\n]*", ctx.line_starts[line_no])
-            next_line = line_no < #ctx.line_starts and ctx.source_code\match("[^\n]*", ctx.line_starts[line_no+1]) or ""
-            pointer = ("-")\rep(pos-ctx.line_starts[line_no]) .. "^"
-            err_msg = (err_msg or "Parse error").." in #{ctx.filename} on line #{line_no}:\n"
-            err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"
-            error(err_msg)
-        FunctionCall: (start, value, stop)->
-            stub = concat([(t.type == "Word" and t.value or "%") for t in *value], " ")
-            src = ctx.source_code\sub(start,stop-1)
-            return {:start, :stop, type: "FunctionCall", :src, get_line_no:ctx.get_line_no, :value, :stub}
+    .error = (src,pos,err_msg)->
+        if lpeg.userdata.source_code\sub(pos,pos) == "\n"
+            pos += #lpeg.userdata.source_code\match("[ \t\n]*", pos)
+        line_no = 1
+        while (lpeg.userdata.line_starts[line_no+1] or math.huge) < pos do line_no += 1
+        prev_line = if line_no > 1
+            lpeg.userdata.source_code\match("[^\n]*", lpeg.userdata.line_starts[line_no-1])
+        else ""
+        err_line = lpeg.userdata.source_code\match("[^\n]*", lpeg.userdata.line_starts[line_no])
+        next_line = if line_no < #lpeg.userdata.line_starts
+            lpeg.userdata.source_code\match("[^\n]*", lpeg.userdata.line_starts[line_no+1])
+        else ""
+        pointer = ("-")\rep(pos-lpeg.userdata.line_starts[line_no]) .. "^"
+        err_msg = (err_msg or "Parse error").." in #{lpeg.userdata.filename} on line #{line_no}:\n"
+        err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"
+        error(err_msg)
 
-    setmetatable(defs, {__index:(key)=>
-        make_node = (start, value, stop)->
-            {:start, :stop, :value, src:ctx.source_code\sub(start,stop-1), get_line_no:ctx.get_line_no, type: key}
-        self[key] = make_node
-        return make_node
-    })
+    .FunctionCall = (start, value, stop)->
+        stub = concat([(t.type == "Word" and t.value or "%") for t in *value], " ")
+        src = lpeg.userdata.source_code\sub(start,stop-1)
+        return {:start, :stop, type: "FunctionCall", :src, get_line_no:lpeg.userdata.get_line_no, :value, :stub}
 
+setmetatable(NOMSU_DEFS, {__index:(key)=>
+    make_node = (start, value, stop)->
+        {:start, :stop, :value, src:lpeg.userdata.source_code\sub(start,stop-1), get_line_no:lpeg.userdata.get_line_no, type: key}
+    self[key] = make_node
+    return make_node
+})
+
+NOMSU = do
     -- Just for cleanliness, I put the language spec in its own file using a slightly modified
     -- version of the lpeg.re syntax.
     peg_tidier = re.compile [[
@@ -120,33 +124,15 @@ do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]]
-
-    nomsu = peg_tidier\match(io.open("nomsu.peg")\read("*a"))
-    nomsu = re.compile(nomsu, defs)
-
-    parse = (source_code, filename)->
-        _ctx = {:source_code, :filename, indent_stack: {0}}
-        _ctx.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*")\match(source_code)
-        _ctx.get_line_no = =>
-            unless @_line_no
-                line_no = 1
-                while (_ctx.line_starts[line_no+1] or math.huge) < @start do line_no += 1
-                @_line_no = "#{_ctx.filename}:#{line_no}"
-            return @_line_no
-
-        old_ctx = ctx
-        export ctx
-        ctx = _ctx
-        tree = nomsu\match(source_code)
-        ctx = old_ctx
-        return tree
+    nomsu_peg = peg_tidier\match(io.open("nomsu.peg")\read("*a"))
+    re.compile(nomsu_peg, NOMSU_DEFS)
 
 class NomsuCompiler
     @def_number: 0
-    new:(parent)=>
+    new:()=>
         @write = (...)=> io.write(...)
         @write_err = (...)=> io.stderr\write(...)
-        -- Use # to prevent someone from defining a function that has a namespace collision.
+        -- Weak-key mapping from objects to randomly generated unique IDs
         @ids = setmetatable({}, {
             __mode: "k"
             __index: (key)=>
@@ -154,17 +140,12 @@ class NomsuCompiler
                 @[key] = id
                 return id
         })
-        if parent
-            -- TODO: Implement
-            error("Not implemented")
         @compilestack = {}
         @debug = false
 
-        @action_metadata = setmetatable({}, {__mode:"k"})
         @environment = {
             -- Discretionary/convenience stuff
             nomsu:self, repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re,
-            ACTIONS:{}, ACTION_METADATA:@action_metadata, LOADED:{},
             -- Lua stuff:
             :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
             :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
@@ -172,8 +153,13 @@ class NomsuCompiler
             :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :pairs,
             :load, :ipairs,
         }
-        if not parent
-            @initialize_core!
+        @environment.ACTIONS = setmetatable({}, {__index:(key)=>
+            error("Attempt to run undefined action: #{key}", 0)
+        })
+        @action_metadata = setmetatable({}, {__mode:"k"})
+        @environment.ACTION_METADATA = @action_metadata
+        @environment.LOADED = {}
+        @initialize_core!
     
     writeln:(...)=>
         @write(...)
@@ -277,13 +263,26 @@ class NomsuCompiler
     indent: (code, levels=1)=>
         return code\gsub("\n","\n"..("    ")\rep(levels))
 
-    parse: (str, filename)=>
+    parse: (nomsu_code, filename)=>
         assert type(filename) == "string", "Bad filename type: #{type filename}"
         if @debug
-            @writeln("#{colored.bright "PARSING:"}\n#{colored.yellow str}")
-        str = str\gsub("\r","")
-        tree = parse(str, filename)
-        assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black str}"
+            @writeln("#{colored.bright "PARSING:"}\n#{colored.yellow nomsu_code}")
+        nomsu_code = nomsu_code\gsub("\r","")
+
+        userdata = with {source_code:nomsu_code, :filename, indent_stack: {0}}
+            .line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*")\match(nomsu_code)
+            .get_line_no = =>
+                unless @_line_no
+                    line_no = 1
+                    while (.line_starts[line_no+1] or math.huge) < @start do line_no += 1
+                    @_line_no = "#{.filename}:#{line_no}"
+                return @_line_no
+
+        old_userdata, lpeg.userdata = lpeg.userdata, userdata
+        tree = NOMSU\match(nomsu_code)
+        lpeg.userdata = old_userdata
+        
+        assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
         if @debug
             @writeln "PARSE TREE:"
             @print_tree tree, "    "
@@ -377,7 +376,7 @@ class NomsuCompiler
                     return nil
             return concat(lines, "\n"..indentation)
 
-        is_operator = (tok)-> tok and tok.type == "Word" and OPERATOR_CHAR\match(tok.value)
+        is_operator = (tok)-> tok and tok.type == "Word" and NOMSU_DEFS.operator\match(tok.value)
 
         local inline_expression, noeol_expression, expression
         inline_expression = (tok)->
@@ -645,7 +644,8 @@ class NomsuCompiler
             when "FunctionCall"
                 insert @compilestack, tree
 
-                fn = @environment.ACTIONS[tree.stub]
+                -- Rawget here to avoid triggering an error for accessing an undefined action
+                fn = rawget(@environment.ACTIONS, tree.stub)
                 metadata = @environment.ACTION_METADATA[fn]
                 if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
@@ -788,7 +788,7 @@ class NomsuCompiler
         return concat(bits, "\n")
 
     @unescape_string: (str)=>
-        Cs(((P("\\\\")/"\\") + (P("\\\"")/'"') + ESCAPE_CHAR + P(1))^0)\match(str)
+        Cs(((P("\\\\")/"\\") + (P("\\\"")/'"') + NOMSU_DEFS.escaped_char + P(1))^0)\match(str)
 
     @comma_separated_items: (open, items, close)=>
         bits = {open}
@@ -836,7 +836,7 @@ class NomsuCompiler
         return tree
 
     @stub_patt: re.compile "{|(' '+ / '\n..' / {'%' %id*} / {%id+} / {%op})*|}",
-        id:IDENT_CHAR, op:OPERATOR_CHAR
+        id:NOMSU_DEFS.ident_char, op:NOMSU_DEFS.operator
     get_stub: (x)=>
         if not x
             error "Nothing to get stub from"
@@ -1014,20 +1014,21 @@ if arg
                 if calling_fn.istailcall and not name
                     name = "<tail call>"
                 if calling_fn.short_src == "./nomsu.moon"
-                    -- Ugh, magic numbers, but this works
-                    char = line_table[calling_fn.linedefined-2]
-                    line_num = 3
+                    char = line_table[calling_fn.currentline]
+                    line_num = 1
                     for _ in nomsu_source\sub(1,char)\gmatch("\n") do line_num += 1
                     line = colored.cyan("#{calling_fn.short_src}:#{line_num}")
                     name = colored.bright(colored.cyan(name or "???"))
                 else
-                    line = colored.blue("#{calling_fn.short_src}:#{calling_fn.linedefined}")
+                    line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline}")
                     name = colored.bright(colored.blue(name or "???"))
             _from = colored.dim colored.white "|"
             print(("%32s %s %s")\format(name, _from, line))
 
         os.exit(false, true)
 
+    -- Note: xpcall has a slightly different API in Lua <=5.1 vs. >=5.2, but this works
+    -- for both APIs
     xpcall(run, err_hand)
 
 return NomsuCompiler
