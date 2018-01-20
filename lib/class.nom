@@ -1,6 +1,6 @@
 use "lib/core.nom"
 
-compile [@%var] to:
+compile [@%var] to
     lua> ".."
         local key_lua = repr(\%var.value);
         local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
@@ -12,7 +12,7 @@ compile [@%var] to:
         end
         return "_me["..key_lua.."]";
 
-compile [set @%var = %val] to code:
+compile [set @%var = %val] to code
     lua> ".."
         local val_lua = \(%val as lua);
         local key_lua = repr(\%var.value);
@@ -25,14 +25,15 @@ compile [set @%var = %val] to code:
         end
         return "_me["..key_lua.."] = "..val_lua..";";
 
-compile [object %classname %class_body] to:
+compile [object %classname %class_body] to
     local [%methods, %class_identifier]
     set %class_identifier = (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
-    if (%class_identifier == ""):
+    if: %class_identifier is ""
         set %class_identifier = "class"
     set %methods = []
-    for %line in (%class_body's "value"):
-        if ((%line's "type") == "Comment"): do next %line
+    for %line in (%class_body's "value")
+        if: (%line's "type") is "Comment"
+            do next %line
         assume (((%line's "type") == "FunctionCall") and ((%line's "stub") == "action % %"))
         ..or barf "Only action definitions are supported inside 'object % %', not \(%line's "src")"
         lua> ".."
