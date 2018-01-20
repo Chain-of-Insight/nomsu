@@ -103,7 +103,7 @@ immediately
                 ::stop_repeat::;
                 end --while-loop label scope
         return %code
-    parse [repeat %body] as: repeat while (true) %body
+    parse [repeat %body] as: repeat while (yes) %body
     parse [repeat until %condition %body] as: repeat while (not %condition) %body
 
 # For loop control flow:

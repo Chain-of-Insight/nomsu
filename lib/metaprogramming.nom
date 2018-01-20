@@ -97,7 +97,7 @@ immediately
                 end
                 template = repr(table.concat(template, "\\n"));
             else
-                template = repr(\%longhand.src);
+                template = repr(nomsu:dedent(\%longhand.src));
             end
             local junk, arg_names, junk = nomsu:get_stub(\%shorthand.value[1]);
             local replacements = {};
