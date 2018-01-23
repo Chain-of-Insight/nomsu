@@ -1378,7 +1378,7 @@ do
         }
       end)
       self:define_action("run file %filename", "nomsu.moon", function(_filename)
-        return nomus:run_file(_filename)
+        return nomsu:run_file(_filename)
       end)
       return self:define_compile_action("use %filename", "nomsu.moon", function(_filename)
         local filename = nomsu:tree_to_value(_filename)

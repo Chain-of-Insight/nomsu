@@ -915,7 +915,7 @@ class NomsuCompiler
             expr: repr(nomsu\source_code(nomsu\tree_to_value(_level)))
 
         @define_action "run file %filename", "nomsu.moon", (_filename)->
-            nomus\run_file(_filename)
+            nomsu\run_file(_filename)
 
         @define_compile_action "use %filename", "nomsu.moon", (_filename)->
             filename = nomsu\tree_to_value(_filename)
