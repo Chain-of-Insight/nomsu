@@ -8,7 +8,6 @@ file (File):
 shebang: "#!" [^%nl]* %nl
 
 statement: functioncall / expression
-inline_statement: inline_functioncall / inline_expression
 
 indented_block (Block):
     {| indent
