@@ -34,11 +34,19 @@ immediately
     lua> ".."
         nomsu:define_compile_action("compile %names to %body", \(__line_no__), function(\%names, \%body)
             local names, args = nomsu:parse_spec(\%names);
+            local declared_locals = {};
+            for i, arg in ipairs(args) do declared_locals[arg] = true; end
             names, args = repr(names), table.concat(args, ", ");
             local body_lua = nomsu:tree_to_lua(\%body);
             local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            if body_lua.locals and #body_lua.locals > 0 then
-                body_code = "local "..table.concat(body_lua.locals, ", ")..";\\n"..body_code;
+            local undeclared_locals = {};
+            for i, body_local in ipairs(body_lua.locals or {}) do
+                if not declared_locals[body_local] then
+                    table.insert(undeclared_locals, body_local);
+                end
+            end
+            if #undeclared_locals > 0 then
+                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
             end
             local lua = ([[
         do
@@ -55,11 +63,20 @@ immediately
     lua> ".."
         nomsu:define_compile_action("compile %names to code %body", \(__line_no__), function(\%names, \%body)
             local names, args = nomsu:parse_spec(\%names);
+            local declared_locals = {};
+            for i, arg in ipairs(args) do declared_locals[arg] = true; end
             names, args = repr(names), table.concat(args, ", ");
             local body_lua = nomsu:tree_to_lua(\%body);
             local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            if body_lua.locals and #body_lua.locals > 0 then
-                body_code = "local "..table.concat(body_lua.locals, ", ")..";\\n"..body_code;
+            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
+            local undeclared_locals = {};
+            for i, body_local in ipairs(body_lua.locals or {}) do
+                if not declared_locals[body_local] then
+                    table.insert(undeclared_locals, body_local);
+                end
+            end
+            if #undeclared_locals > 0 then
+                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
             end
             local lua = ([[
         do
@@ -78,11 +95,19 @@ immediately
     compile [action %names %body] to code
         lua> ".."
             local names, args = nomsu:parse_spec(\%names);
+            local declared_locals = {};
+            for i, arg in ipairs(args) do declared_locals[arg] = true; end
             names, args = repr(names), table.concat(args, ", ");
             local body_lua = nomsu:tree_to_lua(\%body);
             local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            if body_lua.locals and #body_lua.locals > 0 then
-                body_code = "local "..table.concat(body_lua.locals, ", ")..";\\n"..body_code;
+            local undeclared_locals = {};
+            for i, body_local in ipairs(body_lua.locals or {}) do
+                if not declared_locals[body_local] then
+                    table.insert(undeclared_locals, body_local);
+                end
+            end
+            if #undeclared_locals > 0 then
+                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
             end
             local src = nomsu:dedent(nomsu:source_code(0));
             local def_lua = ([[
