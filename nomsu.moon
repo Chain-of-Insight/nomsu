@@ -136,9 +136,13 @@ class NomsuCompiler
         @write = (...)=> io.write(...)
         @write_err = (...)=> io.stderr\write(...)
         -- Weak-key mapping from objects to randomly generated unique IDs
+        NaN_surrogate = {}
+        nil_surrogate = {}
         @ids = setmetatable({}, {
             __mode: "k"
             __index: (key)=>
+                if key == nil then return @[nil_surrogate]
+                elseif key != key then return @[NaN_surrogate]
                 id = new_uuid!
                 @[key] = id
                 return id

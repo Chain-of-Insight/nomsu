@@ -9,10 +9,6 @@ use "lib/operators.nom"
 # List/dict functions:
 
 # Indexing
-parse [..]
-    %index st in %list, %index nd in %list, %index rd in %list
-    %index th in %list
-..as: %list -> %index
 compile [..]
     %index st to last in %list, %index nd to last in %list, %index rd to last in %list
     %index th to last in %list
@@ -47,15 +43,6 @@ compile [..]
 compile [length of %list, size of %list, size %list, number of %list, len %list] to
     "utils.size(\(%list as lua))"
 
-# Chained lookup
-compile [%list ->* %indices] to
-    assume ((%indices's "type") is "List") or barf ".."
-        Expected List for chained lookup, not \(%indices's "type")
-    %ret <- "\(%list as lua)"
-    for %index in (%indices's "value")
-        <- %ret + "[\(%index as lua)]"
-    return "\%ret"
-
 compile [append %item to %list, add %item to %list] to
     "table.insert(\(%list as lua), \(%item as lua))"
 
@@ -72,9 +59,6 @@ action [flatten %lists]
         for %item in %list
             add %item to %flat
     return %flat
-
-action [dict %items]
-    (%->1)=(%->2) for all %items
 
 action [entries in %dict]
     [{key:%k, value:%v} for %k=%v in %dict]
@@ -163,22 +147,16 @@ action [unique %items]
     [%k for %k=%v in (%=(yes) for all %items)]
 
 # Metatable stuff
-compile [counter] to "setmetatable({}, {__index=function() return 0; end})"
-compile [default dict] to ".."
+compile [set %dict's metatable to %metatable] to code ".."
+    setmetatable(\(%dict as lua), \(%metatable as lua));
+
+compile [new counter] to "setmetatable({}, {__index=function() return 0; end})"
+
+compile [new default dict] to ".."
     setmetatable({}, {__index=function(self, key)
         t = {};
         self[key] = t;
         return t;
     end})"
-action [chain %dict to %fallback]
-    when (type of %fallback) is ?
-        * "table"
-            =lua "setmetatable(\%dict, \%fallback)"
-        * "function"
-            =lua "setmetatable(\%dict, {__index=function(self, key) return (\%fallback)(nomsu, {['']=key, self=self}); end})"
-        * else
-            =lua "setmetatable(\%dict, {__index=function(self, key) return (\%fallback); end})"
-
 
 # TODO: maybe make a generator/coroutine?
-

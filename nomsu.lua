@@ -1430,9 +1430,16 @@ do
       self.write_err = function(self, ...)
         return io.stderr:write(...)
       end
+      local NaN_surrogate = { }
+      local nil_surrogate = { }
       self.ids = setmetatable({ }, {
         __mode = "k",
         __index = function(self, key)
+          if key == nil then
+            return self[nil_surrogate]
+          elseif key ~= key then
+            return self[NaN_surrogate]
+          end
           local id = new_uuid()
           self[key] = id
           return id
