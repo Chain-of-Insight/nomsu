@@ -11,7 +11,7 @@ use "lib/operators.nom"
 # Indexing
 parse [..]
     %index st in %list, %index nd in %list, %index rd in %list
-    %index th in %list, %index in %list
+    %index th in %list
 ..as: %list -> %index
 compile [..]
     %index st to last in %list, %index nd to last in %list, %index rd to last in %list
@@ -51,7 +51,7 @@ compile [length of %list, size of %list, size %list, number of %list, len %list]
 compile [%list ->* %indices] to
     assume ((%indices's "type") is "List") or barf ".."
         Expected List for chained lookup, not \(%indices's "type")
-    set %ret = "\(%list as lua)"
+    %ret <- "\(%list as lua)"
     for %index in (%indices's "value")
         %ret join= "[\(%index as lua)]"
     return "\%ret"
@@ -75,7 +75,7 @@ compile [remove index %index from %list] to
 
 
 action [flatten %lists]
-    set %flat = []
+    %flat <- []
     for %list in %lists
         for %item in %list
             add %item to %flat

@@ -21,6 +21,12 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
+do
+  local STRING_METATABLE = getmetatable("")
+  STRING_METATABLE.__add = function(self, other)
+    return self .. stringify(other)
+  end
+end
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt
 P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
@@ -416,6 +422,10 @@ do
       assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local lua = self:tree_to_lua(tree)
       local lua_code = lua.statements or (lua.expr .. ";")
+      local locals = lua_code.locals or { }
+      if #locals > 0 then
+        lua_code = "local " .. concat(locals, ", ") .. ";\n" .. lua_code
+      end
       lua_code = "-- File: " .. tostring(filename) .. "\n" .. lua_code
       local ret = self:run_lua(lua_code)
       if max_operations then
@@ -875,6 +885,7 @@ do
         if #tree.value == 1 then
           return self:tree_to_lua(tree.value[1])
         end
+        local declared_locals = { }
         local lua_bits = { }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
@@ -883,10 +894,32 @@ do
           if not lua then
             error("No lua produced by " .. tostring(repr(line)))
           end
+          if lua.locals then
+            local new_locals
+            do
+              local _accum_0 = { }
+              local _len_0 = 1
+              local _list_1 = lua.locals
+              for _index_1 = 1, #_list_1 do
+                local l = _list_1[_index_1]
+                if not declared_locals[l] then
+                  _accum_0[_len_0] = l
+                  _len_0 = _len_0 + 1
+                end
+              end
+              new_locals = _accum_0
+            end
+            if #new_locals > 0 then
+              insert(lua_bits, "local " .. tostring(concat(new_locals, ", ")) .. ";")
+              for _index_1 = 1, #new_locals do
+                local l = new_locals[_index_1]
+                declared_locals[l] = true
+              end
+            end
+          end
           if lua.statements then
             insert(lua_bits, lua.statements)
-          end
-          if lua.expr then
+          elseif lua.expr then
             insert(lua_bits, tostring(lua.expr) .. ";")
           end
         end
@@ -903,6 +936,7 @@ do
         }
       elseif "Block" == _exp_0 then
         local lua_bits = { }
+        local locals = { }
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local arg = _list_0[_index_0]
@@ -912,15 +946,22 @@ do
               expr = lua.expr
             }
           end
+          if lua.locals then
+            local _list_1 = lua.locals
+            for _index_1 = 1, #_list_1 do
+              local l = _list_1[_index_1]
+              locals[l] = true
+            end
+          end
           if lua.statements then
             insert(lua_bits, lua.statements)
-          end
-          if lua.expr then
+          elseif lua.expr then
             insert(lua_bits, tostring(lua.expr) .. ";")
           end
         end
         return {
-          statements = concat(lua_bits, "\n")
+          statements = concat(lua_bits, "\n"),
+          locals = (next(locals) and utils.keys(locals) or nil)
         }
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
@@ -981,7 +1022,7 @@ do
               insert(bits, tok.value)
             else
               local lua = self:tree_to_lua(tok)
-              assert(lua.statements == nil, "non-expression value inside math expression")
+              assert(lua.expr, "non-expression value inside math expression: " .. tostring(tok.src))
               insert(bits, lua.expr)
             end
           end
@@ -1001,7 +1042,7 @@ do
               break
             end
             local lua = self:tree_to_lua(tok)
-            assert(lua.expr, "Cannot use " .. tostring(tok.src) .. " as an argument, since it's not an expression, it produces: " .. tostring(repr(lua)))
+            assert(lua.expr, tostring(tree:get_line_no()) .. ": Cannot use:\n" .. tostring(colored.yellow(tok.src)) .. "\nas an argument to " .. tostring(tree.stub) .. ", since it's not an expression, it produces: " .. tostring(repr(lua)))
             insert(args, lua.expr)
             _continue_0 = true
           until true
@@ -1051,9 +1092,7 @@ do
               self:print_tree(bit)
               self:writeln(tostring(colored.bright("EXPR:")) .. " " .. tostring(lua.expr) .. ", " .. tostring(colored.bright("STATEMENT:")) .. " " .. tostring(lua.statements))
             end
-            if lua.statements then
-              error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
-            end
+            assert(lua.expr, "Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
             insert(concat_parts, "stringify(" .. tostring(lua.expr) .. ")")
             _continue_0 = true
           until true
@@ -1083,9 +1122,7 @@ do
         for _index_0 = 1, #_list_0 do
           local item = _list_0[_index_0]
           local lua = self:tree_to_lua(item)
-          if lua.statements then
-            error("Cannot use [[" .. tostring(item.src) .. "]] as a list item, since it's not an expression.")
-          end
+          assert(lua.expr, "Cannot use [[" .. tostring(item.src) .. "]] as a list item, since it's not an expression.")
           insert(items, lua.expr)
         end
         return {
@@ -1104,13 +1141,9 @@ do
           else
             key_lua = self:tree_to_lua(entry.dict_key)
           end
-          if key_lua.statements then
-            error("Cannot use [[" .. tostring(entry.dict_key.src) .. "]] as a dict key, since it's not an expression.")
-          end
+          assert(key_lua.expr, "Cannot use [[" .. tostring(entry.dict_key.src) .. "]] as a dict key, since it's not an expression.")
           local value_lua = self:tree_to_lua(entry.dict_value)
-          if value_lua.statements then
-            error("Cannot use [[" .. tostring(entry.dict_value.src) .. "]] as a dict value, since it's not an expression.")
-          end
+          assert(value_lua.expr, "Cannot use [[" .. tostring(entry.dict_value.src) .. "]] as a dict value, since it's not an expression.")
           local key_str = key_lua.expr:match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
           if key_str then
             insert(items, tostring(key_str) .. "=" .. tostring(value_lua.expr))
@@ -1338,9 +1371,7 @@ do
             insert(concat_parts, bit)
           else
             local lua = nomsu:tree_to_lua(bit)
-            if lua.statements then
-              error("Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
-            end
+            assert(lua.expr, "Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
             insert(concat_parts, lua.expr)
           end
         end
@@ -1352,7 +1383,8 @@ do
         lua_code = "-- Immediately:\n" .. lua_code
         nomsu:run_lua(lua_code)
         return {
-          statements = lua_code
+          statements = lua_code,
+          locals = lua.locals
         }
       end)
       self:define_compile_action("lua> %code", "nomsu.moon", function(_code)

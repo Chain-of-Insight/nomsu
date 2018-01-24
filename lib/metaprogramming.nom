@@ -21,7 +21,6 @@ immediately
                 return names, args;
             else
                 local alias = nomsu:tree_to_value(spec);
-                print("ALIAS!!! "..repr(alias).." from "..repr(spec));
                 local junk, arg_names, junk = nomsu:get_stub(alias);
                 local args = {};
                 for i, a in ipairs(arg_names) do args[i] = nomsu:var_to_lua_identifier(a); end
@@ -37,7 +36,10 @@ immediately
             local names, args = nomsu:parse_spec(\%names);
             names, args = repr(names), table.concat(args, ", ");
             local body_lua = nomsu:tree_to_lua(\%body);
-            body_lua = body_lua.statements or ("return "..body_lua.expr..";");
+            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
+            if body_lua.locals and #body_lua.locals > 0 then
+                body_code = "local "..table.concat(body_lua.locals, ", ")..";\\n"..body_code;
+            end
             local lua = ([[
         do
             local function compile_action(%s)
@@ -45,7 +47,7 @@ immediately
             end
             local function compile_action_wrapper(%s) return {expr=compile_action(%s)}; end
             nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
-        end]]):format(args, body_lua, args, args, names, repr(\%names:get_line_no()),
+        end]]):format(args, body_code, args, args, names, repr(\%names:get_line_no()),
             repr(("compile %s\\n..to %s"):format(\%names.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
@@ -55,7 +57,10 @@ immediately
             local names, args = nomsu:parse_spec(\%names);
             names, args = repr(names), table.concat(args, ", ");
             local body_lua = nomsu:tree_to_lua(\%body);
-            body_lua = body_lua.statements or ("return "..body_lua.expr..";");
+            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
+            if body_lua.locals and #body_lua.locals > 0 then
+                body_code = "local "..table.concat(body_lua.locals, ", ")..";\\n"..body_code;
+            end
             local lua = ([[
         do
             local function compile_action(%s)
@@ -63,7 +68,7 @@ immediately
             end
             local function compile_action_wrapper(%s) return {statements=compile_action(%s)}; end
             nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
-        end]]):format(args, body_lua, args, args, names, repr(\%names:get_line_no()),
+        end]]):format(args, body_code, args, args, names, repr(\%names:get_line_no()),
             repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
             return {statements=lua};
         end, \(__src__ 1));
@@ -75,12 +80,15 @@ immediately
             local names, args = nomsu:parse_spec(\%names);
             names, args = repr(names), table.concat(args, ", ");
             local body_lua = nomsu:tree_to_lua(\%body);
-            body_lua = body_lua.statements or ("return "..body_lua.expr..";");
+            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
+            if body_lua.locals and #body_lua.locals > 0 then
+                body_code = "local "..table.concat(body_lua.locals, ", ")..";\\n"..body_code;
+            end
             local src = nomsu:dedent(nomsu:source_code(0));
             local def_lua = ([[
             nomsu:define_action(%s, \(__line_no__), function(%s)
                 %s
-            end, %s);]]):format(names, args, body_lua, repr(src));
+            end, %s);]]):format(names, args, body_code, repr(src));
             return def_lua;
 
 # Macro to make nomsu macros:

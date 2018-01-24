@@ -19,6 +19,12 @@ colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 
+-- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
+-- Note: This globally affects all strings in this instance of Lua!
+do
+    STRING_METATABLE = getmetatable("")
+    STRING_METATABLE.__add = (other)=> @ .. stringify(other)
+
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- improve indentation of generated lua code
@@ -301,6 +307,9 @@ class NomsuCompiler
 
         lua = @tree_to_lua(tree)
         lua_code = lua.statements or (lua.expr..";")
+        locals = lua_code.locals or {}
+        if #locals > 0
+            lua_code = "local "..concat(locals, ", ")..";\n"..lua_code
         lua_code = "-- File: #{filename}\n"..lua_code
         ret = @run_lua(lua_code)
         if max_operations
@@ -616,13 +625,19 @@ class NomsuCompiler
             when "File"
                 if #tree.value == 1
                     return @tree_to_lua(tree.value[1])
+                declared_locals = {}
                 lua_bits = {}
                 for line in *tree.value
                     lua = @tree_to_lua line
                     if not lua
                         error "No lua produced by #{repr line}"
+                    if lua.locals
+                        new_locals = [l for l in *lua.locals when not declared_locals[l]]
+                        if #new_locals > 0
+                            insert lua_bits, "local #{concat new_locals, ", "};"
+                            for l in *new_locals do declared_locals[l] = true
                     if lua.statements then insert lua_bits, lua.statements
-                    if lua.expr then insert lua_bits, "#{lua.expr};"
+                    elseif lua.expr then insert lua_bits, "#{lua.expr};"
                 return statements:concat(lua_bits, "\n")
             
             when "Comment"
@@ -633,13 +648,16 @@ class NomsuCompiler
 
             when "Block"
                 lua_bits = {}
+                locals = {}
                 for arg in *tree.value
                     lua = @tree_to_lua arg
                     if #tree.value == 1 and lua.expr and not lua.statements
                         return expr:lua.expr
+                    if lua.locals
+                        for l in *lua.locals do locals[l] = true
                     if lua.statements then insert lua_bits, lua.statements
-                    if lua.expr then insert lua_bits, "#{lua.expr};"
-                return statements:concat(lua_bits, "\n")
+                    elseif lua.expr then insert lua_bits, "#{lua.expr};"
+                return statements:concat(lua_bits, "\n"), locals:(next(locals) and utils.keys(locals) or nil)
 
             when "FunctionCall"
                 insert @compilestack, tree
@@ -668,7 +686,7 @@ class NomsuCompiler
                             insert bits, tok.value
                         else
                             lua = @tree_to_lua(tok)
-                            assert(lua.statements == nil, "non-expression value inside math expression")
+                            assert(lua.expr, "non-expression value inside math expression: #{tok.src}")
                             insert bits, lua.expr
                     remove @compilestack
                     return expr:"(#{concat bits, " "})"
@@ -677,7 +695,8 @@ class NomsuCompiler
                 for tok in *tree.value
                     if tok.type == "Word" then continue
                     lua = @tree_to_lua(tok)
-                    assert(lua.expr, "Cannot use #{tok.src} as an argument, since it's not an expression, it produces: #{repr lua}")
+                    assert lua.expr,
+                        "#{tree\get_line_no!}: Cannot use:\n#{colored.yellow tok.src}\nas an argument to #{tree.stub}, since it's not an expression, it produces: #{repr lua}"
                     insert args, lua.expr
 
                 if metadata and metadata.arg_orders
@@ -702,8 +721,8 @@ class NomsuCompiler
                         @writeln (colored.bright "INTERP:")
                         @print_tree bit
                         @writeln "#{colored.bright "EXPR:"} #{lua.expr}, #{colored.bright "STATEMENT:"} #{lua.statements}"
-                    if lua.statements
-                        error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
+                    assert lua.expr,
+                        "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, "stringify(#{lua.expr})"
 
                 if string_buffer ~= ""
@@ -719,8 +738,8 @@ class NomsuCompiler
                 items = {}
                 for item in *tree.value
                     lua = @tree_to_lua item
-                    if lua.statements
-                        error "Cannot use [[#{item.src}]] as a list item, since it's not an expression."
+                    assert lua.expr,
+                        "Cannot use [[#{item.src}]] as a list item, since it's not an expression."
                     insert items, lua.expr
                 return expr:@@comma_separated_items("{", items, "}")
 
@@ -731,11 +750,11 @@ class NomsuCompiler
                         {expr:repr(entry.dict_key.value)}
                     else
                         @tree_to_lua entry.dict_key
-                    if key_lua.statements
-                        error "Cannot use [[#{entry.dict_key.src}]] as a dict key, since it's not an expression."
+                    assert key_lua.expr,
+                        "Cannot use [[#{entry.dict_key.src}]] as a dict key, since it's not an expression."
                     value_lua = @tree_to_lua entry.dict_value
-                    if value_lua.statements
-                        error "Cannot use [[#{entry.dict_value.src}]] as a dict value, since it's not an expression."
+                    assert value_lua.expr,
+                        "Cannot use [[#{entry.dict_value.src}]] as a dict value, since it's not an expression."
                     key_str = key_lua.expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                     if key_str
                         insert items, "#{key_str}=#{value_lua.expr}"
@@ -888,8 +907,8 @@ class NomsuCompiler
                     insert concat_parts, bit
                 else
                     lua = nomsu\tree_to_lua bit
-                    if lua.statements
-                        error "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
+                    assert lua.expr,
+                        "Cannot use [[#{bit.src}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, lua.expr
             return concat(concat_parts)
         
@@ -898,7 +917,7 @@ class NomsuCompiler
             lua_code = lua.statements or (lua.expr..";")
             lua_code = "-- Immediately:\n"..lua_code
             nomsu\run_lua(lua_code)
-            return statements:lua_code
+            return statements:lua_code, locals:lua.locals
 
         @define_compile_action "lua> %code", "nomsu.moon", (_code)->
             lua = nomsu_string_as_lua(_code)

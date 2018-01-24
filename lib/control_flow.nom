@@ -40,10 +40,9 @@ immediately
         %when_false_expr unless %condition else %when_true_expr
         %when_false_expr unless %condition then %when_true_expr
     ..to
-        local %safe
         #.. If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
             equivalent of a conditional expression: (cond and if_true or if_false)
-        if: {Text:yes, List:yes, Dict:yes, Number:yes}->(%when_true_expr's "type")
+        if: (%when_true_expr's "type") in {Text:yes, List:yes, Dict:yes, Number:yes}
             return "(\(%condition as lua) and \(%when_true_expr as lua) or \(%when_false_expr as lua))"
         ..else
             #.. Otherwise, need to do an anonymous inline function (yuck, too bad lua 
@@ -58,9 +57,10 @@ immediately
                     end
                 end)()
 
+
 # GOTOs
 immediately
-    compile [-> %label] to code ".."
+    compile [=== %label ===, --- %label ---] to code ".."
         ::label_\(nomsu "var_to_lua_identifier" [%label])::;
     compile [go to %label] to code ".."
         goto label_\(nomsu "var_to_lua_identifier" [%label]);
@@ -72,46 +72,77 @@ immediately
 
 # Helper function
 immediately
-    action [tree %tree has function call %call]
-        lua> ".."
-            local target = (\%call).stub;
-            for subtree,depth in coroutine.wrap(function() nomsu:walk_tree(\%tree); end) do
-                if type(subtree) == 'table' and subtree.type == "FunctionCall"
-                and subtree.stub == target then
-                    return true;
+    compile [for subtree %subtree where %condition in %tree %body] to code ".."
+        for \(%subtree as lua) in coroutine.wrap(function() nomsu:walk_tree(\(%tree as lua)) end) do
+            if type(\(%subtree as lua)) == 'table' and \(%subtree as lua).type then
+                if \(%condition as lua) then
+                    \(%body as lua statements)
                 end
             end
-            return false;
+        end
 
 # While loops
 immediately
-    compile [do next repeat-loop] to code "goto continue_repeat;"
-    compile [stop repeat-loop] to code "goto stop_repeat;"
+    compile [do next repetition] to code "goto continue_repeat;"
+    compile [stop repeating] to code "goto stop_repeat;"
     compile [repeat while %condition %body] to code
-        set %continue_labels =
-            "\n::continue_repeat::;"
-            ..if (tree %body has function call \(do next repeat-loop)) else ""
-        set %code = ".."
+        %continue_labels <- ""
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and ((%'s "stub") == "do next repetition")
+        ..in %body
+            %continue_labels <- "\n::continue_repeat::;"
+            stop
+        %code <- ".."
             while \(%condition as lua) do
             \(%body as lua statements)\
             ..\%continue_labels
             end --while-loop
-        if: tree %body has function call \(stop repeat-loop)
-            return ".."
-                do --while-loop label scope
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and ((%'s "stub") == "stop repeating")
+        ..in %body
+            %code <- ".."
+                do -- scope of "stop repeating" label
                 \%code
                 ::stop_repeat::;
-                end --while-loop label scope
+                end -- end of "stop repeating" label scope
+            %continue_labels <- "\n::continue_repeat::;"
+            stop
         return %code
     parse [repeat %body] as: repeat while (yes) %body
     parse [repeat until %condition %body] as: repeat while (not %condition) %body
 
+    compile [..]
+        repeat %n times %body
+    ..to code
+        %continue_labels <- ""
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and ((%'s "stub") == "do next repetition")
+        ..in %body
+            %continue_labels <- "\n::continue_repeat::;"
+            stop
+        # This trashes the loop variables, just like in Python.
+        %code <- ".."
+            for i=1,\(%n as lua) do
+            \(%body as lua statements)\
+            ..\%continue_labels
+            end --numeric for-loop
+        %stop_labels <- ""
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and ((%'s "stub") == "stop repeating")
+        ..in %body
+            %code <- ".."
+                do -- scope of "stop repeating" label
+                \%code
+                ::stop_repeat::;
+                end -- end of "stop repeating" label scope
+            %continue_labels <- "\n::continue_repeat::;"
+            stop
+        return %code
+
 # For loop control flow:
 immediately
-    compile [stop for-loop] to code "goto stop_for;"
     compile [stop %var] to code ".."
         goto stop_\(nomsu "var_to_lua_identifier" [%var]);
-    compile [do next for-loop] to code "goto continue_for;"
     compile [do next %var] to code ".."
         goto continue_\(nomsu "var_to_lua_identifier" [%var]);
 
@@ -121,37 +152,42 @@ immediately
         for %var from %start to %stop by %step %body
         for %var from %start to %stop via %step %body
     ..to code
-        local [%continue_labels, %code, %stop_labels, %loop_var, %loop_var_shim]
-        set %continue_labels = ""
-        if: tree %body has function call \(do next for-loop)
-            %continue_labels join= "\n::continue_for::;"
-        if: tree %body has function call (tree \(do next %) with {"":%var})
-            %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+        %continue_labels <- ""
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and
+                ((%'s "stub") == "do next %") and 
+                    ((3rd in (%'s "value"))'s "src") == (%var's "src")
+        ..in %body
+            %continue_labels <- "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+            stop
+
         if: (%var's "type") is "Var"
-            set %loop_var = (%var as lua)
-            set %loop_var_shim = ""
+            %loop_var <- (%var as lua)
+            %loop_var_shim <- ""
         ..else
-            set %loop_var = "i"
-            set %loop_var_shim = "\n\(%var as lua) = i;"
+            %loop_var <- "i"
+            %loop_var_shim <- "\n\(%var as lua) = i;"
         # This trashes the loop variables, just like in Python.
-        set %code = ".."
+        %code <- ".."
             for \(%loop_var)=\(%start as lua),\(%stop as lua),\(%step as lua) do\
             ..\%loop_var_shim
             \(%body as lua statements)\
             ..\%continue_labels
             end --numeric for-loop
-        set %stop_labels = ""
-        if: tree %body has function call \(stop for-loop)
-            %stop_labels join= "\n::stop_for::;"
-        if: tree %body has function call (tree \(stop %) with {"":%var})
-            %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-        return
-            ".."
-                do --for-loop label scope
-                \%code\
-                ..\%stop_labels
-                end --for-loop label scope
-            ..if (%stop_labels is not "") else %code
+
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and
+                ((%'s "stub") == "stop %") and
+                    ((2nd in (%'s "value"))'s "src") == (%var's "src")
+        ..in %body
+            %code <- ".."
+                do -- scope for stopping for-loop
+                    \%code
+                    ::stop_\(nomsu "var_to_lua_identifier" [%var])::;
+                end -- end of scope for stopping for-loop
+            stop
+
+        return %code
 
 immediately
     parse [for %var from %start to %stop %body] as: for %var from %start to %stop via 1 %body
@@ -161,207 +197,209 @@ immediately
     ..as: for % from %start to %stop via %step %body
     parse [for all %start to %stop %body] as: for all %start to %stop via 1 %body
 
+# For-each loop
 immediately
     compile [for %var in %iterable %body] to code
-        local [%continue_labels, %code, %stop_labels, %loop_var, %loop_var_shim]
-        set %continue_labels = ""
-        if: tree %body has function call \(do next for-loop)
-            %continue_labels join= "\n::continue_for::;"
-        if: tree %body has function call (tree \(do next %) with {"":%var})
-            %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+        %continue_labels <- ""
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and
+                ((%'s "stub") == "do next %") and
+                    ((3rd in (%'s "value"))'s "src") == (%var's "src")
+        ..in %body
+            %continue_labels <- "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+            stop
         if: (%var's "type") is "Var"
-            set %loop_var = (%var as lua)
-            set %loop_var_shim = ""
+            %loop_var <- (%var as lua)
+            %loop_var_shim <- ""
         ..else
-            set %loop_var = "value"
-            set %loop_var_shim = "\n\(%var as lua) = value;"
+            %loop_var <- "value"
+            %loop_var_shim <- "\n\(%var as lua) = value;"
         # This trashes the loop variables, just like in Python.
-        set %code = ".."
+        %code <- ".."
             for i,\%loop_var in ipairs(\(%iterable as lua)) do\
             ..\%loop_var_shim
             \(%body as lua statements)\
             ..\%continue_labels
             end --foreach-loop
-        set %stop_labels = ""
-        if: tree %body has function call \(stop for-loop)
-            %stop_labels join= "\n::stop_for::;"
-        if: tree %body has function call (tree \(stop %) with {"":%var})
-            %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%var])::;"
-        if: %stop_labels is not ""
-            set %code = ".."
-                do --for-loop label scope
-                \%code\%stop_labels
-                end --for-loop label scope
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and
+                ((%'s "stub") == "stop %") and
+                    ((2nd in (%'s "value"))'s "src") == (%var's "src")
+        ..in %body
+            %code <- ".."
+                do -- scope for stopping for-loop
+                    \%code
+                    ::stop_\(nomsu "var_to_lua_identifier" [%var])::;
+                end -- end of scope for stopping for-loop
+            stop
         return %code
     parse [for all %iterable %body] as: for % in %iterable %body
-
-immediately
-    compile [..]
-        repeat %n times %body, repeat %n x %body
-    ..to code
-        local [%continue_labels, %code, %stop_labels]
-        set %continue_labels = ""
-        if: tree %body has function call \(do next repeat-loop)
-            %continue_labels join= "\n::continue_repeat::;"
-        # This trashes the loop variables, just like in Python.
-        set %code = ".."
-            for i=1,\(%n as lua) do
-            \(%body as lua statements)\
-            ..\%continue_labels
-            end --numeric for-loop
-        set %stop_labels = ""
-        if: tree %body has function call \(stop repeat-loop)
-            %stop_labels join= "\n::stop_repeat::;"
-        return
-            ".."
-                do --repeat-loop label scope
-                \%code\
-                ..\%stop_labels
-                end --repeat-loop label scope
-            ..if (%stop_labels is not "") else %code
 
 # Dict iteration (lua's "pairs()")
 immediately
     compile [for %key = %value in %iterable %body] to code
-        local [..]
-            %continue_labels, %code, %stop_labels, %key_loop_var, %key_loop_var_shim,
-            %value_loop_var, %value_loop_var_shim
-        set %continue_labels = ""
-        if: tree %body has function call \(do next for-loop)
-            %continue_labels join= "\n::continue_for::;"
-        if: tree %body has function call (tree \(do next %) with {"":%key})
-            %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%key])::;"
-        if: tree %body has function call (tree \(do next %) with {"":%value})
-            %continue_labels join= "\n::continue_\(nomsu "var_to_lua_identifier" [%value])::;"
+        %continue_labels <- ""
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and
+                ((%'s "stub") == "do next %") and
+                    ((3rd in (%'s "value"))'s "src") == (%key's "src")
+        ..in %body
+            <- %continue_labels + "\n::continue_\(nomsu "var_to_lua_identifier" [%key])::;"
+            stop
+
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and
+                ((%'s "stub") == "do next %") and
+                    ((3rd in (%'s "value"))'s "src") == (%value's "src")
+        ..in %body
+            <- %continue_labels + "\n::continue_\(nomsu "var_to_lua_identifier" [%value])::;"
+            stop
+
         if: (%key's "type") is "Var"
-            set %key_loop_var = (%key as lua)
-            set %key_loop_var_shim = ""
+            %key_loop_var <- (%key as lua)
+            %key_loop_var_shim <- ""
         ..else
-            set %key_loop_var = "key"
-            set %key_loop_var_shim = "\n\(%key as lua) = key;"
+            %key_loop_var <- "key"
+            %key_loop_var_shim <- "\n\(%key as lua) = key;"
         if: (%value's "type") is "Var"
-            set %value_loop_var = (%value as lua)
-            set %value_loop_var_shim = ""
+            %value_loop_var <- (%value as lua)
+            %value_loop_var_shim <- ""
         ..else
-            set %value_loop_var = "value"
-            set %value_loop_var_shim = "\n\(%value as lua) = value;"
+            %value_loop_var <- "value"
+            %value_loop_var_shim <- "\n\(%value as lua) = value;"
         # This trashes the loop variables, just like in Python.
-        set %code = ".."
+        %code <- ".."
             for \%key_loop_var,\%value_loop_var in pairs(\(%iterable as lua)) do\
             ..\%key_loop_var_shim\%value_loop_var_shim
             \(%body as lua statements)\
             ..\%continue_labels
             end --foreach-loop
-        set %stop_labels = ""
-        if: tree %body has function call \(stop for-loop)
-            %stop_labels join= "\n::stop_for::;"
-        if: tree %body has function call (tree \(stop %) with {"":%key})
-            %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%key])::;"
-        if: tree %body has function call (tree \(stop %) with {"":%value})
-            %stop_labels join= "\n::stop_\(nomsu "var_to_lua_identifier" [%value])::;"
-        return
-            ".."
-                do --for-loop label scope
-                \%code\
-                ..\%stop_labels
-                end --for-loop label scope
-            ..if (%stop_labels is not "") else %code
+        %stop_labels <- ""
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and
+                ((%'s "stub") == "stop %") and
+                    ((2nd in (%'s "value"))'s "src") == (%key's "src")
+        ..in %body
+            <- %stop_labels + "\n::stop_\(nomsu "var_to_lua_identifier" [%key])::;"
+            stop
+
+        for subtree % where
+            ((%'s "type") = "FunctionCall") and
+                ((%'s "stub") == "stop %") and
+                    ((2nd in (%'s "value"))'s "src") == (%value's "src")
+        ..in %body
+            <- %stop_labels + "\n::stop_\(nomsu "var_to_lua_identifier" [%value])::;"
+            stop
+
+        if: %stop_labels is not ""
+            %code <- ".."
+                do -- scope for stopping for % = % loop
+                    \%code\%stop_labels
+                end
+        return %code
 
 # Switch statement/multi-branch if
 immediately
     compile [when %body] to code
-        local [%result, %fallthroughs, %first]
-        set %result = ""
-        set %fallthroughs = []
-        set %first = (yes)
+        %result <- ""
+        %fallthroughs <- []
+        %is_first <- (yes)
         for %func_call in (%body's "value")
-            local [%tokens, %star, %condition, %action]
             assume ((%func_call's "type") is "FunctionCall") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
-            set %tokens = (%func_call's "value")
-            set %star = (%tokens -> 1)
-            assume (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*'
+            with [..]
+                %tokens <- (%func_call's "value")
+                %star <- (1st in %tokens)
+                %condition <- (2nd in %tokens)
+                %action <- (3rd in %tokens)
+            ..
+                assume (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") or barf ".."
+                    Invalid format for 'when' statement. Lines must begin with '*'
+                assume %condition or barf ".."
+                    Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
+                if: %action is (nil)
+                    lua do> "table.insert(\%fallthroughs, \%condition)"
+                    do next %func_call
 
-            set %condition = (%tokens -> 2)
-            assume %condition or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
+                if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
 
-            set %action = (%tokens -> 3)
-            if: %action is (nil)
-                lua do> "table.insert(\%fallthroughs, \%condition)"
-                do next %func_call
+                    <- %result + ".."
+                        
+                        else
+                        \(%action as lua statements)
+                    stop
+                ..else
+                    %condition <- (%condition as lua)
+                    for all %fallthroughs
+                        <- %condition + " or \(% as lua)"
+                    <- %result + ".."
+                        
+                        \("if" if %is_first else "elseif") \%condition then
+                        \(%action as lua statements)
 
-            if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
-                %result join= ".."
-                    
-                    else
-                    \(%action as lua statements)
-                stop for-loop
-            ..else
-                set %condition = (%condition as lua)
-                for all %fallthroughs
-                    %condition join= " or \(% as lua)"
-                %result join= ".."
-                    
-                    \("if" if %first else "elseif") \%condition then
-                    \(%action as lua statements)
-
-            set %fallthroughs = []
-            set %first = (no)
+                %fallthroughs <- []
+                %is_first <- (no)
 
         if: %result is not ""
-            %result join= "\nend"
+            <- %result + "\nend"
         return %result
 
 # Switch statement
 immediately
     compile [when %branch_value = ? %body, when %branch_value is ? %body] to code
-        set %result = ""
-        set %fallthroughs = []
-        set %first = (yes)
+        %result <- ""
+        %fallthroughs <- []
+        %is_first <- (yes)
+        %seen_else <- (no)
         for %func_call in (%body's "value")
             assume ((%func_call's "type") is "FunctionCall") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
-            set %tokens = (%func_call's "value")
-            set %star = (%tokens -> 1)
-            assume (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*'
+            %tokens <- (%func_call's "value")
+            with [%star<-(1st in %tokens), %condition<-(2nd in %tokens), %action<-(3rd in %tokens)]
+                assume (=lua "\%star and \%star.type == 'Word' and \%star.value == '*'") or barf ".."
+                    Invalid format for 'when' statement. Lines must begin with '*'
+                assume %condition or barf ".."
+                    Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
+                if: %action is (nil)
+                    lua> "table.insert(\%fallthroughs, \%condition)"
+                    do next %func_call
 
-            set %condition = (%tokens -> 2)
-            assume %condition or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
+                if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
+                    assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
+                    <- %result + ".."
 
-            set %action = (%tokens -> 3)
-            if: %action is (nil)
-                lua> "table.insert(\%fallthroughs, \%condition)"
-                do next %func_call
+                        else
+                            \(%action as lua statements)
+                        end
+                    %seen_else <- (yes)
+                ..else
+                    assume (not %seen_else) or barf "'else' clause needs to be last in 'when % = ?' block"
+                    %clause <- ""
+                    if: ((%condition's "type") is "Text") or ((%condition's "type") is "Number")
+                        %clause <- "branch_value == (\(%condition as lua))"
+                    ..else 
+                        %clause <- "utils.equivalent(branch_value, \(%condition as lua))"
+                    for all %fallthroughs
+                        if: ((%'s "type") is "Text") or ((%'s "type") is "Number")
+                            <- %clause + " or branch_value == (\(%condition as lua))"
+                        ..else 
+                            <- %clause + " or utils.equivalent(branch_value, \(%condition as lua))"
+                    <- %result + ".."
+                        
+                        \("if" if %is_first else "elseif") \%clause then
+                        \(%action as lua statements)
 
-            if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
-                %result join= ".."
-                    
-                    else
-                    \(%action as lua statements)
-                stop for-loop
-            ..else
-                set %condition = "branch_value == (\(%condition as lua))"
-                for all %fallthroughs
-                    %condition join= " or (branch_value == \(% as lua))"
-                %result join= ".."
-                    
-                    \("if" if %first else "elseif") \%condition then
-                    \(%action as lua statements)
-
-            set %fallthroughs = []
-            set %first = (no)
-
-        if: %result is not ""
-            set %result = ".."
-                do --when % = ?
-                local branch_value = \(%branch_value as lua);\
-                ..\%result
-                end
-                end --when % = ?
+            %fallthroughs <- []
+            %is_first <- (no)
+        
+        assume (%result is not "") or barf "No body for 'when % = ?' block!"
+        unless %seen_else
+            <- %result + "\nend"
+        %result <- ".."
+            do --when % = ?
+            local branch_value = \(%branch_value as lua);\
+            ..\%result
+            end --when % = ?
         return %result
 
 # Try/except
@@ -416,28 +454,4 @@ immediately
                 return ret1;
             end
         end
-
-immediately
-    compile [with %assignments %action] to code
-        local [%lua, %olds, %old_vals, %new_vals]
-        set {%temp_vars:[], %old_vals:[], %new_vals:[]}
-        for %i=%assignment in (%assignments' "value")
-            set (%temp_vars->%i) = "temp\%i"
-            set (%old_vals->%i) = ((%assignment's "dict_key") as lua)
-            set (%new_vals->%i) = ((%assignment's "dict_value") as lua)
-        return ".."
-            do
-                local \(join %temp_vars with ", ") = \(join %old_vals with ", ");
-                \(join %old_vals with ", ") = \(join %new_vals with ", ");
-                local fell_through = false;
-                local ok, ret = pcall(function()
-                    do
-                        \(%action as lua statements)
-                    end
-                    fell_through = true;
-                end);
-                \(join %old_vals with ", ") = \(join %temp_vars with ", ");
-                if not ok then error(ret, 0); end
-                if not fell_through then return ret end
-            end
 
