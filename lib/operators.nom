@@ -57,7 +57,7 @@ immediately
     # For strict identity checking, use (%x's id) is (%y's id)
     compile [%'s id, id of %] to "nomsu.ids[\(% as lua)]"
 
-# Variable assignment operator, and += type versions
+# Variable assignment operator
 immediately
     lua> ".."
         nomsu:define_compile_action("%var <- %value", \(__line_no__), function(\%var, \%value)
@@ -70,6 +70,16 @@ immediately
             end
             return lua;
         end, \(__src__ 1));
+
+    lua> ".."
+        nomsu:define_compile_action("export %var <- %value", \(__line_no__), function(\%var, \%value)
+            local lua = {};
+            lua.statements = ("%s = %s;"):format(
+                assert(nomsu:tree_to_lua(\%var).expr, "Invalid target for assignment: "..\%var.src),
+                assert(nomsu:tree_to_lua(\%value).expr, "Invalid value for assignment: "..\%value.src));
+            return lua;
+        end, \(__src__ 1));
+
     lua> ".."
         nomsu:define_compile_action("with %assignments %body", \(__line_no__), function(\%assignments, \%body)
             local body_lua = nomsu:tree_to_lua(\%body);
@@ -100,6 +110,28 @@ immediately
                             assert(nomsu:tree_to_lua(value).expr, "Invalid value for assignment: "..value.src)));
                     end
                 end
+            end
+            local code = ([[
+        do
+            %s%s
+        end]]):format(declarations, body_lua.statements or (body_lua.expr..";"));
+            return {statements=code, locals=utils.keys(leftover_locals)};
+        end, \(__src__ 1));
+
+    lua> ".."
+        nomsu:define_compile_action("exporting %exported %body", \(__line_no__), function(\%exported, \%body)
+            local body_lua = nomsu:tree_to_lua(\%body);
+            local declarations = "";
+            local leftover_locals = {};
+            for _, body_local in ipairs(body_lua.locals or {}) do
+                leftover_locals[body_local] = true;
+            end
+            assert(\%exported.type == "List",
+                "Expected a List for the export part of 'exporting' statement, not "..\%exported.src);
+            for i, item in ipairs(\%exported.value) do
+                assert(item.type == "Var", "exporting statement expects Vars, not: "..item.src);
+                local var = nomsu:tree_to_lua(item).expr;
+                leftover_locals[var] = nil;
             end
             local code = ([[
         do
