@@ -53,16 +53,8 @@ compile [%list ->* %indices] to
         Expected List for chained lookup, not \(%indices's "type")
     %ret <- "\(%list as lua)"
     for %index in (%indices's "value")
-        %ret join= "[\(%index as lua)]"
+        <- %ret + "[\(%index as lua)]"
     return "\%ret"
-
-# Assignment
-compile [..]
-    %list's %index = %new_value, %index st in %list = %new_value, %index nd in %list = %new_value
-    %index rd in %list = %new_value, %index th in %list = %new_value, %index in %list = %new_value
-    %list -> %index = %new_value
-..to code
-    "(\(%list as lua))[\(%index as lua)] = \(%new_value as lua);"
 
 compile [append %item to %list, add %item to %list] to
     "table.insert(\(%list as lua), \(%item as lua))"
@@ -159,11 +151,11 @@ compile [sort %items by %key_expr] to ".."
     end)
 
 action [%items sorted]
-    %copy = (% for all %items)
+    %copy <- (% for all %items)
     sort %copy
     return %copy
 action [%items sorted by %key]
-    %copy = (% for all %items)
+    %copy <- (% for all %items)
     sort %copy by %key
     return %copy
 
