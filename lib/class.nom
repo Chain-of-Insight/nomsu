@@ -81,7 +81,7 @@ compile [object %classname %class_body] to
             \%class_identifier.class = \%class_identifier;
 
             -- Define the methods:
-        \(join %methods with "\n")
+        \(%methods joined with "\n")
 
             -- Define class methods for instantiating and accessing instances:
             \%class_identifier.instance_metatable = {

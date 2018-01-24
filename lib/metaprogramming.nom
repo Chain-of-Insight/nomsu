@@ -152,11 +152,7 @@ immediately
         =lua "nomsu:tree_to_value(\%tree)"
     compile [repr %obj] to
         "repr(\(%obj as lua))"
-    compile [indented %obj] to
-        "nomsu:indent(\(%obj as lua))"
-    compile [dedented %obj] to
-        "nomsu:dedent(\(%obj as lua))"
-    compile [type %obj, type of %obj] to
+    compile [type of %obj] to
         "type(\(%obj as lua))"
 
 immediately
@@ -186,30 +182,16 @@ action [help %action]
         end
 
 # Compiler tools
-parse [eval %code, run %code] as: nomsu "run" [%code]
-action [source code from tree %tree]
-    lua> ".."
-        local junk,junk,leading_space = \%tree.src:find("\\n(%s*)%S");
-        if leading_space then
-            local chunk1, chunk2 = \%tree.src:match(":%s*([^\\n]*)(\\n.*)");
-            chunk2 = chunk2:gsub("\\n"..leading_space, "\\n");
-            return chunk1..chunk2.."\\n";
-        else
-            return \%tree.src:match(":%s*(%S.*)").."\\n";
-        end
-parse [source code %body] as: source code from tree \%body
-
-parse [parse tree %code] as: nomsu "tree_to_str" [\%code]
-
+parse [run %code] as: nomsu "run" [%code]
 parse [enable debugging] as: lua> "nomsu.debug = true"
 parse [disable debugging] as: lua> "nomsu.debug = false"
 
-compile [say %str] to
+compile [say %message] to
     lua> ".."
-        if \%str.type == "Text" then
-            return "nomsu:writeln("..\(%str as lua)..")";
+        if \%message.type == "Text" then
+            return "nomsu:writeln("..\(%message as lua)..")";
         else
-            return "nomsu:writeln(stringify("..\(%str as lua).."))";
+            return "nomsu:writeln(stringify("..\(%message as lua).."))";
         end
 
 # Error functions

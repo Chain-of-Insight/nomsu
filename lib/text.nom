@@ -5,28 +5,22 @@
 use "lib/metaprogramming.nom"
 
 # Text functions
-action [join %strs with %glue]
+action [%texts joined with %glue]
     lua> ".."
-        local str_bits = {}
-        for i,bit in ipairs(\%strs) do str_bits[i] = stringify(bit) end
-        return table.concat(str_bits, \%glue)
-parse [join %strs] as: join %strs with ""
+        local text_bits = {}
+        for i,bit in ipairs(\%texts) do text_bits[i] = stringify(bit) end
+        return table.concat(text_bits, \%glue)
+parse [joined %texts, %texts joined] as: %texts joined with ""
 
-compile [capitalize %str, %str capitalized] to
-    "(\(%str as lua)):gsub('%l', string.upper, 1)"
+compile [capitalized %text capitalized] to
+    "(\(%text as lua)):gsub('%l', string.upper, 1)"
 
-compile [%str with %patt replaced with %sub, %str s/%patt/%sub] to
-    "((\(%str as lua)):gsub(\(%patt as lua), \(%sub as lua)))"
-compile [%str with %patt replaced with %sub %n times, %str s/%patt/%sub/%n] to
-    "((\(%str as lua)):gsub(\(%patt as lua), \(%sub as lua), \(%n as lua)))"
+compile [%text with %sub instead of %patt, %text s/%patt/%sub] to
+    "((\(%text as lua)):gsub(\(%patt as lua), \(%sub as lua)))"
 
-compile [indent %str] to "\%str:gsub('\\n','\\n'..('    '))"
-compile [indent %str %n times, indent %str %n x] to "\%str:gsub('\\n','\\n'..('    '):rep(\%n))"
-
-# Substring
-# TODO: improve this syntax
-compile [%str |%start|] to "\(%str as lua):sub(\(%start as lua), \(%start as lua))"
-compile [%str |%start - %stop|] to "\(%str as lua):sub(\(%start as lua), \(%stop as lua))"
+compile [indented %text, %text indented] to "\%text:gsub('\\n','\\n'..('    '))"
+compile [dedented %obj, %obj dedented] to "nomsu:dedent(\(%obj as lua))"
+compile [%text indented %n times] to "\%text:gsub('\\n','\\n'..('    '):rep(\%n))"
 
 # Text literals
 lua do> ".."
@@ -46,7 +40,7 @@ lua do> ".."
     };
     for name, e in pairs(escapes) do
         local lua = "'"..e.."'";
-        nomsu:define_compile_action(name, \(__line_no__), function() return {expr=str}; end, \(__src__ 1));
+        nomsu:define_compile_action(name, \(__line_no__), function() return {expr=text}; end, \(__src__ 1));
     end
     for name, c in pairs(colors) do
         local color = "'"..c.."'";

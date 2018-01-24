@@ -37,18 +37,18 @@ action [%n to the nearest %rounder]
 
 # Any/all/none
 compile [all of %items, all %items] to
-    "(\(join ((% as lua) for all (%items' "value")) with " and "))"
+    "(\(joined ((% as lua) for all (%items' "value")) with " and "))"
     ..if ((%items' "type") is "List") else "utils.all(\(%items as lua))"
 parse [not all of %items, not all %items] as: not (all of %items)
 compile [any of %items, any %items] to
-    "(\(join ((% as lua) for all (%items' "value")) with " or "))"
+    "(\(joined ((% as lua) for all (%items' "value")) with " or "))"
     ..if ((%items' "type") is "List") else "utils.any(\(%items as lua))"
 parse [none of %items, none %items] as: not (any of %items)
 compile [sum of %items, sum %items] to
-    "(\(join ((% as lua) for all (%items' "value")) with " + "))"
+    "(\(joined ((% as lua) for all (%items' "value")) with " + "))"
     ..if ((%items' "type") is "List") else "utils.sum(\(%items as lua))"
 compile [product of %items, product %items] to
-    "(\(join ((% as lua) for all (%items' "value")) with " * "))"
+    "(\(joined ((% as lua) for all (%items' "value")) with " * "))"
     ..if ((%items' "type") is "List") else "utils.product(\(%items as lua))"
 action [avg of %items, average of %items]
     =lua "(utils.sum(\%items)/#\%items)"

@@ -20,10 +20,16 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or 
 {:insert, :remove, :concat} = table
 
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
+-- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
 -- Note: This globally affects all strings in this instance of Lua!
 do
     STRING_METATABLE = getmetatable("")
     STRING_METATABLE.__add = (other)=> @ .. stringify(other)
+    STRING_METATABLE.__index = (i)=>
+        if type(i) == 'number' then return string.sub(@, i, i)
+        elseif type(i) == 'table' then return string.sub(@, i[1], i[2])
+        else return string[i]
+    STRING_METATABLE.__mul = (other)=> string.rep(@, other)
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -921,8 +927,11 @@ class NomsuCompiler
             return statements:lua_code, locals:lua.locals
 
         @define_compile_action "lua> %code", "nomsu.moon", (_code)->
-            lua = nomsu_string_as_lua(_code)
-            return statements:lua
+            if _code.type == "Text"
+                lua = nomsu_string_as_lua(_code)
+                return statements:lua
+            else
+                return statements:"nomsu:run_lua(#{nomsu\tree_to_lua(_code).expr});"
 
         @define_compile_action "=lua %code", "nomsu.moon", (_code)->
             lua = nomsu_string_as_lua(_code)

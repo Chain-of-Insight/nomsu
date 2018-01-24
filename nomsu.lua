@@ -26,6 +26,18 @@ do
   STRING_METATABLE.__add = function(self, other)
     return self .. stringify(other)
   end
+  STRING_METATABLE.__index = function(self, i)
+    if type(i) == 'number' then
+      return string.sub(self, i, i)
+    elseif type(i) == 'table' then
+      return string.sub(self, i[1], i[2])
+    else
+      return string[i]
+    end
+  end
+  STRING_METATABLE.__mul = function(self, other)
+    return string.rep(self, other)
+  end
 end
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt
@@ -1388,10 +1400,16 @@ do
         }
       end)
       self:define_compile_action("lua> %code", "nomsu.moon", function(_code)
-        local lua = nomsu_string_as_lua(_code)
-        return {
-          statements = lua
-        }
+        if _code.type == "Text" then
+          local lua = nomsu_string_as_lua(_code)
+          return {
+            statements = lua
+          }
+        else
+          return {
+            statements = "nomsu:run_lua(" .. tostring(nomsu:tree_to_lua(_code).expr) .. ");"
+          }
+        end
       end)
       self:define_compile_action("=lua %code", "nomsu.moon", function(_code)
         local lua = nomsu_string_as_lua(_code)
