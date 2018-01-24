@@ -32,63 +32,48 @@ immediately
 # TODO: reduce code duplication here
 immediately
     lua> ".."
-        nomsu:define_compile_action("compile %names to %body", \(__line_no__), function(\%names, \%body)
-            local names, args = nomsu:parse_spec(\%names);
-            local declared_locals = {};
-            for i, arg in ipairs(args) do declared_locals[arg] = true; end
-            names, args = repr(names), table.concat(args, ", ");
-            local body_lua = nomsu:tree_to_lua(\%body);
-            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            local undeclared_locals = {};
-            for i, body_local in ipairs(body_lua.locals or {}) do
-                if not declared_locals[body_local] then
-                    table.insert(undeclared_locals, body_local);
-                end
-            end
-            if #undeclared_locals > 0 then
-                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
-            end
-            local lua = ([[
         do
-            local function compile_action(%s)
-                %s
-            end
-            local function compile_action_wrapper(%s) return {expr=compile_action(%s)}; end
-            nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
-        end]]):format(args, body_code, args, args, names, repr(\%names:get_line_no()),
-            repr(("compile %s\\n..to %s"):format(\%names.src, \%body.src)));
-            return {statements=lua};
-        end, \(__src__ 1));
-
-    lua> ".."
-        nomsu:define_compile_action("compile %names to code %body", \(__line_no__), function(\%names, \%body)
-            local names, args = nomsu:parse_spec(\%names);
-            local declared_locals = {};
-            for i, arg in ipairs(args) do declared_locals[arg] = true; end
-            names, args = repr(names), table.concat(args, ", ");
-            local body_lua = nomsu:tree_to_lua(\%body);
-            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            local undeclared_locals = {};
-            for i, body_local in ipairs(body_lua.locals or {}) do
-                if not declared_locals[body_local] then
-                    table.insert(undeclared_locals, body_local);
+            local function compile_to(name_tree, body_tree, kind)
+                local names, args = nomsu:parse_spec(name_tree);
+                local declared_locals = {};
+                for i, arg in ipairs(args) do declared_locals[arg] = true; end
+                names, args = repr(names), table.concat(args, ", ");
+                local body_lua = nomsu:tree_to_lua(body_tree);
+                if body_lua.expr and not body_lua.locals then
+                    return [[
+        nomsu:define_compile_action(]]..names..[[, ]]..repr(name_tree:get_line_no())..[[, function(]]..args..[[)
+            return {]]..kind..[[=]]..body_lua.expr..[[};
+        end, ]]..repr(nomsu:source_code())..[[);
+        ]];
                 end
-            end
-            if #undeclared_locals > 0 then
-                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
-            end
-            local lua = ([[
+                local body_code = body_lua.statements or ("return "..body_lua.expr..";");
+                local undeclared_locals = {};
+                for i, body_local in ipairs(body_lua.locals or {}) do
+                    if not declared_locals[body_local] then
+                        table.insert(undeclared_locals, body_local);
+                    end
+                end
+                if #undeclared_locals > 0 then
+                    body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
+                end
+                return [[
         do
-            local function compile_action(%s)
-                %s
+            local function compile_action(]]..args..[[)
+                ]]..body_code.."\\n"..[[
             end
-            local function compile_action_wrapper(%s) return {statements=compile_action(%s)}; end
-            nomsu:define_compile_action(%s, %s, compile_action_wrapper, %s);
-        end]]):format(args, body_code, args, args, names, repr(\%names:get_line_no()),
-            repr(("compile %s\\n..to code %s"):format(\%names.src, \%body.src)));
-            return {statements=lua};
-        end, \(__src__ 1));
+            nomsu:define_compile_action(]]..names..[[, ]]..repr(name_tree:get_line_no())..[[, function(]]..args..[[)
+                return {]]..kind..[[=compile_action(]]..args..[[)};
+            end, ]]..repr(nomsu:source_code())..[[);
+        end]];
+            end
+            local src = \(__src__ 1);
+            nomsu:define_compile_action("compile %names to %body", \(__line_no__), function(\%names, \%body)
+                return {statements=compile_to(\%names, \%body, "expr")};
+            end, src);
+            nomsu:define_compile_action("compile %names to code %body", \(__line_no__), function(\%names, \%body)
+                return {statements=compile_to(\%names, \%body, "statements")};
+            end, src);
+        end
 
 # Compile-time action to make actions
 immediately
