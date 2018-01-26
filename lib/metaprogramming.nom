@@ -2,134 +2,99 @@
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
 
-# Helper function
-immediately
-    lua> ".."
-        nomsu.parse_spec = function(nomsu, spec)
-            if spec.type == 'List' then
-                local names = {};
-                for i, alias in ipairs(spec.value) do
-                    if alias.type == "FunctionCall" then
-                        names[i] = alias.src;
-                    elseif alias.type == "Text" then
-                        names[i] = nomsu:tree_to_value(alias);
-                    end
-                end
-                local junk, arg_names, junk = nomsu:get_stub(names[1]);
-                local args = {};
-                for i, a in ipairs(arg_names) do args[i] = nomsu:var_to_lua_identifier(a); end
-                return names, args;
-            else
-                local alias = nomsu:tree_to_value(spec);
-                local junk, arg_names, junk = nomsu:get_stub(alias);
-                local args = {};
-                for i, a in ipairs(arg_names) do args[i] = nomsu:var_to_lua_identifier(a); end
-                return {alias}, args;
-            end
-        end
-
 # Compile-time action to make compile-time actions:
-# TODO: reduce code duplication here
 immediately
     lua> ".."
-        do
-            local function compile_to(name_tree, body_tree, kind)
-                local names, args = nomsu:parse_spec(name_tree);
-                local declared_locals = {};
-                for i, arg in ipairs(args) do declared_locals[arg] = true; end
-                names, args = repr(names), table.concat(args, ", ");
-                local body_lua = nomsu:tree_to_lua(body_tree);
-                if body_lua.expr and not body_lua.locals then
-                    return [[
-        nomsu:define_compile_action(]]..names..[[, ]]..repr(name_tree:get_line_no())..[[, function(]]..args..[[)
-            return {]]..kind..[[=]]..body_lua.expr..[[};
-        end, ]]..repr(nomsu:source_code())..[[);
-        ]];
-                end
-                local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-                local undeclared_locals = {};
-                for i, body_local in ipairs(body_lua.locals or {}) do
-                    if not declared_locals[body_local] then
-                        table.insert(undeclared_locals, body_local);
-                    end
-                end
-                if #undeclared_locals > 0 then
-                    body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
-                end
-                return [[
-        do
-            local function compile_action(]]..args..[[)
-                ]]..body_code.."\\n"..[[
+        nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(\%actions, \%lua)
+            local signature = {};
+            for i, action in ipairs(\%actions.value) do signature[i] = action:get_src(); end
+            local stubs = nomsu:get_stubs_from_signature(signature);
+            local stub_args = nomsu:get_args_from_signature(signature);
+            local arg_set = {};
+            for i, arg in ipairs(stub_args[1]) do arg_set[arg] = true; end
+            if \%lua.type == "Text" then
+                error("Invalid type for 'compile % to %', expected a dict with expr/statements, but got text.", 0);
             end
-            nomsu:define_compile_action(]]..names..[[, ]]..repr(name_tree:get_line_no())..[[, function(]]..args..[[)
-                return {]]..kind..[[=compile_action(]]..args..[[)};
-            end, ]]..repr(nomsu:source_code())..[[);
-        end]];
-            end
-            local src = \(__src__ 1);
-            nomsu:define_compile_action("compile %names to %body", \(__line_no__), function(\%names, \%body)
-                return {statements=compile_to(\%names, \%body, "expr")};
-            end, src);
-            nomsu:define_compile_action("compile %names to code %body", \(__line_no__), function(\%names, \%body)
-                return {statements=compile_to(\%names, \%body, "statements")};
-            end, src);
-        end
-
-# Compile-time action to make actions
-immediately
-    compile [action %names %body] to code
-        lua> ".."
-            local names, args = nomsu:parse_spec(\%names);
-            local declared_locals = {};
-            for i, arg in ipairs(args) do declared_locals[arg] = true; end
-            names, args = repr(names), table.concat(args, ", ");
-            local body_lua = nomsu:tree_to_lua(\%body);
+            local body_lua = nomsu:tree_to_lua(\%lua);
             local body_code = body_lua.statements or ("return "..body_lua.expr..";");
             local undeclared_locals = {};
             for i, body_local in ipairs(body_lua.locals or {}) do
-                if not declared_locals[body_local] then
+                if not arg_set[body_local] then
                     table.insert(undeclared_locals, body_local);
                 end
             end
             if #undeclared_locals > 0 then
                 body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
             end
-            local src = nomsu:dedent(nomsu:source_code(0));
-            local def_lua = ([[
-            nomsu:define_action(%s, \(__line_no__), function(%s)
-                %s
-            end, %s);]]):format(names, args, body_code, repr(src));
-            return def_lua;
+            local lua_fn_args = table.concat(stub_args[1], ", ");
+            local def_tree = nomsu.compilestack[#nomsu.compilestack];
+            local code_location = ("%s:%s,%s"):format(def_tree.filename, def_tree.start, def_tree.stop);
+            return {statements=([[
+        nomsu:define_compile_action(]]..repr(signature)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
+            ]]..body_code.."\\n"..[[
+        end);
+        ]])};
+        end);
+
+# Compile-time action to make actions
+immediately
+    compile [action %actions %body] to
+        lua> ".."
+            local signature = {};
+            for i, action in ipairs(\%actions.value) do signature[i] = action:get_src(); end
+            local stubs = nomsu:get_stubs_from_signature(signature);
+            local stub_args = nomsu:get_args_from_signature(signature);
+            local arg_set = {};
+            for i, arg in ipairs(stub_args[1]) do arg_set[arg] = true; end
+            local body_lua = nomsu:tree_to_lua(\%body);
+            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
+            local undeclared_locals = {};
+            for i, body_local in ipairs(body_lua.locals or {}) do
+                if not arg_set[body_local] then
+                    table.insert(undeclared_locals, body_local);
+                end
+            end
+            if #undeclared_locals > 0 then
+                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
+            end
+            local lua_fn_args = table.concat(stub_args[1], ", ");
+            local def_tree = nomsu.compilestack[#nomsu.compilestack];
+            local code_location = ("%s:%s,%s"):format(def_tree.filename, def_tree.start, def_tree.stop);
+            return {statements=[[
+            nomsu:define_action(]]..repr(signature)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
+                ]]..body_code.."\\n"..[[
+            end);
+            ]]};
 
 # Macro to make nomsu macros:
 immediately
-    lua> ".."
-        nomsu:define_compile_action("parse %shorthand as %longhand", \(__line_no__), (function(\%shorthand, \%longhand)
-            local names, args = nomsu:parse_spec(\%shorthand);
-            names, args = repr(names), table.concat(args, ", ");
+    compile [parse %shorthand as %longhand] to
+        lua> ".."
+            local signature = {};
+            for i, action in ipairs(\%shorthand.value) do signature[i] = action:get_src(); end
+            local stubs = nomsu:get_stubs_from_signature(signature);
+            local stub_args = nomsu:get_args_from_signature(signature);
+            local lua_fn_args = table.concat(stub_args[1], ", ");
             local template;
             if \%longhand.type == "Block" then
-                template = {};
-                for i, line in ipairs(\%longhand.value) do
-                    template[i] = nomsu:dedent(line.src);
-                end
-                template = repr(table.concat(template, "\\n"));
+                local lines = {};
+                for i, line in ipairs(\%longhand.value) do lines[i] = nomsu:dedent(line:get_src()); end
+                template = repr(table.concat(lines, "\\n"));
             else
-                template = repr(nomsu:dedent(\%longhand.src));
+                template = repr(nomsu:dedent(\%longhand:get_src()));
             end
-            local junk, arg_names, junk = nomsu:get_stub(\%shorthand.value[1]);
             local replacements = {};
-            for i, a in ipairs(arg_names) do replacements[i] = "["..repr(a).."]="..nomsu:var_to_lua_identifier(a); end
+            for i, a in ipairs(stub_args[1]) do replacements[i] = a.."="..a; end
             replacements = "{"..table.concat(replacements, ", ").."}";
-            local lua_code = ([[
-        nomsu:define_compile_action(%s, %s, (function(%s)
-            local template = nomsu:parse(%s, %s);
-            local replacement = nomsu:tree_with_replaced_vars(template, %s);
-            return nomsu:tree_to_lua(replacement);
-        end), %s)]]):format(names, repr(\%shorthand:get_line_no()), args, template,
-            repr(\%shorthand:get_line_no()), replacements, repr(nomsu:source_code(0)));
-            return {statements=lua_code};
-        end), \(__src__ 1));
+            local def_tree = nomsu.compilestack[#nomsu.compilestack];
+            local code_location = ("%s:%s,%s"):format(def_tree.filename, def_tree.start, def_tree.stop);
+            return {statements=[[
+            nomsu:define_compile_action(]]..repr(signature)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
+                local template = nomsu:parse(]]..template..[[, ]]..repr(def_tree.filename)..[[);
+                local replacement = nomsu:tree_with_replaced_vars(template, ]]..replacements..[[);
+                return nomsu:tree_to_lua(replacement);
+            end);
+            ]]};
 
 action [remove action %stub]
     lua> ".."
@@ -143,33 +108,41 @@ action [remove action %stub]
 
 immediately
     action [%tree as lua]
-        =lua "nomsu:tree_to_lua(\%tree).expr"
+        =lua "nomsu:tree_to_lua(\%tree)"
+
+    action [%tree as lua expr]
+        lua> ".."
+            local lua = nomsu:tree_to_lua(\%tree);
+            if lua.locals or not lua.expr then
+                error("Invalid thing to convert to lua expr: "..\%tree:get_src());
+            end
+            return lua.expr;
+
     action [%tree as lua statements]
         lua> ".."
             local lua = nomsu:tree_to_lua(\%tree);
-            return lua.statements or (lua.expr..";");
+            local code = lua.statements or (lua.expr..";");
+            if lua.locals then
+                code = "local "..table.concat(lua.locals, ", ")..";\\n"..code;
+            end
+            return code;
+
     action [%tree as value]
         =lua "nomsu:tree_to_value(\%tree)"
-    compile [repr %obj] to
-        "repr(\(%obj as lua))"
-    compile [type of %obj] to
-        "type(\(%obj as lua))"
-
+    
 immediately
-    parse [lua do> %block] as
-        lua> "do"
-        lua> %block
-        lua> "end"
+    compile [%tree's source code, %tree' source code] to {expr:"\(%tree as lua expr):get_src()"}
 
-compile [nomsu] to "nomsu"
+    compile [repr %obj] to {expr:"repr(\(%obj as lua expr))"}
+    compile [type of %obj] to {expr:"type(\(%obj as lua expr))"}
 
-compile [nomsu's %key] to "nomsu[\(%key as lua)]"
-compile [nomsu %method %args] to "nomsu[\(%method as lua)](nomsu, unpack(\(%args as lua)))"
-compile [tree %tree with %replacements] to ".."
-    nomsu:tree_with_replaced_vars(\(%tree as lua), \(%replacements as lua))
+compile [nomsu] to {expr:"nomsu"}
+
+compile [nomsu's %key] to {expr:"nomsu[\(%key as lua expr)]"}
+compile [nomsu %method %args] to {expr:"nomsu[\(%method as lua expr)](nomsu, unpack(\(%args as lua expr)))"}
 
 action [action %names metadata]
-        =lua "ACTION_METADATA[ACTIONS[\%names]]"
+    =lua "ACTION_METADATA[ACTIONS[\%names]]"
 
 # Get the source code for a function
 action [help %action]
@@ -186,22 +159,34 @@ parse [run %code] as: nomsu "run" [%code]
 parse [enable debugging] as: lua> "nomsu.debug = true"
 parse [disable debugging] as: lua> "nomsu.debug = false"
 
-compile [say %message] to
-    lua> ".."
-        if \%message.type == "Text" then
-            return "nomsu:writeln("..\(%message as lua)..")";
-        else
-            return "nomsu:writeln(stringify("..\(%message as lua).."))";
-        end
+immediately
+    compile [say %message] to
+        lua> ".."
+            if \%message.type == "Text" then
+                return {statements="nomsu:writeln("..\(%message as lua expr)..");"};
+            else
+                return {statements="nomsu:writeln(stringify("..\(%message as lua expr).."));"};
+            end
+
+# Return
+immediately
+    #.. Return statement is wrapped in a do..end block because Lua is unhappy if you
+        put code after a return statement, unless you wrap it in a block.
+    compile [return] to {statements:"do return; end"}
+    compile [return %return_value] to {statements:"do return \(%return_value as lua expr); end"}
 
 # Error functions
-compile [barf!] to "error(nil, 0)"
-compile [barf %msg] to "error(\(%msg as lua), 0)"
-compile [assume %condition] to "assert(\(%condition as lua))"
-compile [assume %condition or barf %msg] to "assert(\(%condition as lua), \(%msg as lua))"
+immediately
+    compile [barf!] to {statements:"error(nil, 0);"}
+    compile [barf %msg] to {statements:"error(\(%msg as lua expr), 0);"}
+    compile [assume %condition] to {..}
+        statements:"if not \(%condition as lua expr) then error('Assumption failed: '..\%condition:get_src(), 0); end"
+    compile [assume %condition or barf %msg] to {..}
+        statements:"if not \(%condition as lua expr) then error(\(%msg as lua expr), 0); end"
 
 # Literals
-compile [yes] to "true"
-compile [no] to "false"
-compile [nothing, nil, null] to "nil"
+immediately
+    compile [yes] to {expr:"true"}
+    compile [no] to {expr:"false"}
+    compile [nothing, nil, null] to {expr:"nil"}
 

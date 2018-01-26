@@ -116,12 +116,15 @@ local function split(str, sep)
 end
 
 local function remove_from_list(list, item)
-    for i=1,#list do
+    local deleted, N = 0, #list
+    for i=1,N do
         if list[i] == item then
-            table.remove(list, i)
-            return 
+            deleted = deleted + 1
+        else
+            list[i-deleted] = list[i]
         end
     end
+    for i=N-deleted+1,N do list[i] = nil end
 end
 
 local function accumulate(glue, co)
@@ -161,6 +164,18 @@ local function set(list)
         ret[list[i]] = true
     end
     return ret
+end
+
+local function deduplicate(list)
+    local seen, deleted = {}, 0
+    for i, item in ipairs(list) do
+        if seen[item] then
+            deleted = deleted + 1
+        else
+            seen[item] = true
+            list[i-deleted] = list[i]
+        end
+    end
 end
 
 local function sum(t)
@@ -343,6 +358,6 @@ end
 
 return {is_list=is_list, size=size, repr=repr, stringify=stringify, split=split,
     remove_from_list=remove_from_list, accumulate=accumulate, nth_to_last=nth_to_last,
-    keys=keys, values=values, set=set, sum=sum, product=product, all=all, any=any,
-    min=min, max=max, sort=sort, equivalent=equivalent, key_for=key_for, clamp=clamp,
-    mix=mix, round=round}
+    keys=keys, values=values, set=set, deduplicate=deduplicate, sum=sum, product=product,
+    all=all, any=any, min=min, max=max, sort=sort, equivalent=equivalent, key_for=key_for,
+    clamp=clamp, mix=mix, round=round}

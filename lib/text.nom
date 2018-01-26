@@ -13,41 +13,43 @@ action [%texts joined with %glue]
 parse [joined %texts, %texts joined] as: %texts joined with ""
 
 compile [capitalized %text capitalized] to
-    "(\(%text as lua)):gsub('%l', string.upper, 1)"
+    {expr:"(\(%text as lua expr)):gsub('%l', string.upper, 1)"}
 
 compile [%text with %sub instead of %patt, %text s/%patt/%sub] to
-    "((\(%text as lua)):gsub(\(%patt as lua), \(%sub as lua)))"
+    {expr:"((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))"}
 
-compile [indented %text, %text indented] to "\%text:gsub('\\n','\\n'..('    '))"
-compile [dedented %obj, %obj dedented] to "nomsu:dedent(\(%obj as lua))"
-compile [%text indented %n times] to "\%text:gsub('\\n','\\n'..('    '):rep(\%n))"
+compile [indented %text, %text indented] to {expr:"\%text:gsub('\\n','\\n'..('    '))"}
+compile [dedented %obj, %obj dedented] to {expr:"nomsu:dedent(\(%obj as lua expr))"}
+compile [%text indented %n times] to {expr:"\%text:gsub('\\n','\\n'..('    '):rep(\%n))"}
 
 # Text literals
-lua do> ".."
-    local escapes = {
-        nl="\\\\n", newline="\\\\n", tab="\\\\t", bell="\\\\a", cr="\\\\r", ["carriage return"]="\\\\r",
-        backspace="\\\\b", ["form feed"]="\\\\f", formfeed="\\\\f", ["vertical tab"]="\\\\v",
-    };
-    local colors = {
-        ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
-        blink="\\\\27[5m", inverse="\\\\27[7m", hidden="\\\\27[8m",
+lua> ".."
+    do
+        local escapes = {
+            nl="\\\\n", newline="\\\\n", tab="\\\\t", bell="\\\\a", cr="\\\\r", ["carriage return"]="\\\\r",
+            backspace="\\\\b", ["form feed"]="\\\\f", formfeed="\\\\f", ["vertical tab"]="\\\\v",
+        };
+        for name, e in pairs(escapes) do
+            local lua = "'"..e.."'";
+            nomsu:define_compile_action(name, \(!! code location !!), function() return {expr=text}; end);
+        end
+        local colors = {
+            ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
+            blink="\\\\27[5m", inverse="\\\\27[7m", hidden="\\\\27[8m",
 
-        black="\\\\27[30m", red="\\\\27[31m", green="\\\\27[32m", yellow="\\\\27[33m", blue="\\\\27[34m",
-        magenta="\\\\27[35m", cyan="\\\\27[36m", white="\\\\27[37m",
+            black="\\\\27[30m", red="\\\\27[31m", green="\\\\27[32m", yellow="\\\\27[33m", blue="\\\\27[34m",
+            magenta="\\\\27[35m", cyan="\\\\27[36m", white="\\\\27[37m",
 
-        ["on black"]="\\\\27[40m", ["on red"]="\\\\27[41m", ["on green"]="\\\\27[42m", ["on yellow"]="\\\\27[43m",
-        ["on blue"]="\\\\27[44m", ["on magenta"]="\\\\27[45m", ["on cyan"]="\\\\27[46m", ["on white"]="\\\\27[47m",
-    };
-    for name, e in pairs(escapes) do
-        local lua = "'"..e.."'";
-        nomsu:define_compile_action(name, \(__line_no__), function() return {expr=text}; end, \(__src__ 1));
-    end
-    for name, c in pairs(colors) do
-        local color = "'"..c.."'";
-        local reset = "'"..colors["reset color"].."'";
-        nomsu:define_compile_action(name, \(__line_no__), function() return {expr=color}; end, \(__src__ 1));
-        nomsu:define_compile_action(name.." %", \(__line_no__), function(\%)
-            return {expr=color..".."..nomsu:tree_to_lua(\%).expr..".."..reset};
-        end, \(__src__ 1));
+            ["on black"]="\\\\27[40m", ["on red"]="\\\\27[41m", ["on green"]="\\\\27[42m", ["on yellow"]="\\\\27[43m",
+            ["on blue"]="\\\\27[44m", ["on magenta"]="\\\\27[45m", ["on cyan"]="\\\\27[46m", ["on white"]="\\\\27[47m",
+        };
+        for name, c in pairs(colors) do
+            local color = "'"..c.."'";
+            local reset = "'"..colors["reset color"].."'";
+            nomsu:define_compile_action(name, \(!! code location !!), function() return {expr=color}; end);
+            nomsu:define_compile_action(name.." %", \(!! code location !!), function(\%)
+                return {expr=color..".."..nomsu:tree_to_lua(\%).expr..".."..reset};
+            end);
+        end
     end
 

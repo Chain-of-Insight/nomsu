@@ -16,138 +16,131 @@ immediately
         %key st in %obj, %key nd in %obj, %key rd in %obj, %key th in %obj,
     ..to
         lua> ".."
-            local obj_lua = \(%obj as lua);
+            local obj_lua = \(%obj as lua expr);
             if not obj_lua:sub(-1,-1):match("[a-zA-Z)]") then
                 obj_lua = "("..obj_lua..")";
             end
-            local key_lua = \(%key as lua);
+            local key_lua = \(%key as lua expr);
             local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
                            or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
             if key_attr then
-                return obj_lua.."."..key_attr;
+                return {expr=obj_lua.."."..key_attr};
             elseif key_lua:sub(1,1) == "[" then
                 key_lua = " "..key_lua.." ";
             end
-            return obj_lua.."["..key_lua.."]";
+            return {expr=obj_lua.."["..key_lua.."]"};
 
 # Comparison Operators
 immediately
-    compile [%x < %y] to "(\(%x as lua) < \(%y as lua))"
-    compile [%x > %y] to "(\(%x as lua) > \(%y as lua))"
-    compile [%x <= %y] to "(\(%x as lua) <= \(%y as lua))"
-    compile [%x >= %y] to "(\(%x as lua) >= \(%y as lua))"
+    compile [%x < %y] to {expr:"(\(%x as lua expr) < \(%y as lua expr))"}
+    compile [%x > %y] to {expr:"(\(%x as lua expr) > \(%y as lua expr))"}
+    compile [%x <= %y] to {expr:"(\(%x as lua expr) <= \(%y as lua expr))"}
+    compile [%x >= %y] to {expr:"(\(%x as lua expr) >= \(%y as lua expr))"}
     compile [%a is %b, %a = %b, %a == %b] to
         lua> ".."
             local safe = {Text=true, Number=true};
             local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
             if safe[\%a.type] or safe[\%b.type] then
-                return "("..a_lua.." == "..b_lua..")";
+                return {expr="("..a_lua.." == "..b_lua..")"};
             else
-                return "utils.equivalent("..a_lua..", "..b_lua..")";
+                return {expr="utils.equivalent("..a_lua..", "..b_lua..")"};
             end
     compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
         lua> ".."
             local safe = {Text=true, Number=true};
             local a_lua, b_lua = nomsu:tree_to_lua(\%a).expr, nomsu:tree_to_lua(\%b).expr;
             if safe[\%a.type] or safe[\%b.type] then
-                return "("..a_lua.." ~= "..b_lua..")";
+                return {expr="("..a_lua.." ~= "..b_lua..")"};
             else
-                return "(not utils.equivalent("..a_lua..", "..b_lua.."))";
+                return {expr="(not utils.equivalent("..a_lua..", "..b_lua.."))"};
             end
     # For strict identity checking, use (%x's id) is (%y's id)
-    compile [%'s id, id of %] to "nomsu.ids[\(% as lua)]"
+    compile [%'s id, id of %] to {expr:"nomsu.ids[\(% as lua expr)]"}
 
 # Variable assignment operator
 immediately
-    lua> ".."
-        nomsu:define_compile_action("%var <- %value", \(__line_no__), function(\%var, \%value)
-            local lua = {};
-            lua.statements = ("%s = %s;"):format(
-                assert(nomsu:tree_to_lua(\%var).expr, "Invalid target for assignment: "..\%var.src),
-                assert(nomsu:tree_to_lua(\%value).expr, "Invalid value for assignment: "..\%value.src));
-            if \%var.type == "Var" then
-                lua.locals = {nomsu:tree_to_lua(\%var).expr};
-            end
-            return lua;
-        end, \(__src__ 1));
+    compile [%var <- %value] to
+        lua> "local \%var_lua = nomsu:tree_to_lua(\%var);"
+        assume (%var_lua's "expr") or barf "Invalid target for assignment: \(%var's source code)"
+        lua> "local \%value_lua = nomsu:tree_to_lua(\%value);"
+        assume (%value_lua's "expr") or barf "Invalid value for assignment: \(%value's source code)"
+        return {..}
+            statements:"\(%var_lua's "expr") = \(%value_lua's "expr");"
+            locals: =lua "(\%var.type == 'Var' and {\%var_lua.expr} or nil)"
 
-    lua> ".."
-        nomsu:define_compile_action("export %var <- %value", \(__line_no__), function(\%var, \%value)
-            local lua = {};
-            lua.statements = ("%s = %s;"):format(
-                assert(nomsu:tree_to_lua(\%var).expr, "Invalid target for assignment: "..\%var.src),
-                assert(nomsu:tree_to_lua(\%value).expr, "Invalid value for assignment: "..\%value.src));
-            return lua;
-        end, \(__src__ 1));
+immediately
+    compile [export %var <- %value] to
+        %var_lua <- (%var as lua)
+        assume (%var_lua's "expr") or barf "Invalid target for assignment: \(%var's source code)"
+        %value_lua <- (%value as lua)
+        assume (%value_lua's "expr") or barf "Invalid value for assignment: \(%value's source code)"
+        return {statements:"\(%var_lua's "expr") = \(%value_lua's "expr");"}
 
-    lua> ".."
-        nomsu:define_compile_action("with %assignments %body", \(__line_no__), function(\%assignments, \%body)
-            local body_lua = nomsu:tree_to_lua(\%body);
-            local declarations = "";
-            local leftover_locals = {};
-            for _, body_local in ipairs(body_lua.locals or {}) do
-                leftover_locals[body_local] = true;
-            end
-            assert(\%assignments.type == "List",
-                "Expected a List for the assignments part of 'with' statement, not "..\%assignments.src);
+    compile [with %assignments %body] to
+        %body_lua <- (%body as lua)
+        %locals <- []
+        %declarations <- []
+        %leftover_locals <- (=lua "{unpack(\%body_lua.locals or {})}")
+        assume ((%assignments' "type") is "List") or barf ".."
+            Expected a List for the assignments part of 'with' statement, not \(%assignments' source code)
+        lua> ".."
             for i, item in ipairs(\%assignments.value) do
                 if item.type == "Var" then
                     local var = nomsu:tree_to_lua(item).expr;
-                    leftover_locals[var] = nil;
-                    declarations = declarations.."local "..var..";\\n    ";
+                    utils.remove_from_list(\%leftover_locals, var);
+                    table.insert(\%locals, var);
                 else
-                    assert(item.type == "FunctionCall" and #item.value == 3 and item.value[2].src == "<-",
-                        "'with' statement expects entries of the form: '%var <- %value', not: "..item.src);
-                    local target, value = item.value[1], item.value[3];
-                    if target.type == "Var" then
-                        local var = nomsu:tree_to_lua(target).expr;
-                        leftover_locals[var] = nil;
-                        declarations = declarations..(("local %s = %s;\\n    "):format(
-                            var, assert(nomsu:tree_to_lua(value).expr, "Invalid value for assignment: "..value.src)));
-                    else
-                        declarations = declarations..(("%s = %s;\\n    "):format(
-                            assert(nomsu:tree_to_lua(target).expr, "Invalid target for assignment: "..target.src),
-                            assert(nomsu:tree_to_lua(value).expr, "Invalid value for assignment: "..value.src)));
+                    if not (item.type == "FunctionCall" and #item.value == 3 and item.value[2].value == "<-") then
+                        error("'with' statement expects entries of the form: '%var <- %value', not: "..item:get_src());
                     end
+                    local target, value = item.value[1], item.value[3];
+                    local target_lua = nomsu:tree_to_lua(target);
+                    if not target_lua.expr then error("Invalid target for assignment: "..target:get_src()); end
+                    local value_lua = nomsu:tree_to_lua(value);
+                    if not value_lua.expr then error("Invalid value for assignment: "..value:get_src()); end
+                    if target.type == "Var" then
+                        utils.remove_from_list(\%leftover_locals, target_lua.expr);
+                    end
+                    table.insert(\%declarations, (("local %s = %s;\\n    "):format(
+                        target_lua.expr, value_lua.expr)));
                 end
             end
-            local code = ([[
-        do
-            %s%s
-        end]]):format(declarations, body_lua.statements or (body_lua.expr..";"));
-            return {statements=code, locals=utils.keys(leftover_locals)};
-        end, \(__src__ 1));
+            local locals_code = "";
+            if #\%locals > 0 then
+                locals_code = "\\nlocal "..table.concat(\%locals, ", ")..";";
+            end
+            local declaration_code = "";
+            if #\%declarations > 0 then
+                declaration_code = "\\n"..table.concat(\%declarations, "\\n");
+            end
+            return {locals=\%leftover_locals, statements=([[
+            do%s%s
+            %s
+            end]]):format(locals_code, declaration_code, \%body_lua.statements or (\%body_lua.expr..";"))};
 
-    lua> ".."
-        nomsu:define_compile_action("exporting %exported %body", \(__line_no__), function(\%exported, \%body)
-            local body_lua = nomsu:tree_to_lua(\%body);
-            local declarations = "";
-            local leftover_locals = {};
-            for _, body_local in ipairs(body_lua.locals or {}) do
-                leftover_locals[body_local] = true;
-            end
-            assert(\%exported.type == "List",
-                "Expected a List for the export part of 'exporting' statement, not "..\%exported.src);
+    compile [exporting %exported %body] to
+        %body_lua <- (%body as lua)
+        %leftover_locals <- (=lua "{unpack(\%body_lua.locals or {})}")
+        assume ((%exported's "type") = "List") or barf ".."
+            Expected a List for the export part of 'exporting' statement, not \(%exported's source code)
+        lua> ".."
             for i, item in ipairs(\%exported.value) do
-                assert(item.type == "Var", "exporting statement expects Vars, not: "..item.src);
+                if item.type ~= "Var" then
+                    error("'exporting' statement expects Vars, not: "..item:get_src());
+                end
                 local var = nomsu:tree_to_lua(item).expr;
-                leftover_locals[var] = nil;
+                utils.remove_from_list(leftover_locals, var);
             end
-            local code = ([[
-        do
-            %s%s
-        end]]):format(declarations, body_lua.statements or (body_lua.expr..";"));
-            return {statements=code, locals=utils.keys(leftover_locals)};
-        end, \(__src__ 1));
+        return {locals:%leftover_locals, statements:=lua "\%body_lua.statements or (\%body_lua.expr..';')"}
 
 immediately
     # Math Operators
-    compile [%x + %y] to "(\(%x as lua) + \(%y as lua))"
-    compile [%x - %y] to "(\(%x as lua) - \(%y as lua))"
-    compile [%x * %y] to "(\(%x as lua) * \(%y as lua))"
-    compile [%x / %y] to "(\(%x as lua) / \(%y as lua))"
-    compile [%x ^ %y] to "(\(%x as lua) ^ \(%y as lua))"
-    compile [%x wrapped around %y, %x mod %y] to "(\(%x as lua) % \(%y as lua))"
+    compile [%x + %y] to {expr:"(\(%x as lua expr) + \(%y as lua expr))"}
+    compile [%x - %y] to {expr:"(\(%x as lua expr) - \(%y as lua expr))"}
+    compile [%x * %y] to {expr:"(\(%x as lua expr) * \(%y as lua expr))"}
+    compile [%x / %y] to {expr:"(\(%x as lua expr) / \(%y as lua expr))"}
+    compile [%x ^ %y] to {expr:"(\(%x as lua expr) ^ \(%y as lua expr))"}
+    compile [%x wrapped around %y, %x mod %y] to {expr:"(\(%x as lua expr) % \(%y as lua expr))"}
 
     # 3-part chained comparisons
     # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
@@ -162,22 +155,22 @@ immediately
     # TODO: optimize for common case where x,y,z are all either variables or number literals
 
     # Boolean Operators
-    compile [%x and %y] to "(\(%x as lua) and \(%y as lua))"
-    compile [%x or %y] to "(\(%x as lua) or \(%y as lua))"
+    compile [%x and %y] to {expr:"(\(%x as lua expr) and \(%y as lua expr))"}
+    compile [%x or %y] to {expr:"(\(%x as lua expr) or \(%y as lua expr))"}
 
     # Bitwise Operators
-    compile [%a OR %b, %a | %b] to "bit32.bor(\(%a as lua), \(%b as lua))"
-    compile [%a XOR %b] to "bit32.bxor(\(%a as lua), \(%b as lua))"
-    compile [%a AND %b, %a & %b] to "bit32.band(\(%a as lua), \(%b as lua))"
-    compile [NOT %, ~ %] to "bit32.bnot(\(% as lua))"
-    compile [%x LSHIFT %shift, %x << %shift] to "bit32.lshift(\(%x as lua), \(%shift as lua))"
-    compile [%x RSHIFT %shift, %x >>> %shift] to "bit32.rshift(\(%x as lua), \(%shift as lua))"
-    compile [%x ARSHIFT %shift, %x >> %shift] to "bit32.arshift(\(%x as lua), \(%shift as lua))"
+    compile [%a OR %b, %a | %b] to {expr:"bit32.bor(\(%a as lua expr), \(%b as lua expr))"}
+    compile [%a XOR %b] to {expr:"bit32.bxor(\(%a as lua expr), \(%b as lua expr))"}
+    compile [%a AND %b, %a & %b] to {expr:"bit32.band(\(%a as lua expr), \(%b as lua expr))"}
+    compile [NOT %, ~ %] to {expr:"bit32.bnot(\(% as lua expr))"}
+    compile [%x LSHIFT %shift, %x << %shift] to {expr:"bit32.lshift(\(%x as lua expr), \(%shift as lua expr))"}
+    compile [%x RSHIFT %shift, %x >>> %shift] to {expr:"bit32.rshift(\(%x as lua expr), \(%shift as lua expr))"}
+    compile [%x ARSHIFT %shift, %x >> %shift] to {expr:"bit32.arshift(\(%x as lua expr), \(%shift as lua expr))"}
     # TODO: implement OR, XOR, AND for multiple operands?
 
     # Unary operators
-    compile [- %] to "(- \(% as lua))"
-    compile [not %] to "(not \(% as lua))"
+    compile [- %] to {expr:"(- \(% as lua expr))"}
+    compile [not %] to {expr:"(not \(% as lua expr))"}
 
 # Update operators
 immediately
@@ -188,4 +181,4 @@ immediately
     parse [<- %var ^ %] as: %var <- (%var ^ %)
     parse [<- %var and %] as: %var <- (%var and %)
     parse [<- %var or %] as: %var <- (%var or %)
-    parse [wrap %var around %] as: "\(%var as lua) = \(%var as lua) % \(% as lua);"
+    parse [wrap %var around %] as: %var <- (%var wrapped around %)

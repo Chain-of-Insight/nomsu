@@ -57,7 +57,7 @@ compile [object %classname %class_body] to
                     body_lua,
                 repr(names), repr(\%line:get_line_no()), table.concat(args, ", "),
                     repr(repr(stub)), table.concat(arg_nomsus, ".."),
-                repr(nomsu:dedent(\%line.src)),
+                repr(nomsu:dedent(\%line:get_src())),
                 \%class_identifier, repr(stub), repr(stub)));
 
     return ".."

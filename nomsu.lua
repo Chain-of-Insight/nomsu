@@ -35,9 +35,6 @@ do
       return string[i]
     end
   end
-  STRING_METATABLE.__mul = function(self, other)
-    return string.rep(self, other)
-  end
 end
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt
@@ -45,7 +42,7 @@ P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C,
 local NOMSU_DEFS
 do
   local _with_0 = { }
-  _with_0.nl = P("\n")
+  _with_0.nl = P("\r") ^ -1 * P("\n")
   _with_0.ws = S(" \t")
   _with_0.tonumber = tonumber
   _with_0.print = function(src, pos, msg)
@@ -100,8 +97,8 @@ do
     end
   end)
   _with_0.error = function(src, pos, err_msg)
-    if lpeg.userdata.source_code:sub(pos, pos) == "\n" then
-      pos = pos + #lpeg.userdata.source_code:match("[ \t\n]*", pos)
+    if lpeg.userdata.source_code:sub(pos, pos):match("[\r\n]") then
+      pos = pos + #lpeg.userdata.source_code:match("[ \t\n\r]*", pos)
     end
     local line_no = 1
     while (lpeg.userdata.line_starts[line_no + 1] or math.huge) < pos do
@@ -109,14 +106,14 @@ do
     end
     local prev_line
     if line_no > 1 then
-      prev_line = lpeg.userdata.source_code:match("[^\n]*", lpeg.userdata.line_starts[line_no - 1])
+      prev_line = lpeg.userdata.source_code:match("[^\r\n]*", lpeg.userdata.line_starts[line_no - 1])
     else
       prev_line = ""
     end
-    local err_line = lpeg.userdata.source_code:match("[^\n]*", lpeg.userdata.line_starts[line_no])
+    local err_line = lpeg.userdata.source_code:match("[^\r\n]*", lpeg.userdata.line_starts[line_no])
     local next_line
     if line_no < #lpeg.userdata.line_starts then
-      next_line = lpeg.userdata.source_code:match("[^\n]*", lpeg.userdata.line_starts[line_no + 1])
+      next_line = lpeg.userdata.source_code:match("[^\r\n]*", lpeg.userdata.line_starts[line_no + 1])
     else
       next_line = ""
     end
@@ -138,13 +135,14 @@ do
     end)(), " ")
     local src = lpeg.userdata.source_code:sub(start, stop - 1)
     return {
+      type = "FunctionCall",
       start = start,
       stop = stop,
-      type = "FunctionCall",
-      src = src,
-      get_line_no = lpeg.userdata.get_line_no,
       value = value,
-      stub = stub
+      stub = stub,
+      filename = lpeg.userdata.filename,
+      get_line_no = lpeg.userdata.get_line_no,
+      get_src = lpeg.userdata.get_src
     }
   end
   NOMSU_DEFS = _with_0
@@ -154,12 +152,13 @@ setmetatable(NOMSU_DEFS, {
     local make_node
     make_node = function(start, value, stop)
       return {
+        type = key,
         start = start,
         stop = stop,
         value = value,
-        src = lpeg.userdata.source_code:sub(start, stop - 1),
-        get_line_no = lpeg.userdata.get_line_no,
-        type = key
+        filename = lpeg.userdata.filename,
+        get_src = lpeg.userdata.get_src,
+        get_line_no = lpeg.userdata.get_line_no
       }
     end
     self[key] = make_node
@@ -183,28 +182,28 @@ end
 local NomsuCompiler
 do
   local _class_0
+  local line_counter, stub_defs, stub_pattern, var_pattern
   local _base_0 = {
     writeln = function(self, ...)
       self:write(...)
       return self:write("\n")
     end,
-    errorln = function(self, ...)
-      self:write_err(...)
-      return self:write_err("\n")
-    end,
-    define_action = function(self, signature, line_no, fn, src, compile_time)
-      if compile_time == nil then
-        compile_time = false
+    define_action = function(self, signature, source, fn)
+      if self.debug then
+        self:writeln(tostring(colored.bright("DEFINING ACTION:")) .. " " .. tostring(colored.green(repr(signature))))
+      end
+      if type(fn) ~= 'function' then
+        error('function', "Bad fn: " .. tostring(repr(fn)))
       end
       if type(signature) == 'string' then
-        signature = self:get_stubs({
+        signature = {
           signature
-        })
-      elseif type(signature) == 'table' and type(signature[1]) == 'string' then
-        signature = self:get_stubs(signature)
+        }
+      elseif type(signature) ~= 'table' or signature.type ~= nil then
+        error("Invalid signature, expected list of strings, but got: " .. tostring(repr(signature)), 0)
       end
-      assert(type(fn) == 'function', "Bad fn: " .. tostring(repr(fn)))
-      local aliases = { }
+      local stubs = self:get_stubs_from_signature(signature)
+      local stub_args = self:get_args_from_signature(signature)
       self.__class.def_number = self.__class.def_number + 1
       local fn_info = debug.getinfo(fn, "u")
       local fn_arg_positions, arg_orders
@@ -218,11 +217,10 @@ do
         end
         arg_orders = { }
       end
-      for sig_i = 1, #signature do
-        local stub, arg_names = unpack(signature[sig_i])
-        assert(stub, "NO STUB FOUND: " .. tostring(repr(signature)))
+      for sig_i = 1, #stubs do
+        local stub, args = stubs[sig_i], stub_args[sig_i]
         if self.debug then
-          self:writeln(tostring(colored.bright("DEFINING ACTION:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(arg_names))) .. " ON: " .. tostring(self.environment.ACTIONS))
+          self:writeln(tostring(colored.bright("ALIAS:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(args))) .. " ON: " .. tostring(self.environment.ACTIONS))
         end
         self.environment.ACTIONS[stub] = fn
         if not (fn_info.isvararg) then
@@ -230,33 +228,31 @@ do
           do
             local _accum_0 = { }
             local _len_0 = 1
-            for _index_0 = 1, #arg_names do
-              local a = arg_names[_index_0]
-              _accum_0[_len_0] = fn_arg_positions[self:var_to_lua_identifier(a)]
+            for _index_0 = 1, #args do
+              local a = args[_index_0]
+              _accum_0[_len_0] = fn_arg_positions[a]
               _len_0 = _len_0 + 1
             end
             arg_positions = _accum_0
           end
-          assert(#arg_positions == #arg_names, "Mismatch in args between lua function's " .. tostring(repr(fn_arg_positions)) .. " and stub's " .. tostring(repr(arg_names)))
+          if #arg_positions ~= #args then
+            error("Mismatch in args between lua function's " .. tostring(repr(fn_arg_positions)) .. " and stub's " .. tostring(repr(args)) .. " for " .. tostring(repr(stub)), 0)
+          end
           arg_orders[stub] = arg_positions
         end
       end
       self.action_metadata[fn] = {
         fn = fn,
-        src = src,
-        line_no = line_no,
-        aliases = aliases,
+        source = source,
+        aliases = stubs,
         arg_orders = arg_orders,
         arg_positions = fn_arg_positions,
         def_number = self.__class.def_number
       }
     end,
-    define_compile_action = function(self, signature, line_no, fn, src)
-      self:define_action(signature, line_no, fn, src, true)
+    define_compile_action = function(self, signature, source, fn, src)
+      self:define_action(signature, source, fn)
       self.action_metadata[fn].compile_time = true
-      if self.debug then
-        return self:writeln(tostring(colored.bright(colored.green("(it was compile time)"))))
-      end
     end,
     serialize_defs = function(self, scope, after)
       if scope == nil then
@@ -265,68 +261,7 @@ do
       if after == nil then
         after = nil
       end
-      error("Not currently functional.")
-      after = after or (self.core_defs or 0)
-      scope = scope or self.defs
-      local defs_by_num = { }
-      for stub, def in pairs(scope) do
-        if def and stub:sub(1, 1) ~= "#" then
-          defs_by_num[def.def_number] = def
-        end
-      end
-      local keys
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for k, v in pairs(defs_by_num) do
-          _accum_0[_len_0] = k
-          _len_0 = _len_0 + 1
-        end
-        keys = _accum_0
-      end
-      table.sort(keys)
-      local buff = { }
-      local k_i = 1
-      local _using = nil
-      local _using_do = { }
-      for k_i, i in ipairs(keys) do
-        local _continue_0 = false
-        repeat
-          if i <= after then
-            _continue_0 = true
-            break
-          end
-          local def = defs_by_num[i]
-          if def.defs == scope then
-            if def.src then
-              insert(buff, def.src)
-            end
-            _continue_0 = true
-            break
-          end
-          if _using == def.defs then
-            if def.src then
-              insert(_using_do, def.src)
-            end
-          else
-            _using = def.defs
-            _using_do = {
-              def.src
-            }
-          end
-          if k_i == #keys or defs_by_num[keys[k_i + 1]].defs ~= _using then
-            insert(buff, "using:\n    " .. tostring(self:indent(self:serialize_defs(_using))) .. "\n..do:\n    " .. tostring(self:indent(concat(_using_do, "\n"))))
-          end
-          _continue_0 = true
-        until true
-        if not _continue_0 then
-          break
-        end
-      end
-      for k, v in pairs(scope["#vars"] or { }) do
-        insert(buff, "<%" .. tostring(k) .. "> = " .. tostring(self:value_to_nomsu(v)))
-      end
-      return concat(buff, "\n")
+      return error("Not currently functional.", 0)
     end,
     dedent = function(self, code)
       if not (code:find("\n")) then
@@ -336,7 +271,7 @@ do
       for line in code:gmatch("\n([^\n]*)") do
         local _continue_0 = false
         repeat
-          if line:match("^%s*#.*") then
+          if line:match("^%s*#.*") or line:match("^%s*$") then
             _continue_0 = true
             break
           else
@@ -362,8 +297,10 @@ do
       end
       if spaces ~= math.huge and spaces < indent_spaces then
         return (code:gsub("\n" .. (" "):rep(spaces), "\n"))
-      else
+      elseif indent_spaces ~= math.huge then
         return (code:gsub("\n" .. (" "):rep(indent_spaces), "\n    "))
+      else
+        return code
       end
     end,
     indent = function(self, code, levels)
@@ -377,7 +314,6 @@ do
       if self.debug then
         self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(colored.yellow(nomsu_code)))
       end
-      nomsu_code = nomsu_code:gsub("\r", "")
       local userdata
       do
         local _with_0 = {
@@ -387,11 +323,14 @@ do
             0
           }
         }
-        _with_0.line_starts = re.compile("lines <- {| line ('\n' line)* |} line <- {} [^\n]*"):match(nomsu_code)
+        _with_0.get_src = function(self)
+          return nomsu_code:sub(self.start, self.stop - 1)
+        end
+        _with_0.line_starts = line_counter:match(_with_0.source_code)
         _with_0.get_line_no = function(self)
           if not (self._line_no) then
             local line_no = 1
-            while (_with_0.line_starts[line_no + 1] or math.huge) < self.start do
+            while line_no < #_with_0.line_starts and _with_0.line_starts[line_no + 1] < self.start do
               line_no = line_no + 1
             end
             self._line_no = tostring(_with_0.filename) .. ":" .. tostring(line_no)
@@ -425,7 +364,7 @@ do
         local timeout
         timeout = function()
           debug.sethook()
-          return error("Execution quota exceeded. Your code took too long.")
+          return error("Execution quota exceeded. Your code took too long.", 0)
         end
         debug.sethook(timeout, "", max_operations)
       end
@@ -434,9 +373,8 @@ do
       assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local lua = self:tree_to_lua(tree)
       local lua_code = lua.statements or (lua.expr .. ";")
-      local locals = lua_code.locals or { }
-      if #locals > 0 then
-        lua_code = "local " .. concat(locals, ", ") .. ";\n" .. lua_code
+      if lua_code.locals and #lua_code.locals > 0 then
+        lua_code = "local " .. concat(lua_code.locals, ", ") .. ";\n" .. lua_code
       end
       lua_code = "-- File: " .. tostring(filename) .. "\n" .. lua_code
       local ret = self:run_lua(lua_code)
@@ -466,13 +404,13 @@ do
         end
         local file = file or io.open(filename)
         if not file then
-          error("File does not exist: " .. tostring(filename))
+          error("File does not exist: " .. tostring(filename), 0)
         end
         local nomsu_code = file:read('*a')
         file:close()
         return self:run(nomsu_code, filename)
       else
-        return error("Invalid filetype for " .. tostring(filename))
+        return error("Invalid filetype for " .. tostring(filename), 0)
       end
     end,
     require_file = function(self, filename)
@@ -495,18 +433,21 @@ do
           return ("\n%-3d|"):format(n)
         end
         local code = "1  |" .. lua_code:gsub("\n", fn)
-        error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(err))
+        error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(err), 0)
       end
       return run_lua_fn()
     end,
     tree_to_value = function(self, tree, filename)
+      if tree.type == 'Text' and #tree.value == 1 and type(tree.value[1]) == 'string' then
+        return tree.value[1]
+      end
       local code = "return " .. tostring(self:tree_to_lua(tree).expr) .. ";"
       if self.debug then
         self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
       end
       local lua_thunk, err = load(code, nil, nil, self.environment)
       if not lua_thunk then
-        error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(colored.red(err)))
+        error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(code)))) .. "\n\n" .. tostring(colored.red(err)), 0)
       end
       return lua_thunk()
     end,
@@ -828,7 +769,7 @@ do
           for _index_0 = 1, #_list_0 do
             local line = _list_0[_index_0]
             nomsu = expression(line)
-            assert(nomsu, "Failed to produce output for:\n" .. tostring(colored.yellow(line.src)))
+            assert(nomsu, "Failed to produce output for:\n" .. tostring(colored.yellow(line:get_src())))
             insert(lines, nomsu)
           end
           return concat(lines, "\n")
@@ -884,13 +825,13 @@ do
           return '".."\n    ' .. (self:indent(value))
         end
       else
-        return error("Unsupported value_to_nomsu type: " .. tostring(type(value)))
+        return error("Unsupported value_to_nomsu type: " .. tostring(type(value)), 0)
       end
     end,
     tree_to_lua = function(self, tree)
       assert(tree, "No tree provided.")
       if not tree.type then
-        error("Invalid tree: " .. tostring(repr(tree)))
+        error("Invalid tree: " .. tostring(repr(tree)), 0)
       end
       local _exp_0 = tree.type
       if "File" == _exp_0 then
@@ -899,12 +840,13 @@ do
         end
         local declared_locals = { }
         local lua_bits = { }
+        local line_no = 1
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local line = _list_0[_index_0]
           local lua = self:tree_to_lua(line)
           if not lua then
-            error("No lua produced by " .. tostring(repr(line)))
+            error("No lua produced by " .. tostring(repr(line)), 0)
           end
           if lua.locals then
             local new_locals
@@ -944,7 +886,7 @@ do
         }
       elseif "Nomsu" == _exp_0 then
         return {
-          expr = "nomsu:parse(" .. tostring(repr(tree.value.src)) .. ", " .. tostring(repr(tree:get_line_no())) .. ").value[1]"
+          expr = "nomsu:parse(" .. tostring(repr(tree.value:get_src())) .. ", " .. tostring(repr(tree:get_line_no())) .. ").value[1]"
         }
       elseif "Block" == _exp_0 then
         local lua_bits = { }
@@ -971,9 +913,10 @@ do
             insert(lua_bits, tostring(lua.expr) .. ";")
           end
         end
+        utils.deduplicate(locals)
         return {
           statements = concat(lua_bits, "\n"),
-          locals = (next(locals) and utils.keys(locals) or nil)
+          locals = (#locals > 0 and locals or nil)
         }
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
@@ -1034,7 +977,7 @@ do
               insert(bits, tok.value)
             else
               local lua = self:tree_to_lua(tok)
-              assert(lua.expr, "non-expression value inside math expression: " .. tostring(tok.src))
+              assert(lua.expr, "non-expression value inside math expression: " .. tostring(tok:get_src()))
               insert(bits, lua.expr)
             end
           end
@@ -1054,7 +997,7 @@ do
               break
             end
             local lua = self:tree_to_lua(tok)
-            assert(lua.expr, tostring(tree:get_line_no()) .. ": Cannot use:\n" .. tostring(colored.yellow(tok.src)) .. "\nas an argument to " .. tostring(tree.stub) .. ", since it's not an expression, it produces: " .. tostring(repr(lua)))
+            assert(lua.expr, tostring(tree:get_line_no()) .. ": Cannot use:\n" .. tostring(colored.yellow(tok:get_src())) .. "\nas an argument to " .. tostring(tree.stub) .. ", since it's not an expression, it produces: " .. tostring(repr(lua)))
             insert(args, lua.expr)
             _continue_0 = true
           until true
@@ -1104,7 +1047,7 @@ do
               self:print_tree(bit)
               self:writeln(tostring(colored.bright("EXPR:")) .. " " .. tostring(lua.expr) .. ", " .. tostring(colored.bright("STATEMENT:")) .. " " .. tostring(lua.statements))
             end
-            assert(lua.expr, "Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
+            assert(lua.expr, "Cannot use [[" .. tostring(bit:get_src()) .. "]] as a string interpolation value, since it's not an expression.")
             insert(concat_parts, "stringify(" .. tostring(lua.expr) .. ")")
             _continue_0 = true
           until true
@@ -1134,7 +1077,7 @@ do
         for _index_0 = 1, #_list_0 do
           local item = _list_0[_index_0]
           local lua = self:tree_to_lua(item)
-          assert(lua.expr, "Cannot use [[" .. tostring(item.src) .. "]] as a list item, since it's not an expression.")
+          assert(lua.expr, "Cannot use [[" .. tostring(item:get_src()) .. "]] as a list item, since it's not an expression.")
           insert(items, lua.expr)
         end
         return {
@@ -1153,9 +1096,9 @@ do
           else
             key_lua = self:tree_to_lua(entry.dict_key)
           end
-          assert(key_lua.expr, "Cannot use [[" .. tostring(entry.dict_key.src) .. "]] as a dict key, since it's not an expression.")
+          assert(key_lua.expr, "Cannot use [[" .. tostring(entry.dict_key:get_src()) .. "]] as a dict key, since it's not an expression.")
           local value_lua = self:tree_to_lua(entry.dict_value)
-          assert(value_lua.expr, "Cannot use [[" .. tostring(entry.dict_value.src) .. "]] as a dict value, since it's not an expression.")
+          assert(value_lua.expr, "Cannot use [[" .. tostring(entry.dict_value:get_src()) .. "]] as a dict value, since it's not an expression.")
           local key_str = key_lua.expr:match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
           if key_str then
             insert(items, tostring(key_str) .. "=" .. tostring(value_lua.expr))
@@ -1177,7 +1120,7 @@ do
           expr = self:var_to_lua_identifier(tree.value)
         }
       else
-        return error("Unknown/unimplemented thingy: " .. tostring(tree.type))
+        return error("Unknown/unimplemented thingy: " .. tostring(tree.type), 0)
       end
     end,
     walk_tree = function(self, tree, depth)
@@ -1239,8 +1182,9 @@ do
       end
       local _exp_0 = tree.type
       if "Var" == _exp_0 then
-        if replacements[tree.value] ~= nil then
-          tree = replacements[tree.value]
+        local id = self:var_to_lua_identifier(tree.value)
+        if replacements[id] ~= nil then
+          tree = replacements[id]
         end
       elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
         local new_value = self:tree_with_replaced_vars(tree.value, replacements)
@@ -1289,69 +1233,41 @@ do
       end
       return tree
     end,
-    get_stub = function(self, x)
-      if not x then
-        error("Nothing to get stub from")
+    get_stubs_from_signature = function(self, signature)
+      if type(signature) ~= 'table' or signature.type then
+        error("Invalid signature: " .. tostring(repr(signature)), 0)
       end
-      if type(x) == 'string' then
-        local spec = concat(self.__class.stub_patt:match(x), " ")
-        local arg_names = { }
-        local stub = spec:gsub("%%(%S*)", function(arg)
-          insert(arg_names, arg)
-          return "%"
-        end)
-        return stub, arg_names
+      local stubs = { }
+      for i, alias in ipairs(signature) do
+        if type(alias) ~= 'string' then
+          error("Expected entries in signature to be strings, not " .. tostring(type(alias)) .. "s like: " .. tostring(repr(alias)) .. "\nsignature: " .. tostring(repr(signature)), 0)
+        end
+        stubs[i] = stub_pattern:match(alias)
+        if not (stubs[i]) then
+          error("Failed to match stub pattern on alias: " .. tostring(repr(alias)))
+        end
       end
-      if type(x) ~= 'table' then
-        error("Invalid type for getting stub: " .. tostring(type(x)) .. " for:\n" .. tostring(repr(x)))
-      end
-      local _exp_0 = x.type
-      if "Text" == _exp_0 then
-        return self:get_stub(x.value)
-      elseif "FunctionCall" == _exp_0 then
-        return self:get_stub(x.src)
-      else
-        return error("Unsupported get stub type: " .. tostring(x.type) .. " for " .. tostring(repr(x)))
-      end
+      return stubs
     end,
-    get_stubs = function(self, x)
-      if type(x) ~= 'table' then
-        return {
-          {
-            self:get_stub(x)
-          }
-        }
+    get_args_from_signature = function(self, signature)
+      if type(signature) ~= 'table' or signature.type then
+        error("Invalid signature: " .. tostring(repr(signature)), 0)
       end
-      local _exp_0 = x.type
-      if nil == _exp_0 then
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #x do
-          local i = x[_index_0]
-          _accum_0[_len_0] = {
-            self:get_stub(i)
-          }
-          _len_0 = _len_0 + 1
+      local stub_args = { }
+      for i, alias in ipairs(signature) do
+        if type(alias) ~= 'string' then
+          error("Invalid type for signature: " .. tostring(type(alias)) .. " for:\n" .. tostring(repr(alias)), 0)
         end
-        return _accum_0
-      elseif "List" == _exp_0 then
-        local _accum_0 = { }
-        local _len_0 = 1
-        local _list_0 = x.value
-        for _index_0 = 1, #_list_0 do
-          local i = _list_0[_index_0]
-          _accum_0[_len_0] = {
-            self:get_stub(i)
-          }
-          _len_0 = _len_0 + 1
+        local args = var_pattern:match(alias)
+        if not (args) then
+          error("Failed to match arg pattern on alias: " .. tostring(repr(alias)), 0)
         end
-        return _accum_0
+        for j = 1, #args do
+          args[j] = self:var_to_lua_identifier(args[j])
+        end
+        stub_args[i] = args
       end
-      return {
-        {
-          self:get_stub(x)
-        }
-      }
+      return stub_args
     end,
     var_to_lua_identifier = function(self, var)
       if type(var) == 'table' and var.type == "Var" then
@@ -1369,9 +1285,13 @@ do
       if level == nil then
         level = 0
       end
-      return self:dedent(self.compilestack[#self.compilestack - level].src)
+      return self:dedent(self.compilestack[#self.compilestack - level]:get_src())
     end,
     initialize_core = function(self)
+      local get_line_no
+      get_line_no = function()
+        return "nomsu.moon:" .. tostring(debug.getinfo(2).currentline)
+      end
       local nomsu = self
       local nomsu_string_as_lua
       nomsu_string_as_lua = function(code)
@@ -1383,23 +1303,24 @@ do
             insert(concat_parts, bit)
           else
             local lua = nomsu:tree_to_lua(bit)
-            assert(lua.expr, "Cannot use [[" .. tostring(bit.src) .. "]] as a string interpolation value, since it's not an expression.")
+            if not (lua.expr) then
+              error("Cannot use [[" .. tostring(bit:get_src()) .. "]] as a string interpolation value, since it's not an expression.", 0)
+            end
             insert(concat_parts, lua.expr)
           end
         end
         return concat(concat_parts)
       end
-      self:define_compile_action("immediately %block", "nomsu.moon", function(_block)
+      self:define_compile_action("immediately %block", get_line_no(), function(_block)
         local lua = nomsu:tree_to_lua(_block)
         local lua_code = lua.statements or (lua.expr .. ";")
-        lua_code = "-- Immediately:\n" .. lua_code
         nomsu:run_lua(lua_code)
         return {
-          statements = lua_code,
+          statements = "if IMMEDIATE then\n" .. tostring(lua_code) .. "\nend",
           locals = lua.locals
         }
       end)
-      self:define_compile_action("lua> %code", "nomsu.moon", function(_code)
+      self:define_compile_action("lua> %code", get_line_no(), function(_code)
         if _code.type == "Text" then
           local lua = nomsu_string_as_lua(_code)
           return {
@@ -1411,26 +1332,22 @@ do
           }
         end
       end)
-      self:define_compile_action("=lua %code", "nomsu.moon", function(_code)
+      self:define_compile_action("=lua %code", get_line_no(), function(_code)
         local lua = nomsu_string_as_lua(_code)
         return {
           expr = lua
         }
       end)
-      self:define_compile_action("__line_no__", "nomsu.moon", function()
+      self:define_compile_action("!! code location !!", get_line_no(), function()
+        local tree = nomsu.compilestack[#nomsu.compilestack - 1]
         return {
-          expr = repr(nomsu.compilestack[#nomsu.compilestack]:get_line_no())
+          expr = repr(tostring(tree.filename) .. ":" .. tostring(tree.start) .. "," .. tostring(tree.stop))
         }
       end)
-      self:define_compile_action("__src__ %level", "nomsu.moon", function(_level)
-        return {
-          expr = repr(nomsu:source_code(nomsu:tree_to_value(_level)))
-        }
-      end)
-      self:define_action("run file %filename", "nomsu.moon", function(_filename)
+      self:define_action("run file %filename", get_line_no(), function(_filename)
         return nomsu:run_file(_filename)
       end)
-      return self:define_compile_action("use %filename", "nomsu.moon", function(_filename)
+      return self:define_compile_action("use %filename", get_line_no(), function(_filename)
         local filename = nomsu:tree_to_value(_filename)
         nomsu:require_file(filename)
         return {
@@ -1444,9 +1361,6 @@ do
     __init = function(self)
       self.write = function(self, ...)
         return io.write(...)
-      end
-      self.write_err = function(self, ...)
-        return io.stderr:write(...)
       end
       local NaN_surrogate = { }
       local nil_surrogate = { }
@@ -1534,6 +1448,11 @@ do
   _base_0.__class = _class_0
   local self = _class_0
   self.def_number = 0
+  line_counter = re.compile([[        lines <- {| line (%nl line)* |}
+        line <- {} (!%nl .)*
+    ]], {
+    nl = NOMSU_DEFS.nl
+  })
   self.math_patt = re.compile([[ "%" (" " [*/^+-] " %")+ ]])
   self.unescape_string = function(self, str)
     return Cs(((P("\\\\") / "\\") + (P("\\\"") / '"') + NOMSU_DEFS.escaped_char + P(1)) ^ 0):match(str)
@@ -1557,10 +1476,13 @@ do
     insert(bits, close)
     return concat(bits)
   end
-  self.stub_patt = re.compile("{|(' '+ / '\n..' / {'%' %id*} / {%id+} / {%op})*|}", {
-    id = NOMSU_DEFS.ident_char,
-    op = NOMSU_DEFS.operator
-  })
+  stub_defs = {
+    space = (P(' ') + P('\n..')) ^ 0,
+    word = (NOMSU_DEFS.ident_char ^ 1 + NOMSU_DEFS.operator ^ 1),
+    varname = (R('az', 'AZ', '09') + P('_') + NOMSU_DEFS.utf8_char) ^ 0
+  }
+  stub_pattern = re.compile("{~ (%space->'') (('%' (%varname->'')) / %word)? ((%space->' ') (('%' (%varname->'')) / %word))* (%space->'') ~}", stub_defs)
+  var_pattern = re.compile("{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs)
   NomsuCompiler = _class_0
 end
 if arg then
@@ -1608,7 +1530,8 @@ if arg then
           input = io.open(args.input):read("*a")
         end
         local retval, code = nomsu:run(input, args.input)
-        if args.output then
+        if compiled_output then
+          compiled_output:write("local IMMEDIATE = true;\n")
           compiled_output:write(code)
         end
       end
@@ -1671,7 +1594,22 @@ if arg then
         do
           local metadata = nomsu.action_metadata[calling_fn.func]
           if metadata then
-            line = colored.yellow(metadata.line_no)
+            local filename, start, stop = metadata.source:match("([^:]*):([0-9]*),([0-9]*)")
+            if filename then
+              local file = io.open(filename):read("*a")
+              local line_no = 1
+              for _ in file:sub(1, tonumber(start)):gmatch("\n") do
+                line_no = line_no + 1
+              end
+              local offending_statement = file:sub(tonumber(start), tonumber(stop))
+              if #offending_statement > 50 then
+                offending_statement = offending_statement:sub(1, 50) .. "..."
+              end
+              offending_statement = colored.red(offending_statement)
+              line = colored.yellow(filename .. ":" .. tostring(line_no) .. "\n    " .. offending_statement)
+            else
+              line = colored.yellow(metadata.source)
+            end
             name = colored.bright(colored.yellow(metadata.aliases[1]))
           else
             if calling_fn.istailcall and not name then
