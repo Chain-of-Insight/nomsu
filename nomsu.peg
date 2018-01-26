@@ -36,9 +36,9 @@ functioncall (FunctionCall):
 word (Word): { %operator / (!number plain_word) }
 
 inline_text (Text):
-    !('".."')
+    !('".."' %ws* line_comment? %nl (%ws* %nl)* %gt_nodent)
     '"' {|
-        ({~ (('\"' -> '"') / ('\\' -> '\') / ('\..' -> '..') / %escaped_char / [^%nl\"])+ ~}
+        ({~ (('\"' -> '"') / ('\\' -> '\') / %escaped_char / [^%nl\"])+ ~}
         / text_interpolation)*
     |} '"'
 indented_text (Text):

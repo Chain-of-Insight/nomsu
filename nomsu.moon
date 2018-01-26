@@ -40,8 +40,6 @@ do
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
 -- Remove nomsu:write and nomsu:writeln and just use print() instead.
--- Allow ("..") as an expression, which is obviously not an indented text region, instead
---    of having a special syntax for "\.."
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
