@@ -642,9 +642,9 @@ class NomsuCompiler
                 for arg in *tree.value
                     lua = @tree_to_lua arg
                     if #tree.value == 1 and lua.expr and not lua.statements
-                        return expr:lua.expr
+                        return {expr:lua.expr, locals:lua.locals}
                     if lua.locals
-                        for l in *lua.locals do locals[l] = true
+                        for l in *lua.locals do table.insert(locals, l)
                     if lua.statements then insert lua_bits, lua.statements
                     elseif lua.expr then insert lua_bits, "#{lua.expr};"
                 utils.deduplicate(locals)

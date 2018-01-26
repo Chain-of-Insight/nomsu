@@ -897,14 +897,15 @@ do
           local lua = self:tree_to_lua(arg)
           if #tree.value == 1 and lua.expr and not lua.statements then
             return {
-              expr = lua.expr
+              expr = lua.expr,
+              locals = lua.locals
             }
           end
           if lua.locals then
             local _list_1 = lua.locals
             for _index_1 = 1, #_list_1 do
               local l = _list_1[_index_1]
-              locals[l] = true
+              table.insert(locals, l)
             end
           end
           if lua.statements then
