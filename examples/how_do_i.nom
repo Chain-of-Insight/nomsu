@@ -10,70 +10,69 @@
 # How do I import files?
 use "lib/core.nom"
 
-# Declare a variable?
-local %x
-# Otherwise, variables are implicitly global (hah, sorry, I know that sucks)
-
 # Set a variable?
-set %x = 1
-set %str = "Hello world"
+%x <- 1
+%str <- "Hello world"
 # Expressions that are more than just literal values require parentheses:
-set %x = (2 + 3)
+%x <- (2 + 3)
 
 # Modify a variable?
-set %x = 100
-%x += 1
+%foobar <- 100
+# As a shorthand, you can type:
+<- %foobar + 1
+# which does the same thing as:
+%foobar <- (%foobar + 1)
 
 # Print stuff?
 say "Hello world!"
 
 # Define a mutli-line string?
-set %mutli_str = ".."
+%mutli_str <- ".."
     Start with "..", then put lines below it
     that are indented one level.
     The string will continue until the indentation ends.
 
 # Format a string?
-set %format_str = ".."
+%format_str <- ".."
     Strings can contain a backslash followed by a variable, list, dict, or parenthesized
     expression. This escaped value will be converted to a readable string, like so:
     The value of %x is \%x, isn't that nice?
     The sum of 2 and 4 is \(2 + 4).
     If you need to use a plain ol' backslash, you can do \\ <-- that
-set %format_str2 = "Single-line strings can contain escape sequences like \", \\, \n, \065, and \x0A"
+%format_str2 <- "Single-line strings can contain escape sequences like \", \\, \n, \065, and \x0A"
 
 # Define a list?
-set %my_list = [1,2,"hello"]
+%my_list <- [1,2,"hello"]
 #.. Really long lists can use [..] followed by a bunch of indented values delimited
     by commas and/or newlines
-set %my_really_long_list = [..]
+%my_really_long_list <- [..]
     1,2,3,4
     5,6
     7
     8,9,10
 
 # Use a list?
-set %my_list = ["first item", "second item", "third item"]
+%my_list <- ["first item", "second item", "third item"]
 # Lists are 1-indexed because they're implemented as Lua tables, so this prints "first item"
-say (%my_list->1)
+say (1st in %my_list)
 # These do the same thing:
 say (%my_list's 1)
 say (1 in %my_list)
 # List entries can be modified like this:
-set (%my_list -> 1) = "ONE!!!"
+(1st in %my_list) <- "ONE!!!"
 say (size of %my_list)
 
 # Define a dictionary/hash map?
-set %my_dict = {x: 99, y: 101}
-set %my_dict = {..}
+%my_dict <- {x: 99, y: 101}
+%my_dict <- {..}
     x: 101, y: 2
     "99 bottles": 99
     653: 292
 
 # Use a dict?
 # Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
-say (%my_dict->"x")
-set (%my_dict->"x") = 9999
+say (%my_dict's "x")
+(%my_dict's "x") <- 9999
 
 # Do conditional branching?
 if: 1 < 10
@@ -109,7 +108,7 @@ when 3 = ?
         say "this won't print"
 
 # Loop over a list (a foreach loop)?
-set %list = [1,2,3]
+%list <- [1,2,3]
 for %x in %list
     say "For %x loop #\%x"
 # There's also a slightly more concise version that automatically populates a loop variable "%"
@@ -129,30 +128,30 @@ for %backwards from 3 to 1 by -1
     say "Backwards #\%backwards"
 
 # While loops:
-set %x = 1
+%x <- 1
 repeat while: %x <= 3
     say "repeat while loop #\%x"
-    %x += 1
+    <- %x + 1
 
-set %x = 1
+%x <- 1
 repeat until: %x > 3
     say "repeat until loop #\%x"
-    %x += 1
+    <- %x + 1
 
 # Infinite loop:
-set %x = 1
+%x <- 1
 repeat
     say "repeat loop #\%x"
-    %x += 1
+    <- %x + 1
     if: %x > 3
-        stop repeat-loop
+        stop repeating
 
 # GOTOs:
 do
-    set %x = 1
-    -> %again
+    %x <- 1
+    === %again ===
     say "GOTO loop #\%x"
-    %x += 1
+    <- %x + 1
     if: %x <= 3
         go to %again
     say "finished going to"
@@ -166,12 +165,12 @@ action [say both %first and also %second]
 
 # Functions can use "return" to return a value early
 action [first fibonacci above %n]
-    set %f1 = 0
-    set %f2 = 1
+    %f1 <- 0
+    %f2 <- 1
     repeat
-        set %tmp = (%f1 + %f2)
-        set %f1 = %f2
-        set %f2 = %tmp
+        %tmp <- (%f1 + %f2)
+        %f1 <- %f2
+        %f2 <- %tmp
         if: %f2 > %n
             return %f2
 
@@ -218,7 +217,7 @@ action [%a ++ %b]
 #.. The following are characters won't "stick" to their neighbors, so the
     compiler treats them as solitary single-character tokens: '~`!@$^&*-+=|<>?/
     which means you can jam things together:
-assume: (5++2) is (   5   ++   2   )
+assume ((5++2) is (   5   ++   2   )) or barf "ugh"
 
 
 # Do grouping?
@@ -259,11 +258,15 @@ immediately
     parse [if %condition is untrue %body] as
         if (not %condition) %body
 
-    # Or to transform nomsu code into custom lua code using "compile % to code %"
-    compile [if %condition on opposite day %body] to code ".."
-        if not (\(%condition as lua)) then
-            \(%body as lua statements)
-        end
+    # Or to transform nomsu code into custom lua code using "compile % to %"
+    compile [if %condition on opposite day %body] to
+        %body_lua <- (%body as lua)
+        return {..}
+            locals: %body_lua's "locals"
+            statements: ".."
+                if not \(%condition as lua expr) then
+                    \((%body_lua's "statements") or "\(%body_lua's "expr");")
+                end
 
 if (1 > 10) is untrue
     say "Nomsu parsing macros work!"

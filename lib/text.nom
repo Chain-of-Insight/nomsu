@@ -12,7 +12,7 @@ action [%texts joined with %glue]
         return table.concat(text_bits, \%glue)
 parse [joined %texts, %texts joined] as: %texts joined with ""
 
-compile [capitalized %text capitalized] to
+compile [capitalized %text, %text capitalized] to
     {expr:"(\(%text as lua expr)):gsub('%l', string.upper, 1)"}
 
 compile [%text with %sub instead of %patt, %text s/%patt/%sub] to
