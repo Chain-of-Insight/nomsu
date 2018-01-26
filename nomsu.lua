@@ -1148,17 +1148,17 @@ do
       return nil
     end,
     print_tree = function(self, tree)
-      local buff = colors.bright .. colors.green
+      io.write(colors.bright .. colors.green)
       for node, depth in coroutine.wrap(function()
         return self:walk_tree(tree)
       end) do
         if type(node) ~= 'table' or not node.type then
-          buff = buff + ((("    "):rep(depth) .. repr(node)) .. "\n")
+          print(("    "):rep(depth) .. repr(node))
         else
-          buff = buff + ((tostring(("    "):rep(depth)) .. tostring(node.type) .. ":") .. "\n")
+          print(tostring(("    "):rep(depth)) .. tostring(node.type) .. ":")
         end
       end
-      return print(buff .. colors.reset)
+      return io.write(colors.reset)
     end,
     tree_to_str = function(self, tree)
       local bits = { }

@@ -773,13 +773,13 @@ class NomsuCompiler
         return nil
 
     print_tree: (tree)=>
-        buff = colors.bright..colors.green
+        io.write(colors.bright..colors.green)
         for node,depth in coroutine.wrap(-> @walk_tree tree)
             if type(node) != 'table' or not node.type
-                buff += (("    ")\rep(depth)..repr(node)).."\n"
+                print(("    ")\rep(depth)..repr(node))
             else
-                buff += ("#{("    ")\rep(depth)}#{node.type}:").."\n"
-        print(buff..colors.reset)
+                print("#{("    ")\rep(depth)}#{node.type}:")
+        io.write(colors.reset)
     
     tree_to_str: (tree)=>
         bits = {}
