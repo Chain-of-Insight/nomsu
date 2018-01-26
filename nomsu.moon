@@ -39,7 +39,6 @@ do
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
--- Change nomsu:tree_to_lua() to use a table lookup instead of a switch statement
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -580,12 +579,13 @@ class NomsuCompiler
             when "bool"
                 return value and "(yes)" or "(no)"
             when "number"
+                -- TODO: support NaN, inf, etc.?
                 return repr(value)
             when "table"
                 if is_list(value)
                     return "[#{concat [@value_to_nomsu(v) for v in *value], ", "}]"
                 else
-                    return "{#{concat ["#{@value_to_nomsu(k)}=#{@value_to_nomsu(v)}" for k,v in pairs(value)], ", "}}"
+                    return "{#{concat ["#{@value_to_nomsu(k)}:#{@value_to_nomsu(v)}" for k,v in pairs(value)], ", "}}"
             when "string"
                 if value == "\n"
                     return "'\\n'"

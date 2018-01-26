@@ -806,7 +806,7 @@ do
             local _accum_0 = { }
             local _len_0 = 1
             for k, v in pairs(value) do
-              _accum_0[_len_0] = tostring(self:value_to_nomsu(k)) .. "=" .. tostring(self:value_to_nomsu(v))
+              _accum_0[_len_0] = tostring(self:value_to_nomsu(k)) .. ":" .. tostring(self:value_to_nomsu(v))
               _len_0 = _len_0 + 1
             end
             return _accum_0
