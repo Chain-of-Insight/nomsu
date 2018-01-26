@@ -184,13 +184,9 @@ do
   local _class_0
   local line_counter, stub_defs, stub_pattern, var_pattern
   local _base_0 = {
-    writeln = function(self, ...)
-      self:write(...)
-      return self:write("\n")
-    end,
     define_action = function(self, signature, source, fn)
       if self.debug then
-        self:writeln(tostring(colored.bright("DEFINING ACTION:")) .. " " .. tostring(colored.green(repr(signature))))
+        print(tostring(colored.bright("DEFINING ACTION:")) .. " " .. tostring(colored.green(repr(signature))))
       end
       if type(fn) ~= 'function' then
         error('function', "Bad fn: " .. tostring(repr(fn)))
@@ -220,7 +216,7 @@ do
       for sig_i = 1, #stubs do
         local stub, args = stubs[sig_i], stub_args[sig_i]
         if self.debug then
-          self:writeln(tostring(colored.bright("ALIAS:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(args))) .. " ON: " .. tostring(self.environment.ACTIONS))
+          print(tostring(colored.bright("ALIAS:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(args))) .. " ON: " .. tostring(self.environment.ACTIONS))
         end
         self.environment.ACTIONS[stub] = fn
         if not (fn_info.isvararg) then
@@ -312,7 +308,7 @@ do
     parse = function(self, nomsu_code, filename)
       assert(type(filename) == "string", "Bad filename type: " .. tostring(type(filename)))
       if self.debug then
-        self:writeln(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(colored.yellow(nomsu_code)))
+        print(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(colored.yellow(nomsu_code)))
       end
       local userdata
       do
@@ -345,7 +341,7 @@ do
       lpeg.userdata = old_userdata
       assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
       if self.debug then
-        self:writeln("PARSE TREE:")
+        print("PARSE TREE:")
         self:print_tree(tree, "    ")
       end
       return tree
@@ -423,7 +419,7 @@ do
     run_lua = function(self, lua_code)
       local run_lua_fn, err = load(lua_code, nil, nil, self.environment)
       if self.debug then
-        self:writeln(tostring(colored.bright("RUNNING LUA:")) .. "\n" .. tostring(colored.blue(colored.bright(lua_code))))
+        print(tostring(colored.bright("RUNNING LUA:")) .. "\n" .. tostring(colored.blue(colored.bright(lua_code))))
       end
       if not run_lua_fn then
         local n = 1
@@ -443,7 +439,7 @@ do
       end
       local code = "return " .. tostring(self:tree_to_lua(tree).expr) .. ";"
       if self.debug then
-        self:writeln(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
+        print(tostring(colored.bright("RUNNING LUA TO GET VALUE:")) .. "\n" .. tostring(colored.blue(colored.bright(code))))
       end
       local lua_thunk, err = load(code, nil, nil, self.environment)
       if not lua_thunk then
@@ -954,8 +950,8 @@ do
             args = new_args
           end
           if self.debug then
-            self:write(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(tree.stub))) .. " ")
-            self:writeln(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr((function()
+            print(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(tree.stub))) .. " ")
+            print(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr((function()
               local _accum_0 = { }
               local _len_0 = 1
               for _index_0 = 1, #args do
@@ -1044,9 +1040,9 @@ do
             end
             local lua = self:tree_to_lua(bit)
             if self.debug then
-              self:writeln((colored.bright("INTERP:")))
+              print(colored.bright("INTERP:"))
               self:print_tree(bit)
-              self:writeln(tostring(colored.bright("EXPR:")) .. " " .. tostring(lua.expr) .. ", " .. tostring(colored.bright("STATEMENT:")) .. " " .. tostring(lua.statements))
+              print(tostring(colored.bright("EXPR:")) .. " " .. tostring(lua.expr) .. ", " .. tostring(colored.bright("STATEMENT:")) .. " " .. tostring(lua.statements))
             end
             assert(lua.expr, "Cannot use [[" .. tostring(bit:get_src()) .. "]] as a string interpolation value, since it's not an expression.")
             insert(concat_parts, "stringify(" .. tostring(lua.expr) .. ")")
@@ -1152,17 +1148,17 @@ do
       return nil
     end,
     print_tree = function(self, tree)
-      self:write(colors.bright .. colors.green)
+      local buff = colors.bright .. colors.green
       for node, depth in coroutine.wrap(function()
         return self:walk_tree(tree)
       end) do
         if type(node) ~= 'table' or not node.type then
-          self:writeln(("    "):rep(depth) .. repr(node))
+          buff = buff + ((("    "):rep(depth) .. repr(node)) .. "\n")
         else
-          self:writeln(tostring(("    "):rep(depth)) .. tostring(node.type) .. ":")
+          buff = buff + ((tostring(("    "):rep(depth)) .. tostring(node.type) .. ":") .. "\n")
         end
       end
-      return self:write(colors.reset)
+      return print(buff .. colors.reset)
     end,
     tree_to_str = function(self, tree)
       local bits = { }
@@ -1360,9 +1356,6 @@ do
   _base_0.__index = _base_0
   _class_0 = setmetatable({
     __init = function(self)
-      self.write = function(self, ...)
-        return io.write(...)
-      end
       local NaN_surrogate = { }
       local nil_surrogate = { }
       self.ids = setmetatable({ }, {
@@ -1515,8 +1508,7 @@ if arg then
       end
       local compiled_output = nil
       if args.flags["-p"] then
-        local _write = nomsu.write
-        nomsu.write = function() end
+        nomsu.environment.print = function() end
         compiled_output = io.output()
       elseif args.output then
         compiled_output = io.open(args.output, 'w')
@@ -1537,7 +1529,7 @@ if arg then
         end
       end
       if args.flags["-p"] then
-        nomsu.write = _write
+        nomsu.environment.print = print
       end
     end
     if args.flags["-i"] then

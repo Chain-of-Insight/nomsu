@@ -149,9 +149,9 @@ action [help %action]
     lua> ".."
         local metadata = \(action %action metadata);
         if not metadata then
-            nomsu:writeln("Action not found: "..repr(\%action));
+            print("Action not found: "..repr(\%action));
         else
-            nomsu:writeln(metadata.src or "<unknown source code>");
+            print(metadata.src or "<unknown source code>");
         end
 
 # Compiler tools
@@ -163,9 +163,9 @@ immediately
     compile [say %message] to
         lua> ".."
             if \%message.type == "Text" then
-                return {statements="nomsu:writeln("..\(%message as lua expr)..");"};
+                return {statements="print("..\(%message as lua expr)..");"};
             else
-                return {statements="nomsu:writeln(stringify("..\(%message as lua expr).."));"};
+                return {statements="print(stringify("..\(%message as lua expr).."));"};
             end
 
 # Return

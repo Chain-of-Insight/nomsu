@@ -39,7 +39,7 @@ do
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
--- Remove nomsu:write and nomsu:writeln and just use print() instead.
+-- Change nomsu:tree_to_lua() to use a table lookup instead of a switch statement
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -147,7 +147,6 @@ NOMSU = do
 class NomsuCompiler
     @def_number: 0
     new:()=>
-        @write = (...)=> io.write(...)
         -- Weak-key mapping from objects to randomly generated unique IDs
         NaN_surrogate = {}
         nil_surrogate = {}
@@ -181,13 +180,9 @@ class NomsuCompiler
         @environment.LOADED = {}
         @initialize_core!
     
-    writeln:(...)=>
-        @write(...)
-        @write("\n")
-    
     define_action: (signature, source, fn)=>
         if @debug
-            @writeln "#{colored.bright "DEFINING ACTION:"} #{colored.green repr(signature)}"
+            print "#{colored.bright "DEFINING ACTION:"} #{colored.green repr(signature)}"
         if type(fn) != 'function'
             error 'function', "Bad fn: #{repr fn}"
         if type(signature) == 'string'
@@ -206,7 +201,7 @@ class NomsuCompiler
         for sig_i=1,#stubs
             stub, args = stubs[sig_i], stub_args[sig_i]
             if @debug
-                @writeln "#{colored.bright "ALIAS:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(args)} ON: #{@environment.ACTIONS}"
+                print "#{colored.bright "ALIAS:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(args)} ON: #{@environment.ACTIONS}"
             -- TODO: use debug.getupvalue instead of @environment.ACTIONS?
             @environment.ACTIONS[stub] = fn
             unless fn_info.isvararg
@@ -256,7 +251,7 @@ class NomsuCompiler
     parse: (nomsu_code, filename)=>
         assert type(filename) == "string", "Bad filename type: #{type filename}"
         if @debug
-            @writeln("#{colored.bright "PARSING:"}\n#{colored.yellow nomsu_code}")
+            print "#{colored.bright "PARSING:"}\n#{colored.yellow nomsu_code}"
 
         userdata = with {source_code:nomsu_code, :filename, indent_stack: {0}}
             .get_src = => nomsu_code\sub(@start, @stop-1)
@@ -275,7 +270,7 @@ class NomsuCompiler
         
         assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
         if @debug
-            @writeln "PARSE TREE:"
+            print "PARSE TREE:"
             @print_tree tree, "    "
         return tree
 
@@ -333,7 +328,7 @@ class NomsuCompiler
     run_lua: (lua_code)=>
         run_lua_fn, err = load(lua_code, nil, nil, @environment)
         if @debug
-            @writeln "#{colored.bright "RUNNING LUA:"}\n#{colored.blue colored.bright(lua_code)}"
+            print "#{colored.bright "RUNNING LUA:"}\n#{colored.blue colored.bright(lua_code)}"
         if not run_lua_fn
             n = 1
             fn = ->
@@ -349,7 +344,7 @@ class NomsuCompiler
             return tree.value[1]
         code = "return #{@tree_to_lua(tree).expr};"
         if @debug
-            @writeln "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
+            print "#{colored.bright "RUNNING LUA TO GET VALUE:"}\n#{colored.blue colored.bright(code)}"
         lua_thunk, err = load(code, nil, nil, @environment)
         if not lua_thunk
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack code}\n\n#{colored.red err}", 0)
@@ -660,8 +655,8 @@ class NomsuCompiler
                         new_args = [args[p] for p in *metadata.arg_orders[tree.stub]]
                         args = new_args
                     if @debug
-                        @write "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
-                        @writeln "#{colored.bright "WITH ARGS:"} #{colored.dim repr [(repr a)\sub(1,50) for a in *args]}"
+                        print "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
+                        print "#{colored.bright "WITH ARGS:"} #{colored.dim repr [(repr a)\sub(1,50) for a in *args]}"
                     lua = fn(unpack(args))
                     remove @compilestack
                     return lua
@@ -707,9 +702,9 @@ class NomsuCompiler
                         string_buffer = ""
                     lua = @tree_to_lua bit
                     if @debug
-                        @writeln (colored.bright "INTERP:")
+                        print(colored.bright "INTERP:")
                         @print_tree bit
-                        @writeln "#{colored.bright "EXPR:"} #{lua.expr}, #{colored.bright "STATEMENT:"} #{lua.statements}"
+                        print "#{colored.bright "EXPR:"} #{lua.expr}, #{colored.bright "STATEMENT:"} #{lua.statements}"
                     assert lua.expr,
                         "Cannot use [[#{bit\get_src!}]] as a string interpolation value, since it's not an expression."
                     insert concat_parts, "stringify(#{lua.expr})"
@@ -778,13 +773,13 @@ class NomsuCompiler
         return nil
 
     print_tree: (tree)=>
-        @write colors.bright..colors.green
+        buff = colors.bright..colors.green
         for node,depth in coroutine.wrap(-> @walk_tree tree)
             if type(node) != 'table' or not node.type
-                @writeln(("    ")\rep(depth)..repr(node))
+                buff += (("    ")\rep(depth)..repr(node)).."\n"
             else
-                @writeln("#{("    ")\rep(depth)}#{node.type}:")
-        @write colors.reset
+                buff += ("#{("    ")\rep(depth)}#{node.type}:").."\n"
+        print(buff..colors.reset)
     
     tree_to_str: (tree)=>
         bits = {}
@@ -964,8 +959,7 @@ if arg
                 args.output = args.input\gsub("%.nom", ".lua")
             compiled_output = nil
             if args.flags["-p"]
-                _write = nomsu.write
-                nomsu.write = ->
+                nomsu.environment.print = ->
                 compiled_output = io.output()
             elseif args.output
                 compiled_output = io.open(args.output, 'w')
@@ -982,7 +976,7 @@ if arg
                     compiled_output\write(code)
 
             if args.flags["-p"]
-                nomsu.write = _write
+                nomsu.environment.print = print
 
         if args.flags["-i"]
             -- REPL
