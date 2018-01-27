@@ -1,0 +1,55 @@
+#..
+    Tests for the stuff defined in lib/metaprogramming.nom
+
+use "lib/core.nom"
+
+immediately
+    compile [five] to {expr:"5"}
+assume ((five) = 5) or barf "Compile to expression failed."
+
+immediately
+    compile [loc x] to {statements:"_x = 99", locals:["_x"]}
+lua> "do"
+loc x
+assume (%x is 99) or barf "Compile to statements with locals failed."
+lua> "end"
+assume (%x is (nil)) or barf "Failed to properly localize a variable."
+
+immediately
+    compile [asdf] to
+        %tmp <- ""
+        return {statements:%tmp}
+asdf
+assume (%tmp is (nil)) or barf "compile to is leaking variables"
+
+action [foo %x]
+    %y <- (%x + 1)
+    return %y
+assume ((foo 10) = 11) or barf "Action didn't work."
+assume (%y is (nil)) or barf "Action leaked a local into globals."
+
+immediately
+    parse [baz %] as: foo %
+assume ((baz 10) = 11) or barf "Parse as action failed."
+
+immediately
+    parse [V] as: five
+assume ((V) = 5) or barf "Parse as compile action failed."
+
+remove action "foo %"
+try: foo 99
+..and if it succeeds: barf "Failed to delete action"
+
+assume ((\(5 + 5) as value) = 10) or barf "%tree as value failed."
+
+assume ((\(foo %x)'s source code) = "foo %x") or barf "source code failed."
+
+assume ((repr [1,2]) = "{1, 2}") or barf "repr failed."
+
+assume ((type of {}) = "table") or barf "type of failed."
+
+assume ((nomsu) = (=lua "nomsu")) or barf "nomsu failed"
+
+assume (("x" as lua identifier) = (\%x as lua identifier)) or barf "converting to identifier failed."
+
+assume ((run "return 99") = 99) or barf "run % failed."

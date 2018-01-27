@@ -70,9 +70,9 @@ immediately
 # GOTOs
 immediately
     compile [=== %label ===, --- %label ---, *** %label ***] to {..}
-        statements:"::label_\(nomsu "var_to_lua_identifier" [%label])::;"
+        statements:"::label_\(%label as lua identifier)::;"
     compile [go to %label] to {..}
-        statements:"goto label_\(nomsu "var_to_lua_identifier" [%label]);"
+        statements:"goto label_\(%label as lua identifier);"
 
 # Basic loop control
 immediately
@@ -98,14 +98,14 @@ immediately
 
 # While loops
 immediately
-    compile [do next repetition] to {statements:"goto continue_repeat;"}
+    compile [do next repeat] to {statements:"goto continue_repeat;"}
     compile [stop repeating] to {statements:"goto stop_repeat;"}
     compile [repeat while %condition %body] to
         %body_lua <- (%body as lua)
         %body_statements <- ((%body_lua's "statements") or "\(%body_lua's "expr");")
         if %body has subtree % where 
-            ((%'s "type") = "FunctionCall") and ((%'s "stub") is "do next repetition")
-        ..: <- %body_statments + "\n::continue_repeat::;"
+            ((%'s "type") = "FunctionCall") and ((%'s "stub") is "do next repeat")
+        ..: %body_statments +<- "\n::continue_repeat::;"
         %code <- ".."
             while \(%condition as lua expr) do
             \%body_statements
@@ -128,8 +128,8 @@ immediately
         %body_lua <- (%body as lua)
         %body_statements <- ((%body_lua's "statements") or "\(%body_lua's "expr");")
         if %body has subtree % where
-            ((%'s "type") = "FunctionCall") and ((%'s "stub") is "do next repetition")
-        ..: <- %body_statements + "\n::continue_repeat::;"
+            ((%'s "type") = "FunctionCall") and ((%'s "stub") is "do next repeat")
+        ..: %body_statements +<- "\n::continue_repeat::;"
         %code <- ".."
             for i=1,\(%n as lua expr) do
             \%body_statements
@@ -147,9 +147,9 @@ immediately
 # For loop control flow:
 immediately
     compile [stop %var] to {..}
-        statements:"goto stop_\(nomsu "var_to_lua_identifier" [%var]);"
+        statements:"goto stop_\(%var as lua identifier);"
     compile [do next %var] to {..}
-        statements:"goto continue_\(nomsu "var_to_lua_identifier" [%var]);"
+        statements:"goto continue_\(%var as lua identifier);"
 
 # Numeric range for loops
 immediately
@@ -163,7 +163,7 @@ immediately
             ((%'s "type") = "FunctionCall") and
                 ((%'s "stub") is "do next %") and 
                     ((3rd in (%'s "value"))'s "value") is (%var's "value")
-        ..: <- %body_statements + "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+        ..: %body_statements +<- "\n::continue_\(%var as lua identifier)::;"
 
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
         assume ((%var's "type") is "Var") or barf "Loop expected variable, not: \(%var's source code)"
@@ -180,7 +180,7 @@ immediately
             %code <- ".."
                 do -- scope for stopping for-loop
                     \%code
-                    ::stop_\(nomsu "var_to_lua_identifier" [%var])::;
+                    ::stop_\(%var as lua identifier)::;
                 end -- end of scope for stopping for-loop
 
         return {statements:%code, locals:%body_lua's "locals"}
@@ -202,7 +202,7 @@ immediately
             ((%'s "type") = "FunctionCall") and
                 ((%'s "stub") is "do next %") and
                     ((3rd in (%'s "value"))'s "value") is (%var's "value")
-        ..: <- %body_statements + "\n::continue_\(nomsu "var_to_lua_identifier" [%var])::;"
+        ..: %body_statements +<- "\n::continue_\(%var as lua identifier)::;"
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
         assume ((%var's "type") is "Var") or barf "Loop expected variable, not: \(%var's source code)"
         %code <- ".."
@@ -217,7 +217,7 @@ immediately
             %code <- ".."
                 do -- scope for stopping for-loop
                     \%code
-                    ::stop_\(nomsu "var_to_lua_identifier" [%var])::;
+                    ::stop_\(%var as lua identifier)::;
                 end -- end of scope for stopping for-loop
         return {statements:%code, locals:%body_lua's "locals"}
 
@@ -232,13 +232,13 @@ immediately
             ((%'s "type") = "FunctionCall") and
                 ((%'s "stub") is "do next %") and
                     ((3rd in (%'s "value"))'s "value") is (%key's "value")
-        ..: <- %body_statements + "\n::continue_\(nomsu "var_to_lua_identifier" [%key])::;"
+        ..: %body_statements +<- "\n::continue_\(%key as lua identifier)::;"
 
         if %body has subtree % where
             ((%'s "type") = "FunctionCall") and
                 ((%'s "stub") is "do next %") and
                     ((3rd in (%'s "value"))'s "value") is (%value's "value")
-        ..: <- %body_statements + "\n::continue_\(nomsu "var_to_lua_identifier" [%value])::;"
+        ..: %body_statements +<- "\n::continue_\(%value as lua identifier)::;"
 
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
         assume ((%key's "type") is "Var") or barf "Loop expected variable, not: \(%key's source code)"
@@ -253,13 +253,13 @@ immediately
             ((%'s "type") = "FunctionCall") and
                 ((%'s "stub") is "stop %") and
                     ((2nd in (%'s "value"))'s "value") is (%key's "value")
-        ..: <- %stop_labels + "\n::stop_\(nomsu "var_to_lua_identifier" [%key])::;"
+        ..: %stop_labels +<- "\n::stop_\(%key as lua identifier)::;"
 
         if %body has subtree % where
             ((%'s "type") = "FunctionCall") and
                 ((%'s "stub") is "stop %") and
                     ((2nd in (%'s "value"))'s "value") is (%value's "value")
-        ..: <- %stop_labels + "\n::stop_\(nomsu "var_to_lua_identifier" [%value])::;"
+        ..: %stop_labels +<- "\n::stop_\(%value as lua identifier)::;"
 
         if: %stop_labels is not ""
             %code <- ".."
@@ -290,7 +290,7 @@ immediately
                 assume %condition or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
                 if: %action is (nil)
-                    lua> "table.insert(\%fallthroughs, \%condition);"
+                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
                     do next %func_call
                 %action <- (%action as lua)
                 %action_statements <- ((%action's "statements") or "\(%action's "expr");")
@@ -298,19 +298,19 @@ immediately
                     lua> "table.insert(\%locals, \%local);"
 
                 if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
-                    <- %code + ".."
+                    assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
+                    %code +<- ".."
                         
                         else
                         \%action_statements
                     %seen_else <- (yes)
                 ..else
                     assume (not %seen_else) or barf "'else' clause needs to be last in 'when' block"
-                    %condition <- (%condition as lua expr)
-                    for all %fallthroughs
-                        <- %condition + " or \(% as lua)"
-                    <- %code + ".."
+                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
+                    %condition_code <- (%fallthroughs joined with " or ")
+                    %code +<- ".."
                         
-                        \("if" if %is_first else "elseif") \%condition then
+                        \("if" if %is_first else "elseif") \%condition_code then
                         \%action_statements
 
                 %fallthroughs <- []
@@ -318,7 +318,7 @@ immediately
 
         assume (%fallthroughs = []) or barf "Unfinished fallthrough conditions in 'when' block"
         if: %code is not ""
-            <- %code + "\nend"
+            %code +<- "\nend"
         lua> "utils.deduplicate(\%locals);"
         return {statements:%code, locals:%locals}
 
@@ -340,7 +340,7 @@ immediately
                 assume %condition or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
                 if: %action is (nil)
-                    lua> "table.insert(\%fallthroughs, \%condition)"
+                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
                     do next %func_call
 
                 %action <- (%action as lua)
@@ -350,7 +350,7 @@ immediately
 
                 if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
                     assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
-                    <- %code + ".."
+                    %code +<- ".."
 
                         else
                             \%action_statements
@@ -358,17 +358,14 @@ immediately
                     %seen_else <- (yes)
                 ..else
                     assume (not %seen_else) or barf "'else' clause needs to be last in 'when % = ?' block"
-                    %clause <- ""
-                    if: ((%condition's "type") is "Text") or ((%condition's "type") is "Number")
-                        %clause <- "branch_value == (\(%condition as lua expr))"
-                    ..else 
-                        %clause <- "utils.equivalent(branch_value, \(%condition as lua expr))"
-                    for all %fallthroughs
+                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
+                    for %i = % in %fallthroughs
                         if: ((%'s "type") is "Text") or ((%'s "type") is "Number")
-                            <- %clause + " or branch_value == (\(%condition as lua expr))"
+                            (%i'th in %fallthroughs) <- "branch_value == \%"
                         ..else 
-                            <- %clause + " or utils.equivalent(branch_value, \(%condition as lua expr))"
-                    <- %code + ".."
+                            (%i'th in %fallthroughs) <- "utils.equivalent(branch_value, \%)"
+                    %clause <- (%fallthroughs joined with " or ")
+                    %code +<- ".."
                         
                         \("if" if %is_first else "elseif") \%clause then
                         \%action_statements
@@ -379,7 +376,7 @@ immediately
         assume (%fallthroughs = []) or barf "Unfinished fallthrough conditions in 'when' block"
         assume (%code is not "") or barf "No body for 'when % = ?' block!"
         unless %seen_else
-            <- %code + "\nend"
+            %code +<- "\nend"
         %code <- ".."
             do --when % = ?
             local branch_value = \(%branch_value as lua expr);\
@@ -391,14 +388,16 @@ immediately
 # Try/except
 immediately
     compile [..]
-        try %action and if it succeeds %success or if it fails %fallback
-        try %action and if it fails %fallback or if it succeeds %success
+        try %action and if it succeeds %success or if it barfs %fallback
+        try %action and if it barfs %fallback or if it succeeds %success
     ..to
         %locals <- []
-        %action <- (%action as lua)
+        %action_lua <- (%action as lua)
+        %success_lua <- (%success as lua)
+        %fallback_lua <- (%fallback as lua)
         %fallback <- (%fallback as lua)
-        for %sub_locals in [%action's "locals", %success's "locals", %fallback's "locals"]
-            for %local in %sub_locals
+        for %block in [%action_lua, %success_lua, %fallback_lua]
+            for %local in ((%block's "locals") or [])
                 lua> "table.insert(\%locals, \%local);"
         lua> "utils.deduplicate(\%locals);"
         return {..}
@@ -407,26 +406,26 @@ immediately
                 do
                     local fell_through = false;
                     local ok, ret = pcall(function()
-                        \((%action's "statements") or "\(%action's "expr");")
+                        \((%action_lua's "statements") or "\(%action_lua's "expr");")
                         fell_through = true;
                     end);
                     if ok then
-                        \((%success's "statements") or "\(%success's "expr");")
+                        \((%success_lua's "statements") or "\(%success_lua's "expr");")
                     end
                     if not ok then
-                        \((%fallback's "statements") or "\(%fallback's "expr");")
+                        \((%fallback_lua's "statements") or "\(%fallback_lua's "expr");")
                     elseif not fell_through then
                         return ret;
                     end
                 end
     parse [try %action] as
         try %action and if it succeeds: do nothing
-        ..or if it fails: do nothing
-    parse [try %action and if it fails %fallback] as
+        ..or if it barfs: do nothing
+    parse [try %action and if it barfs %fallback] as
         try %action and if it succeeds: do nothing
-        ..or if it fails %fallback
+        ..or if it barfs %fallback
     parse [try %action and if it succeeds %success] as
-        try %action and if it succeeds %success or if it fails: do nothing
+        try %action and if it succeeds %success or if it barfs: do nothing
 
 # Do/finally:
 immediately
@@ -441,7 +440,7 @@ immediately
 
     compile [do %action then always %final_action] to
         %action <- (%action as lua)
-        %final_action <- (%action as lua)
+        %final_action <- (%final_action as lua)
         %locals <- []
         for %sub_locals in [%action's "locals", %final_action's "locals"]
             for %local in %sub_locals

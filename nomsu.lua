@@ -1311,6 +1311,9 @@ do
       self:define_compile_action("immediately %block", get_line_no(), function(_block)
         local lua = nomsu:tree_to_lua(_block)
         local lua_code = lua.statements or (lua.expr .. ";")
+        if lua.locals and #lua.locals > 0 then
+          lua_code = "local " .. tostring(concat(lua.locals, ", ")) .. ";\n" .. tostring(lua_code)
+        end
         nomsu:run_lua(lua_code)
         return {
           statements = "if IMMEDIATE then\n" .. tostring(lua_code) .. "\nend",

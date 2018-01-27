@@ -36,6 +36,7 @@ immediately
     compile [%x > %y] to {expr:"(\(%x as lua expr) > \(%y as lua expr))"}
     compile [%x <= %y] to {expr:"(\(%x as lua expr) <= \(%y as lua expr))"}
     compile [%x >= %y] to {expr:"(\(%x as lua expr) >= \(%y as lua expr))"}
+    # TODO: optimize case of [%x,%y] = [1,2]
     compile [%a is %b, %a = %b, %a == %b] to
         lua> ".."
             local safe = {Text=true, Number=true};
@@ -69,12 +70,51 @@ immediately
             locals: =lua "(\%var.type == 'Var' and {\%var_lua.expr} or nil)"
 
 immediately
+    # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
+    compile [<- %assignments] to
+        %locals <- []
+        %targets <- []
+        %values <- []
+        assume ((%assignments' "type") is "Dict") or barf ".."
+            Expected a Dict for the assignments part of '<- %' statement, not \(%assignments' source code)
+        lua> ".."
+            for i, item in ipairs(\%assignments.value) do
+                local target, value = item.dict_key, item.dict_value;
+                local target_lua = nomsu:tree_to_lua(target);
+                if not target_lua.expr then error("Invalid target for assignment: "..target:get_src()); end
+                local value_lua = nomsu:tree_to_lua(value);
+                if not value_lua.expr then error("Invalid value for assignment: "..value:get_src()); end
+                if target.type == "Var" then
+                    table.insert(\%locals, target_lua.expr);
+                end
+                table.insert(\%targets, target_lua.expr);
+                table.insert(\%values, value_lua.expr);
+            end
+            utils.deduplicate(\%locals);
+            return {locals=\%locals, statements=(table.concat(\%targets, ", ").." = "..table.concat(\%values, ", ")..";")};
+
+immediately
     compile [export %var <- %value] to
         %var_lua <- (%var as lua)
         assume (%var_lua's "expr") or barf "Invalid target for assignment: \(%var's source code)"
         %value_lua <- (%value as lua)
         assume (%value_lua's "expr") or barf "Invalid value for assignment: \(%value's source code)"
         return {statements:"\(%var_lua's "expr") = \(%value_lua's "expr");"}
+
+    compile [exporting %exported %body] to
+        %body_lua <- (%body as lua)
+        %leftover_locals <- (=lua "{unpack(\%body_lua.locals or {})}")
+        assume ((%exported's "type") = "List") or barf ".."
+            Expected a List for the export part of 'exporting' statement, not \(%exported's source code)
+        lua> ".."
+            for i, item in ipairs(\%exported.value) do
+                if item.type ~= "Var" then
+                    error("'exporting' statement expects Vars, not: "..item:get_src());
+                end
+                local var = nomsu:tree_to_lua(item).expr;
+                utils.remove_from_list(\%leftover_locals, var);
+            end
+        return {locals:%leftover_locals, statements:=lua "\%body_lua.statements or (\%body_lua.expr..';')"}
 
     compile [with %assignments %body] to
         %body_lua <- (%body as lua)
@@ -118,21 +158,6 @@ immediately
             %s
             end]]):format(locals_code, declaration_code, \%body_lua.statements or (\%body_lua.expr..";"))};
 
-    compile [exporting %exported %body] to
-        %body_lua <- (%body as lua)
-        %leftover_locals <- (=lua "{unpack(\%body_lua.locals or {})}")
-        assume ((%exported's "type") = "List") or barf ".."
-            Expected a List for the export part of 'exporting' statement, not \(%exported's source code)
-        lua> ".."
-            for i, item in ipairs(\%exported.value) do
-                if item.type ~= "Var" then
-                    error("'exporting' statement expects Vars, not: "..item:get_src());
-                end
-                local var = nomsu:tree_to_lua(item).expr;
-                utils.remove_from_list(leftover_locals, var);
-            end
-        return {locals:%leftover_locals, statements:=lua "\%body_lua.statements or (\%body_lua.expr..';')"}
-
 immediately
     # Math Operators
     compile [%x + %y] to {expr:"(\(%x as lua expr) + \(%y as lua expr))"}
@@ -174,11 +199,11 @@ immediately
 
 # Update operators
 immediately
-    parse [<- %var + %] as: %var <- (%var + %)
-    parse [<- %var - %] as: %var <- (%var - %)
-    parse [<- %var * %] as: %var <- (%var * %)
-    parse [<- %var / %] as: %var <- (%var / %)
-    parse [<- %var ^ %] as: %var <- (%var ^ %)
-    parse [<- %var and %] as: %var <- (%var and %)
-    parse [<- %var or %] as: %var <- (%var or %)
+    parse [%var + <- %, %var +<- %] as: %var <- (%var + %)
+    parse [%var - <- %, %var -<- %] as: %var <- (%var - %)
+    parse [%var * <- %, %var *<- %] as: %var <- (%var * %)
+    parse [%var / <- %, %var /<- %] as: %var <- (%var / %)
+    parse [%var ^ <- %, %var ^<- %] as: %var <- (%var ^ %)
+    parse [%var and <- %] as: %var <- (%var and %)
+    parse [%var or <- %] as: %var <- (%var or %)
     parse [wrap %var around %] as: %var <- (%var wrapped around %)

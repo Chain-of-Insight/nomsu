@@ -29,6 +29,7 @@ do
         if type(i) == 'number' then return string.sub(@, i, i)
         elseif type(i) == 'table' then return string.sub(@, i[1], i[2])
         else return string[i]
+    -- Can't use this because it breaks some LPEG stuff
     --STRING_METATABLE.__mul = (other)=> string.rep(@, other)
 
 -- TODO:
@@ -39,6 +40,7 @@ do
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
+-- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
 
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
@@ -223,6 +225,7 @@ class NomsuCompiler
         -- TODO: repair
         error("Not currently functional.", 0)
 
+    -- TODO: figure out whether indent/dedent should affect first line
     dedent: (code)=>
         unless code\find("\n")
             return code
@@ -900,10 +903,11 @@ class NomsuCompiler
                     insert concat_parts, lua.expr
             return concat(concat_parts)
 
-        -- TODO: fix how 'immediately' works with locals, e.g. "immediately: %x <- 5"
         @define_compile_action "immediately %block", get_line_no!, (_block)->
             lua = nomsu\tree_to_lua(_block)
             lua_code = lua.statements or (lua.expr..";")
+            if lua.locals and #lua.locals > 0
+                lua_code = "local #{concat lua.locals, ", "};\n#{lua_code}"
             nomsu\run_lua(lua_code)
             return statements:"if IMMEDIATE then\n#{lua_code}\nend", locals:lua.locals
 

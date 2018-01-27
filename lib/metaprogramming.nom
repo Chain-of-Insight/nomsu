@@ -136,10 +136,9 @@ immediately
     compile [repr %obj] to {expr:"repr(\(%obj as lua expr))"}
     compile [type of %obj] to {expr:"type(\(%obj as lua expr))"}
 
-compile [nomsu] to {expr:"nomsu"}
-
-compile [nomsu's %key] to {expr:"nomsu[\(%key as lua expr)]"}
-compile [nomsu %method %args] to {expr:"nomsu[\(%method as lua expr)](nomsu, unpack(\(%args as lua expr)))"}
+immediately
+    compile [nomsu] to {expr:"nomsu"}
+    compile [%var as lua identifier] to {expr:"nomsu:var_to_lua_identifier(\(%var as lua expr))"}
 
 action [action %names metadata]
     =lua "ACTION_METADATA[ACTIONS[\%names]]"
@@ -155,9 +154,10 @@ action [help %action]
         end
 
 # Compiler tools
-parse [run %code] as: nomsu "run" [%code]
-parse [enable debugging] as: lua> "nomsu.debug = true"
-parse [disable debugging] as: lua> "nomsu.debug = false"
+immediately
+    compile [run %code] to {expr: "nomsu:run(\(%code as lua expr), '\(!! code location !!)')"}
+    parse [enable debugging] as: lua> "nomsu.debug = true;"
+    parse [disable debugging] as: lua> "nomsu.debug = false;"
 
 immediately
     compile [say %message] to
@@ -177,12 +177,20 @@ immediately
 
 # Error functions
 immediately
-    compile [barf!] to {statements:"error(nil, 0);"}
+    compile [barf] to {statements:"error(nil, 0);"}
     compile [barf %msg] to {statements:"error(\(%msg as lua expr), 0);"}
-    compile [assume %condition] to {..}
-        statements:"if not \(%condition as lua expr) then error('Assumption failed: '..\%condition:get_src(), 0); end"
+    compile [assume %condition] to
+        lua> "local \%assumption = 'Assumption failed: '..\%condition:get_src();"
+        return {..}
+            statements:".."
+                if not \(%condition as lua expr) then
+                    error(\(repr %assumption), 0);
+                end
     compile [assume %condition or barf %msg] to {..}
-        statements:"if not \(%condition as lua expr) then error(\(%msg as lua expr), 0); end"
+        statements:".."
+            if not \(%condition as lua expr) then
+                error(\(%msg as lua expr), 0);
+            end
 
 # Literals
 immediately

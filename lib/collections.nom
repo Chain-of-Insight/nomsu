@@ -9,68 +9,55 @@ use "lib/operators.nom"
 # List/dict functions:
 
 # Indexing
-compile [..]
-    %index st to last in %list, %index nd to last in %list, %index rd to last in %list
-    %index th to last in %list
-..to {expr:"utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))"}
+immediately
+    compile [..]
+        %index st to last in %list, %index nd to last in %list, %index rd to last in %list
+        %index th to last in %list
+    ..to {expr:"utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))"}
 
-parse [first in %list, first %list] as: 1 st in %list
-parse [last in %list, last %list] as: 1 st to last in %list
+immediately
+    parse [first in %list, first %list] as: 1 st in %list
+    parse [last in %list, last %list] as: 1 st to last in %list
 
 # Membership testing
-action [%item is in %list, %list contains %item, %list has %item]
-    for %key = %value in %list
-        if (%key is %item): return (yes)
-    return (no)
+immediately
+    action [%item is in %list, %list contains %item, %list has %item]
+        for %key = %value in %list
+            if (%key is %item): return (yes)
+        return (no)
 
-action [..]
-    %item isn't in %list, %item is not in %list
-    %list doesn't contain %item, %list does not contain %item
-    %list doesn't have %item, %list does not have %item
-..
-    for %key = %value in %list
-        if (%key is %item): return (no)
-    return (yes)
+    action [..]
+        %item isn't in %list, %item is not in %list
+        %list doesn't contain %item, %list does not contain %item
+        %list doesn't have %item, %list does not have %item
+    ..
+        for %key = %value in %list
+            if (%key is %item): return (no)
+        return (yes)
 
-# Note: it's important to have the space after "[" to prevent confusion if %index is a string
-compile [%list has key %index, %list has index %index] to {..}
-    expr: ".."
-        ((\(%list as lua expr))[ \(%index as lua expr)] ~= nil)
+immediately
+    # Note: it's important to have the space after "[" to prevent confusion if %index is a string
+    compile [%list has key %index, %list has index %index] to {..}
+        expr: ".."
+            ((\(%list as lua expr))[ \(%index as lua expr)] ~= nil)
 
-# Note: it's important to have the space after "[" to prevent confusion if %index is a string
-compile [..]
-    %list doesn't have key %index, %list does not have key %index
-    %list doesn't have index %index, %list does not have index %index
-..to {expr:"((\(%list as lua expr))[ \(%index as lua expr)] ~= nil)"}
+    # Note: it's important to have the space after "[" to prevent confusion if %index is a string
+    compile [..]
+        %list doesn't have key %index, %list does not have key %index
+        %list doesn't have index %index, %list does not have index %index
+    ..to {expr:"((\(%list as lua expr))[ \(%index as lua expr)] == nil)"}
 
-compile [length of %list, size of %list, size %list, number of %list, len %list] to
-    {expr:"utils.size(\(%list as lua expr))"}
+    compile [length of %list, size of %list, size %list, number of %list, len %list] to
+        {expr:"utils.size(\(%list as lua expr))"}
 
-compile [append %item to %list, add %item to %list] to
-    {statements:"table.insert(\(%list as lua expr), \(%item as lua expr))"}
+    compile [append %item to %list, add %item to %list] to
+        {statements:"table.insert(\(%list as lua expr), \(%item as lua expr))"}
 
-compile [pop from %list, remove last from %list] to
-    {statements:"table.remove(\(%list as lua expr))"}
+    compile [pop from %list, remove last from %list] to
+        {statements:"table.remove(\(%list as lua expr))"}
 
-compile [remove index %index from %list] to
-    {statements:"table.remove(\(%list as lua expr), \(%index as lua expr))"}
-
-
-action [flatten %lists]
-    %flat <- []
-    for %list in %lists
-        for %item in %list
-            add %item to %flat
-    return %flat
-
-action [entries in %dict]
-    [{key:%k, value:%v} for %k=%v in %dict]
-
-action [keys in %dict]
-    [%k for %k=%v in %dict]
-
-action [values in %dict]
-    [%v for %k=%v in %dict]
+    compile [remove index %index from %list] to
+        {statements:"table.remove(\(%list as lua expr), \(%index as lua expr))"}
 
 # List Comprehension
 immediately
@@ -98,7 +85,7 @@ immediately
                 (function()
                     local comprehension = {};
                     for \(%key as lua expr), \(%value as lua expr) in pairs(\(%iterable as lua expr)) do
-                        comprehension[i] = \(%expression as lua expr)
+                        table.insert(comprehension, \(%expression as lua expr));
                     end
                     return comprehension;
                 end)()
@@ -136,38 +123,59 @@ immediately
                     return comprehension;
                 end)()
 
+immediately
+    action [%lists flattened]
+        %flat <- []
+        for %list in %lists
+            for %item in %list
+                add %item to %flat
+        return %flat
+
+    parse [entries in %dict] as: {key:%k, value:%v} for %k = %v in %dict
+    parse [keys in %dict] as: %k for %k = %v in %dict
+    parse [values in %dict] as: %v for %k = %v in %dict
+
 # Sorting:
-compile [sort %items] to {statements:"table.sort(\(%items as lua expr))"}
-compile [sort %items by %key_expr] to {..}
-    statements: ".."
-        utils.sort(\(%items as lua expr), function(\(\% as lua expr))
-            return \(%key_expr as lua expr);
-        end)
+immediately
+    compile [sort %items] to {statements:"table.sort(\(%items as lua expr))"}
+    compile [sort %items by %key_expr] to {..}
+        statements: ".."
+            utils.sort(\(%items as lua expr), function(\(\% as lua expr))
+                return \(%key_expr as lua expr);
+            end)
 
-action [%items sorted]
-    %copy <- (% for all %items)
-    sort %copy
-    return %copy
-action [%items sorted by %key]
-    %copy <- (% for all %items)
-    sort %copy by %key
-    return %copy
+immediately
+    action [%items sorted, sorted %items]
+        %copy <- (% for all %items)
+        sort %copy
+        return %copy
+    action [%items sorted by %key]
+        %copy <- (% for all %items)
+        sort %copy by %key
+        return %copy
 
-action [unique %items]
-    [%k for %k=%v in (%=(yes) for all %items)]
+    action [unique %items]
+        %unique <- []
+        %seen <- {}
+        for all %items
+            unless: % in %seen
+                add % to %unique
+                (% in %seen) <- (yes)
+        return %unique
 
-# Metatable stuff
-compile [set %dict's metatable to %metatable] to {..}
-    statements: "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
+immediately
+    # Metatable stuff
+    compile [set %dict's metatable to %metatable] to {..}
+        statements: "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
 
-compile [new counter] to {expr:"setmetatable({}, {__index=function() return 0; end})"}
+    compile [new counter] to {expr:"setmetatable({}, {__index=function() return 0; end})"}
 
-compile [new default dict] to {..}
-    expr: ".."
-        setmetatable({}, {__index=function(self, key)
-            t = {};
-            self[key] = t;
-            return t;
-        end})
+    compile [new default dict] to {..}
+        expr: ".."
+            setmetatable({}, {__index=function(self, key)
+                t = {};
+                self[key] = t;
+                return t;
+            end})
 
 # TODO: maybe make a generator/coroutine?

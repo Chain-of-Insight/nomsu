@@ -2,6 +2,8 @@
     This file defines some common math literals and functions
 
 use "lib/metaprogramming.nom"
+use "lib/text.nom"
+use "lib/operators.nom"
 use "lib/control_flow.nom"
 
 # Literals:
@@ -10,10 +12,10 @@ compile [not a number, NaN, nan] to {expr:"(0/0)"}
 compile [pi, Pi, PI] to {expr:"math.pi"}
 compile [tau, Tau, TAU] to {expr:"(2*math.pi)"}
 compile [golden ratio] to {expr:"((1+math.sqrt(5))/2)"}
-compile [e] to {expr:"math.e"}
+compile [e] to {expr:"math.exp(1)"}
 
 # Functions:
-compile [% as number] to {expr:"tonumber(\(% as lua expr))"}
+compile [% as a number] to {expr:"tonumber(\(% as lua expr))"}
 compile [absolute value %, | % |, abs %] to {expr:"math.abs(\(% as lua expr))"}
 compile [square root %, √%, sqrt %] to {expr:"math.sqrt(\(% as lua expr))"}
 compile [sine %, sin %] to {expr:"math.sin(\(% as lua expr))"}
@@ -36,24 +38,32 @@ action [%n to the nearest %rounder]
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 
 # Any/all/none
-compile [all of %items, all %items] to {..}
-    expr:
-        "(\(joined ((% as lua expr) for all (%items' "value")) with " and "))"
-        ..if ((%items' "type") is "List") else "utils.all(\(%items as lua expr))"
+compile [all of %items, all %items] to
+    unless: (%items' "type") is "List"
+        return {expr:"utils.all(\(%items as lua expr))"}
+    %clauses <- []
+    for all (%items' "value"): lua> "table.insert(\%clauses, \(% as lua expr));"
+    return {expr:"(\(%clauses joined with " and "))"}
 parse [not all of %items, not all %items] as: not (all of %items)
-compile [any of %items, any %items] to {..}
-    expr:
-        "(\(joined ((% as lua expr) for all (%items' "value")) with " or "))"
-        ..if ((%items' "type") is "List") else "utils.any(\(%items as lua expr))"
+compile [any of %items, any %items] to
+    unless: (%items' "type") is "List"
+        return {expr:"utils.any(\(%items as lua expr))"}
+    %clauses <- []
+    for all (%items' "value"): lua> "table.insert(\%clauses, \(% as lua expr));"
+    return {expr:"(\(%clauses joined with " or "))"}
 parse [none of %items, none %items] as: not (any of %items)
-compile [sum of %items, sum %items] to {..}
-    expr:
-        "(\(joined ((% as lua expr) for all (%items' "value")) with " + "))"
-        ..if ((%items' "type") is "List") else "utils.sum(\(%items as lua expr))"
-compile [product of %items, product %items] to {..}
-    expr:
-        "(\(joined ((% as lua expr) for all (%items' "value")) with " * "))"
-        ..if ((%items' "type") is "List") else "utils.product(\(%items as lua expr))"
+compile [sum of %items, sum %items] to
+    unless: (%items' "type") is "List"
+        return {expr:"utils.sum(\(%items as lua expr))"}
+    %clauses <- []
+    for all (%items' "value"): lua> "table.insert(\%clauses, \(% as lua expr));"
+    return {expr:"(\(%clauses joined with " + "))"}
+compile [product of %items, product %items] to
+    unless: (%items' "type") is "List"
+        return {expr:"utils.product(\(%items as lua expr))"}
+    %clauses <- []
+    for all (%items' "value"): lua> "table.insert(\%clauses, \(% as lua expr));"
+    return {expr:"(\(%clauses joined with " * "))"}
 action [avg of %items, average of %items]
     =lua "(utils.sum(\%items)/#\%items)"
 compile [min of %items, smallest of %items, lowest of %items] to {..}

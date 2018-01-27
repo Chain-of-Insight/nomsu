@@ -284,7 +284,7 @@ local function sort(list, keyFn, reverse)
 end
 
 local function equivalent(x, y, depth)
-    depth = depth or 1
+    depth = depth or -1
     if x == y then
         return true
     end
@@ -296,6 +296,8 @@ local function equivalent(x, y, depth)
     end
     if depth == 0 then
         return false
+    elseif depth < -999 then
+        error("Exceeded maximum comparison depth")
     end
     local checked = {}
     for k, v in pairs(x) do

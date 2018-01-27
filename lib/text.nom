@@ -13,14 +13,15 @@ action [%texts joined with %glue]
 parse [joined %texts, %texts joined] as: %texts joined with ""
 
 compile [capitalized %text, %text capitalized] to
-    {expr:"(\(%text as lua expr)):gsub('%l', string.upper, 1)"}
+    {expr:"((\(%text as lua expr)):gsub('%l', string.upper, 1))"}
 
 compile [%text with %sub instead of %patt, %text s/%patt/%sub] to
     {expr:"((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))"}
 
-compile [indented %text, %text indented] to {expr:"\%text:gsub('\\n','\\n'..('    '))"}
+# TODO: figure out whether indent/dedent should affect first line
+compile [indented %text, %text indented] to {expr:"((\%text):gsub('\\n','\\n'..('    ')))"}
 compile [dedented %obj, %obj dedented] to {expr:"nomsu:dedent(\(%obj as lua expr))"}
-compile [%text indented %n times] to {expr:"\%text:gsub('\\n','\\n'..('    '):rep(\%n))"}
+compile [%text indented %n times] to {expr:"((\%text):gsub('\\n','\\n'..('    '):rep(\%n)))"}
 
 # Text literals
 lua> ".."
@@ -31,7 +32,7 @@ lua> ".."
         };
         for name, e in pairs(escapes) do
             local lua = "'"..e.."'";
-            nomsu:define_compile_action(name, \(!! code location !!), function() return {expr=text}; end);
+            nomsu:define_compile_action(name, \(!! code location !!), function() return {expr=lua}; end);
         end
         local colors = {
             ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",

@@ -24,3 +24,8 @@ for file in $(cat lib/core.nom | lua -e "for filename in io.read('*a'):gmatch('u
     ./nomsu.moon -c $file
     echo "done."
 done
+for file in $(cat tests/all.nom | lua -e "for filename in io.read('*a'):gmatch('run file \"([^\"]*)\"') do print(filename) end") ; do
+    printf "Compiling $file ..."
+    ./nomsu.moon -c $file
+    echo "done."
+done
