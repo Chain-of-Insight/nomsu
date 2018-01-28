@@ -1006,7 +1006,8 @@ if arg
 
         -- TODO: properly print out the calling site of nomsu code, not just the *called* code
 
-        import to_lua from require "moonscript.base"
+        ok, to_lua = pcall -> require('moonscript.base').to_lua
+        if not ok then to_lua = -> nil
         nomsu_file = io.open("nomsu.moon")
         nomsu_source = nomsu_file\read("*a")
         _, line_table = to_lua(nomsu_source)
@@ -1038,7 +1039,7 @@ if arg
             else
                 if calling_fn.istailcall and not name
                     name = "<tail call>"
-                if calling_fn.short_src == "./nomsu.moon"
+                if calling_fn.short_src == "./nomsu.moon" and line_table
                     char = line_table[calling_fn.currentline]
                     line_num = 1
                     for _ in nomsu_source\sub(1,char)\gmatch("\n") do line_num += 1

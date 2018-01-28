@@ -1563,8 +1563,14 @@ if arg then
   err_hand = function(error_message)
     print(tostring(colored.red("ERROR:")) .. " " .. tostring(colored.bright(colored.yellow(colored.onred((error_message or ""))))))
     print("stack traceback:")
-    local to_lua
-    to_lua = require("moonscript.base").to_lua
+    local ok, to_lua = pcall(function()
+      return require('moonscript.base').to_lua
+    end)
+    if not ok then
+      to_lua = function()
+        return nil
+      end
+    end
     local nomsu_file = io.open("nomsu.moon")
     local nomsu_source = nomsu_file:read("*a")
     local _, line_table = to_lua(nomsu_source)
@@ -1611,7 +1617,7 @@ if arg then
             if calling_fn.istailcall and not name then
               name = "<tail call>"
             end
-            if calling_fn.short_src == "./nomsu.moon" then
+            if calling_fn.short_src == "./nomsu.moon" and line_table then
               local char = line_table[calling_fn.currentline]
               local line_num = 1
               for _ in nomsu_source:sub(1, char):gmatch("\n") do
