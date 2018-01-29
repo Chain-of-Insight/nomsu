@@ -31,7 +31,7 @@ action [return nil]: return (nil)
 assume (((return nil) if (yes) else 99) = (nil))
 
 go to %skip
-error "go to failed."
+barf "go-to failed."
 --- %skip ---
 
 %tot <- 0
