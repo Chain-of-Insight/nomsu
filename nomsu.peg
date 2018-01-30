@@ -10,7 +10,7 @@ shebang: "#!" [^%nl]* %nl
 statement: functioncall / expression
 
 indented_block (Block):
-    {| indent
+    {| ("(..)")? indent
             statement (nodent statement)*
         (dedent / (("" -> "Error while parsing block") => error))
     |}
@@ -36,20 +36,28 @@ functioncall (FunctionCall):
 word (Word): { %operator / (!number plain_word) }
 
 inline_text (Text):
-    !('".."' %ws* line_comment? %nl (%ws* %nl)* %gt_nodent)
+    !('".."' eol)
     '"' {|
         ({~ (('\"' -> '"') / ('\\' -> '\') / %escaped_char / [^%nl\"])+ ~}
         / text_interpolation)*
     |} '"'
+-- Have to use "%indent" instead of "indent" etc. to avoid messing up text lines that start with "#"
 indented_text (Text):
-    '".."' %ws* line_comment? %nl %gt_nodent? {|
+    '".."' eol %nl {|
+        {~ (%nl*) (%indent -> "") ~}
         ({~
-            (("\\" -> "\") / (("\" eol %nl %gt_nodent "..") -> "")
-            / (%nl+ {~ %gt_nodent -> "" ~}) / [^%nl\])+
+            (("\\" -> "\") / (("\" eol %nl+ %nodent "..") -> "")
+            / (%nl+ {~ %nodent -> "" ~}) / [^%nl\])+
         ~} / text_interpolation)*
-    |} ((!.) / (&(%nl+ !%gt_nodent)) / (("" -> "Error while parsing Text") => error))
+    |} (((!.) &%dedent) / (&(%nl %dedent)) / (("" -> "Error while parsing Text") => error))
 text_interpolation:
-    "\" (variable / inline_list / inline_dict / inline_text / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")"))
+    "\" (
+        variable / inline_list / inline_dict / inline_text
+        / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")")
+        / (%ws* (block_comment / line_comment)? nodent "..")
+        / (indented_text %nl+ %nodent "..")
+        / ((indented_list / indented_block) nodent "..")
+    )
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
@@ -84,7 +92,7 @@ dict_line:
 inline_dict_item:
     {| {:dict_key: inline_expression / word :} %ws* ":" %ws* {:dict_value: inline_functioncall / inline_expression :} |}
 
-block_comment(Comment): "#.." { [^%nl]* (%nl %gt_nodent [^%nl]*)* }
+block_comment(Comment): "#.." { [^%nl]* (%nl+ %indent [^%nl]* (%nl+ %nodent [^%nl]*)* %dedent)? }
 line_comment(Comment): "#" { [^%nl]* }
 
 eol: %ws* line_comment? (!. / &%nl)

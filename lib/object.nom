@@ -6,26 +6,26 @@ compile [@%var] to
         local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
                        or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
         if key_attr then
-            return "_me."..key_attr;
+            return {expr="_me."..key_attr};
         elseif key_lua:sub(1,1) == "[" then
             key_lua = " "..key_lua.." ";
         end
-        return "_me["..key_lua.."]";
+        return {expr="_me["..key_lua.."]"};
 
-compile [@%var <- %val] to code
+compile [@%var <- %val] to
     lua> ".."
-        local val_lua = \(%val as lua);
+        local val_lua = \(%val as lua expr);
         local key_lua = repr(\%var.value);
         local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
                        or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
         if key_attr then
-            return "_me."..key_attr.." = "..val_lua..";";
+            return {statements="_me."..key_attr.." = "..val_lua..";"};
         elseif key_lua:sub(1,1) == "[" then
             key_lua = " "..key_lua.." ";
         end
-        return "_me["..key_lua.."] = "..val_lua..";";
+        return {statements="_me["..key_lua.."] = "..val_lua..";"};
 
-compile [object %classname %class_body] to
+compile [define object %classname %class_body] to
     %class_identifier <- (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
     if: %class_identifier is ""
         %class_identifier <- "class"
@@ -34,71 +34,91 @@ compile [object %classname %class_body] to
         if: (%line's "type") is "Comment"
             do next %line
         assume (((%line's "type") == "FunctionCall") and ((%line's "stub") == "action % %"))
-        ..or barf "Only action definitions are supported inside 'object % %', not \(%line's "src")"
+        ..or barf "Only action definitions are supported inside 'define object % %', not \(%line's "src")"
+        %actions <- (2nd in (%line's "value"))
+        %body <- (3rd in (%line's "value"))
         lua> ".."
-            assert(\%line.value[3].type == "Block",
-                "Invalid type for action definition body. Expected Block, but got: "..tostring(\%line.value[3].type));
-            local names, args = nomsu:parse_spec(\%line.value[2]);
-            local stub = nomsu:get_stub(names[1]);
-            local body_lua = nomsu:tree_to_lua(\%line.value[3]);
-            body_lua = body_lua.statements or ("return "..body_lua.expr..";");
-            local arg_nomsus = {};
-            for i, arg in ipairs(args) do arg_nomsus[i] = "nomsu:tree_to_lua("..arg..").expr"; end
+            local signature = {};
+            for i, action in ipairs(\%actions.value) do signature[i] = action:get_src(); end
+            local stubs = nomsu:get_stubs_from_signature(signature);
+            local stub_args = nomsu:get_args_from_signature(signature);
+            local arg_set = {};
+            for i, arg in ipairs(stub_args[1]) do arg_set[arg] = true; end
+            local body_lua = nomsu:tree_to_lua(\%body);
+            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
+            local undeclared_locals = {};
+            for i, body_local in ipairs(body_lua.locals or {}) do
+                if not arg_set[body_local] then
+                    table.insert(undeclared_locals, body_local);
+                end
+            end
+            if #undeclared_locals > 0 then
+                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
+            end
+            local lua_fn_args = table.concat(stub_args[1], ", ");
+            local def_tree = nomsu.compilestack[#nomsu.compilestack];
+            local code_location = ("%s:%s,%s"):format(def_tree.filename, def_tree.start, def_tree.stop);
+
+            local compiled_args = {};
+            for i, arg in ipairs(stub_args[1]) do
+                compiled_args[i] = "nomsu:tree_to_lua("..arg..").expr";
+            end
+            compiled_args = table.concat(compiled_args, "..', '..");
             table.insert(\%methods, ([==[
                 %s[ %s] = function(%s)
                     %s
                 end
                 nomsu:define_compile_action(%s, %s, function(%s)
                     return {expr="("..nomsu:tree_to_lua(_me).expr..")[ "..%s.."]("..%s..")"};
-                end, %s);
-                ACTION_METADATA[%s[ %s]] = ACTION_METADATA[ACTIONS[ %s]];
+                end);
+                ACTION_METADATA[%s[ %s]] = ACTION_METADATA[ACTION[ %s]];
             ]==]):format(
-                \%class_identifier, repr(stub), table.concat(args, ", "),
-                    body_lua,
-                repr(names), repr(\%line:get_line_no()), table.concat(args, ", "),
-                    repr(repr(stub)), table.concat(arg_nomsus, ".."),
-                repr(nomsu:dedent(\%line:get_src())),
-                \%class_identifier, repr(stub), repr(stub)));
+                \%class_identifier, repr(stubs[1]), lua_fn_args,
+                    body_code,
+                repr(signature), repr(code_location), lua_fn_args,
+                    repr(repr(stubs[1])), compiled_args,
+                \%class_identifier, repr(stubs[1]), repr(stubs[1])));
 
-    return ".."
-        do -- \%class_identifier
-            -- Create the class object:
-            local \%class_identifier = setmetatable({
-                name=\(%classname as lua), instances=setmetatable({}, {__mode="k"}),
-            }, {
-                __tostring=function(c) return c.name; end,
-                __call=function(cls, inst)
-                    inst = inst or {};
-                    inst.id = tostring(inst):match('table: (.*)');
-                    setmetatable(inst, cls.instance_metatable);
-                    cls.instances[inst] = true;
-                    if inst['set % up'] then
-                        inst['set % up'](inst);
-                    end
-                    return inst;
-                end,
-            });
-            \%class_identifier.class = \%class_identifier;
+    return {..}
+        statements:".."
+            do -- \%class_identifier
+                -- Create the class object:
+                local \%class_identifier = setmetatable({
+                    name=\(%classname as lua expr), instances=setmetatable({}, {__mode="k"}),
+                }, {
+                    __tostring=function(c) return c.name; end,
+                    __call=function(cls, inst)
+                        inst = inst or {};
+                        inst.id = tostring(inst):match('table: (.*)');
+                        setmetatable(inst, cls.instance_metatable);
+                        cls.instances[inst] = true;
+                        if inst['set % up'] then
+                            inst['set % up'](inst);
+                        end
+                        return inst;
+                    end,
+                });
+                \%class_identifier.class = \%class_identifier;
 
-            -- Define the methods:
-        \(%methods joined with "\n")
+                -- Define the methods:
+            \(%methods joined with "\n")
 
-            -- Define class methods for instantiating and accessing instances:
-            \%class_identifier.instance_metatable = {
-                __index=\%class_identifier,
-                __tostring=\%class_identifier['% as text'] or function(inst)
-                    return "<"..inst.class.name..": "..inst.id..">";
-                end,
-            };
-            nomsu:define_action("instances of "..\%class_identifier.name, "lib/class.nom", function()
-                return utils.keys(\%class_identifier.instances);
-            end, "");
-            nomsu:define_action("new "..\%class_identifier.name.." %instance", "lib/class.nom", function(_instance)
-                return \%class_identifier(_instance);
-            end, "");
-            nomsu:define_action("new "..\%class_identifier.name, "lib/class.nom", function()
-                return \%class_identifier({});
-            end, "");
-        end -- End of definition of \%class_identifier
-        \("\n\n")
-    
+                -- Define class methods for instantiating and accessing instances:
+                \%class_identifier.instance_metatable = {
+                    __index=\%class_identifier,
+                    __tostring=\%class_identifier['% as text'] or function(inst)
+                        return "<"..inst.class.name..": "..inst.id..">";
+                    end,
+                };
+                nomsu:define_action("instances of "..\%class_identifier.name, "lib/class.nom", function()
+                    return utils.keys(\%class_identifier.instances);
+                end, "");
+                nomsu:define_action("new "..\%class_identifier.name.." %instance", "lib/class.nom", function(_instance)
+                    return \%class_identifier(_instance);
+                end, "");
+                nomsu:define_action("new "..\%class_identifier.name, "lib/class.nom", function()
+                    return \%class_identifier({});
+                end, "");
+            end -- End of definition of \%class_identifier
+            \("\n\n")
+        

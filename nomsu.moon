@@ -66,33 +66,28 @@ NOMSU_DEFS = with {}
         R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
     .ident_char = R("az","AZ","09") + P("_") + .utf8_char
 
-    -- If the number of leading space characters is greater than number in the top of the
-    -- stack, this pattern matches and pushes the number onto the stack.
+    -- If the line begins with #indent+4 spaces, the pattern matches *those* spaces
+    -- and adds them to the stack (not any more).
     .indent = P (start)=>
-        spaces = @match("[ \t]*", start)
-        if #spaces > lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-            insert(lpeg.userdata.indent_stack, #spaces)
-            return start + #spaces
-    -- If the number of leading space characters is less than number in the top of the
-    -- stack, this pattern matches and pops off the top of the stack exactly once.
+        nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+        indented = nodent.."    "
+        if @sub(start, start+#indented-1) == indented
+            insert(lpeg.userdata.indent_stack, indented)
+            return start + #indented
+    -- If the number of leading space characters is <= the number of space on the top of the
+    -- stack minus 4, this pattern matches and pops off the top of the stack exactly once.
     .dedent = P (start)=>
-        spaces = @match("[ \t]*", start)
-        if #spaces < lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+        nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+        spaces = @match("[ ]*", start)
+        if #spaces <= #nodent-4
             remove(lpeg.userdata.indent_stack)
             return start
-    -- If the number of leading space characters is equal to the number on the top of the
+    -- If the number of leading space characters is >= the number on the top of the
     -- stack, this pattern matches and does not modify the stack.
     .nodent = P (start)=>
-        spaces = @match("[ \t]*", start)
-        if #spaces == lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-            return start + #spaces
-    -- If the number of leading space characters is 4+ more than the number on the top of the
-    -- stack, this pattern matches the first n+4 spaces and does not modify the stack.
-    .gt_nodent = P (start)=>
-        -- Note! This assumes indent is exactly 4 spaces!!!
-        spaces = @match("[ \t]*", start)
-        if #spaces >= lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] + 4
-            return start + lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] + 4
+        nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+        if @sub(start, start+#nodent-1) == nodent
+            return start + #nodent
 
     .error = (src,pos,err_msg)->
         if lpeg.userdata.source_code\sub(pos,pos)\match("[\r\n]")
@@ -146,7 +141,6 @@ NOMSU = do
     re.compile(nomsu_peg, NOMSU_DEFS)
 
 class NomsuCompiler
-    @def_number: 0
     new:()=>
         -- Weak-key mapping from objects to randomly generated unique IDs
         NaN_surrogate = {}
@@ -173,7 +167,7 @@ class NomsuCompiler
             :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :pairs,
             :load, :ipairs,
         }
-        @environment.ACTIONS = setmetatable({}, {__index:(key)=>
+        @environment.ACTION = setmetatable({}, {__index:(key)=>
             error("Attempt to run undefined action: #{key}", 0)
         })
         @action_metadata = setmetatable({}, {__mode:"k"})
@@ -192,7 +186,6 @@ class NomsuCompiler
             error("Invalid signature, expected list of strings, but got: #{repr signature}", 0)
         stubs = @get_stubs_from_signature signature
         stub_args = @get_args_from_signature signature
-        @@def_number += 1
 
         fn_info = debug.getinfo(fn, "u")
         local fn_arg_positions, arg_orders
@@ -202,9 +195,9 @@ class NomsuCompiler
         for sig_i=1,#stubs
             stub, args = stubs[sig_i], stub_args[sig_i]
             if @debug
-                print "#{colored.bright "ALIAS:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(args)} ON: #{@environment.ACTIONS}"
-            -- TODO: use debug.getupvalue instead of @environment.ACTIONS?
-            @environment.ACTIONS[stub] = fn
+                print "#{colored.bright "ALIAS:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(args)} ON: #{@environment.ACTION}"
+            -- TODO: use debug.getupvalue instead of @environment.ACTION?
+            @environment.ACTION[stub] = fn
             unless fn_info.isvararg
                 arg_positions = [fn_arg_positions[a] for a in *args]
                 -- TODO: better error checking?
@@ -255,7 +248,7 @@ class NomsuCompiler
         if @debug
             print "#{colored.bright "PARSING:"}\n#{colored.yellow nomsu_code}"
 
-        userdata = with {source_code:nomsu_code, :filename, indent_stack: {0}}
+        userdata = with {source_code:nomsu_code, :filename, indent_stack: {""}}
             .get_src = => nomsu_code\sub(@start, @stop-1)
             .line_starts = line_counter\match(.source_code)
             .get_line_no = =>
@@ -650,7 +643,7 @@ class NomsuCompiler
                 insert @compilestack, tree
 
                 -- Rawget here to avoid triggering an error for accessing an undefined action
-                fn = rawget(@environment.ACTIONS, tree.stub)
+                fn = rawget(@environment.ACTION, tree.stub)
                 metadata = @environment.ACTION_METADATA[fn]
                 if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
@@ -691,7 +684,7 @@ class NomsuCompiler
                     args = new_args
                 
                 remove @compilestack
-                return expr:@@comma_separated_items("ACTIONS[#{repr tree.stub}](", args, ")")
+                return expr:@@comma_separated_items("ACTION[#{repr tree.stub}](", args, ")")
 
             when "Text"
                 concat_parts = {}
