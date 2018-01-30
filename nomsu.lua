@@ -71,29 +71,25 @@ do
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
   _with_0.indent = P(function(self, start)
-    local spaces = self:match("[ \t]*", start)
-    if #spaces > lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] then
-      insert(lpeg.userdata.indent_stack, #spaces)
-      return start + #spaces
+    local nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+    local indented = nodent .. "    "
+    if self:sub(start, start + #indented - 1) == indented then
+      insert(lpeg.userdata.indent_stack, indented)
+      return start + #indented
     end
   end)
   _with_0.dedent = P(function(self, start)
-    local spaces = self:match("[ \t]*", start)
-    if #spaces < lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] then
+    local nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+    local spaces = self:match("[ ]*", start)
+    if #spaces <= #nodent - 4 then
       remove(lpeg.userdata.indent_stack)
       return start
     end
   end)
   _with_0.nodent = P(function(self, start)
-    local spaces = self:match("[ \t]*", start)
-    if #spaces == lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] then
-      return start + #spaces
-    end
-  end)
-  _with_0.gt_nodent = P(function(self, start)
-    local spaces = self:match("[ \t]*", start)
-    if #spaces >= lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] + 4 then
-      return start + lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack] + 4
+    local nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
+    if self:sub(start, start + #nodent - 1) == nodent then
+      return start + #nodent
     end
   end)
   _with_0.error = function(src, pos, err_msg)
@@ -200,7 +196,6 @@ do
       end
       local stubs = self:get_stubs_from_signature(signature)
       local stub_args = self:get_args_from_signature(signature)
-      self.__class.def_number = self.__class.def_number + 1
       local fn_info = debug.getinfo(fn, "u")
       local fn_arg_positions, arg_orders
       if not (fn_info.isvararg) then
@@ -216,9 +211,9 @@ do
       for sig_i = 1, #stubs do
         local stub, args = stubs[sig_i], stub_args[sig_i]
         if self.debug then
-          print(tostring(colored.bright("ALIAS:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(args))) .. " ON: " .. tostring(self.environment.ACTIONS))
+          print(tostring(colored.bright("ALIAS:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(args))) .. " ON: " .. tostring(self.environment.ACTION))
         end
-        self.environment.ACTIONS[stub] = fn
+        self.environment.ACTION[stub] = fn
         if not (fn_info.isvararg) then
           local arg_positions
           do
@@ -316,7 +311,7 @@ do
           source_code = nomsu_code,
           filename = filename,
           indent_stack = {
-            0
+            ""
           }
         }
         _with_0.get_src = function(self)
@@ -917,7 +912,7 @@ do
         }
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
-        local fn = rawget(self.environment.ACTIONS, tree.stub)
+        local fn = rawget(self.environment.ACTION, tree.stub)
         local metadata = self.environment.ACTION_METADATA[fn]
         if metadata and metadata.compile_time then
           local args
@@ -1019,7 +1014,7 @@ do
         end
         remove(self.compilestack)
         return {
-          expr = self.__class:comma_separated_items("ACTIONS[" .. tostring(repr(tree.stub)) .. "](", args, ")")
+          expr = self.__class:comma_separated_items("ACTION[" .. tostring(repr(tree.stub)) .. "](", args, ")")
         }
       elseif "Text" == _exp_0 then
         local concat_parts = { }
@@ -1420,7 +1415,7 @@ do
         load = load,
         ipairs = ipairs
       }
-      self.environment.ACTIONS = setmetatable({ }, {
+      self.environment.ACTION = setmetatable({ }, {
         __index = function(self, key)
           return error("Attempt to run undefined action: " .. tostring(key), 0)
         end
@@ -1444,7 +1439,6 @@ do
   })
   _base_0.__class = _class_0
   local self = _class_0
-  self.def_number = 0
   line_counter = re.compile([[        lines <- {| line (%nl line)* |}
         line <- {} (!%nl .)*
     ]], {

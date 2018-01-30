@@ -104,7 +104,7 @@ immediately
         assume ((%value's "type") is "Var") or barf ".."
             List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value's "type")
         return {..}
-           expr: ".."
+            expr: ".."
                 (function()
                     local comprehension = {};
                     for \(%key as lua expr), \(%value as lua expr) in pairs(\(%iterable as lua expr)) do
