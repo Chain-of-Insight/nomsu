@@ -39,7 +39,7 @@ inline_text (Text):
     !('".."' eol)
     '"' {|
         ({~ (('\"' -> '"') / ('\\' -> '\') / %escaped_char / [^%nl\"])+ ~}
-        / text_interpolation)*
+        / inline_text_interpolation)*
     |} '"'
 -- Have to use "%indent" instead of "indent" etc. to avoid messing up text lines that start with "#"
 indented_text (Text):
@@ -50,14 +50,20 @@ indented_text (Text):
             / (%nl+ {~ %nodent -> "" ~}) / [^%nl\])+
         ~} / text_interpolation)*
     |} (((!.) &%dedent) / (&(%nl %dedent)) / (("" -> "Error while parsing Text") => error))
-text_interpolation:
+inline_text_interpolation:
     "\" (
+        variable / inline_list / inline_dict / inline_text
+        / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")")
+    )
+text_interpolation:
+    inline_text_interpolation /
+    ("\" (
         variable / inline_list / inline_dict / inline_text
         / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")")
         / (%ws* (block_comment / line_comment)? nodent "..")
         / (indented_text %nl+ %nodent "..")
         / ((indented_list / indented_block) nodent "..")
-    )
+    ))
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
