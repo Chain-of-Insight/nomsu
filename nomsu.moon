@@ -927,7 +927,8 @@ class NomsuCompiler
             nomsu\require_file(filename)
             return statements:"nomsu:require_file(#{repr filename});"
 
-if arg
+-- Only run this code if this file was run directly with command line arguments, and not require()'d:
+if arg and debug.getinfo(2).func != require
     export colors
     colors = require 'consolecolors'
     parser = re.compile([[
@@ -979,13 +980,15 @@ if arg
             -- REPL
             nomsu\run('use "lib/core.nom"', "stdin")
             while true
+                io.write(colored.bright colored.yellow ">> ")
                 buff = ""
                 while true
-                    io.write(">> ")
                     line = io.read("*L")
                     if line == "\n" or not line
                         break
+                    line = line\gsub("\t", "    ")
                     buff ..= line
+                    io.write(colored.dim colored.yellow ".. ")
                 if #buff == 0
                     break
                 ok, ret = pcall(-> nomsu\run(buff, "stdin"))

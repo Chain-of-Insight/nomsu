@@ -1476,7 +1476,7 @@ do
   var_pattern = re.compile("{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs)
   NomsuCompiler = _class_0
 end
-if arg then
+if arg and debug.getinfo(2).func ~= require then
   colors = require('consolecolors')
   local parser = re.compile([[        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)
@@ -1532,14 +1532,16 @@ if arg then
     if args.flags["-i"] then
       nomsu:run('use "lib/core.nom"', "stdin")
       while true do
+        io.write(colored.bright(colored.yellow(">> ")))
         local buff = ""
         while true do
-          io.write(">> ")
           local line = io.read("*L")
           if line == "\n" or not line then
             break
           end
+          line = line:gsub("\t", "    ")
           buff = buff .. line
+          io.write(colored.dim(colored.yellow(".. ")))
         end
         if #buff == 0 then
           break
