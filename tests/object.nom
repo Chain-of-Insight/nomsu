@@ -1,0 +1,22 @@
+use "lib/core.nom"
+use "lib/object.nom"
+
+immediately:
+    define object "Dog":
+        action [bark]:
+            %barks <- ("Bark!" for all 1 to (@%barks))
+            return (%barks joined with " ")
+        action [get pissed off]:
+            (@%barks) +<- 1
+
+%d <- (new Dog {barks:2})
+as %d:
+    assume ((@) = %d)
+    assume ((@%barks) = 2)
+    assume ((bark) = "Bark! Bark!")
+    get pissed off
+    assume ((@%barks) = 3)
+    assume ((bark) = "Bark! Bark! Bark!")
+assume ("\(%d's "class")" = "Dog")
+assume ((%d's "barks") = 3)
+
