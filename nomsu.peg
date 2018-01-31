@@ -10,7 +10,7 @@ shebang: "#!" [^%nl]* %nl
 statement: functioncall / expression
 
 indented_block (Block):
-    {| ("(..)")? indent
+    {| (":" / "(..)")? indent
             statement (nodent statement)*
         (dedent / (("" -> "Error while parsing block") => error))
     |}
