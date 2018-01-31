@@ -26,11 +26,11 @@ parse [error!, panic!, fail!, abort!] as: barf!
 parse [error %, panic %, fail %, abort %] as: barf %
 parse [assert %condition %message] as: assume %condition or barf %message
 parse [%cond ? %if_true %if_false] as: %if_true if %cond else %if_false
-compile [function %args %body, lambda %args %body] to
+compile [function %args %body, lambda %args %body] to:
     %body_lua <- (%body as lua)
     %statements <- ((%body_lua's "statements") or "return \(%body_lua's "expr");")
     %locals <- (% for all ((%body_lua's "locals") or []))
-    for all (%args's "value")
+    for all (%args's "value"):
         lua> "utils.remove_from_list(\%locals, \(% as lua expr));"
     if: (size of %locals) > 0
         %statements <- "local \(%locals joined with ", ");\n\%statements"

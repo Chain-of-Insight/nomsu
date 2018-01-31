@@ -5,18 +5,18 @@
 use "lib/metaprogramming.nom"
 
 # Text functions
-action [%texts joined with %glue]
+action [%texts joined with %glue]:
     lua> ".."
         local text_bits = {}
         for i,bit in ipairs(\%texts) do text_bits[i] = stringify(bit) end
         return table.concat(text_bits, \%glue)
 parse [joined %texts, %texts joined] as: %texts joined with ""
 
-compile [capitalized %text, %text capitalized] to
-    {expr:"((\(%text as lua expr)):gsub('%l', string.upper, 1))"}
+compile [capitalized %text, %text capitalized] to {..}
+    expr:"((\(%text as lua expr)):gsub('%l', string.upper, 1))"
 
-compile [%text with %sub instead of %patt, %text s/%patt/%sub] to
-    {expr:"((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))"}
+compile [%text with %sub instead of %patt, %text s/%patt/%sub] to {..}
+    expr:"((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))"
 
 # TODO: figure out whether indent/dedent should affect first line
 compile [indented %text, %text indented] to {expr:"((\%text):gsub('\\n','\\n'..('    ')))"}

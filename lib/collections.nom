@@ -9,18 +9,18 @@ use "lib/operators.nom"
 # List/dict functions:
 
 # Indexing
-immediately
+immediately:
     compile [..]
         %index st to last in %list, %index nd to last in %list, %index rd to last in %list
         %index th to last in %list
     ..to {expr:"utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))"}
 
-immediately
+immediately:
     parse [first in %list, first %list] as: 1 st in %list
     parse [last in %list, last %list] as: 1 st to last in %list
 
 # Membership testing
-immediately
+immediately:
     action [%item is in %list, %list contains %item, %list has %item]
         for %key = %value in %list
             if (%key is %item): return (yes)
@@ -30,12 +30,12 @@ immediately
         %item isn't in %list, %item is not in %list
         %list doesn't contain %item, %list does not contain %item
         %list doesn't have %item, %list does not have %item
-    ..
+    ..:
         for %key = %value in %list
             if (%key is %item): return (no)
         return (yes)
 
-immediately
+immediately:
     # Note: it's important to have the space after "[" to prevent confusion if %index is a string
     compile [%list has key %index, %list has index %index] to {..}
         expr: ".."
@@ -47,21 +47,21 @@ immediately
         %list doesn't have index %index, %list does not have index %index
     ..to {expr:"((\(%list as lua expr))[ \(%index as lua expr)] == nil)"}
 
-    compile [length of %list, size of %list, size %list, number of %list, len %list] to
+    compile [length of %list, size of %list, size %list, number of %list, len %list] to:
         {expr:"utils.size(\(%list as lua expr))"}
 
-    compile [append %item to %list, add %item to %list] to
+    compile [append %item to %list, add %item to %list] to:
         {statements:"table.insert(\(%list as lua expr), \(%item as lua expr))"}
 
-    compile [pop from %list, remove last from %list] to
+    compile [pop from %list, remove last from %list] to:
         {statements:"table.remove(\(%list as lua expr))"}
 
-    compile [remove index %index from %list] to
+    compile [remove index %index from %list] to:
         {statements:"table.remove(\(%list as lua expr), \(%index as lua expr))"}
 
 # List Comprehension
-immediately
-    compile [%expression for %item in %iterable] to
+immediately:
+    compile [%expression for %item in %iterable] to:
         assume ((%item's "type") is "Var") or barf ".."
             List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
         return {..}
@@ -78,7 +78,7 @@ immediately
     compile [..]
         %expression for %index from %start to %stop via %step
         %expression for %index from %start to %stop by %step
-    ..to
+    ..to:
         assume ((%index's "type") is "Var") or barf ".."
             List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%index's "type")
         return {..}
@@ -98,7 +98,7 @@ immediately
     ..as: %expression for % from %start to %stop via %step
     parse [%expression for all %start to %stop] as: %expression for all %start to %stop via 1
 
-    compile [%expression for %key = %value in %iterable] to
+    compile [%expression for %key = %value in %iterable] to:
         assume ((%key's "type") is "Var") or barf ".."
             List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key's "type")
         assume ((%value's "type") is "Var") or barf ".."
@@ -114,8 +114,8 @@ immediately
                 end)()
 
 # Dict comprehensions
-immediately
-    compile [%key = %value for %item in %iterable] to
+immediately:
+    compile [%key = %value for %item in %iterable] to:
         assume ((%item's "type") is "Var") or barf ".."
             Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
         # Note: it's important to have the space after "[" to prevent confusion if %key is a string
@@ -130,7 +130,7 @@ immediately
                 end)()
     parse [%key = %value for all %iterable] as: %key = %value for % in %iterable
 
-    compile [%key = %value for %src_key = %src_value in %iterable] to
+    compile [%key = %value for %src_key = %src_value in %iterable] to:
         assume ((%src_key's "type") is "Var") or barf ".."
             Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key's "type")
         assume ((%src_value's "type") is "Var") or barf ".."
@@ -146,11 +146,11 @@ immediately
                     return comprehension;
                 end)()
 
-immediately
-    action [%lists flattened]
+immediately:
+    action [%lists flattened]:
         %flat <- []
-        for %list in %lists
-            for %item in %list
+        for %list in %lists:
+            for %item in %list:
                 add %item to %flat
         return %flat
 
@@ -159,7 +159,7 @@ immediately
     parse [values in %dict] as: %v for %k = %v in %dict
 
 # Sorting:
-immediately
+immediately:
     compile [sort %items] to {statements:"table.sort(\(%items as lua expr))"}
     compile [sort %items by %key_expr] to {..}
         statements: ".."
@@ -167,26 +167,26 @@ immediately
                 return \(%key_expr as lua expr);
             end)
 
-immediately
-    action [%items sorted, sorted %items]
+immediately:
+    action [%items sorted, sorted %items]:
         %copy <- (% for all %items)
         sort %copy
         return %copy
-    action [%items sorted by %key]
+    action [%items sorted by %key]:
         %copy <- (% for all %items)
         sort %copy by %key
         return %copy
 
-    action [unique %items]
+    action [unique %items]:
         %unique <- []
         %seen <- {}
-        for all %items
+        for all %items:
             unless: % in %seen
                 add % to %unique
                 (% in %seen) <- (yes)
         return %unique
 
-immediately
+immediately:
     # Metatable stuff
     compile [set %dict's metatable to %metatable] to {..}
         statements: "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"

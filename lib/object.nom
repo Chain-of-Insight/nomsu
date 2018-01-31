@@ -1,6 +1,6 @@
 use "lib/core.nom"
 
-compile [@%var] to
+compile [@%var] to:
     lua> ".."
         local key_lua = repr(\%var.value);
         local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
@@ -12,7 +12,7 @@ compile [@%var] to
         end
         return {expr="_me["..key_lua.."]"};
 
-compile [@%var <- %val] to
+compile [@%var <- %val] to:
     lua> ".."
         local val_lua = \(%val as lua expr);
         local key_lua = repr(\%var.value);
@@ -25,12 +25,12 @@ compile [@%var <- %val] to
         end
         return {statements="_me["..key_lua.."] = "..val_lua..";"};
 
-compile [define object %classname %class_body] to
+compile [define object %classname %class_body] to:
     %class_identifier <- (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
     if: %class_identifier is ""
         %class_identifier <- "class"
     %methods <- []
-    for %line in (%class_body's "value")
+    for %line in (%class_body's "value"):
         if: (%line's "type") is "Comment"
             do next %line
         assume (((%line's "type") == "FunctionCall") and ((%line's "stub") == "action % %"))

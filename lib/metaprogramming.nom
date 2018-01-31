@@ -3,7 +3,7 @@
     functions to make that easier.
 
 # Compile-time action to make compile-time actions:
-immediately
+immediately:
     lua> ".."
         nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(\%actions, \%lua)
             local signature = {};
@@ -37,8 +37,8 @@ immediately
         end);
 
 # Compile-time action to make actions
-immediately
-    compile [action %actions %body] to
+immediately:
+    compile [action %actions %body] to:
         lua> ".."
             local signature = {};
             for i, action in ipairs(\%actions.value) do signature[i] = action:get_src(); end
@@ -67,8 +67,8 @@ immediately
             ]]};
 
 # Macro to make nomsu macros:
-immediately
-    compile [parse %shorthand as %longhand] to
+immediately:
+    compile [parse %shorthand as %longhand] to:
         lua> ".."
             local signature = {};
             for i, action in ipairs(\%shorthand.value) do signature[i] = action:get_src(); end
@@ -96,7 +96,7 @@ immediately
             end);
             ]]};
 
-action [remove action %stub]
+action [remove action %stub]:
     lua> ".."
         local fn = ACTION[\%stub];
         local metadata = ACTION_METADATA[fn];
@@ -106,11 +106,11 @@ action [remove action %stub]
         end
         ACTION[\%stub] = nil;
 
-immediately
-    action [%tree as lua]
+immediately:
+    action [%tree as lua]:
         =lua "nomsu:tree_to_lua(\%tree)"
 
-    action [%tree as lua expr]
+    action [%tree as lua expr]:
         lua> ".."
             local lua = nomsu:tree_to_lua(\%tree);
             if lua.locals or not lua.expr then
@@ -118,7 +118,7 @@ immediately
             end
             return lua.expr;
 
-    action [%tree as lua statements]
+    action [%tree as lua statements]:
         lua> ".."
             local lua = nomsu:tree_to_lua(\%tree);
             local code = lua.statements or (lua.expr..";");
@@ -127,24 +127,24 @@ immediately
             end
             return code;
 
-    action [%tree as value]
+    action [%tree as value]:
         =lua "nomsu:tree_to_value(\%tree)"
     
-immediately
+immediately:
     compile [%tree's source code, %tree' source code] to {expr:"\(%tree as lua expr):get_src()"}
 
     compile [repr %obj] to {expr:"repr(\(%obj as lua expr))"}
     compile [type of %obj] to {expr:"type(\(%obj as lua expr))"}
 
-immediately
+immediately:
     compile [nomsu] to {expr:"nomsu"}
     compile [%var as lua identifier] to {expr:"nomsu:var_to_lua_identifier(\(%var as lua expr))"}
 
-action [action %names metadata]
+action [action %names metadata]:
     =lua "ACTION_METADATA[ACTION[\%names]]"
 
 # Get the source code for a function
-action [help %action]
+action [help %action]:
     lua> ".."
         local metadata = \(action %action metadata);
         if not metadata then
@@ -154,13 +154,13 @@ action [help %action]
         end
 
 # Compiler tools
-immediately
+immediately:
     compile [run %code] to {expr: "nomsu:run(\(%code as lua expr), '\(!! code location !!)')"}
     parse [enable debugging] as: lua> "nomsu.debug = true;"
     parse [disable debugging] as: lua> "nomsu.debug = false;"
 
-immediately
-    compile [say %message] to
+immediately:
+    compile [say %message] to:
         lua> ".."
             if \%message.type == "Text" then
                 return {statements="print("..\(%message as lua expr)..");"};
@@ -169,17 +169,17 @@ immediately
             end
 
 # Return
-immediately
+immediately:
     #.. Return statement is wrapped in a do..end block because Lua is unhappy if you
         put code after a return statement, unless you wrap it in a block.
     compile [return] to {statements:"do return; end"}
     compile [return %return_value] to {statements:"do return \(%return_value as lua expr); end"}
 
 # Error functions
-immediately
+immediately:
     compile [barf] to {statements:"error(nil, 0);"}
     compile [barf %msg] to {statements:"error(\(%msg as lua expr), 0);"}
-    compile [assume %condition] to
+    compile [assume %condition] to:
         lua> "local \%assumption = 'Assumption failed: '..\%condition:get_src();"
         return {..}
             statements:".."
@@ -193,7 +193,7 @@ immediately
             end
 
 # Literals
-immediately
+immediately:
     compile [yes] to {expr:"true"}
     compile [no] to {expr:"false"}
     compile [nothing, nil, null] to {expr:"nil"}
