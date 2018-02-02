@@ -127,15 +127,12 @@ local function remove_from_list(list, item)
     for i=N-deleted+1,N do list[i] = nil end
 end
 
-local function accumulate(glue, co)
-    if co == nil then
-        glue, co = "", glue
-    end
-    local bits = { }
+local function accumulate(co)
+    local bits = {}
     for bit in coroutine.wrap(co) do
         bits[#bits+1] = bit
     end
-    return table.concat(bits, glue)
+    return bits
 end
 
 local function nth_to_last(list, n)
