@@ -10,6 +10,7 @@
 --        nomsu:run(your_nomsu_code)
 --    Or from the command line:
 --        lua nomsu.lua [input_file [output_file or -]]
+lfs = require 'lfs'
 re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
@@ -170,8 +171,7 @@ class NomsuCompiler
         @environment.ACTION = setmetatable({}, {__index:(key)=>
             error("Attempt to run undefined action: #{key}", 0)
         })
-        @action_metadata = setmetatable({}, {__mode:"k"})
-        @environment.ACTION_METADATA = @action_metadata
+        @environment.ACTION_METADATA = setmetatable({}, {__mode:"k"})
         @environment.LOADED = {}
         @initialize_core!
     
@@ -205,14 +205,14 @@ class NomsuCompiler
                     error("Mismatch in args between lua function's #{repr fn_arg_positions} and stub's #{repr args} for #{repr stub}", 0)
                 arg_orders[stub] = arg_positions
         
-        @action_metadata[fn] = {
+        @environment.ACTION_METADATA[fn] = {
             :fn, :source, aliases:stubs, :arg_orders,
             arg_positions:fn_arg_positions, def_number:@@def_number,
         }
 
     define_compile_action: (signature, source, fn, src)=>
         @define_action(signature, source, fn)
-        @action_metadata[fn].compile_time = true
+        @environment.ACTION_METADATA[fn].compile_time = true
 
     serialize_defs: (scope=nil, after=nil)=>
         -- TODO: repair
@@ -316,9 +316,18 @@ class NomsuCompiler
     
     require_file: (filename)=>
         loaded = @environment.LOADED
-        if not loaded[filename]
-            loaded[filename] = @run_file(filename) or true
-        return loaded[filename]
+        file_attributes = lfs.attributes(filename)
+        if file_attributes.mode == "directory"
+            for short_filename in lfs.dir(filename)
+                full_filename = filename..'/'..short_filename
+                attr = lfs.attributes(full_filename)
+                if attr.mode ~= "directory" and short_filename\match(".*%.nom")
+                    if not loaded[full_filename]
+                        loaded[full_filename] = @run_file(full_filename) or true
+        else
+            if not loaded[filename]
+                loaded[filename] = @run_file(filename) or true
+            return loaded[filename]
 
     run_lua: (lua_code)=>
         run_lua_fn, err = load(lua_code, nil, nil, @environment)
@@ -1018,7 +1027,7 @@ if arg and debug.getinfo(2).func != require
             name = calling_fn.name
             if name == "run_lua_fn" then continue
             line = nil
-            if metadata = nomsu.action_metadata[calling_fn.func]
+            if metadata = nomsu.environment.ACTION_METADATA[calling_fn.func]
                 filename, start, stop = metadata.source\match("([^:]*):([0-9]*),([0-9]*)")
                 if filename
                     file = io.open(filename)\read("*a")

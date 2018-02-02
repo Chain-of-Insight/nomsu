@@ -1,3 +1,4 @@
+local lfs = require('lfs')
 local re = require('re')
 local lpeg = require('lpeg')
 local utils = require('utils')
@@ -232,7 +233,7 @@ do
           arg_orders[stub] = arg_positions
         end
       end
-      self.action_metadata[fn] = {
+      self.environment.ACTION_METADATA[fn] = {
         fn = fn,
         source = source,
         aliases = stubs,
@@ -243,7 +244,7 @@ do
     end,
     define_compile_action = function(self, signature, source, fn, src)
       self:define_action(signature, source, fn)
-      self.action_metadata[fn].compile_time = true
+      self.environment.ACTION_METADATA[fn].compile_time = true
     end,
     serialize_defs = function(self, scope, after)
       if scope == nil then
@@ -406,10 +407,23 @@ do
     end,
     require_file = function(self, filename)
       local loaded = self.environment.LOADED
-      if not loaded[filename] then
-        loaded[filename] = self:run_file(filename) or true
+      local file_attributes = lfs.attributes(filename)
+      if file_attributes.mode == "directory" then
+        for short_filename in lfs.dir(filename) do
+          local full_filename = filename .. '/' .. short_filename
+          local attr = lfs.attributes(full_filename)
+          if attr.mode ~= "directory" and short_filename:match(".*%.nom") then
+            if not loaded[full_filename] then
+              loaded[full_filename] = self:run_file(full_filename) or true
+            end
+          end
+        end
+      else
+        if not loaded[filename] then
+          loaded[filename] = self:run_file(filename) or true
+        end
+        return loaded[filename]
       end
-      return loaded[filename]
     end,
     run_lua = function(self, lua_code)
       local run_lua_fn, err = load(lua_code, nil, nil, self.environment)
@@ -1420,10 +1434,9 @@ do
           return error("Attempt to run undefined action: " .. tostring(key), 0)
         end
       })
-      self.action_metadata = setmetatable({ }, {
+      self.environment.ACTION_METADATA = setmetatable({ }, {
         __mode = "k"
       })
-      self.environment.ACTION_METADATA = self.action_metadata
       self.environment.LOADED = { }
       return self:initialize_core()
     end,
@@ -1590,7 +1603,7 @@ if arg and debug.getinfo(2).func ~= require then
         end
         local line = nil
         do
-          local metadata = nomsu.action_metadata[calling_fn.func]
+          local metadata = nomsu.environment.ACTION_METADATA[calling_fn.func]
           if metadata then
             local filename, start, stop = metadata.source:match("([^:]*):([0-9]*),([0-9]*)")
             if filename then

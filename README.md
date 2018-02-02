@@ -6,7 +6,7 @@ revolving around natural language rule-making and self modification.
 
 ## Dependencies
 
-Nomsu's only dependencies are [Lua 5.2 or later](https://www.lua.org/) (tested with version 5.2.4) (or [Luajit](http://luajit.org/) (tested with version 2.1.0)) and [LPEG](http://www.inf.puc-rio.br/~roberto/lpeg/) (`luarocks install lpeg`). Nomsu's compiler was written in [Moonscript](http://moonscript.org/), but all of the .moon files have been compiled into lua for convenience, so Moonscript is not a dependency.
+Nomsu's only dependencies are [Lua 5.2 or later](https://www.lua.org/) (tested with version 5.2.4) (or [Luajit](http://luajit.org/) (tested with version 2.1.0)), [LPEG](http://www.inf.puc-rio.br/~roberto/lpeg/) (`luarocks install lpeg`), and [LuaFileSystem](https://keplerproject.github.io/luafilesystem/) (`luarocks install luafilesystem`). Nomsu's compiler was written in [Moonscript](http://moonscript.org/), but all of the .moon files have been compiled into lua for convenience, so Moonscript is not a dependency.
 
 ## Usage
 
