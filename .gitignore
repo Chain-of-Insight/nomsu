@@ -1,3 +1,4 @@
+core/*.lua
 lib/*.lua
-scratch/*
+tests/*.lua
 .pending-post-commit
