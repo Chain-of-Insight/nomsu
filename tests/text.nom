@@ -1,7 +1,7 @@
 #..
     Tests for the stuff defined in lib/text.nom
 
-use "lib/core.nom"
+use "core"
 
 assume ((["x","y"] joined with ",") = "x,y") or barf "joined with failed"
 assume ((["x","y"] joined) = "xy") or barf "joined failed"
@@ -11,3 +11,5 @@ assume (("asdf" with "X" instead of "s") = "aXdf") or barf "substitution failed"
 assume ("\n" = (newline)) or barf "Text literals failed."
 %x <- "\(green)hello\(reset color)"
 assume (("x" + "y") = "xy")
+
+say "Text test passed."

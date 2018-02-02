@@ -1,16 +1,18 @@
 use "core"
 
+compile [@] to {expr:"self"}
+
 compile [@%var] to:
     lua> ".."
         local key_lua = repr(\%var.value);
         local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
                        or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
         if key_attr then
-            return {expr="_me."..key_attr};
+            return {expr="self."..key_attr};
         elseif key_lua:sub(1,1) == "[" then
             key_lua = " "..key_lua.." ";
         end
-        return {expr="_me["..key_lua.."]"};
+        return {expr="self["..key_lua.."]"};
 
 compile [@%var <- %val] to:
     lua> ".."
@@ -19,11 +21,27 @@ compile [@%var <- %val] to:
         local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
                        or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
         if key_attr then
-            return {statements="_me."..key_attr.." = "..val_lua..";"};
+            return {statements="self."..key_attr.." = "..val_lua..";"};
         elseif key_lua:sub(1,1) == "[" then
             key_lua = " "..key_lua.." ";
         end
-        return {statements="_me["..key_lua.."] = "..val_lua..";"};
+        return {statements="self["..key_lua.."] = "..val_lua..";"};
+
+compile [as %instance %body] to:
+    %body_lua <- (%body as lua)
+    return {..}
+        statements: ".."
+            do
+            local self = \(%instance as lua expr);
+            local global_actions = ACTION;
+            local ACTION = setmetatable({}, {__index=function(_,key)
+                local method = self[key];
+                if method then return (function(...) return method(self, ...); end); end
+                return global_actions[key];
+            end});
+            \((%body_lua's "statements") or "\(%body_lua's "expr");")
+            end
+        locals: %body_lua's "locals"
 
 compile [define object %classname %class_body] to:
     %class_identifier <- (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
@@ -55,7 +73,7 @@ compile [define object %classname %class_body] to:
             if #undeclared_locals > 0 then
                 body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
             end
-            local lua_fn_args = table.concat(stub_args[1], ", ");
+            local lua_fn_args = table.concat({"self", unpack(stub_args[1])}, ", ");
             local def_tree = nomsu.compilestack[#nomsu.compilestack];
             local code_location = ("%s:%s,%s"):format(def_tree.filename, def_tree.start, def_tree.stop);
 
@@ -68,16 +86,9 @@ compile [define object %classname %class_body] to:
                 %s[ %s] = function(%s)
                     %s
                 end
-                nomsu:define_compile_action(%s, %s, function(%s)
-                    return {expr="("..nomsu:tree_to_lua(_me).expr..")[ "..%s.."]("..%s..")"};
-                end);
-                ACTION_METADATA[%s[ %s]] = ACTION_METADATA[ACTION[ %s]];
             ]==]):format(
                 \%class_identifier, repr(stubs[1]), lua_fn_args,
-                    body_code,
-                repr(signature), repr(code_location), lua_fn_args,
-                    repr(repr(stubs[1])), compiled_args,
-                \%class_identifier, repr(stubs[1]), repr(stubs[1])));
+                    body_code));
 
     return {..}
         statements:".."

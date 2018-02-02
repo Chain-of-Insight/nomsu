@@ -2,9 +2,9 @@
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
 
-use "lib/metaprogramming.nom"
-use "lib/text.nom"
-use "lib/operators.nom"
+use "core/metaprogramming.nom"
+use "core/text.nom"
+use "core/operators.nom"
 
 # No-Op
 immediately:

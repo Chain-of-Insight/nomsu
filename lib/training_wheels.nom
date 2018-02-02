@@ -2,7 +2,7 @@
     This file contains a set of definitions that bring some familiar language features
     from other languages into nomsu (e.g. "==" and "continue")
 
-use "lib/core.nom"
+use "core"
 
 parse [%a = %b] as: %a <- %b
 parse [%a == %b] as: %a is %b

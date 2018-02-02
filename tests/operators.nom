@@ -1,7 +1,7 @@
 #..
     Tests for the stuff defined in lib/operators.nom
 
-use "lib/core.nom"
+use "core"
 
 assume (({x:5}'s "x") = 5) or barf "indexing doesn't work."
 try: % <- ({}'s "[[[\n]]]")
@@ -74,3 +74,5 @@ assume (%x = 2) or barf "+<- failed"
 assume (%x = 4) or barf "*<- failed"
 wrap %x around 3
 assume (%x = 1) or barf "wrap around failed"
+
+say "Operator test passed."

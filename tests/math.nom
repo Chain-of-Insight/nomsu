@@ -1,7 +1,7 @@
 #..
     Tests for the stuff defined in lib/control_flow.nom
 
-use "lib/core.nom"
+use "core"
 
 assume (all of [inf, pi, tau, golden ratio, e]) or barf "math constants failed"
 %nan <- (NaN)
@@ -15,3 +15,5 @@ assume
 ..or barf "math functions failed"
 assume ((463 to the nearest 100) = 500) or barf "rounding failed"
 assume ((2.6 to the nearest 0.25) = 2.5) or barf "rounding failed"
+
+say "Math test passed"

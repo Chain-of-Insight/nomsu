@@ -1,7 +1,7 @@
 #..
     Tests for the stuff defined in lib/control_flow.nom
 
-use "lib/core.nom"
+use "core"
 
 assume ((2nd to last in [1,2,3,4,5]) = 4)
 assume ((first in [1,2]) = 1)
@@ -41,3 +41,5 @@ assume ((unique [1,2,1,3,2,3]) = [1,2,3])
 for all ["x","y","x","x","y"]
     (% in %c) +<- 1
 assume (%c = {x:3,y:2})
+
+say "Collections test passed."

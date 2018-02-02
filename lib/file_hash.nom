@@ -1,0 +1,46 @@
+use "core"
+
+%hash_to_filename <- {}
+
+lua> ".."
+    local Hash = require("openssl.digest");
+    local function sha1(x)
+        local hash = Hash.new("sha1"):final(x);
+        local hex = hash:gsub('.', function(c) return string.format('%02x', string.byte(c)) end)
+        return hex
+    end
+    local lfs = require('lfs');
+    local function attrdir(path)
+        for filename in lfs.dir(path) do
+            if filename ~= "." and filename ~= ".." and filename:sub(1,1) ~= "." then
+                local filename = path..'/'..filename
+                local attr = lfs.attributes(filename);
+                if attr.mode == "directory" then
+                    attrdir(filename);
+                elseif filename:match(".*%.nom") then
+                    local file = io.open(filename);
+                    local hash = sha1(file:read("*a"));
+                    file:close();
+                    \%hash_to_filename[hash] = filename
+                end
+            end
+        end
+    end
+    attrdir(".");
+
+action [sha1 %]:
+    lua> "return sha1(\%);"
+
+action [file with hash %hash]:
+    %file <- (%hash in %hash_to_filename)
+    assume %file or barf "File with SHA1 hash \%hash not found!"
+    return %file
+
+action [hash of file %filename]:
+    lua> ".."
+        local f = io.open(\%filename);
+        local hash = sha1(f:read("*a"));
+        f:close();
+        return hash;
+
+parse [use file with hash %hash] as: use (file with hash %hash)

@@ -11,20 +11,22 @@ while getopts ":f" opt; do
   esac
 done
 if [ "$FLUSH" = true ] ; then
-    for file in $(find lib/ -name "*.lua") ; do
-        rm $file
-    done
+    rm core/*.lua
+    rm lib/*.lua
+    rm tests/*.lua
 fi
 
-printf "Compiling lib/core.nom ..."
-./nomsu.moon -c lib/core.nom
-echo "done."
-for file in $(cat lib/core.nom | lua -e "for filename in io.read('*a'):gmatch('use \"([^\"]*)\"') do print(filename) end") ; do
+for file in core/*.nom; do
     printf "Compiling $file ..."
     ./nomsu.moon -c $file
     echo "done."
 done
-for file in $(cat tests/all.nom | lua -e "for filename in io.read('*a'):gmatch('run file \"([^\"]*)\"') do print(filename) end") ; do
+for file in lib/*.nom; do
+    printf "Compiling $file ..."
+    ./nomsu.moon -c $file
+    echo "done."
+done
+for file in tests/*.nom; do
     printf "Compiling $file ..."
     ./nomsu.moon -c $file
     echo "done."

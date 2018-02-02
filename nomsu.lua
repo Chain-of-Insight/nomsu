@@ -379,6 +379,17 @@ do
       return ret, lua_code
     end,
     run_file = function(self, filename)
+      local file_attributes = assert(lfs.attributes(filename), "File not found: " .. tostring(filename))
+      if file_attributes.mode == "directory" then
+        for short_filename in lfs.dir(filename) do
+          local full_filename = filename .. '/' .. short_filename
+          local attr = lfs.attributes(full_filename)
+          if attr.mode ~= "directory" and short_filename:match(".*%.nom") then
+            self:run_file(full_filename)
+          end
+        end
+        return 
+      end
       if filename:match(".*%.lua") then
         local file = io.open(filename)
         local contents = file:read("*a")
@@ -407,23 +418,10 @@ do
     end,
     require_file = function(self, filename)
       local loaded = self.environment.LOADED
-      local file_attributes = lfs.attributes(filename)
-      if file_attributes.mode == "directory" then
-        for short_filename in lfs.dir(filename) do
-          local full_filename = filename .. '/' .. short_filename
-          local attr = lfs.attributes(full_filename)
-          if attr.mode ~= "directory" and short_filename:match(".*%.nom") then
-            if not loaded[full_filename] then
-              loaded[full_filename] = self:run_file(full_filename) or true
-            end
-          end
-        end
-      else
-        if not loaded[filename] then
-          loaded[filename] = self:run_file(filename) or true
-        end
-        return loaded[filename]
+      if not loaded[filename] then
+        loaded[filename] = self:run_file(filename) or true
       end
+      return loaded[filename]
     end,
     run_lua = function(self, lua_code)
       local run_lua_fn, err = load(lua_code, nil, nil, self.environment)
@@ -1526,13 +1524,12 @@ if arg and debug.getinfo(2).func ~= require then
       if args.input:match(".*%.lua") then
         local retval = dofile(args.input)(nomsu, { })
       else
-        local input
+        local retval, code
         if args.input == '-' then
-          input = io.read('*a')
+          retval, code = nomsu:run(io.read('*a'), 'stdin')
         else
-          input = io.open(args.input):read("*a")
+          retval, code = nomsu:run_file(args.input)
         end
-        local retval, code = nomsu:run(input, args.input)
         if compiled_output then
           compiled_output:write("local IMMEDIATE = true;\n")
           compiled_output:write(code)
@@ -1543,7 +1540,7 @@ if arg and debug.getinfo(2).func ~= require then
       end
     end
     if args.flags["-i"] then
-      nomsu:run('use "lib/core.nom"', "stdin")
+      nomsu:run('use "core"', "stdin")
       while true do
         io.write(colored.bright(colored.yellow(">> ")))
         local buff = ""

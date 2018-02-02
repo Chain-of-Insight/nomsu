@@ -2,7 +2,7 @@
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
 
-use "lib/metaprogramming.nom"
+use "core/metaprogramming.nom"
 
 # Text functions
 action [%texts joined with %glue]:

@@ -1,7 +1,8 @@
 #..
     Tests for the stuff defined in lib/control_flow.nom
 
-use "lib/core.nom"
+use "core"
+
 do nothing
 
 action [test conditionals]
@@ -189,3 +190,5 @@ try
         %x <- 1
 ..and if it barfs: do nothing
 assume (%x = 1) or barf "do/then always failed"
+
+say "Control flow test passed."

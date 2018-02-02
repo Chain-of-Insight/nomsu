@@ -1,10 +1,10 @@
 #..
     This file defines some common math literals and functions
 
-use "lib/metaprogramming.nom"
-use "lib/text.nom"
-use "lib/operators.nom"
-use "lib/control_flow.nom"
+use "core/metaprogramming.nom"
+use "core/text.nom"
+use "core/operators.nom"
+use "core/control_flow.nom"
 
 # Literals:
 compile [infinity, inf] to {expr:"math.huge"}

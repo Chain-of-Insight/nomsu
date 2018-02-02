@@ -1,5 +1,5 @@
-use "lib/core.nom"
-use "lib/object.nom"
+use "core"
+use "lib/object2.nom"
 
 immediately:
     define object "Dog":
@@ -20,3 +20,4 @@ as %d:
 assume ("\(%d's "class")" = "Dog")
 assume ((%d's "barks") = 3)
 
+say "Object test passed."

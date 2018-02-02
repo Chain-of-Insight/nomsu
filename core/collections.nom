@@ -2,9 +2,9 @@
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.
 
-use "lib/metaprogramming.nom"
-use "lib/control_flow.nom"
-use "lib/operators.nom"
+use "core/metaprogramming.nom"
+use "core/control_flow.nom"
+use "core/operators.nom"
 
 # List/dict functions:
 

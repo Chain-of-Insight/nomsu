@@ -1,7 +1,7 @@
 #..
     Tests for the stuff defined in lib/metaprogramming.nom
 
-use "lib/core.nom"
+use "core"
 
 immediately
     compile [five] to {expr:"5"}
@@ -53,3 +53,5 @@ assume ((nomsu) = (=lua "nomsu")) or barf "nomsu failed"
 assume (("x" as lua identifier) = (\%x as lua identifier)) or barf "converting to identifier failed."
 
 assume ((run "return 99") = 99) or barf "run % failed."
+
+say "Metaprogramming test passed."

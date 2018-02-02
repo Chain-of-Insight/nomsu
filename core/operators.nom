@@ -1,7 +1,7 @@
 #..
     This file contains definitions of operators like "+" and "and".
 
-use "lib/metaprogramming.nom"
+use "core/metaprogramming.nom"
 
 # Indexing:
 immediately:
