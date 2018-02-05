@@ -48,10 +48,37 @@ compile [define object %classname %class_body] to:
     if: %class_identifier is ""
         %class_identifier <- "class"
     %methods <- []
+    %__index <- %class_identifier
+    %__newindex <- "nil"
     for %line in (%class_body's "value"):
         if: (%line's "type") is "Comment"
             do next %line
-        assume (((%line's "type") == "FunctionCall") and ((%line's "stub") == "action % %"))
+        if: ((%line's "type") is "FunctionCall") and ((%line's "stub") is "slots %")
+            %slot_index_clauses <- []
+            %slot_newindex_clauses <- []
+            %slots <- ("value" in (2nd in (%line's "value")))
+            for %slot_index = %slot_var in %slots:
+                to %slot_index_clauses add ".."
+                    if key == \(repr (%slot_var's "value")) or key == \(repr (%slot_var as lua expr)) then
+                        return rawget(self, \%slot_index);
+                    end
+                to %slot_newindex_clauses add ".."
+                    if key == \(repr (%slot_var's "value")) or key == \(repr (%slot_var as lua expr)) or key == \%slot_index then
+                        rawset(self, \%slot_index, value);
+                    end
+
+            %__index <- ".."
+                function(self, key)
+                    \(%slot_index_clauses joined with "\n")
+                    return \%class_identifier[key];
+                end
+            %__newindex <- ".."
+                function(self, key, value)
+                    \(%slot_newindex_clauses joined with "\n")
+                    error("Attempt to store data in "..repr(key)..", which is not a valid slot on "..tostring(self.class));
+                end
+            do next %line
+        assume (((%line's "type") is "FunctionCall") and ((%line's "stub") is "action % %"))
         ..or barf "Only action definitions are supported inside 'define object % %', not \(%line's "src")"
         %actions <- (2nd in (%line's "value"))
         %body <- (3rd in (%line's "value"))
@@ -98,10 +125,9 @@ compile [define object %classname %class_body] to:
                     name=\(%classname as lua expr), instances=setmetatable({}, {__mode="k"}),
                 }, {
                     __tostring=function(c) return c.name; end,
-                    __call=function(cls, inst)
-                        inst = inst or {};
-                        inst.id = tostring(inst):match('table: (.*)');
-                        setmetatable(inst, cls.instance_metatable);
+                    __call=function(cls, initial_values)
+                        local inst = setmetatable({}, cls.instance_metatable);
+                        for k,v in pairs(initial_values) do inst[k] = v; end
                         cls.instances[inst] = true;
                         if inst['set % up'] then
                             inst['set % up'](inst);
@@ -116,10 +142,27 @@ compile [define object %classname %class_body] to:
 
                 -- Define class methods for instantiating and accessing instances:
                 \%class_identifier.instance_metatable = {
-                    __index=\%class_identifier,
-                    __tostring=\%class_identifier['% as text'] or function(inst)
-                        return "<"..inst.class.name..": "..inst.id..">";
+                    __index=\%__index,
+                    __newindex=\%__newindex,
+                    __tostring=\%class_identifier['as text'] or function(inst)
+                        return "<"..inst.class.name..": "..nomsu.ids[inst]..">";
                     end,
+                    __len=\%class_identifier['size of'],
+                    __unm=\%class_identifier['-'],
+                    __add=\%class_identifier['+ %'],
+                    __sub=\%class_identifier['- %'],
+                    __mul=\%class_identifier['* %'],
+                    __div=\%class_identifier['/ %'],
+                    __mod=\%class_identifier['wrapped around %'],
+                    __pow=\%class_identifier['^ %'],
+                    __band=\%class_identifier['AND %'],
+                    __bor=\%class_identifier['OR %'],
+                    __bxor=\%class_identifier['XOR %'],
+                    __bshl=\%class_identifier['<< %'],
+                    __bshr=\%class_identifier['>> %'],
+                    __eq=\%class_identifier['= %'],
+                    __lt=\%class_identifier['< %'],
+                    __le=\%class_identifier['<= %'],
                 };
                 nomsu:define_action("instances of "..\%class_identifier.name, "lib/class.nom", function()
                     return utils.keys(\%class_identifier.instances);
