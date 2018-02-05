@@ -17,7 +17,7 @@ compile [e] to {expr:"math.exp(1)"}
 # Functions:
 compile [% as a number] to {expr:"tonumber(\(% as lua expr))"}
 compile [absolute value %, | % |, abs %] to {expr:"math.abs(\(% as lua expr))"}
-compile [square root %, √%, sqrt %] to {expr:"math.sqrt(\(% as lua expr))"}
+compile [square root %, square root of %, √%, sqrt %] to {expr:"math.sqrt(\(% as lua expr))"}
 compile [sine %, sin %] to {expr:"math.sin(\(% as lua expr))"}
 compile [cosine %, cos %] to {expr:"math.cos(\(% as lua expr))"}
 compile [tangent %, tan %] to {expr:"math.tan(\(% as lua expr))"}
