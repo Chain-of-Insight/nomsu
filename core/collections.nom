@@ -50,7 +50,7 @@ immediately:
     compile [length of %list, size of %list, size %list, number of %list, len %list] to:
         {expr:"utils.size(\(%list as lua expr))"}
 
-    compile [append %item to %list, add %item to %list] to:
+    compile [append %item to %list, add %item to %list, to %list add %item, to %list append %item] to:
         {statements:"table.insert(\(%list as lua expr), \(%item as lua expr))"}
 
     compile [pop from %list, remove last from %list] to:
@@ -86,7 +86,7 @@ immediately:
                 (function()
                     local comprehension = {};
                     for \(%index as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(%step as lua expr) do
-                        comprehension[\(%index as lua expr)] = \(%expression as lua expr);
+                        comprehension[#comprehension+1] = \(%expression as lua expr);
                     end
                     return comprehension;
                 end)()
