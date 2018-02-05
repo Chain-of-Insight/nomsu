@@ -155,6 +155,7 @@ class NomsuCompiler
                 @[key] = id
                 return id
         })
+        @use_stack = {}
         @compilestack = {}
         @debug = false
 
@@ -323,9 +324,15 @@ class NomsuCompiler
         else
             error("Invalid filetype for #{filename}", 0)
     
-    require_file: (filename)=>
+    use_file: (filename)=>
         loaded = @environment.LOADED
         if not loaded[filename]
+            for i,f in ipairs @use_stack
+                if f == filename
+                    loop = [@use_stack[j] for j=i,#@use_stack]
+                    insert loop, filename
+                    error("Circular import, this loops forever: #{concat loop, " -> "}")
+            insert @use_stack, filename
             loaded[filename] = @run_file(filename) or true
         return loaded[filename]
 
@@ -933,8 +940,8 @@ class NomsuCompiler
 
         @define_compile_action "use %filename", get_line_no!, (_filename)->
             filename = nomsu\tree_to_value(_filename)
-            nomsu\require_file(filename)
-            return expr:"nomsu:require_file(#{repr filename});"
+            nomsu\use_file(filename)
+            return expr:"nomsu:use_file(#{repr filename});"
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug.getinfo(2).func != require

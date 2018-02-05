@@ -416,9 +416,26 @@ do
         return error("Invalid filetype for " .. tostring(filename), 0)
       end
     end,
-    require_file = function(self, filename)
+    use_file = function(self, filename)
       local loaded = self.environment.LOADED
       if not loaded[filename] then
+        for i, f in ipairs(self.use_stack) do
+          if f == filename then
+            local loop
+            do
+              local _accum_0 = { }
+              local _len_0 = 1
+              for j = i, #self.use_stack do
+                _accum_0[_len_0] = self.use_stack[j]
+                _len_0 = _len_0 + 1
+              end
+              loop = _accum_0
+            end
+            insert(loop, filename)
+            error("Circular import, this loops forever: " .. tostring(concat(loop, " -> ")))
+          end
+        end
+        insert(self.use_stack, filename)
         loaded[filename] = self:run_file(filename) or true
       end
       return loaded[filename]
@@ -1358,9 +1375,9 @@ do
       end)
       return self:define_compile_action("use %filename", get_line_no(), function(_filename)
         local filename = nomsu:tree_to_value(_filename)
-        nomsu:require_file(filename)
+        nomsu:use_file(filename)
         return {
-          expr = "nomsu:require_file(" .. tostring(repr(filename)) .. ");"
+          expr = "nomsu:use_file(" .. tostring(repr(filename)) .. ");"
         }
       end)
     end
@@ -1383,6 +1400,7 @@ do
           return id
         end
       })
+      self.use_stack = { }
       self.compilestack = { }
       self.debug = false
       self.environment = {
