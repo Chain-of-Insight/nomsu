@@ -1352,13 +1352,15 @@ do
         }
       end)
       self:define_action("run file %filename", get_line_no(), function(_filename)
-        return nomsu:run_file(_filename)
+        return {
+          expr = "nomsu:run_file(" .. tostring(nomsu:tree_to_lua(filename).expr) .. ")"
+        }
       end)
       return self:define_compile_action("use %filename", get_line_no(), function(_filename)
         local filename = nomsu:tree_to_value(_filename)
         nomsu:require_file(filename)
         return {
-          statements = "nomsu:require_file(" .. tostring(repr(filename)) .. ");"
+          expr = "nomsu:require_file(" .. tostring(repr(filename)) .. ");"
         }
       end)
     end
