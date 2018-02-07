@@ -212,9 +212,9 @@ do
       for sig_i = 1, #stubs do
         local stub, args = stubs[sig_i], stub_args[sig_i]
         if self.debug then
-          print(tostring(colored.bright("ALIAS:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(args))) .. " ON: " .. tostring(self.environment.ACTION))
+          print(tostring(colored.bright("ALIAS:")) .. " " .. tostring(colored.underscore(colored.magenta(repr(stub)))) .. " " .. tostring(colored.bright("WITH ARGS")) .. " " .. tostring(colored.dim(repr(args))) .. " ON: " .. tostring(self.environment.ACTIONS))
         end
-        self.environment.ACTION[stub] = fn
+        self.environment.ACTIONS[stub] = fn
         if not (fn_info.isvararg) then
           local arg_positions
           do
@@ -941,7 +941,12 @@ do
         }
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
-        local fn = rawget(self.environment.ACTION, tree.stub)
+        local ok, fn = pcall(function()
+          return self.environment.ACTIONS[tree.stub]
+        end)
+        if not ok then
+          fn = nil
+        end
         local metadata = self.environment.ACTION_METADATA[fn]
         if metadata and metadata.compile_time then
           local args
@@ -1043,7 +1048,7 @@ do
         end
         remove(self.compilestack)
         return {
-          expr = self.__class:comma_separated_items("ACTION[" .. tostring(repr(tree.stub)) .. "](", args, ")")
+          expr = self.__class:comma_separated_items("ACTIONS[" .. tostring(repr(tree.stub)) .. "](", args, ")")
         }
       elseif "Text" == _exp_0 then
         local concat_parts = { }
@@ -1369,15 +1374,13 @@ do
         }
       end)
       self:define_action("run file %filename", get_line_no(), function(_filename)
-        return {
-          expr = "nomsu:run_file(" .. tostring(nomsu:tree_to_lua(filename).expr) .. ")"
-        }
+        return nomsu:run_file(_filename)
       end)
       return self:define_compile_action("use %filename", get_line_no(), function(_filename)
         local filename = nomsu:tree_to_value(_filename)
         nomsu:use_file(filename)
         return {
-          expr = "nomsu:use_file(" .. tostring(repr(filename)) .. ");"
+          expr = "nomsu:use_file(" .. tostring(repr(filename)) .. ")"
         }
       end)
     end
@@ -1447,7 +1450,7 @@ do
         load = load,
         ipairs = ipairs
       }
-      self.environment.ACTION = setmetatable({ }, {
+      self.environment.ACTIONS = setmetatable({ }, {
         __index = function(self, key)
           return error("Attempt to run undefined action: " .. tostring(key), 0)
         end

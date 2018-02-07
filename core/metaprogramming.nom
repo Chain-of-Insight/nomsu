@@ -98,13 +98,13 @@ immediately:
 
 action [remove action %stub]:
     lua> ".."
-        local fn = ACTION[\%stub];
+        local fn = ACTIONS[\%stub];
         local metadata = ACTION_METADATA[fn];
         for i=#metadata.aliases,1,-1 do
             metadata.arg_orders[metadata.aliases[i]] = nil;
             table.remove(metadata.aliases, i);
         end
-        ACTION[\%stub] = nil;
+        ACTIONS[\%stub] = nil;
 
 immediately:
     action [%tree as lua]:
@@ -141,7 +141,7 @@ immediately:
     compile [%var as lua identifier] to {expr:"nomsu:var_to_lua_identifier(\(%var as lua expr))"}
 
 action [action %names metadata]:
-    =lua "ACTION_METADATA[ACTION[\%names]]"
+    =lua "ACTION_METADATA[ACTIONS[\%names]]"
 
 # Get the source code for a function
 action [help %action]:
@@ -158,6 +158,12 @@ immediately:
     compile [run %code] to {expr: "nomsu:run(\(%code as lua expr), '\(!! code location !!)')"}
     parse [enable debugging] as: lua> "nomsu.debug = true;"
     parse [disable debugging] as: lua> "nomsu.debug = false;"
+
+immediately:
+    compile [show lua %block] to:
+        lua> ".."
+            local \%lua = nomsu:tree_to_lua(\%block);
+            return {statements = "print("..repr(\%lua.statements or \%lua.expr)..");"};
 
 immediately:
     compile [say %message] to:

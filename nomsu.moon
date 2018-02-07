@@ -169,7 +169,7 @@ class NomsuCompiler
             :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :pairs,
             :load, :ipairs,
         }
-        @environment.ACTION = setmetatable({}, {__index:(key)=>
+        @environment.ACTIONS = setmetatable({}, {__index:(key)=>
             error("Attempt to run undefined action: #{key}", 0)
         })
         @environment.ACTION_METADATA = setmetatable({}, {__mode:"k"})
@@ -196,9 +196,8 @@ class NomsuCompiler
         for sig_i=1,#stubs
             stub, args = stubs[sig_i], stub_args[sig_i]
             if @debug
-                print "#{colored.bright "ALIAS:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(args)} ON: #{@environment.ACTION}"
-            -- TODO: use debug.getupvalue instead of @environment.ACTION?
-            @environment.ACTION[stub] = fn
+                print "#{colored.bright "ALIAS:"} #{colored.underscore colored.magenta repr(stub)} #{colored.bright "WITH ARGS"} #{colored.dim repr(args)} ON: #{@environment.ACTIONS}"
+            @environment.ACTIONS[stub] = fn
             unless fn_info.isvararg
                 arg_positions = [fn_arg_positions[a] for a in *args]
                 -- TODO: better error checking?
@@ -658,8 +657,9 @@ class NomsuCompiler
             when "FunctionCall"
                 insert @compilestack, tree
 
-                -- Rawget here to avoid triggering an error for accessing an undefined action
-                fn = rawget(@environment.ACTION, tree.stub)
+                ok, fn = pcall(-> @environment.ACTIONS[tree.stub])
+                if not ok then fn = nil
+
                 metadata = @environment.ACTION_METADATA[fn]
                 if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
@@ -700,7 +700,7 @@ class NomsuCompiler
                     args = new_args
                 
                 remove @compilestack
-                return expr:@@comma_separated_items("ACTION[#{repr tree.stub}](", args, ")")
+                return expr:@@comma_separated_items("ACTIONS[#{repr tree.stub}](", args, ")")
 
             when "Text"
                 concat_parts = {}
@@ -936,12 +936,12 @@ class NomsuCompiler
             return expr: repr("#{tree.filename}:#{tree.start},#{tree.stop}")
 
         @define_action "run file %filename", get_line_no!, (_filename)->
-            return expr:"nomsu:run_file(#{nomsu\tree_to_lua(filename).expr})"
+            return nomsu\run_file(_filename)
 
         @define_compile_action "use %filename", get_line_no!, (_filename)->
             filename = nomsu\tree_to_value(_filename)
             nomsu\use_file(filename)
-            return expr:"nomsu:use_file(#{repr filename});"
+            return expr:"nomsu:use_file(#{repr filename})"
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug.getinfo(2).func != require
