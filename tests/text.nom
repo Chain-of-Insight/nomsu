@@ -13,3 +13,12 @@ assume ("\n" = (newline)) or barf "Text literals failed."
 assume (("x" + "y") = "xy")
 
 say "Text test passed."
+
+immediately:
+    parse [アクション %spec %body] as: action %spec %body
+
+%こんにちは <- "こんにちは"
+アクション [% と言う]:
+    "\(%)世界"
+
+assume ((%こんにちは と言う) = "こんにちは世界") or barf "Unicode doesn't work"
