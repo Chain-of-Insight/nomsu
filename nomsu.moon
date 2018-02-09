@@ -20,6 +20,13 @@ colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 
+cached = (fn)->
+    cache = setmetatable({}, {__mode:"k"})
+    return (self, arg)->
+        unless cache[arg]
+            cache[arg] = fn(self, arg)
+        return cache[arg]
+
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
 -- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
 -- Note: This globally affects all strings in this instance of Lua!
@@ -107,20 +114,13 @@ NOMSU_DEFS = with {}
         err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"
         error(err_msg)
 
-    .FunctionCall = (start, value, stop)->
-        stub = concat([(t.type == "Word" and t.value or "%") for t in *value], " ")
-        src = lpeg.userdata.source_code\sub(start,stop-1)
-        return {
-            type: "FunctionCall", :start, :stop, :value, :stub, filename:lpeg.userdata.filename,
-            get_line_no:lpeg.userdata.get_line_no, get_src:lpeg.userdata.get_src,
-        }
-
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop)->
-        {
-            type: key, :start, :stop, :value, filename:lpeg.userdata.filename,
-            get_src:lpeg.userdata.get_src, get_line_no:lpeg.userdata.get_line_no,
+        node = {type: key, :value}
+        lpeg.userdata.tree_metadata[node] = {
+            :start,:stop,filename:lpeg.userdata.filename,source_code:lpeg.userdata.source_code
         }
+        return node
     self[key] = make_node
     return make_node
 })
@@ -157,6 +157,9 @@ class NomsuCompiler
         })
         @use_stack = {}
         @compilestack = {}
+        @file_metadata = setmetatable({}, {__mode:"k"})
+        @tree_metadata = setmetatable({}, {__mode:"k"})
+        @action_metadata = setmetatable({}, {__mode:"k"})
         @debug = false
 
         @environment = {
@@ -172,7 +175,6 @@ class NomsuCompiler
         @environment.ACTIONS = setmetatable({}, {__index:(key)=>
             error("Attempt to run undefined action: #{key}", 0)
         })
-        @environment.ACTION_METADATA = setmetatable({}, {__mode:"k"})
         @environment.LOADED = {}
         @initialize_core!
     
@@ -205,14 +207,14 @@ class NomsuCompiler
                     error("Mismatch in args between lua function's #{repr fn_arg_positions} and stub's #{repr args} for #{repr stub}", 0)
                 arg_orders[stub] = arg_positions
         
-        @environment.ACTION_METADATA[fn] = {
+        @action_metadata[fn] = {
             :fn, :source, aliases:stubs, :arg_orders,
             arg_positions:fn_arg_positions, def_number:@@def_number,
         }
 
     define_compile_action: (signature, source, fn, src)=>
         @define_action(signature, source, fn)
-        @environment.ACTION_METADATA[fn].compile_time = true
+        @action_metadata[fn].compile_time = true
 
     serialize_defs: (scope=nil, after=nil)=>
         -- TODO: repair
@@ -239,6 +241,30 @@ class NomsuCompiler
     indent: (code, levels=1)=>
         return code\gsub("\n","\n"..("    ")\rep(levels))
 
+    get_line_number: cached (tree)=>
+        metadata = @tree_metadata[tree]
+        unless metadata
+            error "Failed to find metatdata for tree: #{tree}", 0
+        unless @file_metadata[metadata.filename]
+            error "Failed to find file metatdata for file: #{metadata.filename}", 0
+        line_starts = @file_metadata[metadata.filename].line_starts
+        first_line = 1
+        while first_line < #line_starts and line_starts[first_line+1] < metadata.start
+            first_line += 1
+        last_line = first_line
+        while last_line < #line_starts and line_starts[last_line+1] < metadata.stop
+            last_line += 1
+        --return first_line == last_line and "#{metadata.filename}:#{first_line}" or "#{metadata.filename}:#{first_line}-#{last_line}"
+        return "#{metadata.filename}:#{first_line}"
+
+    get_source_code: (tree)=>
+        -- Return the (dedented) source code of a tree, or construct some if the tree was
+        -- dynamically generated.
+        metadata = @tree_metadata[tree]
+        unless metadata
+            return @tree_to_nomsu(tree)
+        return @dedent metadata.source_code\sub(metadata.start, metadata.stop-1)
+
     line_counter = re.compile([[
         lines <- {| line (%nl line)* |}
         line <- {} (!%nl .)*
@@ -248,16 +274,14 @@ class NomsuCompiler
         if @debug
             print "#{colored.bright "PARSING:"}\n#{colored.yellow nomsu_code}"
 
-        userdata = with {source_code:nomsu_code, :filename, indent_stack: {""}}
-            .get_src = => nomsu_code\sub(@start, @stop-1)
-            .line_starts = line_counter\match(.source_code)
-            .get_line_no = =>
-                unless @_line_no
-                    line_no = 1
-                    while line_no < #.line_starts and .line_starts[line_no+1] < @start
-                        line_no += 1
-                    @_line_no = "#{.filename}:#{line_no}"
-                return @_line_no
+        unless @file_metadata[filename]
+            @file_metadata[filename] = {
+                source_code:nomsu_code, :filename, line_starts:line_counter\match(nomsu_code)
+            }
+        userdata = {
+            source_code:nomsu_code, :filename, indent_stack: {""}, tree_metadata:@tree_metadata,
+            line_starts:@file_metadata[filename].line_starts,
+        }
 
         old_userdata, lpeg.userdata = lpeg.userdata, userdata
         tree = NOMSU\match(nomsu_code)
@@ -569,7 +593,9 @@ class NomsuCompiler
                     lines = {}
                     for line in *tree.value
                         nomsu = expression(line)
-                        assert nomsu, "Failed to produce output for:\n#{colored.yellow line\get_src!}"
+                        unless nomsu
+                            src = @get_source_code line
+                            error "Failed to produce output for:\n#{colored.yellow src}", 0
                         
                         insert lines, nomsu
                     return concat lines, "\n"
@@ -614,6 +640,8 @@ class NomsuCompiler
         assert tree, "No tree provided."
         if not tree.type
             error("Invalid tree: #{repr(tree)}", 0)
+        unless @tree_metadata[tree]
+            error "??? tree: #{repr tree}", 0
         switch tree.type
             when "File"
                 if #tree.value == 1
@@ -638,7 +666,7 @@ class NomsuCompiler
                 return statements:"--"..tree.value\gsub("\n","\n--")
             
             when "Nomsu"
-                return expr:"nomsu:parse(#{repr tree.value\get_src!}, #{repr tree\get_line_no!}).value[1]"
+                return expr:"nomsu:parse(#{repr @get_source_code(tree.value)}, #{repr @get_line_number(tree.value)}).value[1]"
 
             when "Block"
                 lua_bits = {}
@@ -657,22 +685,23 @@ class NomsuCompiler
             when "FunctionCall"
                 insert @compilestack, tree
 
-                ok, fn = pcall(-> @environment.ACTIONS[tree.stub])
+                stub = @tree_to_stub tree
+                ok, fn = pcall(-> @environment.ACTIONS[stub])
                 if not ok then fn = nil
 
-                metadata = @environment.ACTION_METADATA[fn]
+                metadata = @action_metadata[fn]
                 if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
                     if metadata and metadata.arg_orders
-                        new_args = [args[p] for p in *metadata.arg_orders[tree.stub]]
+                        new_args = [args[p] for p in *metadata.arg_orders[stub]]
                         args = new_args
                     if @debug
-                        print "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(tree.stub)} "
-                        print "#{colored.bright "WITH ARGS:"} #{colored.dim repr [(repr a)\sub(1,50) for a in *args]}"
+                        print "#{colored.bright "RUNNING MACRO"} #{colored.underscore colored.magenta(stub)} "
+                        print "#{colored.bright "WITH ARGS:"} #{colored.dim concat([(repr a)\sub(1,100) for a in *args], ", ")}"
                     lua = fn(unpack(args))
                     remove @compilestack
                     return lua
-                elseif not metadata and @@math_patt\match(tree.stub)
+                elseif not metadata and @@math_patt\match(stub)
                     -- This is a bit of a hack, but this code handles arbitrarily complex
                     -- math expressions like 2*x + 3^2 without having to define a single
                     -- action for every possibility.
@@ -682,7 +711,9 @@ class NomsuCompiler
                             insert bits, tok.value
                         else
                             lua = @tree_to_lua(tok)
-                            assert(lua.expr, "non-expression value inside math expression: #{tok\get_src!}")
+                            unless lua.expr
+                                src = @get_source_code(tok)
+                                error("non-expression value inside math expression: #{colored.yellow src}")
                             insert bits, lua.expr
                     remove @compilestack
                     return expr:"(#{concat bits, " "})"
@@ -691,16 +722,18 @@ class NomsuCompiler
                 for tok in *tree.value
                     if tok.type == "Word" then continue
                     lua = @tree_to_lua(tok)
-                    assert lua.expr,
-                        "#{tree\get_line_no!}: Cannot use:\n#{colored.yellow tok\get_src!}\nas an argument to #{tree.stub}, since it's not an expression, it produces: #{repr lua}"
+                    unless lua.expr
+                        line = @get_line_number(tok)
+                        src = @get_source_code(tok)
+                        error "#{line}: Cannot use:\n#{colored.yellow src}\nas an argument to #{stub}, since it's not an expression, it produces: #{repr lua}", 0
                     insert args, lua.expr
 
                 if metadata and metadata.arg_orders
-                    new_args = [args[p] for p in *metadata.arg_orders[tree.stub]]
+                    new_args = [args[p] for p in *metadata.arg_orders[stub]]
                     args = new_args
                 
                 remove @compilestack
-                return expr:@@comma_separated_items("ACTIONS[#{repr tree.stub}](", args, ")")
+                return expr:@@comma_separated_items("ACTIONS[#{repr stub}](", args, ")")
 
             when "Text"
                 concat_parts = {}
@@ -717,8 +750,10 @@ class NomsuCompiler
                         print(colored.bright "INTERP:")
                         @print_tree bit
                         print "#{colored.bright "EXPR:"} #{lua.expr}, #{colored.bright "STATEMENT:"} #{lua.statements}"
-                    assert lua.expr,
-                        "Cannot use [[#{bit\get_src!}]] as a string interpolation value, since it's not an expression."
+                    unless lua.expr
+                        line = @get_line_number(bit)
+                        src = @get_source_code(bit)
+                        error "#{line}: Cannot use #{colored.yellow bit} as a string interpolation value, since it's not an expression.", 0
                     insert concat_parts, "stringify(#{lua.expr})"
 
                 if string_buffer ~= ""
@@ -734,8 +769,10 @@ class NomsuCompiler
                 items = {}
                 for item in *tree.value
                     lua = @tree_to_lua item
-                    assert lua.expr,
-                        "Cannot use [[#{item\get_src!}]] as a list item, since it's not an expression."
+                    unless lua.expr
+                        line = @get_line_number(item)
+                        src = @get_source_code(item)
+                        error "#{line}: Cannot use #{colored.yellow src} as a list item, since it's not an expression.", 0
                     insert items, lua.expr
                 return expr:@@comma_separated_items("{", items, "}")
 
@@ -746,11 +783,15 @@ class NomsuCompiler
                         {expr:repr(entry.dict_key.value)}
                     else
                         @tree_to_lua entry.dict_key
-                    assert key_lua.expr,
-                        "Cannot use [[#{entry.dict_key\get_src!}]] as a dict key, since it's not an expression."
+                    unless key_lua.expr
+                        line = @get_line_number(entry.dict_key)
+                        src = @get_source_code(entry.dict_key)
+                        error "#{line}: Cannot use #{colored.yellow src} as a dict key, since it's not an expression.", 0
                     value_lua = @tree_to_lua entry.dict_value
-                    assert value_lua.expr,
-                        "Cannot use [[#{entry.dict_value\get_src!}]] as a dict value, since it's not an expression."
+                    unless value_lua.expr
+                        line = @get_line_number(entry.dict_value)
+                        src = @get_source_code(entry.dict_value)
+                        error "#{line}: Cannot use #{colored.yellow src} as a dict value, since it's not an expression.", 0
                     key_str = key_lua.expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                     if key_str
                         insert items, "#{key_str}=#{value_lua.expr}"
@@ -828,7 +869,10 @@ class NomsuCompiler
             when "File", "Nomsu", "Block", "List", "FunctionCall", "Text"
                 new_value = @tree_with_replaced_vars tree.value, replacements
                 if new_value != tree.value
-                    tree = {k,v for k,v in pairs(tree)}
+                    new_tree = {k,v for k,v in pairs(tree)}
+                    -- TODO: Maybe generate new metadata?
+                    @tree_metadata[new_tree] = @tree_metadata[tree]
+                    tree = new_tree
                     tree.value = new_value
             when "Dict"
                 dirty = false
@@ -839,7 +883,10 @@ class NomsuCompiler
                     dirty or= new_key != e.dict_key or new_value != e.dict_value
                     replacements[i] = {dict_key:new_key, dict_value:new_value}
                 if dirty
-                    tree = {k,v for k,v in pairs(tree)}
+                    new_tree = {k,v for k,v in pairs(tree)}
+                    -- TODO: Maybe generate new metadata?
+                    @tree_metadata[new_tree] = @tree_metadata[tree]
+                    tree = new_tree
                     tree.value = replacements
             when nil -- Raw table, probably from one of the .value of a multi-value tree (e.g. List)
                 new_values = {}
@@ -851,6 +898,13 @@ class NomsuCompiler
                     tree = new_values
         return tree
 
+    tree_to_stub: cached (tree)=>
+        if tree.type != "FunctionCall" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
+        return concat([(t.type == "Word" and t.value or "%") for t in *tree.value], " ")
+
+    tree_to_named_stub: cached (tree)=>
+        if tree.type != "FunctionCall" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
+        return concat([(t.type == "Word" and t.value or "%#{t.value}") for t in *tree.value], " ")
 
     stub_defs = {
         space:(P(' ') + P('\n..'))^0
@@ -893,9 +947,6 @@ class NomsuCompiler
         "_"..(var\gsub "%W", (verboten)->
             if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
     
-    source_code: (level=0)=>
-        @dedent @compilestack[#@compilestack-level]\get_src!
-    
     initialize_core: =>
         -- Sets up some core functionality
         get_line_no = -> "nomsu.moon:#{debug.getinfo(2).currentline}"
@@ -908,7 +959,9 @@ class NomsuCompiler
                 else
                     lua = nomsu\tree_to_lua bit
                     unless lua.expr
-                        error("Cannot use [[#{bit\get_src!}]] as a string interpolation value, since it's not an expression.", 0)
+                        line = @get_line_number(bit)
+                        src = @get_source_code(bit)
+                        error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
                     insert concat_parts, lua.expr
             return concat(concat_parts)
 
@@ -933,7 +986,8 @@ class NomsuCompiler
 
         @define_compile_action "!! code location !!", get_line_no!, ->
             tree = nomsu.compilestack[#nomsu.compilestack-1]
-            return expr: repr("#{tree.filename}:#{tree.start},#{tree.stop}")
+            metadata = @tree_metadata[tree]
+            return expr: repr("#{metadata.filename}:#{metadata.start},#{metadata.stop}")
 
         @define_action "run file %filename", get_line_no!, (_filename)->
             return nomsu\run_file(_filename)
@@ -1035,7 +1089,7 @@ if arg and debug.getinfo(2).func != require
             name = calling_fn.name
             if name == "run_lua_fn" then continue
             line = nil
-            if metadata = nomsu.environment.ACTION_METADATA[calling_fn.func]
+            if metadata = nomsu.action_metadata[calling_fn.func]
                 filename, start, stop = metadata.source\match("([^:]*):([0-9]*),([0-9]*)")
                 if filename
                     file = io.open(filename)\read("*a")

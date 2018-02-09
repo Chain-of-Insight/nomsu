@@ -53,7 +53,7 @@ compile [define object %classname %class_body] to:
     for %line in (%class_body's "value"):
         if: (%line's "type") is "Comment"
             do next %line
-        if: ((%line's "type") is "FunctionCall") and ((%line's "stub") is "slots %")
+        if: ((%line's "type") is "FunctionCall") and ((%line's stub) is "slots %")
             %slot_index_clauses <- []
             %slot_newindex_clauses <- []
             %slots <- ("value" in (2nd in (%line's "value")))
@@ -78,17 +78,21 @@ compile [define object %classname %class_body] to:
                     error("Attempt to store data in "..repr(key)..", which is not a valid slot on "..tostring(self.class));
                 end
             do next %line
-        assume (((%line's "type") is "FunctionCall") and ((%line's "stub") is "action % %"))
+        assume (((%line's "type") is "FunctionCall") and ((%line's stub) is "action % %"))
         ..or barf "Only action definitions are supported inside 'define object % %', not \(%line's "src")"
         %actions <- (2nd in (%line's "value"))
         %body <- (3rd in (%line's "value"))
         lua> ".."
-            local signature = {};
-            for i, action in ipairs(\%actions.value) do signature[i] = action:get_src(); end
-            local stubs = nomsu:get_stubs_from_signature(signature);
-            local stub_args = nomsu:get_args_from_signature(signature);
+            local stubs = {};
+            for i, action in ipairs(\%actions.value) do
+                stubs[i] = nomsu:tree_to_named_stub(action);
+            end
+            local args = {};
+            for i,tok in ipairs(\%actions.value[1].value) do
+                if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
+            end
             local arg_set = {};
-            for i, arg in ipairs(stub_args[1]) do arg_set[arg] = true; end
+            for i, arg in ipairs(args) do arg_set[arg] = true; end
             local body_lua = nomsu:tree_to_lua(\%body);
             local body_code = body_lua.statements or ("return "..body_lua.expr..";");
             local undeclared_locals = {};
@@ -100,12 +104,12 @@ compile [define object %classname %class_body] to:
             if #undeclared_locals > 0 then
                 body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
             end
-            local lua_fn_args = table.concat({"self", unpack(stub_args[1])}, ", ");
+            local lua_fn_args = table.concat({"self", unpack(args)}, ", ");
             local def_tree = nomsu.compilestack[#nomsu.compilestack];
             local code_location = ("%s:%s,%s"):format(def_tree.filename, def_tree.start, def_tree.stop);
 
             local compiled_args = {};
-            for i, arg in ipairs(stub_args[1]) do
+            for i, arg in ipairs(args) do
                 compiled_args[i] = "nomsu:tree_to_lua("..arg..").expr";
             end
             compiled_args = table.concat(compiled_args, "..', '..");

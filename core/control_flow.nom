@@ -104,14 +104,14 @@ immediately:
         %body_lua <- (%body as lua)
         %body_statements <- ((%body_lua's "statements") or "\(%body_lua's "expr");")
         if %body has subtree % where:
-            ((%'s "type") = "FunctionCall") and ((%'s "stub") is "do next repeat")
+            ((%'s "type") = "FunctionCall") and ((%'s stub) is "do next repeat")
         ..: %body_statments +<- "\n::continue_repeat::;"
         %code <- ".."
             while \(%condition as lua expr) do
             \%body_statements
             end --while-loop
         if %body has subtree % where:
-            ((%'s "type") = "FunctionCall") and ((%'s "stub") is "stop repeating")
+            ((%'s "type") = "FunctionCall") and ((%'s stub) is "stop repeating")
         ..:
             %code <- ".."
                 do -- scope of "stop repeating" label
@@ -128,14 +128,14 @@ immediately:
         %body_lua <- (%body as lua)
         %body_statements <- ((%body_lua's "statements") or "\(%body_lua's "expr");")
         if %body has subtree % where
-            ((%'s "type") = "FunctionCall") and ((%'s "stub") is "do next repeat")
+            ((%'s "type") = "FunctionCall") and ((%'s stub) is "do next repeat")
         ..: %body_statements +<- "\n::continue_repeat::;"
         %code <- ".."
             for i=1,\(%n as lua expr) do
             \%body_statements
             end --numeric for-loop
         if %body has subtree % where:
-            ((%'s "type") = "FunctionCall") and ((%'s "stub") is "stop repeating")
+            ((%'s "type") = "FunctionCall") and ((%'s stub) is "stop repeating")
         ..:
             %code <- ".."
                 do -- scope of "stop repeating" label
@@ -161,7 +161,7 @@ immediately:
         %body_statements <- ((%body_lua's "statements") or "\(%body_lua's "expr");")
         if %body has subtree % where:
             ((%'s "type") = "FunctionCall") and
-                ((%'s "stub") is "do next %") and 
+                ((%'s stub) is "do next %") and 
                     ((3rd in (%'s "value"))'s "value") is (%var's "value")
         ..: %body_statements +<- "\n::continue_\(%var as lua identifier)::;"
 
@@ -174,7 +174,7 @@ immediately:
 
         if %body has subtree % where:
             ((%'s "type") = "FunctionCall") and:
-                ((%'s "stub") is "stop %") and:
+                ((%'s stub) is "stop %") and:
                     ((2nd in (%'s "value"))'s "value") is (%var's "value")
         ..:
             %code <- ".."
@@ -200,7 +200,7 @@ immediately:
         %body_statements <- ((%body_lua's "statements") or "\(%body_lua's "expr");")
         if %body has subtree % where:
             ((%'s "type") = "FunctionCall") and
-                ((%'s "stub") is "do next %") and
+                ((%'s stub) is "do next %") and
                     ((3rd in (%'s "value"))'s "value") is (%var's "value")
         ..: %body_statements +<- "\n::continue_\(%var as lua identifier)::;"
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
@@ -211,7 +211,7 @@ immediately:
             end --foreach-loop
         if %body has subtree % where:
             ((%'s "type") = "FunctionCall") and
-                ((%'s "stub") is "stop %") and
+                ((%'s stub) is "stop %") and
                     ((2nd in (%'s "value"))'s "value") is (%var's "value")
         ..:
             %code <- ".."
@@ -230,13 +230,13 @@ immediately:
         %body_statements <- ((%body_lua's "statements") or "\(%body_lua's "expr");")
         if %body has subtree % where:
             ((%'s "type") = "FunctionCall") and
-                ((%'s "stub") is "do next %") and
+                ((%'s stub) is "do next %") and
                     ((3rd in (%'s "value"))'s "value") is (%key's "value")
         ..: %body_statements +<- "\n::continue_\(%key as lua identifier)::;"
 
         if %body has subtree % where:
             ((%'s "type") = "FunctionCall") and
-                ((%'s "stub") is "do next %") and
+                ((%'s stub) is "do next %") and
                     ((3rd in (%'s "value"))'s "value") is (%value's "value")
         ..: %body_statements +<- "\n::continue_\(%value as lua identifier)::;"
 
@@ -251,13 +251,13 @@ immediately:
         %stop_labels <- ""
         if %body has subtree % where:
             ((%'s "type") = "FunctionCall") and
-                ((%'s "stub") is "stop %") and
+                ((%'s stub) is "stop %") and
                     ((2nd in (%'s "value"))'s "value") is (%key's "value")
         ..: %stop_labels +<- "\n::stop_\(%key as lua identifier)::;"
 
         if %body has subtree % where:
             ((%'s "type") = "FunctionCall") and
-                ((%'s "stub") is "stop %") and
+                ((%'s stub) is "stop %") and
                     ((2nd in (%'s "value"))'s "value") is (%value's "value")
         ..: %stop_labels +<- "\n::stop_\(%value as lua identifier)::;"
 

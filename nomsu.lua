@@ -22,6 +22,18 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
+local cached
+cached = function(fn)
+  local cache = setmetatable({ }, {
+    __mode = "k"
+  })
+  return function(self, arg)
+    if not (cache[arg]) then
+      cache[arg] = fn(self, arg)
+    end
+    return cache[arg]
+  end
+end
 do
   local STRING_METATABLE = getmetatable("")
   STRING_METATABLE.__add = function(self, other)
@@ -119,44 +131,23 @@ do
     err_msg = err_msg .. "\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n"
     return error(err_msg)
   end
-  _with_0.FunctionCall = function(start, value, stop)
-    local stub = concat((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      for _index_0 = 1, #value do
-        local t = value[_index_0]
-        _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)(), " ")
-    local src = lpeg.userdata.source_code:sub(start, stop - 1)
-    return {
-      type = "FunctionCall",
-      start = start,
-      stop = stop,
-      value = value,
-      stub = stub,
-      filename = lpeg.userdata.filename,
-      get_line_no = lpeg.userdata.get_line_no,
-      get_src = lpeg.userdata.get_src
-    }
-  end
   NOMSU_DEFS = _with_0
 end
 setmetatable(NOMSU_DEFS, {
   __index = function(self, key)
     local make_node
     make_node = function(start, value, stop)
-      return {
+      local node = {
         type = key,
+        value = value
+      }
+      lpeg.userdata.tree_metadata[node] = {
         start = start,
         stop = stop,
-        value = value,
         filename = lpeg.userdata.filename,
-        get_src = lpeg.userdata.get_src,
-        get_line_no = lpeg.userdata.get_line_no
+        source_code = lpeg.userdata.source_code
       }
+      return node
     end
     self[key] = make_node
     return make_node
@@ -233,7 +224,7 @@ do
           arg_orders[stub] = arg_positions
         end
       end
-      self.environment.ACTION_METADATA[fn] = {
+      self.action_metadata[fn] = {
         fn = fn,
         source = source,
         aliases = stubs,
@@ -244,7 +235,7 @@ do
     end,
     define_compile_action = function(self, signature, source, fn, src)
       self:define_action(signature, source, fn)
-      self.environment.ACTION_METADATA[fn].compile_time = true
+      self.action_metadata[fn].compile_time = true
     end,
     serialize_defs = function(self, scope, after)
       if scope == nil then
@@ -301,36 +292,53 @@ do
       end
       return code:gsub("\n", "\n" .. ("    "):rep(levels))
     end,
+    get_line_number = cached(function(self, tree)
+      local metadata = self.tree_metadata[tree]
+      if not (metadata) then
+        error("Failed to find metatdata for tree: " .. tostring(tree), 0)
+      end
+      if not (self.file_metadata[metadata.filename]) then
+        error("Failed to find file metatdata for file: " .. tostring(metadata.filename), 0)
+      end
+      local line_starts = self.file_metadata[metadata.filename].line_starts
+      local first_line = 1
+      while first_line < #line_starts and line_starts[first_line + 1] < metadata.start do
+        first_line = first_line + 1
+      end
+      local last_line = first_line
+      while last_line < #line_starts and line_starts[last_line + 1] < metadata.stop do
+        last_line = last_line + 1
+      end
+      return tostring(metadata.filename) .. ":" .. tostring(first_line)
+    end),
+    get_source_code = function(self, tree)
+      local metadata = self.tree_metadata[tree]
+      if not (metadata) then
+        return self:tree_to_nomsu(tree)
+      end
+      return self:dedent(metadata.source_code:sub(metadata.start, metadata.stop - 1))
+    end,
     parse = function(self, nomsu_code, filename)
       assert(type(filename) == "string", "Bad filename type: " .. tostring(type(filename)))
       if self.debug then
         print(tostring(colored.bright("PARSING:")) .. "\n" .. tostring(colored.yellow(nomsu_code)))
       end
-      local userdata
-      do
-        local _with_0 = {
+      if not (self.file_metadata[filename]) then
+        self.file_metadata[filename] = {
           source_code = nomsu_code,
           filename = filename,
-          indent_stack = {
-            ""
-          }
+          line_starts = line_counter:match(nomsu_code)
         }
-        _with_0.get_src = function(self)
-          return nomsu_code:sub(self.start, self.stop - 1)
-        end
-        _with_0.line_starts = line_counter:match(_with_0.source_code)
-        _with_0.get_line_no = function(self)
-          if not (self._line_no) then
-            local line_no = 1
-            while line_no < #_with_0.line_starts and _with_0.line_starts[line_no + 1] < self.start do
-              line_no = line_no + 1
-            end
-            self._line_no = tostring(_with_0.filename) .. ":" .. tostring(line_no)
-          end
-          return self._line_no
-        end
-        userdata = _with_0
       end
+      local userdata = {
+        source_code = nomsu_code,
+        filename = filename,
+        indent_stack = {
+          ""
+        },
+        tree_metadata = self.tree_metadata,
+        line_starts = self.file_metadata[filename].line_starts
+      }
       local old_userdata
       old_userdata, lpeg.userdata = lpeg.userdata, userdata
       local tree = NOMSU:match(nomsu_code)
@@ -789,7 +797,10 @@ do
           for _index_0 = 1, #_list_0 do
             local line = _list_0[_index_0]
             nomsu = expression(line)
-            assert(nomsu, "Failed to produce output for:\n" .. tostring(colored.yellow(line:get_src())))
+            if not (nomsu) then
+              local src = self:get_source_code(line)
+              error("Failed to produce output for:\n" .. tostring(colored.yellow(src)), 0)
+            end
             insert(lines, nomsu)
           end
           return concat(lines, "\n")
@@ -853,6 +864,9 @@ do
       if not tree.type then
         error("Invalid tree: " .. tostring(repr(tree)), 0)
       end
+      if not (self.tree_metadata[tree]) then
+        error("??? tree: " .. tostring(repr(tree)), 0)
+      end
       local _exp_0 = tree.type
       if "File" == _exp_0 then
         if #tree.value == 1 then
@@ -906,7 +920,7 @@ do
         }
       elseif "Nomsu" == _exp_0 then
         return {
-          expr = "nomsu:parse(" .. tostring(repr(tree.value:get_src())) .. ", " .. tostring(repr(tree:get_line_no())) .. ").value[1]"
+          expr = "nomsu:parse(" .. tostring(repr(self:get_source_code(tree.value))) .. ", " .. tostring(repr(self:get_line_number(tree.value))) .. ").value[1]"
         }
       elseif "Block" == _exp_0 then
         local lua_bits = { }
@@ -941,13 +955,14 @@ do
         }
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
+        local stub = self:tree_to_stub(tree)
         local ok, fn = pcall(function()
-          return self.environment.ACTIONS[tree.stub]
+          return self.environment.ACTIONS[stub]
         end)
         if not ok then
           fn = nil
         end
-        local metadata = self.environment.ACTION_METADATA[fn]
+        local metadata = self.action_metadata[fn]
         if metadata and metadata.compile_time then
           local args
           do
@@ -968,7 +983,7 @@ do
             do
               local _accum_0 = { }
               local _len_0 = 1
-              local _list_0 = metadata.arg_orders[tree.stub]
+              local _list_0 = metadata.arg_orders[stub]
               for _index_0 = 1, #_list_0 do
                 local p = _list_0[_index_0]
                 _accum_0[_len_0] = args[p]
@@ -979,22 +994,22 @@ do
             args = new_args
           end
           if self.debug then
-            print(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(tree.stub))) .. " ")
-            print(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(repr((function()
+            print(tostring(colored.bright("RUNNING MACRO")) .. " " .. tostring(colored.underscore(colored.magenta(stub))) .. " ")
+            print(tostring(colored.bright("WITH ARGS:")) .. " " .. tostring(colored.dim(concat((function()
               local _accum_0 = { }
               local _len_0 = 1
               for _index_0 = 1, #args do
                 local a = args[_index_0]
-                _accum_0[_len_0] = (repr(a)):sub(1, 50)
+                _accum_0[_len_0] = (repr(a)):sub(1, 100)
                 _len_0 = _len_0 + 1
               end
               return _accum_0
-            end)()))))
+            end)(), ", "))))
           end
           local lua = fn(unpack(args))
           remove(self.compilestack)
           return lua
-        elseif not metadata and self.__class.math_patt:match(tree.stub) then
+        elseif not metadata and self.__class.math_patt:match(stub) then
           local bits = { }
           local _list_0 = tree.value
           for _index_0 = 1, #_list_0 do
@@ -1003,7 +1018,10 @@ do
               insert(bits, tok.value)
             else
               local lua = self:tree_to_lua(tok)
-              assert(lua.expr, "non-expression value inside math expression: " .. tostring(tok:get_src()))
+              if not (lua.expr) then
+                local src = self:get_source_code(tok)
+                error("non-expression value inside math expression: " .. tostring(colored.yellow(src)))
+              end
               insert(bits, lua.expr)
             end
           end
@@ -1023,7 +1041,11 @@ do
               break
             end
             local lua = self:tree_to_lua(tok)
-            assert(lua.expr, tostring(tree:get_line_no()) .. ": Cannot use:\n" .. tostring(colored.yellow(tok:get_src())) .. "\nas an argument to " .. tostring(tree.stub) .. ", since it's not an expression, it produces: " .. tostring(repr(lua)))
+            if not (lua.expr) then
+              local line = self:get_line_number(tok)
+              local src = self:get_source_code(tok)
+              error(tostring(line) .. ": Cannot use:\n" .. tostring(colored.yellow(src)) .. "\nas an argument to " .. tostring(stub) .. ", since it's not an expression, it produces: " .. tostring(repr(lua)), 0)
+            end
             insert(args, lua.expr)
             _continue_0 = true
           until true
@@ -1036,7 +1058,7 @@ do
           do
             local _accum_0 = { }
             local _len_0 = 1
-            local _list_1 = metadata.arg_orders[tree.stub]
+            local _list_1 = metadata.arg_orders[stub]
             for _index_0 = 1, #_list_1 do
               local p = _list_1[_index_0]
               _accum_0[_len_0] = args[p]
@@ -1048,7 +1070,7 @@ do
         end
         remove(self.compilestack)
         return {
-          expr = self.__class:comma_separated_items("ACTIONS[" .. tostring(repr(tree.stub)) .. "](", args, ")")
+          expr = self.__class:comma_separated_items("ACTIONS[" .. tostring(repr(stub)) .. "](", args, ")")
         }
       elseif "Text" == _exp_0 then
         local concat_parts = { }
@@ -1073,7 +1095,11 @@ do
               self:print_tree(bit)
               print(tostring(colored.bright("EXPR:")) .. " " .. tostring(lua.expr) .. ", " .. tostring(colored.bright("STATEMENT:")) .. " " .. tostring(lua.statements))
             end
-            assert(lua.expr, "Cannot use [[" .. tostring(bit:get_src()) .. "]] as a string interpolation value, since it's not an expression.")
+            if not (lua.expr) then
+              local line = self:get_line_number(bit)
+              local src = self:get_source_code(bit)
+              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(bit)) .. " as a string interpolation value, since it's not an expression.", 0)
+            end
             insert(concat_parts, "stringify(" .. tostring(lua.expr) .. ")")
             _continue_0 = true
           until true
@@ -1103,7 +1129,11 @@ do
         for _index_0 = 1, #_list_0 do
           local item = _list_0[_index_0]
           local lua = self:tree_to_lua(item)
-          assert(lua.expr, "Cannot use [[" .. tostring(item:get_src()) .. "]] as a list item, since it's not an expression.")
+          if not (lua.expr) then
+            local line = self:get_line_number(item)
+            local src = self:get_source_code(item)
+            error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a list item, since it's not an expression.", 0)
+          end
           insert(items, lua.expr)
         end
         return {
@@ -1122,9 +1152,17 @@ do
           else
             key_lua = self:tree_to_lua(entry.dict_key)
           end
-          assert(key_lua.expr, "Cannot use [[" .. tostring(entry.dict_key:get_src()) .. "]] as a dict key, since it's not an expression.")
+          if not (key_lua.expr) then
+            local line = self:get_line_number(entry.dict_key)
+            local src = self:get_source_code(entry.dict_key)
+            error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict key, since it's not an expression.", 0)
+          end
           local value_lua = self:tree_to_lua(entry.dict_value)
-          assert(value_lua.expr, "Cannot use [[" .. tostring(entry.dict_value:get_src()) .. "]] as a dict value, since it's not an expression.")
+          if not (value_lua.expr) then
+            local line = self:get_line_number(entry.dict_value)
+            local src = self:get_source_code(entry.dict_value)
+            error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict value, since it's not an expression.", 0)
+          end
           local key_str = key_lua.expr:match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
           if key_str then
             insert(items, tostring(key_str) .. "=" .. tostring(value_lua.expr))
@@ -1215,13 +1253,16 @@ do
       elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
         local new_value = self:tree_with_replaced_vars(tree.value, replacements)
         if new_value ~= tree.value then
+          local new_tree
           do
             local _tbl_0 = { }
             for k, v in pairs(tree) do
               _tbl_0[k] = v
             end
-            tree = _tbl_0
+            new_tree = _tbl_0
           end
+          self.tree_metadata[new_tree] = self.tree_metadata[tree]
+          tree = new_tree
           tree.value = new_value
         end
       elseif "Dict" == _exp_0 then
@@ -1237,13 +1278,16 @@ do
           }
         end
         if dirty then
+          local new_tree
           do
             local _tbl_0 = { }
             for k, v in pairs(tree) do
               _tbl_0[k] = v
             end
-            tree = _tbl_0
+            new_tree = _tbl_0
           end
+          self.tree_metadata[new_tree] = self.tree_metadata[tree]
+          tree = new_tree
           tree.value = replacements
         end
       elseif nil == _exp_0 then
@@ -1259,6 +1303,38 @@ do
       end
       return tree
     end,
+    tree_to_stub = cached(function(self, tree)
+      if tree.type ~= "FunctionCall" then
+        error("Tried to get stub from non-functioncall tree: " .. tostring(tree.type), 0)
+      end
+      return concat((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local t = _list_0[_index_0]
+          _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)(), " ")
+    end),
+    tree_to_named_stub = cached(function(self, tree)
+      if tree.type ~= "FunctionCall" then
+        error("Tried to get stub from non-functioncall tree: " .. tostring(tree.type), 0)
+      end
+      return concat((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local t = _list_0[_index_0]
+          _accum_0[_len_0] = (t.type == "Word" and t.value or "%" .. tostring(t.value))
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)(), " ")
+    end),
     get_stubs_from_signature = function(self, signature)
       if type(signature) ~= 'table' or signature.type then
         error("Invalid signature: " .. tostring(repr(signature)), 0)
@@ -1307,12 +1383,6 @@ do
         end
       end))
     end,
-    source_code = function(self, level)
-      if level == nil then
-        level = 0
-      end
-      return self:dedent(self.compilestack[#self.compilestack - level]:get_src())
-    end,
     initialize_core = function(self)
       local get_line_no
       get_line_no = function()
@@ -1330,7 +1400,9 @@ do
           else
             local lua = nomsu:tree_to_lua(bit)
             if not (lua.expr) then
-              error("Cannot use [[" .. tostring(bit:get_src()) .. "]] as a string interpolation value, since it's not an expression.", 0)
+              local line = self:get_line_number(bit)
+              local src = self:get_source_code(bit)
+              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.", 0)
             end
             insert(concat_parts, lua.expr)
           end
@@ -1369,8 +1441,9 @@ do
       end)
       self:define_compile_action("!! code location !!", get_line_no(), function()
         local tree = nomsu.compilestack[#nomsu.compilestack - 1]
+        local metadata = self.tree_metadata[tree]
         return {
-          expr = repr(tostring(tree.filename) .. ":" .. tostring(tree.start) .. "," .. tostring(tree.stop))
+          expr = repr(tostring(metadata.filename) .. ":" .. tostring(metadata.start) .. "," .. tostring(metadata.stop))
         }
       end)
       self:define_action("run file %filename", get_line_no(), function(_filename)
@@ -1405,6 +1478,15 @@ do
       })
       self.use_stack = { }
       self.compilestack = { }
+      self.file_metadata = setmetatable({ }, {
+        __mode = "k"
+      })
+      self.tree_metadata = setmetatable({ }, {
+        __mode = "k"
+      })
+      self.action_metadata = setmetatable({ }, {
+        __mode = "k"
+      })
       self.debug = false
       self.environment = {
         nomsu = self,
@@ -1454,9 +1536,6 @@ do
         __index = function(self, key)
           return error("Attempt to run undefined action: " .. tostring(key), 0)
         end
-      })
-      self.environment.ACTION_METADATA = setmetatable({ }, {
-        __mode = "k"
       })
       self.environment.LOADED = { }
       return self:initialize_core()
@@ -1623,7 +1702,7 @@ if arg and debug.getinfo(2).func ~= require then
         end
         local line = nil
         do
-          local metadata = nomsu.environment.ACTION_METADATA[calling_fn.func]
+          local metadata = nomsu.action_metadata[calling_fn.func]
           if metadata then
             local filename, start, stop = metadata.source:match("([^:]*):([0-9]*),([0-9]*)")
             if filename then
