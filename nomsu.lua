@@ -864,9 +864,6 @@ do
       if not tree.type then
         error("Invalid tree: " .. tostring(repr(tree)), 0)
       end
-      if not (self.tree_metadata[tree]) then
-        error("??? tree: " .. tostring(repr(tree)), 0)
-      end
       local _exp_0 = tree.type
       if "File" == _exp_0 then
         if #tree.value == 1 then
@@ -1240,19 +1237,27 @@ do
       end
       return concat(bits, "\n")
     end,
-    tree_with_replaced_vars = function(self, tree, replacements)
+    tree_map = function(self, tree, fn)
       if type(tree) ~= 'table' then
         return tree
       end
+      local replacement = fn(tree)
+      if replacement ~= nil then
+        return replacement
+      end
       local _exp_0 = tree.type
-      if "Var" == _exp_0 then
-        local id = self:var_to_lua_identifier(tree.value)
-        if replacements[id] ~= nil then
-          tree = replacements[id]
+      if "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
+        local new_values, is_changed = { }, false
+        for i, old_value in ipairs(tree.value) do
+          local new_value = type(old_value) ~= "string" and self:tree_map(old_value, fn) or nil
+          if new_value ~= nil and new_value ~= old_value then
+            is_changed = true
+            new_values[i] = new_value
+          else
+            new_values[i] = old_value
+          end
         end
-      elseif "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
-        local new_value = self:tree_with_replaced_vars(tree.value, replacements)
-        if new_value ~= tree.value then
+        if is_changed then
           local new_tree
           do
             local _tbl_0 = { }
@@ -1262,22 +1267,25 @@ do
             new_tree = _tbl_0
           end
           self.tree_metadata[new_tree] = self.tree_metadata[tree]
-          tree = new_tree
-          tree.value = new_value
+          new_tree.value = new_values
+          return new_tree
         end
       elseif "Dict" == _exp_0 then
-        local dirty = false
-        replacements = { }
+        local new_values, is_changed = { }, false
         for i, e in ipairs(tree.value) do
-          local new_key = self:tree_with_replaced_vars(e.dict_key, replacements)
-          local new_value = self:tree_with_replaced_vars(e.dict_value, replacements)
-          dirty = dirty or (new_key ~= e.dict_key or new_value ~= e.dict_value)
-          replacements[i] = {
-            dict_key = new_key,
-            dict_value = new_value
-          }
+          local new_key = self:tree_map(e.dict_key, fn)
+          local new_value = self:tree_map(e.dict_value, fn)
+          if (new_key ~= nil and new_key ~= e.dict_key) or (new_value ~= nil and new_value ~= e.dict_value) then
+            is_changed = true
+            new_values[i] = {
+              dict_key = new_key,
+              dict_value = new_value
+            }
+          else
+            new_values[i] = e
+          end
         end
-        if dirty then
+        if is_changed then
           local new_tree
           do
             local _tbl_0 = { }
@@ -1287,21 +1295,23 @@ do
             new_tree = _tbl_0
           end
           self.tree_metadata[new_tree] = self.tree_metadata[tree]
-          tree = new_tree
-          tree.value = replacements
+          new_tree.value = new_values
+          return new_tree
         end
       elseif nil == _exp_0 then
-        local new_values = { }
-        local any_different = false
-        for k, v in pairs(tree) do
-          new_values[k] = self:tree_with_replaced_vars(v, replacements)
-          any_different = any_different or (new_values[k] ~= tree[k])
-        end
-        if any_different then
-          tree = new_values
-        end
+        error("Invalid tree: " .. tostring(repr(tree)))
       end
       return tree
+    end,
+    tree_with_replaced_vars = function(self, tree, replacements)
+      return self:tree_map(tree, function(t)
+        if t.type == "Var" then
+          local id = self:var_to_lua_identifier(t.value)
+          if replacements[id] ~= nil then
+            return replacements[id]
+          end
+        end
+      end)
     end,
     tree_to_stub = cached(function(self, tree)
       if tree.type ~= "FunctionCall" then
@@ -1663,6 +1673,8 @@ if arg and debug.getinfo(2).func ~= require then
         end)
         if ok and ret ~= nil then
           print("= " .. repr(ret))
+        elseif not ok then
+          print(colored.bright(colored.red(ret)))
         end
       end
     end

@@ -640,8 +640,6 @@ class NomsuCompiler
         assert tree, "No tree provided."
         if not tree.type
             error("Invalid tree: #{repr(tree)}", 0)
-        unless @tree_metadata[tree]
-            error "??? tree: #{repr tree}", 0
         switch tree.type
             when "File"
                 if #tree.value == 1
@@ -859,44 +857,57 @@ class NomsuCompiler
         insert bits, close
         return concat(bits)
 
-    tree_with_replaced_vars: (tree, replacements)=>
+    tree_map: (tree, fn)=>
+        -- Return a new tree with fn mapped to each node. If fn provides a replacement,
+        -- use that and stop recursing, otherwise recurse.
         if type(tree) != 'table' then return tree
+        replacement = fn(tree)
+        if replacement != nil
+            return replacement
         switch tree.type
-            when "Var"
-                id = @var_to_lua_identifier tree.value
-                if replacements[id] ~= nil
-                    tree = replacements[id]
             when "File", "Nomsu", "Block", "List", "FunctionCall", "Text"
-                new_value = @tree_with_replaced_vars tree.value, replacements
-                if new_value != tree.value
+                new_values, is_changed = {}, false
+                for i,old_value in ipairs(tree.value)
+                    new_value = type(old_value) != "string" and @tree_map(old_value, fn) or nil
+                    if new_value != nil and new_value != old_value
+                        is_changed = true
+                        new_values[i] = new_value
+                    else
+                        new_values[i] = old_value
+                if is_changed
                     new_tree = {k,v for k,v in pairs(tree)}
                     -- TODO: Maybe generate new metadata?
                     @tree_metadata[new_tree] = @tree_metadata[tree]
-                    tree = new_tree
-                    tree.value = new_value
+                    new_tree.value = new_values
+                    return new_tree
+                
             when "Dict"
-                dirty = false
-                replacements = {}
+                new_values, is_changed = {}, false
                 for i,e in ipairs tree.value
-                    new_key = @tree_with_replaced_vars e.dict_key, replacements
-                    new_value = @tree_with_replaced_vars e.dict_value, replacements
-                    dirty or= new_key != e.dict_key or new_value != e.dict_value
-                    replacements[i] = {dict_key:new_key, dict_value:new_value}
-                if dirty
+                    new_key = @tree_map(e.dict_key, fn)
+                    new_value = @tree_map(e.dict_value, fn)
+                    if (new_key != nil and new_key != e.dict_key) or (new_value != nil and new_value != e.dict_value)
+                        is_changed = true
+                        new_values[i] = {dict_key:new_key, dict_value:new_value}
+                    else
+                        new_values[i] = e
+                if is_changed
                     new_tree = {k,v for k,v in pairs(tree)}
                     -- TODO: Maybe generate new metadata?
                     @tree_metadata[new_tree] = @tree_metadata[tree]
-                    tree = new_tree
-                    tree.value = replacements
+                    new_tree.value = new_values
+                    return new_tree
             when nil -- Raw table, probably from one of the .value of a multi-value tree (e.g. List)
-                new_values = {}
-                any_different = false
-                for k,v in pairs tree
-                    new_values[k] = @tree_with_replaced_vars v, replacements
-                    any_different or= (new_values[k] != tree[k])
-                if any_different
-                    tree = new_values
+                error("Invalid tree: #{repr tree}")
+
         return tree
+
+    tree_with_replaced_vars: (tree, replacements)=>
+        return @tree_map tree, (t)->
+            if t.type == "Var"
+                id = @var_to_lua_identifier t.value
+                if replacements[id] != nil
+                    return replacements[id]
 
     tree_to_stub: cached (tree)=>
         if tree.type != "FunctionCall" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
@@ -1065,6 +1076,8 @@ if arg and debug.getinfo(2).func != require
                 ok, ret = pcall(-> nomsu\run(buff, "stdin"))
                 if ok and ret != nil
                     print "= "..repr(ret)
+                elseif not ok
+                    print colored.bright colored.red ret
     
     err_hand = (error_message)->
         -- TODO: write properly to stderr
