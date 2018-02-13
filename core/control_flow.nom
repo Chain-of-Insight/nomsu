@@ -88,7 +88,7 @@ immediately:
             locals: %body_lua's "locals"
             statements:".."
                 for \(%subtree as lua expr) in coroutine.wrap(function() nomsu:walk_tree(\(%tree as lua expr)) end) do
-                    if type(\(%subtree as lua expr)) == 'table' and \(%subtree as lua expr).type then
+                    if Types.is_node(\(%subtree as lua expr)) then
                         if \(%condition as lua expr) then
                             \%body_statements
                             break;

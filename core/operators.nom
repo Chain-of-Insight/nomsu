@@ -79,7 +79,7 @@ immediately:
             Expected a Dict for the assignments part of '<- %' statement, not \(%assignments' source code)
         lua> ".."
             for i, item in ipairs(\%assignments.value) do
-                local target, value = item.dict_key, item.dict_value;
+                local target, value = item.key, item.value;
                 local target_lua = nomsu:tree_to_lua(target);
                 if not target_lua.expr then error("Invalid target for assignment: "..target:get_src()); end
                 local value_lua = nomsu:tree_to_lua(value);

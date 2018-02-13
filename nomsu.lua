@@ -3,6 +3,7 @@ local re = require('re')
 local lpeg = require('lpeg')
 local utils = require('utils')
 local new_uuid = require('uuid')
+local immutable = require('immutable')
 local repr, stringify, min, max, equivalent, set, is_list, sum
 repr, stringify, min, max, equivalent, set, is_list, sum = utils.repr, utils.stringify, utils.min, utils.max, utils.equivalent, utils.set, utils.is_list, utils.sum
 local colors = setmetatable({ }, {
@@ -21,6 +22,14 @@ local insert, remove, concat
 do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
+end
+local _tuples = { }
+local Tuple
+Tuple = function(t)
+  if not _tuples[#t] then
+    _tuples[#t] = immutable(#t)
+  end
+  return _tuples[#t]:from_table(t)
 end
 local cached
 cached = function(fn)
@@ -52,9 +61,46 @@ end
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt
 P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
+local Types = { }
+local _list_0 = {
+  "File",
+  "Nomsu",
+  "Block",
+  "List",
+  "FunctionCall",
+  "Text",
+  "Dict",
+  "Number",
+  "Word",
+  "Var",
+  "Comment"
+}
+for _index_0 = 1, #_list_0 do
+  local t = _list_0[_index_0]
+  Types[t] = immutable({
+    "id",
+    "value"
+  }, {
+    type = t,
+    name = t
+  })
+end
+Types.DictEntry = immutable({
+  "key",
+  "value"
+}, {
+  name = "DictEntry"
+})
+Types.is_node = function(n)
+  return type(n) == 'userdata' and n.type
+end
 local NOMSU_DEFS
 do
   local _with_0 = { }
+  _with_0.Tuple = Tuple
+  _with_0.DictEntry = function(k, v)
+    return Types.DictEntry(k, v)
+  end
   _with_0.nl = P("\r") ^ -1 * P("\n")
   _with_0.ws = S(" \t")
   _with_0.tonumber = tonumber
@@ -133,14 +179,16 @@ do
   end
   NOMSU_DEFS = _with_0
 end
+local node_id = 0
 setmetatable(NOMSU_DEFS, {
   __index = function(self, key)
     local make_node
     make_node = function(start, value, stop)
-      local node = {
-        type = key,
-        value = value
-      }
+      node_id = node_id + 1
+      if type(value) == 'table' then
+        error(value)
+      end
+      local node = Types[key](node_id, value)
       lpeg.userdata.tree_metadata[node] = {
         start = start,
         stop = stop,
@@ -490,7 +538,7 @@ do
         expr_type = nil
       end
       assert(tree, "No tree provided to tree_to_nomsu.")
-      assert(tree.type, "Invalid tree: " .. tostring(repr(tree)))
+      assert(Types.is_node(tree), "Invalid tree: " .. tostring(repr(tree)))
       local join_lines
       join_lines = function(lines)
         for _index_0 = 1, #lines do
@@ -543,9 +591,9 @@ do
           return buff
         elseif "List" == _exp_0 then
           local bits = { }
-          local _list_0 = tok.value
-          for _index_0 = 1, #_list_0 do
-            local bit = _list_0[_index_0]
+          local _list_1 = tok.value
+          for _index_0 = 1, #_list_1 do
+            local bit = _list_1[_index_0]
             local nomsu = inline_expression(bit)
             if not (nomsu) then
               return nil
@@ -555,22 +603,22 @@ do
           return "[" .. concat(bits, ", ") .. "]"
         elseif "Dict" == _exp_0 then
           local bits = { }
-          local _list_0 = tok.value
-          for _index_0 = 1, #_list_0 do
-            local bit = _list_0[_index_0]
+          local _list_1 = tok.value
+          for _index_0 = 1, #_list_1 do
+            local bit = _list_1[_index_0]
             local key_nomsu
-            if bit.dict_key.type == "Word" then
-              key_nomsu = bit.dict_key.value
+            if bit.key.type == "Word" then
+              key_nomsu = bit.key.value
             else
-              key_nomsu = inline_expression(bit.dict_key)
+              key_nomsu = inline_expression(bit.key)
             end
             if not (key_nomsu) then
               return nil
             end
-            if bit.dict_key.type == "FunctionCall" then
+            if bit.key.type == "FunctionCall" then
               key_nomsu = "(" .. key_nomsu .. ")"
             end
-            local value_nomsu = inline_expression(bit.dict_value)
+            local value_nomsu = inline_expression(bit.value)
             if not (value_nomsu) then
               return nil
             end
@@ -579,9 +627,9 @@ do
           return "{" .. concat(bits, ", ") .. "}"
         elseif "Text" == _exp_0 then
           local buff = '"'
-          local _list_0 = tok.value
-          for _index_0 = 1, #_list_0 do
-            local bit = _list_0[_index_0]
+          local _list_1 = tok.value
+          for _index_0 = 1, #_list_1 do
+            local bit = _list_1[_index_0]
             if type(bit) == 'string' then
               if bit:find("\n") then
                 return nil
@@ -627,9 +675,9 @@ do
         local _exp_0 = tok.type
         if "Block" == _exp_0 then
           local buff = ":"
-          local _list_0 = tok.value
-          for _index_0 = 1, #_list_0 do
-            local line = _list_0[_index_0]
+          local _list_1 = tok.value
+          for _index_0 = 1, #_list_1 do
+            local line = _list_1[_index_0]
             nomsu = expression(line)
             if not (nomsu) then
               return nil
@@ -646,9 +694,9 @@ do
         elseif "List" == _exp_0 then
           local buff = "[..]"
           local line = "\n    "
-          local _list_0 = tok.value
-          for _index_0 = 1, #_list_0 do
-            local bit = _list_0[_index_0]
+          local _list_1 = tok.value
+          for _index_0 = 1, #_list_1 do
+            local bit = _list_1[_index_0]
             nomsu = inline_expression(bit)
             if line ~= "\n    " and #line + #", " + #nomsu > max_line then
               buff = buff .. line
@@ -674,17 +722,17 @@ do
         elseif "Dict" == _exp_0 then
           local buff = "{..}"
           local line = "\n    "
-          local _list_0 = tok.value
-          for _index_0 = 1, #_list_0 do
-            local bit = _list_0[_index_0]
-            local key_nomsu = inline_expression(bit.dict_key)
+          local _list_1 = tok.value
+          for _index_0 = 1, #_list_1 do
+            local bit = _list_1[_index_0]
+            local key_nomsu = inline_expression(bit.key)
             if not (key_nomsu) then
               return nil
             end
-            if bit.dict_key.type == "FunctionCall" then
+            if bit.key.type == "FunctionCall" then
               key_nomsu = "(" .. key_nomsu .. ")"
             end
-            local value_nomsu = inline_expression(bit.dict_value)
+            local value_nomsu = inline_expression(bit.value)
             if value_nomsu and #key_nomsu + #value_nomsu < max_line then
               line = line .. (key_nomsu .. "=" .. value_nomsu .. ",")
               if #line >= max_line then
@@ -692,7 +740,7 @@ do
                 line = "\n    "
               end
             else
-              line = line .. (key_nomsu .. "=" .. expression(bit.dict_value))
+              line = line .. (key_nomsu .. "=" .. expression(bit.value))
               buff = buff .. line
               line = "\n    "
             end
@@ -703,9 +751,9 @@ do
           return buff
         elseif "Text" == _exp_0 then
           local buff = '".."\n    '
-          local _list_0 = tok.value
-          for _index_0 = 1, #_list_0 do
-            local bit = _list_0[_index_0]
+          local _list_1 = tok.value
+          for _index_0 = 1, #_list_1 do
+            local bit = _list_1[_index_0]
             if type(bit) == 'string' then
               buff = buff .. bit:gsub("\\", "\\\\"):gsub("\n", "\n    ")
             else
@@ -793,9 +841,9 @@ do
           return buff
         elseif "File" == _exp_0 then
           local lines = { }
-          local _list_0 = tree.value
-          for _index_0 = 1, #_list_0 do
-            local line = _list_0[_index_0]
+          local _list_1 = tree.value
+          for _index_0 = 1, #_list_1 do
+            local line = _list_1[_index_0]
             nomsu = expression(line)
             if not (nomsu) then
               local src = self:get_source_code(line)
@@ -861,7 +909,7 @@ do
     end,
     tree_to_lua = function(self, tree)
       assert(tree, "No tree provided.")
-      if not tree.type then
+      if not Types.is_node(tree) then
         error("Invalid tree: " .. tostring(repr(tree)), 0)
       end
       local _exp_0 = tree.type
@@ -872,9 +920,9 @@ do
         local declared_locals = { }
         local lua_bits = { }
         local line_no = 1
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local line = _list_0[_index_0]
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
+          local line = _list_1[_index_0]
           local lua = self:tree_to_lua(line)
           if not lua then
             error("No lua produced by " .. tostring(repr(line)), 0)
@@ -884,9 +932,9 @@ do
             do
               local _accum_0 = { }
               local _len_0 = 1
-              local _list_1 = lua.locals
-              for _index_1 = 1, #_list_1 do
-                local l = _list_1[_index_1]
+              local _list_2 = lua.locals
+              for _index_1 = 1, #_list_2 do
+                local l = _list_2[_index_1]
                 if not declared_locals[l] then
                   _accum_0[_len_0] = l
                   _len_0 = _len_0 + 1
@@ -922,9 +970,9 @@ do
       elseif "Block" == _exp_0 then
         local lua_bits = { }
         local locals = { }
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local arg = _list_0[_index_0]
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
+          local arg = _list_1[_index_0]
           local lua = self:tree_to_lua(arg)
           if #tree.value == 1 and lua.expr and not lua.statements then
             return {
@@ -933,9 +981,9 @@ do
             }
           end
           if lua.locals then
-            local _list_1 = lua.locals
-            for _index_1 = 1, #_list_1 do
-              local l = _list_1[_index_1]
+            local _list_2 = lua.locals
+            for _index_1 = 1, #_list_2 do
+              local l = _list_2[_index_1]
               table.insert(locals, l)
             end
           end
@@ -965,9 +1013,9 @@ do
           do
             local _accum_0 = { }
             local _len_0 = 1
-            local _list_0 = tree.value
-            for _index_0 = 1, #_list_0 do
-              local arg = _list_0[_index_0]
+            local _list_1 = tree.value
+            for _index_0 = 1, #_list_1 do
+              local arg = _list_1[_index_0]
               if arg.type ~= "Word" then
                 _accum_0[_len_0] = arg
                 _len_0 = _len_0 + 1
@@ -980,9 +1028,9 @@ do
             do
               local _accum_0 = { }
               local _len_0 = 1
-              local _list_0 = metadata.arg_orders[stub]
-              for _index_0 = 1, #_list_0 do
-                local p = _list_0[_index_0]
+              local _list_1 = metadata.arg_orders[stub]
+              for _index_0 = 1, #_list_1 do
+                local p = _list_1[_index_0]
                 _accum_0[_len_0] = args[p]
                 _len_0 = _len_0 + 1
               end
@@ -1008,9 +1056,9 @@ do
           return lua
         elseif not metadata and self.__class.math_patt:match(stub) then
           local bits = { }
-          local _list_0 = tree.value
-          for _index_0 = 1, #_list_0 do
-            local tok = _list_0[_index_0]
+          local _list_1 = tree.value
+          for _index_0 = 1, #_list_1 do
+            local tok = _list_1[_index_0]
             if tok.type == "Word" then
               insert(bits, tok.value)
             else
@@ -1028,11 +1076,11 @@ do
           }
         end
         local args = { }
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
           local _continue_0 = false
           repeat
-            local tok = _list_0[_index_0]
+            local tok = _list_1[_index_0]
             if tok.type == "Word" then
               _continue_0 = true
               break
@@ -1055,9 +1103,9 @@ do
           do
             local _accum_0 = { }
             local _len_0 = 1
-            local _list_1 = metadata.arg_orders[stub]
-            for _index_0 = 1, #_list_1 do
-              local p = _list_1[_index_0]
+            local _list_2 = metadata.arg_orders[stub]
+            for _index_0 = 1, #_list_2 do
+              local p = _list_2[_index_0]
               _accum_0[_len_0] = args[p]
               _len_0 = _len_0 + 1
             end
@@ -1072,11 +1120,11 @@ do
       elseif "Text" == _exp_0 then
         local concat_parts = { }
         local string_buffer = ""
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
           local _continue_0 = false
           repeat
-            local bit = _list_0[_index_0]
+            local bit = _list_1[_index_0]
             if type(bit) == "string" then
               string_buffer = string_buffer .. bit
               _continue_0 = true
@@ -1122,9 +1170,9 @@ do
         end
       elseif "List" == _exp_0 then
         local items = { }
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local item = _list_0[_index_0]
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
+          local item = _list_1[_index_0]
           local lua = self:tree_to_lua(item)
           if not (lua.expr) then
             local line = self:get_line_number(item)
@@ -1138,26 +1186,26 @@ do
         }
       elseif "Dict" == _exp_0 then
         local items = { }
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local entry = _list_0[_index_0]
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
+          local entry = _list_1[_index_0]
           local key_lua
-          if entry.dict_key.type == "Word" then
+          if entry.key.type == "Word" then
             key_lua = {
-              expr = repr(entry.dict_key.value)
+              expr = repr(entry.key.value)
             }
           else
-            key_lua = self:tree_to_lua(entry.dict_key)
+            key_lua = self:tree_to_lua(entry.key)
           end
           if not (key_lua.expr) then
-            local line = self:get_line_number(entry.dict_key)
-            local src = self:get_source_code(entry.dict_key)
+            local line = self:get_line_number(entry.key)
+            local src = self:get_source_code(entry.key)
             error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict key, since it's not an expression.", 0)
           end
-          local value_lua = self:tree_to_lua(entry.dict_value)
+          local value_lua = self:tree_to_lua(entry.value)
           if not (value_lua.expr) then
-            local line = self:get_line_number(entry.dict_value)
-            local src = self:get_source_code(entry.dict_value)
+            local line = self:get_line_number(entry.value)
+            local src = self:get_source_code(entry.value)
             error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict value, since it's not an expression.", 0)
           end
           local key_str = key_lua.expr:match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
@@ -1189,22 +1237,22 @@ do
         depth = 0
       end
       coroutine.yield(tree, depth)
-      if type(tree) ~= 'table' or not tree.type then
+      if not (Types.is_node(tree)) then
         return 
       end
       local _exp_0 = tree.type
       if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local v = _list_0[_index_0]
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
+          local v = _list_1[_index_0]
           self:walk_tree(v, depth + 1)
         end
       elseif "Dict" == _exp_0 then
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local e = _list_0[_index_0]
-          self:walk_tree(e.dict_key, depth + 1)
-          self:walk_tree(e.dict_value, depth + 1)
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
+          local e = _list_1[_index_0]
+          self:walk_tree(e.key, depth + 1)
+          self:walk_tree(e.value, depth + 1)
         end
       else
         self:walk_tree(tree.value, depth + 1)
@@ -1216,10 +1264,10 @@ do
       for node, depth in coroutine.wrap(function()
         return self:walk_tree(tree)
       end) do
-        if type(node) ~= 'table' or not node.type then
-          print(("    "):rep(depth) .. repr(node))
-        else
+        if Types.is_node(node) then
           print(tostring(("    "):rep(depth)) .. tostring(node.type) .. ":")
+        else
+          print(("    "):rep(depth) .. repr(node))
         end
       end
       return io.write(colors.reset)
@@ -1229,16 +1277,16 @@ do
       for node, depth in coroutine.wrap(function()
         return self:walk_tree(tree)
       end) do
-        if type(node) ~= 'table' or not node.type then
-          insert(bits, (("    "):rep(depth) .. repr(node)))
-        else
+        if Types.is_node(node) then
           insert(bits, (tostring(("    "):rep(depth)) .. tostring(node.type) .. ":"))
+        else
+          insert(bits, (("    "):rep(depth) .. repr(node)))
         end
       end
       return concat(bits, "\n")
     end,
     tree_map = function(self, tree, fn)
-      if type(tree) ~= 'table' then
+      if not (Types.is_node(tree)) then
         return tree
       end
       local replacement = fn(tree)
@@ -1258,44 +1306,25 @@ do
           end
         end
         if is_changed then
-          local new_tree
-          do
-            local _tbl_0 = { }
-            for k, v in pairs(tree) do
-              _tbl_0[k] = v
-            end
-            new_tree = _tbl_0
-          end
+          local new_tree = getmetatable(tree)(tree.id, Tuple(new_values))
           self.tree_metadata[new_tree] = self.tree_metadata[tree]
-          new_tree.value = new_values
           return new_tree
         end
       elseif "Dict" == _exp_0 then
         local new_values, is_changed = { }, false
         for i, e in ipairs(tree.value) do
-          local new_key = self:tree_map(e.dict_key, fn)
-          local new_value = self:tree_map(e.dict_value, fn)
-          if (new_key ~= nil and new_key ~= e.dict_key) or (new_value ~= nil and new_value ~= e.dict_value) then
+          local new_key = self:tree_map(e.key, fn)
+          local new_value = self:tree_map(e.value, fn)
+          if (new_key ~= nil and new_key ~= e.key) or (new_value ~= nil and new_value ~= e.value) then
             is_changed = true
-            new_values[i] = {
-              dict_key = new_key,
-              dict_value = new_value
-            }
+            new_values[i] = DictEntry(new_key, new_value)
           else
             new_values[i] = e
           end
         end
         if is_changed then
-          local new_tree
-          do
-            local _tbl_0 = { }
-            for k, v in pairs(tree) do
-              _tbl_0[k] = v
-            end
-            new_tree = _tbl_0
-          end
+          local new_tree = getmetatable(tree)(tree.id, Tuple(new_values))
           self.tree_metadata[new_tree] = self.tree_metadata[tree]
-          new_tree.value = new_values
           return new_tree
         end
       elseif nil == _exp_0 then
@@ -1320,9 +1349,9 @@ do
       return concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local t = _list_0[_index_0]
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
+          local t = _list_1[_index_0]
           _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
           _len_0 = _len_0 + 1
         end
@@ -1336,9 +1365,9 @@ do
       return concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local t = _list_0[_index_0]
+        local _list_1 = tree.value
+        for _index_0 = 1, #_list_1 do
+          local t = _list_1[_index_0]
           _accum_0[_len_0] = (t.type == "Word" and t.value or "%" .. tostring(t.value))
           _len_0 = _len_0 + 1
         end
@@ -1382,7 +1411,7 @@ do
       return stub_args
     end,
     var_to_lua_identifier = function(self, var)
-      if type(var) == 'table' and var.type == "Var" then
+      if Types.Var:is_instance(var) then
         var = var.value
       end
       return "_" .. (var:gsub("%W", function(verboten)
@@ -1402,9 +1431,9 @@ do
       local nomsu_string_as_lua
       nomsu_string_as_lua = function(code)
         local concat_parts = { }
-        local _list_0 = code.value
-        for _index_0 = 1, #_list_0 do
-          local bit = _list_0[_index_0]
+        local _list_1 = code.value
+        for _index_0 = 1, #_list_1 do
+          local bit = _list_1[_index_0]
           if type(bit) == "string" then
             insert(concat_parts, bit)
           else
@@ -1548,6 +1577,7 @@ do
         end
       })
       self.environment.LOADED = { }
+      self.environment.Types = Types
       return self:initialize_core()
     end,
     __base = _base_0,

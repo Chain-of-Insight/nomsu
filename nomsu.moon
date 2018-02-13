@@ -15,10 +15,17 @@ re = require 're'
 lpeg = require 'lpeg'
 utils = require 'utils'
 new_uuid = require 'uuid'
+immutable = require 'immutable'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
+
+_tuples = {}
+Tuple = (t)->
+    if not _tuples[#t]
+        _tuples[#t] = immutable(#t)
+    return _tuples[#t]\from_table(t)
 
 cached = (fn)->
     cache = setmetatable({}, {__mode:"k"})
@@ -53,8 +60,17 @@ do
 lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
+Types = {}
+for t in *{"File", "Nomsu", "Block", "List", "FunctionCall", "Text", "Dict", "Number", "Word", "Var", "Comment"}
+    Types[t] = immutable({"id","value"}, {type:t, name:t})
+Types.DictEntry = immutable({"key","value"}, {name:"DictEntry"})
+Types.is_node = (n)->
+    type(n) == 'userdata' and n.type
+
 NOMSU_DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
+    .Tuple = Tuple
+    .DictEntry = (k,v) -> Types.DictEntry(k,v)
     .nl = P("\r")^-1 * P("\n")
     .ws = S(" \t")
     .tonumber = tonumber
@@ -114,9 +130,12 @@ NOMSU_DEFS = with {}
         err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"
         error(err_msg)
 
+node_id = 0
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop)->
-        node = {type: key, :value}
+        node_id = node_id + 1
+        if type(value) == 'table' then error(value)-- = Tuple(value)
+        node = Types[key](node_id, value)
         lpeg.userdata.tree_metadata[node] = {
             :start,:stop,filename:lpeg.userdata.filename,source_code:lpeg.userdata.source_code
         }
@@ -176,6 +195,7 @@ class NomsuCompiler
             error("Attempt to run undefined action: #{key}", 0)
         })
         @environment.LOADED = {}
+        @environment.Types = Types
         @initialize_core!
     
     define_action: (signature, source, fn)=>
@@ -394,7 +414,7 @@ class NomsuCompiler
         --   "inline" for code that cannot contain indented code or an end-of-line component
         --       e.g. code that is meant to go inside parentheses
         assert tree, "No tree provided to tree_to_nomsu."
-        assert tree.type, "Invalid tree: #{repr(tree)}"
+        assert Types.is_node(tree), "Invalid tree: #{repr(tree)}"
         join_lines = (lines)->
             for line in *lines
                 if #indentation + #line > max_line
@@ -436,13 +456,13 @@ class NomsuCompiler
                 when "Dict"
                     bits = {}
                     for bit in *tok.value
-                        key_nomsu = if bit.dict_key.type == "Word"
-                            bit.dict_key.value
-                        else inline_expression bit.dict_key
+                        key_nomsu = if bit.key.type == "Word"
+                            bit.key.value
+                        else inline_expression bit.key
                         return nil unless key_nomsu
-                        if bit.dict_key.type == "FunctionCall"
+                        if bit.key.type == "FunctionCall"
                             key_nomsu = "("..key_nomsu..")"
-                        value_nomsu = inline_expression bit.dict_value
+                        value_nomsu = inline_expression bit.value
                         return nil unless value_nomsu
                         insert bits, key_nomsu.."="..value_nomsu
                     return "{"..concat(bits, ", ").."}"
@@ -510,18 +530,18 @@ class NomsuCompiler
                     buff = "{..}"
                     line = "\n    "
                     for bit in *tok.value
-                        key_nomsu = inline_expression bit.dict_key
+                        key_nomsu = inline_expression bit.key
                         return nil unless key_nomsu
-                        if bit.dict_key.type == "FunctionCall"
+                        if bit.key.type == "FunctionCall"
                             key_nomsu = "("..key_nomsu..")"
-                        value_nomsu = inline_expression bit.dict_value
+                        value_nomsu = inline_expression bit.value
                         if value_nomsu and #key_nomsu + #value_nomsu < max_line
                             line ..= key_nomsu.."="..value_nomsu..","
                             if #line >= max_line
                                 buff ..= line
                                 line = "\n    "
                         else
-                            line ..= key_nomsu.."="..expression(bit.dict_value)
+                            line ..= key_nomsu.."="..expression(bit.value)
                             buff ..= line
                             line = "\n    "
                     if line ~= "\n    "
@@ -638,7 +658,7 @@ class NomsuCompiler
     tree_to_lua: (tree)=>
         -- Return <lua code for value>, <additional lua code>
         assert tree, "No tree provided."
-        if not tree.type
+        if not Types.is_node(tree)
             error("Invalid tree: #{repr(tree)}", 0)
         switch tree.type
             when "File"
@@ -777,18 +797,18 @@ class NomsuCompiler
             when "Dict"
                 items = {}
                 for entry in *tree.value
-                    key_lua = if entry.dict_key.type == "Word"
-                        {expr:repr(entry.dict_key.value)}
+                    key_lua = if entry.key.type == "Word"
+                        {expr:repr(entry.key.value)}
                     else
-                        @tree_to_lua entry.dict_key
+                        @tree_to_lua entry.key
                     unless key_lua.expr
-                        line = @get_line_number(entry.dict_key)
-                        src = @get_source_code(entry.dict_key)
+                        line = @get_line_number(entry.key)
+                        src = @get_source_code(entry.key)
                         error "#{line}: Cannot use #{colored.yellow src} as a dict key, since it's not an expression.", 0
-                    value_lua = @tree_to_lua entry.dict_value
+                    value_lua = @tree_to_lua entry.value
                     unless value_lua.expr
-                        line = @get_line_number(entry.dict_value)
-                        src = @get_source_code(entry.dict_value)
+                        line = @get_line_number(entry.value)
+                        src = @get_source_code(entry.value)
                         error "#{line}: Cannot use #{colored.yellow src} as a dict value, since it's not an expression.", 0
                     key_str = key_lua.expr\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                     if key_str
@@ -810,35 +830,34 @@ class NomsuCompiler
     
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
-        if type(tree) != 'table' or not tree.type
-            return
+        return unless Types.is_node(tree)
         switch tree.type
             when "List", "File", "Block", "FunctionCall", "Text"
                 for v in *tree.value
                     @walk_tree(v, depth+1)
             when "Dict"
                 for e in *tree.value
-                    @walk_tree(e.dict_key, depth+1)
-                    @walk_tree(e.dict_value, depth+1)
+                    @walk_tree(e.key, depth+1)
+                    @walk_tree(e.value, depth+1)
             else @walk_tree(tree.value, depth+1)
         return nil
 
     print_tree: (tree)=>
         io.write(colors.bright..colors.green)
         for node,depth in coroutine.wrap(-> @walk_tree tree)
-            if type(node) != 'table' or not node.type
-                print(("    ")\rep(depth)..repr(node))
-            else
+            if Types.is_node(node)
                 print("#{("    ")\rep(depth)}#{node.type}:")
+            else
+                print(("    ")\rep(depth)..repr(node))
         io.write(colors.reset)
     
     tree_to_str: (tree)=>
         bits = {}
         for node,depth in coroutine.wrap(-> @walk_tree tree)
-            if type(node) != 'table' or not node.type
-                insert bits, (("    ")\rep(depth)..repr(node))
-            else
+            if Types.is_node(node)
                 insert bits, ("#{("    ")\rep(depth)}#{node.type}:")
+            else
+                insert bits, (("    ")\rep(depth)..repr(node))
         return concat(bits, "\n")
 
     @unescape_string: (str)=>
@@ -860,7 +879,7 @@ class NomsuCompiler
     tree_map: (tree, fn)=>
         -- Return a new tree with fn mapped to each node. If fn provides a replacement,
         -- use that and stop recursing, otherwise recurse.
-        if type(tree) != 'table' then return tree
+        unless Types.is_node(tree) then return tree
         replacement = fn(tree)
         if replacement != nil
             return replacement
@@ -875,27 +894,25 @@ class NomsuCompiler
                     else
                         new_values[i] = old_value
                 if is_changed
-                    new_tree = {k,v for k,v in pairs(tree)}
+                    new_tree = getmetatable(tree)(tree.id, Tuple(new_values))
                     -- TODO: Maybe generate new metadata?
                     @tree_metadata[new_tree] = @tree_metadata[tree]
-                    new_tree.value = new_values
                     return new_tree
                 
             when "Dict"
                 new_values, is_changed = {}, false
                 for i,e in ipairs tree.value
-                    new_key = @tree_map(e.dict_key, fn)
-                    new_value = @tree_map(e.dict_value, fn)
-                    if (new_key != nil and new_key != e.dict_key) or (new_value != nil and new_value != e.dict_value)
+                    new_key = @tree_map(e.key, fn)
+                    new_value = @tree_map(e.value, fn)
+                    if (new_key != nil and new_key != e.key) or (new_value != nil and new_value != e.value)
                         is_changed = true
-                        new_values[i] = {dict_key:new_key, dict_value:new_value}
+                        new_values[i] = DictEntry(new_key, new_value)
                     else
                         new_values[i] = e
                 if is_changed
-                    new_tree = {k,v for k,v in pairs(tree)}
+                    new_tree = getmetatable(tree)(tree.id, Tuple(new_values))
                     -- TODO: Maybe generate new metadata?
                     @tree_metadata[new_tree] = @tree_metadata[tree]
-                    new_tree.value = new_values
                     return new_tree
             when nil -- Raw table, probably from one of the .value of a multi-value tree (e.g. List)
                 error("Invalid tree: #{repr tree}")
@@ -953,7 +970,7 @@ class NomsuCompiler
     var_to_lua_identifier: (var)=>
         -- Converts arbitrary nomsu vars to valid lua identifiers by replacing illegal
         -- characters with escape sequences
-        if type(var) == 'table' and var.type == "Var"
+        if Types.Var\is_instance(var)
             var = var.value
         "_"..(var\gsub "%W", (verboten)->
             if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
