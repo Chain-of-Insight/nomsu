@@ -21,11 +21,9 @@ colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 
-_tuples = {}
+_Tuple = immutable(nil)
 Tuple = (t)->
-    if not _tuples[#t]
-        _tuples[#t] = immutable(#t)
-    return _tuples[#t]\from_table(t)
+    return _Tuple(table.unpack(t))
 
 cached = (fn)->
     cache = setmetatable({}, {__mode:"k"})

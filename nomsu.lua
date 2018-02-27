@@ -23,13 +23,10 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local _tuples = { }
+local _Tuple = immutable(nil)
 local Tuple
 Tuple = function(t)
-  if not _tuples[#t] then
-    _tuples[#t] = immutable(#t)
-  end
-  return _tuples[#t]:from_table(t)
+  return _Tuple(table.unpack(t))
 end
 local cached
 cached = function(fn)
