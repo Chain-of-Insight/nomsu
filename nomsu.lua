@@ -38,18 +38,6 @@ local Tuple = immutable(nil, {
     end)(), ", ")) .. ")"
   end
 })
-local cached
-cached = function(fn)
-  local cache = setmetatable({ }, {
-    __mode = "k"
-  })
-  return function(self, arg)
-    if not (cache[arg]) then
-      cache[arg] = fn(self, arg)
-    end
-    return cache[arg]
-  end
-end
 do
   local STRING_METATABLE = getmetatable("")
   STRING_METATABLE.__add = function(self, other)
@@ -363,7 +351,7 @@ do
       end
       return code:gsub("\n", "\n" .. ("    "):rep(levels))
     end,
-    get_line_number = cached(function(self, tree)
+    get_line_number = function(self, tree)
       local metadata = self.tree_metadata[tree]
       if not (metadata) then
         return "<dynamically generated>"
@@ -381,7 +369,7 @@ do
         last_line = last_line + 1
       end
       return tostring(metadata.filename) .. ":" .. tostring(first_line)
-    end),
+    end,
     get_source_code = function(self, tree)
       local metadata = self.tree_metadata[tree]
       if not (metadata) then
@@ -1363,7 +1351,7 @@ do
         end
       end)
     end,
-    tree_to_stub = cached(function(self, tree)
+    tree_to_stub = function(self, tree)
       if tree.type ~= "FunctionCall" then
         error("Tried to get stub from non-functioncall tree: " .. tostring(tree.type), 0)
       end
@@ -1378,8 +1366,8 @@ do
         end
         return _accum_0
       end)(), " ")
-    end),
-    tree_to_named_stub = cached(function(self, tree)
+    end,
+    tree_to_named_stub = function(self, tree)
       if tree.type ~= "FunctionCall" then
         error("Tried to get stub from non-functioncall tree: " .. tostring(tree.type), 0)
       end
@@ -1394,7 +1382,7 @@ do
         end
         return _accum_0
       end)(), " ")
-    end),
+    end,
     get_stubs_from_signature = function(self, signature)
       if type(signature) ~= 'table' or signature.type then
         error("Invalid signature: " .. tostring(repr(signature)), 0)

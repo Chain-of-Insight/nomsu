@@ -23,13 +23,6 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or 
 
 Tuple = immutable(nil, {name:"Tuple", __tostring:=> "Tuple(#{concat [repr(x) for x in *@], ", "})"})
 
-cached = (fn)->
-    cache = setmetatable({}, {__mode:"k"})
-    return (self, arg)->
-        unless cache[arg]
-            cache[arg] = fn(self, arg)
-        return cache[arg]
-
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
 -- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
 -- Note: This globally affects all strings in this instance of Lua!
@@ -262,7 +255,7 @@ class NomsuCompiler
     indent: (code, levels=1)=>
         return code\gsub("\n","\n"..("    ")\rep(levels))
 
-    get_line_number: cached (tree)=>
+    get_line_number: (tree)=>
         metadata = @tree_metadata[tree]
         unless metadata
             return "<dynamically generated>"
@@ -924,11 +917,11 @@ class NomsuCompiler
                 if replacements[id] != nil
                     return replacements[id]
 
-    tree_to_stub: cached (tree)=>
+    tree_to_stub: (tree)=>
         if tree.type != "FunctionCall" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
         return concat([(t.type == "Word" and t.value or "%") for t in *tree.value], " ")
 
-    tree_to_named_stub: cached (tree)=>
+    tree_to_named_stub: (tree)=>
         if tree.type != "FunctionCall" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
         return concat([(t.type == "Word" and t.value or "%#{t.value}") for t in *tree.value], " ")
 
