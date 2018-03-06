@@ -211,14 +211,13 @@ setmetatable(NOMSU_DEFS, {
       if type(value) == 'table' then
         error(value)
       end
-      lpeg.userdata.tree_metadata[node_id] = {
+      local node = Types[key](node_id, value)
+      lpeg.userdata.tree_metadata[node] = {
         start = start,
         stop = stop,
         filename = lpeg.userdata.filename,
         source_code = lpeg.userdata.source_code
       }
-      local node = Types[key](node_id, value)
-      lpeg.userdata.tree_metadata[node] = lpeg.userdata.tree_metadata[node_id]
       return node
     end
     self[key] = make_node

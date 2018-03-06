@@ -21,9 +21,7 @@ colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 
-_Tuple = immutable(nil)
-Tuple = (t)->
-    return _Tuple(table.unpack(t))
+Tuple = immutable(nil, {name:"Tuple", __tostring:=> "Tuple(#{concat [repr(x) for x in *@], ", "})"})
 
 cached = (fn)->
     cache = setmetatable({}, {__mode:"k"})
@@ -59,15 +57,18 @@ lpeg.setmaxstack 10000 -- whoa
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 
 Types = {}
+type_tostring = =>
+    "#{@name}(#{concat [repr(x) for x in *@], ", "})"
 for t in *{"File", "Nomsu", "Block", "List", "FunctionCall", "Text", "Dict", "Number", "Word", "Var", "Comment"}
-    Types[t] = immutable({"id","value"}, {type:t, name:t})
+    Types[t] = immutable({"id","value"}, {type:t, name:t, __tostring:type_tostring})
 Types.DictEntry = immutable({"key","value"}, {name:"DictEntry"})
 Types.is_node = (n)->
     type(n) == 'userdata' and n.type
 
 NOMSU_DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
-    .Tuple = Tuple
+    .Tuple = (values)->
+        return Tuple(table.unpack(values))
     .DictEntry = (k,v) -> Types.DictEntry(k,v)
     .nl = P("\r")^-1 * P("\n")
     .ws = S(" \t")
@@ -189,6 +190,8 @@ class NomsuCompiler
             :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :pairs,
             :load, :ipairs,
         }
+        for k,v in pairs(Types) do @environment[k] = v
+        @environment.Tuple = Tuple
         @environment.ACTIONS = setmetatable({}, {__index:(key)=>
             error("Attempt to run undefined action: #{key}", 0)
         })
@@ -262,7 +265,7 @@ class NomsuCompiler
     get_line_number: cached (tree)=>
         metadata = @tree_metadata[tree]
         unless metadata
-            error "Failed to find metatdata for tree: #{tree}", 0
+            return "<dynamically generated>"
         unless @file_metadata[metadata.filename]
             error "Failed to find file metatdata for file: #{metadata.filename}", 0
         line_starts = @file_metadata[metadata.filename].line_starts
@@ -682,7 +685,8 @@ class NomsuCompiler
                 return statements:"--"..tree.value\gsub("\n","\n--")
             
             when "Nomsu"
-                return expr:"nomsu:parse(#{repr @get_source_code(tree.value)}, #{repr @get_line_number(tree.value)}).value[1]"
+                --return expr:"nomsu:parse(#{repr @get_source_code(tree.value)}, #{repr @get_line_number(tree.value)}).value[1]"
+                return expr:repr(tree.value)
 
             when "Block"
                 lua_bits = {}
@@ -892,9 +896,7 @@ class NomsuCompiler
                     else
                         new_values[i] = old_value
                 if is_changed
-                    new_tree = getmetatable(tree)(tree.id, Tuple(new_values))
-                    -- TODO: Maybe generate new metadata?
-                    @tree_metadata[new_tree] = @tree_metadata[tree]
+                    new_tree = getmetatable(tree)(tree.id, Tuple(table.unpack(new_values)))
                     return new_tree
                 
             when "Dict"
@@ -908,9 +910,7 @@ class NomsuCompiler
                     else
                         new_values[i] = e
                 if is_changed
-                    new_tree = getmetatable(tree)(tree.id, Tuple(new_values))
-                    -- TODO: Maybe generate new metadata?
-                    @tree_metadata[new_tree] = @tree_metadata[tree]
+                    new_tree = getmetatable(tree)(tree.id, Tuple(table.unpack(new_values)))
                     return new_tree
             when nil -- Raw table, probably from one of the .value of a multi-value tree (e.g. List)
                 error("Invalid tree: #{repr tree}")
@@ -1013,7 +1013,10 @@ class NomsuCompiler
         @define_compile_action "!! code location !!", get_line_no!, ->
             tree = nomsu.compilestack[#nomsu.compilestack-1]
             metadata = @tree_metadata[tree]
-            return expr: repr("#{metadata.filename}:#{metadata.start},#{metadata.stop}")
+            if metadata
+                return expr: repr("#{metadata.filename}:#{metadata.start},#{metadata.stop}")
+            else
+                return expr: repr("<dynamically generated>")
 
         @define_action "run file %filename", get_line_no!, (_filename)->
             return nomsu\run_file(_filename)
