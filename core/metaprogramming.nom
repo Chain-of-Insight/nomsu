@@ -32,7 +32,8 @@ immediately:
             end
             local lua_fn_args = table.concat(args, ", ");
             local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            local code_location = ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop);
+            local code_location = (metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
+                                   or "<dynamically generated>");
             return {statements=([[
         nomsu:define_compile_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
             ]]..body_code.."\\n"..[[
@@ -67,8 +68,8 @@ immediately:
             end
             local lua_fn_args = table.concat(args, ", ");
             local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            assert(def_metadata, "No metadata found for: "..tostring(nomsu.compilestack[#nomsu.compilestack]));
-            local code_location = ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop);
+            local code_location = (metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
+                                   or "<dynamically generated>");
             return {statements=[[
             nomsu:define_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
                 ]]..body_code.."\\n"..[[
@@ -100,7 +101,8 @@ immediately:
             for i, a in ipairs(args) do replacements[i] = a.."="..a; end
             replacements = "{"..table.concat(replacements, ", ").."}";
             local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            local code_location = ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop);
+            local code_location = (metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
+                                   or "<dynamically generated>");
             return {statements=[[
             nomsu:define_compile_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
                 local template = nomsu:parse(]]..template..[[, ]]..repr(def_metadata.filename)..[[);
@@ -175,7 +177,7 @@ immediately:
     compile [run %code] to {..}
         expr: ".."
             nomsu:run(\(%code as lua expr), '\
-                =lua "nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]].filename"
+                =lua "nomsu:get_line_number(nomsu.compilestack[#nomsu.compilestack])"
             ..')
     parse [enable debugging] as: lua> "nomsu.debug = true;"
     parse [disable debugging] as: lua> "nomsu.debug = false;"

@@ -23,11 +23,21 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local _Tuple = immutable(nil)
-local Tuple
-Tuple = function(t)
-  return _Tuple(table.unpack(t))
-end
+local Tuple = immutable(nil, {
+  name = "Tuple",
+  __tostring = function(self)
+    return "Tuple(" .. tostring(concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #self do
+        local x = self[_index_0]
+        _accum_0[_len_0] = repr(x)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ")) .. ")"
+  end
+})
 local cached
 cached = function(fn)
   local cache = setmetatable({ }, {
@@ -59,6 +69,19 @@ lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt
 P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
 local Types = { }
+local type_tostring
+type_tostring = function(self)
+  return tostring(self.name) .. "(" .. tostring(concat((function()
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _index_0 = 1, #self do
+      local x = self[_index_0]
+      _accum_0[_len_0] = repr(x)
+      _len_0 = _len_0 + 1
+    end
+    return _accum_0
+  end)(), ", ")) .. ")"
+end
 local _list_0 = {
   "File",
   "Nomsu",
@@ -79,7 +102,8 @@ for _index_0 = 1, #_list_0 do
     "value"
   }, {
     type = t,
-    name = t
+    name = t,
+    __tostring = type_tostring
   })
 end
 Types.DictEntry = immutable({
@@ -94,7 +118,9 @@ end
 local NOMSU_DEFS
 do
   local _with_0 = { }
-  _with_0.Tuple = Tuple
+  _with_0.Tuple = function(values)
+    return Tuple(table.unpack(values))
+  end
   _with_0.DictEntry = function(k, v)
     return Types.DictEntry(k, v)
   end
@@ -185,13 +211,14 @@ setmetatable(NOMSU_DEFS, {
       if type(value) == 'table' then
         error(value)
       end
-      local node = Types[key](node_id, value)
-      lpeg.userdata.tree_metadata[node] = {
+      lpeg.userdata.tree_metadata[node_id] = {
         start = start,
         stop = stop,
         filename = lpeg.userdata.filename,
         source_code = lpeg.userdata.source_code
       }
+      local node = Types[key](node_id, value)
+      lpeg.userdata.tree_metadata[node] = lpeg.userdata.tree_metadata[node_id]
       return node
     end
     self[key] = make_node
@@ -340,7 +367,7 @@ do
     get_line_number = cached(function(self, tree)
       local metadata = self.tree_metadata[tree]
       if not (metadata) then
-        error("Failed to find metatdata for tree: " .. tostring(tree), 0)
+        return "<dynamically generated>"
       end
       if not (self.file_metadata[metadata.filename]) then
         error("Failed to find file metatdata for file: " .. tostring(metadata.filename), 0)
@@ -962,7 +989,7 @@ do
         }
       elseif "Nomsu" == _exp_0 then
         return {
-          expr = "nomsu:parse(" .. tostring(repr(self:get_source_code(tree.value))) .. ", " .. tostring(repr(self:get_line_number(tree.value))) .. ").value[1]"
+          expr = repr(tree.value)
         }
       elseif "Block" == _exp_0 then
         local lua_bits = { }
@@ -1303,8 +1330,7 @@ do
           end
         end
         if is_changed then
-          local new_tree = getmetatable(tree)(tree.id, Tuple(new_values))
-          self.tree_metadata[new_tree] = self.tree_metadata[tree]
+          local new_tree = getmetatable(tree)(tree.id, Tuple(table.unpack(new_values)))
           return new_tree
         end
       elseif "Dict" == _exp_0 then
@@ -1320,8 +1346,7 @@ do
           end
         end
         if is_changed then
-          local new_tree = getmetatable(tree)(tree.id, Tuple(new_values))
-          self.tree_metadata[new_tree] = self.tree_metadata[tree]
+          local new_tree = getmetatable(tree)(tree.id, Tuple(table.unpack(new_values)))
           return new_tree
         end
       elseif nil == _exp_0 then
@@ -1478,9 +1503,15 @@ do
       self:define_compile_action("!! code location !!", get_line_no(), function()
         local tree = nomsu.compilestack[#nomsu.compilestack - 1]
         local metadata = self.tree_metadata[tree]
-        return {
-          expr = repr(tostring(metadata.filename) .. ":" .. tostring(metadata.start) .. "," .. tostring(metadata.stop))
-        }
+        if metadata then
+          return {
+            expr = repr(tostring(metadata.filename) .. ":" .. tostring(metadata.start) .. "," .. tostring(metadata.stop))
+          }
+        else
+          return {
+            expr = repr("<dynamically generated>")
+          }
+        end
       end)
       self:define_action("run file %filename", get_line_no(), function(_filename)
         return nomsu:run_file(_filename)
@@ -1568,6 +1599,10 @@ do
         load = load,
         ipairs = ipairs
       }
+      for k, v in pairs(Types) do
+        self.environment[k] = v
+      end
+      self.environment.Tuple = Tuple
       self.environment.ACTIONS = setmetatable({ }, {
         __index = function(self, key)
           return error("Attempt to run undefined action: " .. tostring(key), 0)
