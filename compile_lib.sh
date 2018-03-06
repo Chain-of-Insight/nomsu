@@ -13,7 +13,7 @@ done
 if [ "$FLUSH" = true ] ; then
     rm core/*.lua
     rm lib/*.lua
-    rm tests/*.lua
+    #rm tests/*.lua
 fi
 
 for file in core/*.nom; do
@@ -26,8 +26,8 @@ for file in lib/*.nom; do
     ./nomsu.moon -c $file
     echo "done."
 done
-for file in tests/*.nom; do
-    printf "Compiling $file ..."
-    ./nomsu.moon -c $file
-    echo "done."
-done
+#for file in tests/*.nom; do
+#    printf "Compiling $file ..."
+#    ./nomsu.moon -c $file
+#    echo "done."
+#done
