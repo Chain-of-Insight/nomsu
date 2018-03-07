@@ -23,21 +23,6 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local Tuple = immutable(nil, {
-  name = "Tuple",
-  __tostring = function(self)
-    return "Tuple(" .. tostring(concat((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      for _index_0 = 1, #self do
-        local x = self[_index_0]
-        _accum_0[_len_0] = repr(x)
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)(), ", ")) .. ")"
-  end
-})
 do
   local STRING_METATABLE = getmetatable("")
   STRING_METATABLE.__add = function(self, other)
@@ -70,6 +55,9 @@ type_tostring = function(self)
     return _accum_0
   end)(), ", ")) .. ")"
 end
+local Tuple = immutable(nil, {
+  name = "Tuple"
+})
 local _list_0 = {
   "File",
   "Nomsu",

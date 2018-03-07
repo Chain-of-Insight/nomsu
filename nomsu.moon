@@ -21,8 +21,6 @@ colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 
-Tuple = immutable(nil, {name:"Tuple", __tostring:=> "Tuple(#{concat [repr(x) for x in *@], ", "})"})
-
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
 -- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
 -- Note: This globally affects all strings in this instance of Lua!
@@ -52,6 +50,7 @@ lpeg.setmaxstack 10000 -- whoa
 Types = {}
 type_tostring = =>
     "#{@name}(#{concat [repr(x) for x in *@], ", "})"
+Tuple = immutable(nil, {name:"Tuple"})
 for t in *{"File", "Nomsu", "Block", "List", "FunctionCall", "Text", "Dict", "Number", "Word", "Var", "Comment"}
     Types[t] = immutable({"id","value"}, {type:t, name:t, __tostring:type_tostring})
 Types.DictEntry = immutable({"key","value"}, {name:"DictEntry"})
