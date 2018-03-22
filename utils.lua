@@ -30,6 +30,8 @@ local max = math.max
 local _quote_patt = re.compile("(({'\n' / '\"' / \"'\" / '\\'}->mark_char) / (']' ({'='*}->mark_eq) (']' / !.)) / .)*",
     {mark_char=function(q)
         if q == "\n" or q == "\\" then
+            _quote_state["'"] = false
+            _quote_state['"'] = false
             if _quote_state.min_eq == nil then
                 _quote_state.min_eq = 0
             end
@@ -74,9 +76,9 @@ local function repr(x, depth)
         end
         _quote_state = {}
         _quote_patt:match(x)
-        if _quote_state["'"] ~= false and _quote_state.min_eq == nil then
+        if _quote_state["'"] ~= false then
             return "\'" .. x .. "\'"
-        elseif _quote_state['"'] ~= false and _quote_state.min_eq == nil then
+        elseif _quote_state['"'] ~= false then
             return "\"" .. x .. "\""
         else
             local eq = ("="):rep(_quote_state.min_eq or 0)
