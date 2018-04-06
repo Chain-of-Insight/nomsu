@@ -589,6 +589,18 @@ do
             end
           end
           return buff
+        elseif "IndexChain" == _exp_0 then
+          local bits = { }
+          local _list_1 = tok.value
+          for _index_0 = 1, #_list_1 do
+            local bit = _list_1[_index_0]
+            local nomsu = inline_expression(bit)
+            if not (nomsu) then
+              return nil
+            end
+            insert(bits, nomsu)
+          end
+          return concat(bits, ".")
         elseif "List" == _exp_0 then
           local bits = { }
           local _list_1 = tok.value
@@ -691,6 +703,8 @@ do
             return nil
           end
           return "(..)\n    " .. self:indent(nomsu)
+        elseif "IndexChain" == _exp_0 then
+          return nil
         elseif "List" == _exp_0 then
           local buff = "[..]"
           local line = "\n    "
@@ -762,7 +776,7 @@ do
                 return nil
               end
               buff = buff .. (function()
-                if bit.type == "Var" or bit.type == "List" or bit.type == "Dict" then
+                if bit.type == "Var" or bit.type == "List" or bit.type == "Dict" or bit.type == "IndexChain" then
                   return "\\" .. nomsu
                 else
                   return "\\(" .. nomsu .. ")"
@@ -967,24 +981,6 @@ do
         return {
           expr = repr(tree.value)
         }
-      elseif "IndexChain" == _exp_0 then
-        local items = { }
-        for i, item in ipairs(tree.value) do
-          local lua = self:tree_to_lua(item)
-          if not (lua.expr) then
-            local line = self:get_line_number(item)
-            local src = self:get_source_code(item)
-            error(tostring(line) .. ": Cannot index " .. tostring(colored.yellow(src)) .. ", since it's not an expression.", 0)
-          end
-          if i == 1 then
-            insert(items, "(" .. tostring(lua.expr) .. ")")
-          else
-            insert(items, "[ " .. tostring(lua.expr) .. "]")
-          end
-        end
-        return {
-          expr = concat(items, "")
-        }
       elseif "Block" == _exp_0 then
         local lua_bits = { }
         local locals = { }
@@ -1186,6 +1182,24 @@ do
             expr = "(" .. tostring(concat(concat_parts, "..")) .. ")"
           }
         end
+      elseif "IndexChain" == _exp_0 then
+        local items = { }
+        for i, item in ipairs(tree.value) do
+          local lua = self:tree_to_lua(item)
+          if not (lua.expr) then
+            local line = self:get_line_number(item)
+            local src = self:get_source_code(item)
+            error(tostring(line) .. ": Cannot index " .. tostring(colored.yellow(src)) .. ", since it's not an expression.", 0)
+          end
+          if i == 1 then
+            insert(items, "(" .. tostring(lua.expr) .. ")")
+          else
+            insert(items, "[ " .. tostring(lua.expr) .. "]")
+          end
+        end
+        return {
+          expr = concat(items, "")
+        }
       elseif "List" == _exp_0 then
         local items = { }
         local _list_1 = tree.value
@@ -1259,7 +1273,7 @@ do
         return 
       end
       local _exp_0 = tree.type
-      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
+      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
         local _list_1 = tree.value
         for _index_0 = 1, #_list_1 do
           local v = _list_1[_index_0]
@@ -1312,7 +1326,7 @@ do
         return replacement
       end
       local _exp_0 = tree.type
-      if "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 then
+      if "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
         local new_values, is_changed = { }, false
         for i, old_value in ipairs(tree.value) do
           local new_value = type(old_value) ~= "string" and self:tree_map(old_value, fn) or nil

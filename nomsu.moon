@@ -439,6 +439,13 @@ class NomsuCompiler
                                 "("..nomsu..")"
                             else nomsu
                     return buff
+                when "IndexChain"
+                    bits = {}
+                    for bit in *tok.value
+                        nomsu = inline_expression bit
+                        return nil unless nomsu
+                        insert bits, nomsu
+                    return concat(bits, ".")
                 when "List"
                     bits = {}
                     for bit in *tok.value
@@ -498,6 +505,8 @@ class NomsuCompiler
                     nomsu = expression(tok)
                     return nil unless nomsu
                     return "(..)\n    "..@indent(nomsu)
+                when "IndexChain"
+                    return nil
                 when "List"
                     buff = "[..]"
                     line = "\n    "
@@ -548,7 +557,7 @@ class NomsuCompiler
                         else
                             nomsu = inline_expression(bit)
                             return nil unless nomsu
-                            buff ..= if bit.type == "Var" or bit.type == "List" or bit.type == "Dict"
+                            buff ..= if bit.type == "Var" or bit.type == "List" or bit.type == "Dict" or bit.type == "IndexChain"
                                 "\\"..nomsu
                             else "\\("..nomsu..")"
                     return buff
@@ -680,20 +689,6 @@ class NomsuCompiler
                 --return expr:"nomsu:parse(#{repr @get_source_code(tree.value)}, #{repr @get_line_number(tree.value)}).value[1]"
                 return expr:repr(tree.value)
 
-            when "IndexChain"
-                items = {}
-                for i, item in ipairs(tree.value)
-                    lua = @tree_to_lua item
-                    unless lua.expr
-                        line = @get_line_number(item)
-                        src = @get_source_code(item)
-                        error "#{line}: Cannot index #{colored.yellow src}, since it's not an expression.", 0
-                    if i == 1
-                        insert items, "(#{lua.expr})"
-                    else
-                        insert items, "[ #{lua.expr}]"
-                return expr:concat(items,"")
-
             when "Block"
                 lua_bits = {}
                 locals = {}
@@ -791,6 +786,21 @@ class NomsuCompiler
                     return expr:concat_parts[1]
                 else return expr:"(#{concat(concat_parts, "..")})"
 
+            when "IndexChain"
+                items = {}
+                for i, item in ipairs(tree.value)
+                    lua = @tree_to_lua item
+                    unless lua.expr
+                        line = @get_line_number(item)
+                        src = @get_source_code(item)
+                        error "#{line}: Cannot index #{colored.yellow src}, since it's not an expression.", 0
+                    -- TODO: improve generated code by removing parens and square brackets when possible
+                    if i == 1
+                        insert items, "(#{lua.expr})"
+                    else
+                        insert items, "[ #{lua.expr}]"
+                return expr:concat(items,"")
+
             when "List"
                 items = {}
                 for item in *tree.value
@@ -840,7 +850,7 @@ class NomsuCompiler
         coroutine.yield(tree, depth)
         return unless Types.is_node(tree)
         switch tree.type
-            when "List", "File", "Block", "FunctionCall", "Text"
+            when "List", "File", "Block", "FunctionCall", "Text", "IndexChain"
                 for v in *tree.value
                     @walk_tree(v, depth+1)
             when "Dict"
@@ -892,7 +902,7 @@ class NomsuCompiler
         if replacement != nil
             return replacement
         switch tree.type
-            when "File", "Nomsu", "Block", "List", "FunctionCall", "Text"
+            when "File", "Nomsu", "Block", "List", "FunctionCall", "Text", "IndexChain"
                 new_values, is_changed = {}, false
                 for i,old_value in ipairs(tree.value)
                     new_value = type(old_value) != "string" and @tree_map(old_value, fn) or nil

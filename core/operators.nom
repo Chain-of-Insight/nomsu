@@ -11,24 +11,10 @@ immediately:
         It's also critical to have parens around %obj, otherwise Lua is too dumb to
         realize that {x=1}["x"] is the same as ({x=1})["x"] or that
         {x=1}.x is the same as ({x=1}).x
-    compile [..]
+    parse [..]
         %obj' %key, %obj's %key, %key in %obj, %key'th in %obj, %key of %obj,
         %key st in %obj, %key nd in %obj, %key rd in %obj, %key th in %obj,
-    ..to:
-        lua> ".."
-            local obj_lua = \(%obj as lua expr);
-            if not obj_lua:sub(-1,-1):match("[a-zA-Z)]") then
-                obj_lua = "("..obj_lua..")";
-            end
-            local key_lua = \(%key as lua expr);
-            local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
-                           or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
-            if key_attr then
-                return {expr=obj_lua.."."..key_attr};
-            elseif key_lua:sub(1,1) == "[" then
-                key_lua = " "..key_lua.." ";
-            end
-            return {expr=obj_lua.."["..key_lua.."]"};
+    ..as: %obj.%key
 
 # Comparison Operators
 immediately:
