@@ -69,7 +69,8 @@ local _list_0 = {
   "Number",
   "Word",
   "Var",
-  "Comment"
+  "Comment",
+  "IndexChain"
 }
 for _index_0 = 1, #_list_0 do
   local t = _list_0[_index_0]
@@ -185,7 +186,7 @@ setmetatable(NOMSU_DEFS, {
     make_node = function(start, value, stop)
       node_id = node_id + 1
       if type(value) == 'table' then
-        error(value)
+        error("Not a tuple: " .. tostring(repr(value)))
       end
       local node = Types[key](node_id, value)
       lpeg.userdata.tree_metadata[node] = {
@@ -965,6 +966,24 @@ do
       elseif "Nomsu" == _exp_0 then
         return {
           expr = repr(tree.value)
+        }
+      elseif "IndexChain" == _exp_0 then
+        local items = { }
+        for i, item in ipairs(tree.value) do
+          local lua = self:tree_to_lua(item)
+          if not (lua.expr) then
+            local line = self:get_line_number(item)
+            local src = self:get_source_code(item)
+            error(tostring(line) .. ": Cannot index " .. tostring(colored.yellow(src)) .. ", since it's not an expression.", 0)
+          end
+          if i == 1 then
+            insert(items, "(" .. tostring(lua.expr) .. ")")
+          else
+            insert(items, "[ " .. tostring(lua.expr) .. "]")
+          end
+        end
+        return {
+          expr = concat(items, "")
         }
       elseif "Block" == _exp_0 then
         local lua_bits = { }
@@ -1798,6 +1817,7 @@ if arg and debug.getinfo(2).func ~= require then
     end
     return os.exit(false, true)
   end
-  xpcall(run, err_hand)
+  local ldt = require('ldt')
+  ldt.guard(run)
 end
 return NomsuCompiler

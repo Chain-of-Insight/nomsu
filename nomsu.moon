@@ -51,7 +51,7 @@ Types = {}
 type_tostring = =>
     "#{@name}(#{concat [repr(x) for x in *@], ", "})"
 Tuple = immutable(nil, {name:"Tuple"})
-for t in *{"File", "Nomsu", "Block", "List", "FunctionCall", "Text", "Dict", "Number", "Word", "Var", "Comment"}
+for t in *{"File", "Nomsu", "Block", "List", "FunctionCall", "Text", "Dict", "Number", "Word", "Var", "Comment", "IndexChain"}
     Types[t] = immutable({"id","value"}, {type:t, name:t, __tostring:type_tostring})
 Types.DictEntry = immutable({"key","value"}, {name:"DictEntry"})
 Types.is_node = (n)->
@@ -125,7 +125,7 @@ node_id = 0
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop)->
         node_id = node_id + 1
-        if type(value) == 'table' then error(value)-- = Tuple(value)
+        if type(value) == 'table' then error("Not a tuple: #{repr value}")-- = Tuple(value)
         node = Types[key](node_id, value)
         lpeg.userdata.tree_metadata[node] = {
             :start,:stop,filename:lpeg.userdata.filename,source_code:lpeg.userdata.source_code
@@ -680,6 +680,20 @@ class NomsuCompiler
                 --return expr:"nomsu:parse(#{repr @get_source_code(tree.value)}, #{repr @get_line_number(tree.value)}).value[1]"
                 return expr:repr(tree.value)
 
+            when "IndexChain"
+                items = {}
+                for i, item in ipairs(tree.value)
+                    lua = @tree_to_lua item
+                    unless lua.expr
+                        line = @get_line_number(item)
+                        src = @get_source_code(item)
+                        error "#{line}: Cannot index #{colored.yellow src}, since it's not an expression.", 0
+                    if i == 1
+                        insert items, "(#{lua.expr})"
+                    else
+                        insert items, "[ #{lua.expr}]"
+                return expr:concat(items,"")
+
             when "Block"
                 lua_bits = {}
                 locals = {}
@@ -1145,6 +1159,8 @@ if arg and debug.getinfo(2).func != require
 
     -- Note: xpcall has a slightly different API in Lua <=5.1 vs. >=5.2, but this works
     -- for both APIs
-    xpcall(run, err_hand)
+    ldt = require 'ldt'
+    ldt.guard run
+    --xpcall(run, err_hand)
 
 return NomsuCompiler

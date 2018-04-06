@@ -18,9 +18,15 @@ indented_block (Block):
 inline_nomsu (Nomsu): "\" inline_expression
 indented_nomsu (Nomsu): "\" expression
 
-inline_expression:
+index_chain (IndexChain):
+    {| noindex_inline_expression ("." ((({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / noindex_inline_expression))+ |} -> Tuple
+
+noindex_inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
     / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")")
+
+inline_expression:
+    index_chain / noindex_inline_expression 
 indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict / indented_block
 expression:
