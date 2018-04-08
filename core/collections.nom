@@ -62,8 +62,8 @@ immediately:
 # List Comprehension
 immediately:
     compile [%expression for %item in %iterable] to:
-        assume ((%item's "type") is "Var") or barf ".."
-            List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
+        assume (%item.type is "Var") or barf ".."
+            List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item.type)
         return {..}
             expr:".."
                 (function()
@@ -79,8 +79,8 @@ immediately:
         %expression for %index from %start to %stop via %step
         %expression for %index from %start to %stop by %step
     ..to:
-        assume ((%index's "type") is "Var") or barf ".."
-            List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%index's "type")
+        assume (%index.type is "Var") or barf ".."
+            List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%index.type)
         return {..}
             expr:".."
                 (function()
@@ -99,10 +99,10 @@ immediately:
     parse [%expression for all %start to %stop] as: %expression for all %start to %stop via 1
 
     compile [%expression for %key = %value in %iterable] to:
-        assume ((%key's "type") is "Var") or barf ".."
-            List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key's "type")
-        assume ((%value's "type") is "Var") or barf ".."
-            List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value's "type")
+        assume (%key.type is "Var") or barf ".."
+            List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key.type)
+        assume (%value.type is "Var") or barf ".."
+            List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value.type)
         return {..}
             expr: ".."
                 (function()
@@ -116,8 +116,8 @@ immediately:
 # Dict comprehensions
 immediately:
     compile [%key = %value for %item in %iterable] to:
-        assume ((%item's "type") is "Var") or barf ".."
-            Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item's "type")
+        assume (%item.type is "Var") or barf ".."
+            Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item.type)
         # Note: it's important to have the space after "[" to prevent confusion if %key is a string
         return {..}
             expr: ".."
@@ -131,10 +131,10 @@ immediately:
     parse [%key = %value for all %iterable] as: %key = %value for % in %iterable
 
     compile [%key = %value for %src_key = %src_value in %iterable] to:
-        assume ((%src_key's "type") is "Var") or barf ".."
-            Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key's "type")
-        assume ((%src_value's "type") is "Var") or barf ".."
-            Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value's "type")
+        assume (%src_key.type is "Var") or barf ".."
+            Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key.type)
+        assume (%src_value.type is "Var") or barf ".."
+            Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value.type)
         # Note: it's important to have the space after "[" to prevent confusion if %key is a string
         return {..}
             expr: ".."

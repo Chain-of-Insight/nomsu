@@ -48,11 +48,11 @@ immediately:
 immediately:
     compile [%var <- %value] to:
         lua> "local \%var_lua = nomsu:tree_to_lua(\%var);"
-        assume (%var_lua's "expr") or barf "Invalid target for assignment: \(%var's source code)"
+        assume %var_lua.expr or barf "Invalid target for assignment: \(%var's source code)"
         lua> "local \%value_lua = nomsu:tree_to_lua(\%value);"
-        assume (%value_lua's "expr") or barf "Invalid value for assignment: \(%value's source code)"
+        assume %value_lua.expr or barf "Invalid value for assignment: \(%value's source code)"
         return {..}
-            statements:"\(%var_lua's "expr") = \(%value_lua's "expr");"
+            statements:"\(%var_lua.expr) = \(%value_lua.expr);"
             locals: =lua "(\%var.type == 'Var' and {\%var_lua.expr} or nil)"
 
 immediately:
@@ -82,15 +82,15 @@ immediately:
 immediately:
     compile [export %var <- %value] to:
         %var_lua <- (%var as lua)
-        assume (%var_lua's "expr") or barf "Invalid target for assignment: \(%var's source code)"
+        assume %var_lua.expr or barf "Invalid target for assignment: \(%var's source code)"
         %value_lua <- (%value as lua)
-        assume (%value_lua's "expr") or barf "Invalid value for assignment: \(%value's source code)"
-        return {statements:"\(%var_lua's "expr") = \(%value_lua's "expr");"}
+        assume %value_lua.expr or barf "Invalid value for assignment: \(%value's source code)"
+        return {statements:"\(%var_lua.expr) = \(%value_lua.expr);"}
 
     compile [exporting %exported %body] to:
         %body_lua <- (%body as lua)
         %leftover_locals <- (=lua "{unpack(\%body_lua.locals or {})}")
-        assume ((%exported's "type") = "List") or barf ".."
+        assume (%exported.type = "List") or barf ".."
             Expected a List for the export part of 'exporting' statement, not \(%exported's source code)
         lua> ".."
             for i, item in ipairs(\%exported.value) do
