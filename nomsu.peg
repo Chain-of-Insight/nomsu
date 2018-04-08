@@ -15,8 +15,9 @@ indented_block (Block):
         (dedent / (("" -> "Error while parsing block") => error))
     |} -> Tuple
 
-inline_nomsu (Nomsu): "\" inline_expression
-indented_nomsu (Nomsu): "\" expression
+inline_nomsu (Nomsu): "\" noindex_inline_expression
+indented_nomsu (Nomsu):
+    "\" (noindex_inline_expression / (":" %ws* (inline_functioncall / inline_expression) eol) / indented_expression)
 
 index_chain (IndexChain):
     {| noindex_inline_expression ("." ((({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / noindex_inline_expression))+ |} -> Tuple
@@ -30,7 +31,7 @@ inline_expression:
 indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict / indented_block
 expression:
-    inline_expression / (":" %ws* (inline_functioncall / inline_expression)) / indented_expression
+    inline_expression / (":" %ws* (inline_functioncall / inline_expression) eol) / indented_expression
 
 -- Function calls need at least one word in them
 inline_functioncall (FunctionCall):

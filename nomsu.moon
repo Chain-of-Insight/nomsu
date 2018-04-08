@@ -557,7 +557,7 @@ class NomsuCompiler
                         else
                             nomsu = inline_expression(bit)
                             return nil unless nomsu
-                            buff ..= if bit.type == "Var" or bit.type == "List" or bit.type == "Dict" or bit.type == "IndexChain"
+                            buff ..= if bit.type == "Var" or bit.type == "List" or bit.type == "Dict"
                                 "\\"..nomsu
                             else "\\("..nomsu..")"
                     return buff
@@ -796,9 +796,18 @@ class NomsuCompiler
                         error "#{line}: Cannot index #{colored.yellow src}, since it's not an expression.", 0
                     -- TODO: improve generated code by removing parens and square brackets when possible
                     if i == 1
-                        insert items, "(#{lua.expr})"
+                        if lua.expr\sub(-1,-1) == "}" or lua.expr\sub(-1,-1) == '"'
+                            insert items, "(#{lua.expr})"
+                        else
+                            insert items, lua.expr
                     else
-                        insert items, "[ #{lua.expr}]"
+                        -- NOTE: this *must* use a space after the [ to avoid freaking out
+                        -- Lua's parser if the inner expression is a long string. Lua
+                        -- parses x[[[y]]] as x("[y]"), not as x["y"]
+                        if item.type == 'Text' and #item.value == 1 and type(item.value[1]) == 'string' and item.value[1]\match("^[a-zA-Z_][a-zA-Z0-9_]$")
+                            insert items, ".#{item.value[1]}"
+                        else
+                            insert items, "[ #{lua.expr}]"
                 return expr:concat(items,"")
 
             when "List"
@@ -1169,6 +1178,7 @@ if arg and debug.getinfo(2).func != require
 
     -- Note: xpcall has a slightly different API in Lua <=5.1 vs. >=5.2, but this works
     -- for both APIs
+    -- TODO: revert back to old error handler
     ldt = require 'ldt'
     ldt.guard run
     --xpcall(run, err_hand)

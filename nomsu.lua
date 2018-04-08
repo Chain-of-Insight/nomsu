@@ -776,7 +776,7 @@ do
                 return nil
               end
               buff = buff .. (function()
-                if bit.type == "Var" or bit.type == "List" or bit.type == "Dict" or bit.type == "IndexChain" then
+                if bit.type == "Var" or bit.type == "List" or bit.type == "Dict" then
                   return "\\" .. nomsu
                 else
                   return "\\(" .. nomsu .. ")"
@@ -1192,9 +1192,17 @@ do
             error(tostring(line) .. ": Cannot index " .. tostring(colored.yellow(src)) .. ", since it's not an expression.", 0)
           end
           if i == 1 then
-            insert(items, "(" .. tostring(lua.expr) .. ")")
+            if lua.expr:sub(-1, -1) == "}" or lua.expr:sub(-1, -1) == '"' then
+              insert(items, "(" .. tostring(lua.expr) .. ")")
+            else
+              insert(items, lua.expr)
+            end
           else
-            insert(items, "[ " .. tostring(lua.expr) .. "]")
+            if item.type == 'Text' and #item.value == 1 and type(item.value[1]) == 'string' and item.value[1]:match("^[a-zA-Z_][a-zA-Z0-9_]$") then
+              insert(items, "." .. tostring(item.value[1]))
+            else
+              insert(items, "[ " .. tostring(lua.expr) .. "]")
+            end
           end
         end
         return {

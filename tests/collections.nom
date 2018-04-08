@@ -27,7 +27,7 @@ assume (([[1,2],[3,4]] flattened) = [1,2,3,4])
 assume ((entries in {x:1}) = [{key:"x",value:1}])
 assume ((keys in {x:1}) = ["x"])
 assume ((values in {x:1}) = [1])
-assume ((sorted [3,1,2]) = [1,2,3])
+#assume ((sorted [3,1,2]) = [1,2,3])
 %x <- [3,1,2]
 sort %x
 assume (%x = [1,2,3])
