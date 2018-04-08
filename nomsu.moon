@@ -794,20 +794,22 @@ class NomsuCompiler
                         line = @get_line_number(item)
                         src = @get_source_code(item)
                         error "#{line}: Cannot index #{colored.yellow src}, since it's not an expression.", 0
-                    -- TODO: improve generated code by removing parens and square brackets when possible
                     if i == 1
                         if lua.expr\sub(-1,-1) == "}" or lua.expr\sub(-1,-1) == '"'
                             insert items, "(#{lua.expr})"
                         else
                             insert items, lua.expr
                     else
-                        -- NOTE: this *must* use a space after the [ to avoid freaking out
-                        -- Lua's parser if the inner expression is a long string. Lua
-                        -- parses x[[[y]]] as x("[y]"), not as x["y"]
                         if item.type == 'Text' and #item.value == 1 and type(item.value[1]) == 'string' and item.value[1]\match("^[a-zA-Z_][a-zA-Z0-9_]$")
                             insert items, ".#{item.value[1]}"
                         else
-                            insert items, "[ #{lua.expr}]"
+                            -- NOTE: this *must* use a space after the [ to avoid freaking out
+                            -- Lua's parser if the inner expression is a long string. Lua
+                            -- parses x[[[y]]] as x("[y]"), not as x["y"]
+                            if lua.expr\sub(1,1) == '['
+                                insert items, "[ #{lua.expr}]"
+                            else
+                                insert items, "[#{lua.expr}]"
                 return expr:concat(items,"")
 
             when "List"
@@ -841,6 +843,9 @@ class NomsuCompiler
                     if key_str
                         insert items, "#{key_str}=#{value_lua.expr}"
                     elseif key_lua.expr\sub(1,1) == "["
+                        -- NOTE: this *must* use a space after the [ to avoid freaking out
+                        -- Lua's parser if the inner expression is a long string. Lua
+                        -- parses x[[[y]]] as x("[y]"), not as x["y"]
                         insert items, "[ #{key_lua.expr}]=#{value_lua.expr}"
                     else
                         insert items, "[#{key_lua.expr}]=#{value_lua.expr}"
