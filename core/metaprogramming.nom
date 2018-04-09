@@ -32,7 +32,7 @@ immediately:
             end
             local lua_fn_args = table.concat(args, ", ");
             local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            local code_location = (metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
+            local code_location = (def_metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
                                    or "<dynamically generated>");
             return {statements=([[
         nomsu:define_compile_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
@@ -68,7 +68,7 @@ immediately:
             end
             local lua_fn_args = table.concat(args, ", ");
             local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            local code_location = (metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
+            local code_location = (def_metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
                                    or "<dynamically generated>");
             return {statements=[[
             nomsu:define_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
@@ -101,7 +101,7 @@ immediately:
             for i, a in ipairs(args) do replacements[i] = a.."="..a; end
             replacements = "{"..table.concat(replacements, ", ").."}";
             local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            local code_location = (metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
+            local code_location = (def_metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
                                    or "<dynamically generated>");
             return {statements=[[
             nomsu:define_compile_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)

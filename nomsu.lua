@@ -1,3 +1,4 @@
+local log = io.open('output.log', 'w')
 local lfs = require('lfs')
 local re = require('re')
 local lpeg = require('lpeg')
@@ -23,6 +24,7 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
+local debug_getinfo = debug.getinfo
 do
   local STRING_METATABLE = getmetatable("")
   STRING_METATABLE.__add = function(self, other)
@@ -236,7 +238,7 @@ do
       end
       local stubs = self:get_stubs_from_signature(signature)
       local stub_args = self:get_args_from_signature(signature)
-      local fn_info = debug.getinfo(fn, "u")
+      local fn_info = debug_getinfo(fn, "u")
       local fn_arg_positions, arg_orders
       if not (fn_info.isvararg) then
         do
@@ -1467,7 +1469,7 @@ do
     initialize_core = function(self)
       local get_line_no
       get_line_no = function()
-        return "nomsu.moon:" .. tostring(debug.getinfo(2).currentline)
+        return "nomsu.moon:" .. tostring(debug_getinfo(2).currentline)
       end
       local nomsu = self
       local nomsu_string_as_lua
@@ -1681,7 +1683,7 @@ do
   var_pattern = re.compile("{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs)
   NomsuCompiler = _class_0
 end
-if arg and debug.getinfo(2).func ~= require then
+if arg and debug_getinfo(2).func ~= require then
   colors = require('consolecolors')
   local parser = re.compile([[        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)
@@ -1698,6 +1700,66 @@ if arg and debug.getinfo(2).func ~= require then
     os.exit()
   end
   local nomsu = NomsuCompiler()
+  local ok, to_lua = pcall(function()
+    return require('moonscript.base').to_lua
+  end)
+  if not ok then
+    to_lua = nil
+  end
+  local files = setmetatable({ }, {
+    __index = function(self, filename)
+      local file = io.open(filename)
+      local source = file:read("*a")
+      file:close()
+      self[filename] = source
+      return source
+    end
+  })
+  local moonscript_line_tables = setmetatable({ }, {
+    __index = function(self, filename)
+      if not (to_lua) then
+        return nil
+      end
+      local _, line_table = to_lua(files[filename])
+      self[filename] = line_table
+      return line_table
+    end
+  })
+  debug.getinfo = function(...)
+    local info = debug_getinfo(...)
+    if not info or not info.func then
+      return info
+    end
+    do
+      local metadata = nomsu.action_metadata[info.func]
+      if metadata then
+        info.name = metadata.aliases[1]
+        local filename, start, stop = metadata.source:match("([^:]*):([0-9]*),([0-9]*)")
+        if filename then
+          local file = files[filename]
+          local line_no = 1
+          for _ in file:sub(1, tonumber(start)):gmatch("\n") do
+            line_no = line_no + 1
+          end
+          log:write("short_src " .. tostring(info.short_src) .. " -> " .. tostring(filename) .. "\n")
+          info.short_src, info.linedefined = filename, line_no
+          info.currentline = line_no
+          info.source = file
+        else
+          info.source = "@" .. metadata.source
+        end
+        local name = colored.bright(colored.yellow(metadata.aliases[1]))
+      else
+        log:write("SHORT SRC: " .. tostring(info.short_src) .. "\n")
+        if info.short_src and info.short_src:match("^.*%.moon$") then
+          local line_table = moonscript_line_tables[info.short_src]
+          local file = files[info.short_src]
+          info.source = file or info.source
+        end
+      end
+    end
+    return info
+  end
   local run
   run = function()
     if args.flags["-v"] then
@@ -1750,7 +1812,8 @@ if arg and debug.getinfo(2).func ~= require then
         if #buff == 0 then
           break
         end
-        local ok, ret = pcall(function()
+        local ret
+        ok, ret = pcall(function()
           return nomsu:run(buff, "stdin")
         end)
         if ok and ret ~= nil then
@@ -1765,7 +1828,7 @@ if arg and debug.getinfo(2).func ~= require then
   err_hand = function(error_message)
     print(tostring(colored.red("ERROR:")) .. " " .. tostring(colored.bright(colored.yellow(colored.onred((error_message or ""))))))
     print("stack traceback:")
-    local ok, to_lua = pcall(function()
+    ok, to_lua = pcall(function()
       return require('moonscript.base').to_lua
     end)
     if not ok then
@@ -1781,7 +1844,7 @@ if arg and debug.getinfo(2).func ~= require then
     while true do
       local _continue_0 = false
       repeat
-        local calling_fn = debug.getinfo(level)
+        local calling_fn = debug_getinfo(level)
         if not calling_fn then
           break
         end
