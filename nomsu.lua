@@ -1,4 +1,3 @@
-local log = io.open('output.log', 'w')
 local lfs = require('lfs')
 local re = require('re')
 local lpeg = require('lpeg')
@@ -1741,7 +1740,6 @@ if arg and debug_getinfo(2).func ~= require then
           for _ in file:sub(1, tonumber(start)):gmatch("\n") do
             line_no = line_no + 1
           end
-          log:write("short_src " .. tostring(info.short_src) .. " -> " .. tostring(filename) .. "\n")
           info.short_src, info.linedefined = filename, line_no
           info.currentline = line_no
           info.source = file
@@ -1750,7 +1748,6 @@ if arg and debug_getinfo(2).func ~= require then
         end
         local name = colored.bright(colored.yellow(metadata.aliases[1]))
       else
-        log:write("SHORT SRC: " .. tostring(info.short_src) .. "\n")
         if info.short_src and info.short_src:match("^.*%.moon$") then
           local line_table = moonscript_line_tables[info.short_src]
           local file = files[info.short_src]

@@ -20,6 +20,7 @@ immutable = require 'immutable'
 colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
+debug_getinfo = debug.getinfo
 
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
 -- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
@@ -203,7 +204,7 @@ class NomsuCompiler
         stubs = @get_stubs_from_signature signature
         stub_args = @get_args_from_signature signature
 
-        fn_info = debug.getinfo(fn, "u")
+        fn_info = debug_getinfo(fn, "u")
         local fn_arg_positions, arg_orders
         unless fn_info.isvararg
             fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
@@ -1005,7 +1006,7 @@ class NomsuCompiler
     
     initialize_core: =>
         -- Sets up some core functionality
-        get_line_no = -> "nomsu.moon:#{debug.getinfo(2).currentline}"
+        get_line_no = -> "nomsu.moon:#{debug_getinfo(2).currentline}"
         nomsu = self
         nomsu_string_as_lua = (code)->
             concat_parts = {}
@@ -1057,7 +1058,7 @@ class NomsuCompiler
             return expr:"nomsu:use_file(#{repr filename})"
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
-if arg and debug.getinfo(2).func != require
+if arg and debug_getinfo(2).func != require
     export colors
     colors = require 'consolecolors'
     parser = re.compile([[
@@ -1074,6 +1075,49 @@ if arg and debug.getinfo(2).func != require
         os.exit!
 
     nomsu = NomsuCompiler()
+
+    ok, to_lua = pcall -> require('moonscript.base').to_lua
+    if not ok then to_lua = nil
+    files = setmetatable {}, {
+        __index: (filename)=>
+            file = io.open(filename)
+            source = file\read("*a")
+            file\close!
+            self[filename] = source
+            return source
+    }
+    moonscript_line_tables = setmetatable {}, {
+        __index: (filename)=>
+            return nil unless to_lua
+            _, line_table = to_lua(files[filename])
+            self[filename] = line_table
+            return line_table
+    }
+
+    debug.getinfo = (...)->
+        info = debug_getinfo(...)
+        if not info or not info.func then return info
+        if metadata = nomsu.action_metadata[info.func]
+            info.name = metadata.aliases[1]
+            filename, start, stop = metadata.source\match("([^:]*):([0-9]*),([0-9]*)")
+            if filename
+                file = files[filename]
+                line_no = 1
+                for _ in file\sub(1,tonumber(start))\gmatch("\n") do line_no += 1
+                info.short_src, info.linedefined = filename, line_no
+                -- TODO: Fix this to use actual current line
+                info.currentline = line_no
+                info.source = file
+            else
+                info.source = "@"..metadata.source
+            name = colored.bright(colored.yellow(metadata.aliases[1]))
+        else
+            if info.short_src and info.short_src\match("^.*%.moon$")
+                line_table = moonscript_line_tables[info.short_src]
+                file = files[info.short_src]
+                info.source = file or info.source
+        return info
+
     
     run = ->
         if args.flags["-v"]
@@ -1143,7 +1187,8 @@ if arg and debug.getinfo(2).func != require
 
         level = 2
         while true
-            calling_fn = debug.getinfo(level)
+            -- TODO: reduce duplicate code
+            calling_fn = debug_getinfo(level)
             if not calling_fn then break
             if calling_fn.func == run then break
             level += 1
