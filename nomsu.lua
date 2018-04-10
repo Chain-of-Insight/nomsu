@@ -1743,7 +1743,7 @@ if arg and debug_getinfo(2).func ~= require then
           info.short_src, info.linedefined = filename, line_no
           info.currentline = line_no
           if type(select(1, ...)) == 'number' then
-            local varname, callsite = debug.getlocal(select(1, ...), 1)
+            local varname, callsite = debug.getlocal(select(1, ...) - 1, 1)
             if varname == "__callsite" then
               info.short_src, info.currentline = callsite:match("^(.*):(%d+)$")
               info.currentline = tonumber(info.currentline)
