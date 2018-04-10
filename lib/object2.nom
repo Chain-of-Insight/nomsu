@@ -168,13 +168,13 @@ compile [define object %classname %class_body] to:
                     __lt=\%class_identifier['< %'],
                     __le=\%class_identifier['<= %'],
                 };
-                nomsu:define_action("instances of "..\%class_identifier.name, "lib/class.nom", function()
+                nomsu:define_action("instances of "..\%class_identifier.name, "lib/class.nom", function(__callsite)
                     return utils.keys(\%class_identifier.instances);
                 end, "");
-                nomsu:define_action("new "..\%class_identifier.name.." %instance", "lib/class.nom", function(_instance)
+                nomsu:define_action("new "..\%class_identifier.name.." %instance", "lib/class.nom", function(__callsite, _instance)
                     return \%class_identifier(_instance);
                 end, "");
-                nomsu:define_action("new "..\%class_identifier.name, "lib/class.nom", function()
+                nomsu:define_action("new "..\%class_identifier.name, "lib/class.nom", function(__callsite)
                     return \%class_identifier({});
                 end, "");
             end -- End of definition of \%class_identifier

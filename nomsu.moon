@@ -149,7 +149,7 @@ NOMSU = do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]]
-    nomsu_peg = peg_tidier\match(io.open("nomsu.peg")\read("*a"))
+    nomsu_peg = peg_tidier\match(io.open("nomsu.peg")\read("a"))
     re.compile(nomsu_peg, NOMSU_DEFS)
 
 class NomsuCompiler
@@ -263,11 +263,11 @@ class NomsuCompiler
             error "Failed to find file metatdata for file: #{metadata.filename}", 0
         line_starts = @file_metadata[metadata.filename].line_starts
         first_line = 1
-        while first_line < #line_starts and line_starts[first_line+1] < metadata.start
+        while first_line < #line_starts and line_starts[first_line+1] <= metadata.start
             first_line += 1
-        last_line = first_line
-        while last_line < #line_starts and line_starts[last_line+1] < metadata.stop
-            last_line += 1
+        --last_line = first_line
+        --while last_line < #line_starts and line_starts[last_line+1] <= metadata.stop
+        --    last_line += 1
         --return first_line == last_line and "#{metadata.filename}:#{first_line}" or "#{metadata.filename}:#{first_line}-#{last_line}"
         return "#{metadata.filename}:#{first_line}"
 
@@ -342,20 +342,20 @@ class NomsuCompiler
 
         if filename\match(".*%.lua")
             file = io.open(filename)
-            contents = file\read("*a")
+            contents = file\read("a")
             file\close!
             return assert(load(contents, nil, nil, @environment))!
         if filename\match(".*%.nom")
             if not @skip_precompiled -- Look for precompiled version
                 file = io.open(filename\gsub("%.nom", ".lua"), "r")
                 if file
-                    lua_code = file\read("*a")
+                    lua_code = file\read("a")
                     file\close!
                     return @run_lua(lua_code)
             file = file or io.open(filename)
             if not file
                 error("File does not exist: #{filename}", 0)
-            nomsu_code = file\read('*a')
+            nomsu_code = file\read('a')
             file\close!
             return @run(nomsu_code, filename)
         else
@@ -714,6 +714,7 @@ class NomsuCompiler
                 metadata = @action_metadata[fn]
                 if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
+                    table.insert args, 1, @get_line_number(tree)
                     if metadata and metadata.arg_orders
                         new_args = [args[p] for p in *metadata.arg_orders[stub]]
                         args = new_args
@@ -740,7 +741,7 @@ class NomsuCompiler
                     remove @compilestack
                     return expr:"(#{concat bits, " "})"
 
-                args = {}
+                args = {repr(@get_line_number(tree))}
                 for tok in *tree.value
                     if tok.type == "Word" then continue
                     lua = @tree_to_lua(tok)
@@ -992,7 +993,8 @@ class NomsuCompiler
             args = var_pattern\match(alias)
             unless args
                 error("Failed to match arg pattern on alias: #{repr alias}", 0)
-            for j=1,#args do args[j] = @var_to_lua_identifier(args[j])
+            table.insert(args,1,'__callsite')
+            for j=2,#args do args[j] = @var_to_lua_identifier(args[j])
             stub_args[i] = args
         return stub_args
 
@@ -1022,7 +1024,7 @@ class NomsuCompiler
                     insert concat_parts, lua.expr
             return concat(concat_parts)
 
-        @define_compile_action "immediately %block", get_line_no!, (_block)->
+        @define_compile_action "immediately %block", get_line_no!, (__callsite,_block)->
             lua = nomsu\tree_to_lua(_block)
             lua_code = lua.statements or (lua.expr..";")
             if lua.locals and #lua.locals > 0
@@ -1030,18 +1032,18 @@ class NomsuCompiler
             nomsu\run_lua(lua_code)
             return statements:"if IMMEDIATE then\n#{lua_code}\nend", locals:lua.locals
 
-        @define_compile_action "lua> %code", get_line_no!, (_code)->
+        @define_compile_action "lua> %code", get_line_no!, (__callsite,_code)->
             if _code.type == "Text"
                 lua = nomsu_string_as_lua(_code)
                 return statements:lua
             else
-                return statements:"nomsu:run_lua(#{nomsu\tree_to_lua(_code).expr});"
+                return statements:"nomsu:run_lua(#{nomsu\tree_to_lua(__callsite,_code).expr});"
 
-        @define_compile_action "=lua %code", get_line_no!, (_code)->
+        @define_compile_action "=lua %code", get_line_no!, (__callsite,_code)->
             lua = nomsu_string_as_lua(_code)
             return expr:lua
 
-        @define_compile_action "!! code location !!", get_line_no!, ->
+        @define_compile_action "!! code location !!", get_line_no!, (__callsite)->
             tree = nomsu.compilestack[#nomsu.compilestack-1]
             metadata = @tree_metadata[tree]
             if metadata
@@ -1049,10 +1051,10 @@ class NomsuCompiler
             else
                 return expr: repr("<dynamically generated>")
 
-        @define_action "run file %filename", get_line_no!, (_filename)->
+        @define_action "run file %filename", get_line_no!, (__callsite,_filename)->
             return nomsu\run_file(_filename)
 
-        @define_compile_action "use %filename", get_line_no!, (_filename)->
+        @define_compile_action "use %filename", get_line_no!, (__callsite,_filename)->
             filename = nomsu\tree_to_value(_filename)
             nomsu\use_file(filename)
             return expr:"nomsu:use_file(#{repr filename})"
@@ -1081,7 +1083,7 @@ if arg and debug_getinfo(2).func != require
     files = setmetatable {}, {
         __index: (filename)=>
             file = io.open(filename)
-            source = file\read("*a")
+            source = file\read("a")
             file\close!
             self[filename] = source
             return source
@@ -1105,8 +1107,12 @@ if arg and debug_getinfo(2).func != require
                 line_no = 1
                 for _ in file\sub(1,tonumber(start))\gmatch("\n") do line_no += 1
                 info.short_src, info.linedefined = filename, line_no
-                -- TODO: Fix this to use actual current line
                 info.currentline = line_no
+                if type(select(1, ...)) == 'number'
+                    varname, callsite = debug.getlocal(select(1,...), 1)
+                    if varname == "__callsite"
+                        info.short_src, info.currentline = callsite\match("^(.*):(%d+)$")
+                        info.currentline = tonumber(info.currentline)
                 info.source = file
             else
                 info.source = "@"..metadata.source
@@ -1140,7 +1146,7 @@ if arg and debug_getinfo(2).func != require
             else
                 local retval, code
                 if args.input == '-'
-                    retval, code = nomsu\run(io.read('*a'), 'stdin')
+                    retval, code = nomsu\run(io.read('a'), 'stdin')
                 else
                     retval, code = nomsu\run_file(args.input)
                 if compiled_output
@@ -1181,7 +1187,7 @@ if arg and debug_getinfo(2).func != require
         ok, to_lua = pcall -> require('moonscript.base').to_lua
         if not ok then to_lua = -> nil
         nomsu_file = io.open("nomsu.moon")
-        nomsu_source = nomsu_file\read("*a")
+        nomsu_source = nomsu_file\read("a")
         _, line_table = to_lua(nomsu_source)
         nomsu_file\close!
 
@@ -1198,7 +1204,7 @@ if arg and debug_getinfo(2).func != require
             if metadata = nomsu.action_metadata[calling_fn.func]
                 filename, start, stop = metadata.source\match("([^:]*):([0-9]*),([0-9]*)")
                 if filename
-                    file = io.open(filename)\read("*a")
+                    file = io.open(filename)\read("a")
                     line_no = 1
                     for _ in file\sub(1,tonumber(start))\gmatch("\n") do line_no += 1
                     offending_statement = file\sub(tonumber(start),tonumber(stop))
@@ -1229,8 +1235,7 @@ if arg and debug_getinfo(2).func != require
     -- Note: xpcall has a slightly different API in Lua <=5.1 vs. >=5.2, but this works
     -- for both APIs
     -- TODO: revert back to old error handler
-    ldt = require 'ldt'
-    ldt.guard run
+    require('ldt').guard run
     --xpcall(run, err_hand)
 
 return NomsuCompiler

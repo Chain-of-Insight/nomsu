@@ -32,7 +32,7 @@ lua> ".."
         };
         for name, e in pairs(escapes) do
             local lua = "'"..e.."'";
-            nomsu:define_compile_action(name, \(!! code location !!), function() return {expr=lua}; end);
+            nomsu:define_compile_action(name, \(!! code location !!), function(__callsite) return {expr=lua}; end);
         end
         local colors = {
             ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
@@ -47,8 +47,8 @@ lua> ".."
         for name, c in pairs(colors) do
             local color = "'"..c.."'";
             local reset = "'"..colors["reset color"].."'";
-            nomsu:define_compile_action(name, \(!! code location !!), function() return {expr=color}; end);
-            nomsu:define_compile_action(name.." %", \(!! code location !!), function(\%)
+            nomsu:define_compile_action(name, \(!! code location !!), function(__callsite) return {expr=color}; end);
+            nomsu:define_compile_action(name.." %", \(!! code location !!), function(__callsite, \%)
                 return {expr=color..".."..nomsu:tree_to_lua(\%).expr..".."..reset};
             end);
         end

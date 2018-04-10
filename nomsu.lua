@@ -213,7 +213,7 @@ do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]])
-  local nomsu_peg = peg_tidier:match(io.open("nomsu.peg"):read("*a"))
+  local nomsu_peg = peg_tidier:match(io.open("nomsu.peg"):read("a"))
   NOMSU = re.compile(nomsu_peg, NOMSU_DEFS)
 end
 local NomsuCompiler
@@ -351,12 +351,8 @@ do
       end
       local line_starts = self.file_metadata[metadata.filename].line_starts
       local first_line = 1
-      while first_line < #line_starts and line_starts[first_line + 1] < metadata.start do
+      while first_line < #line_starts and line_starts[first_line + 1] <= metadata.start do
         first_line = first_line + 1
-      end
-      local last_line = first_line
-      while last_line < #line_starts and line_starts[last_line + 1] < metadata.stop do
-        last_line = last_line + 1
       end
       return tostring(metadata.filename) .. ":" .. tostring(first_line)
     end,
@@ -449,7 +445,7 @@ do
       end
       if filename:match(".*%.lua") then
         local file = io.open(filename)
-        local contents = file:read("*a")
+        local contents = file:read("a")
         file:close()
         return assert(load(contents, nil, nil, self.environment))()
       end
@@ -457,7 +453,7 @@ do
         if not self.skip_precompiled then
           local file = io.open(filename:gsub("%.nom", ".lua"), "r")
           if file then
-            local lua_code = file:read("*a")
+            local lua_code = file:read("a")
             file:close()
             return self:run_lua(lua_code)
           end
@@ -466,7 +462,7 @@ do
         if not file then
           error("File does not exist: " .. tostring(filename), 0)
         end
-        local nomsu_code = file:read('*a')
+        local nomsu_code = file:read('a')
         file:close()
         return self:run(nomsu_code, filename)
       else
@@ -1038,6 +1034,7 @@ do
             end
             args = _accum_0
           end
+          table.insert(args, 1, self:get_line_number(tree))
           if metadata and metadata.arg_orders then
             local new_args
             do
@@ -1090,7 +1087,9 @@ do
             expr = "(" .. tostring(concat(bits, " ")) .. ")"
           }
         end
-        local args = { }
+        local args = {
+          repr(self:get_line_number(tree))
+        }
         local _list_1 = tree.value
         for _index_0 = 1, #_list_1 do
           local _continue_0 = false
@@ -1446,7 +1445,8 @@ do
         if not (args) then
           error("Failed to match arg pattern on alias: " .. tostring(repr(alias)), 0)
         end
-        for j = 1, #args do
+        table.insert(args, 1, '__callsite')
+        for j = 2, #args do
           args[j] = self:var_to_lua_identifier(args[j])
         end
         stub_args[i] = args
@@ -1491,7 +1491,7 @@ do
         end
         return concat(concat_parts)
       end
-      self:define_compile_action("immediately %block", get_line_no(), function(_block)
+      self:define_compile_action("immediately %block", get_line_no(), function(__callsite, _block)
         local lua = nomsu:tree_to_lua(_block)
         local lua_code = lua.statements or (lua.expr .. ";")
         if lua.locals and #lua.locals > 0 then
@@ -1503,7 +1503,7 @@ do
           locals = lua.locals
         }
       end)
-      self:define_compile_action("lua> %code", get_line_no(), function(_code)
+      self:define_compile_action("lua> %code", get_line_no(), function(__callsite, _code)
         if _code.type == "Text" then
           local lua = nomsu_string_as_lua(_code)
           return {
@@ -1511,17 +1511,17 @@ do
           }
         else
           return {
-            statements = "nomsu:run_lua(" .. tostring(nomsu:tree_to_lua(_code).expr) .. ");"
+            statements = "nomsu:run_lua(" .. tostring(nomsu:tree_to_lua(__callsite, _code).expr) .. ");"
           }
         end
       end)
-      self:define_compile_action("=lua %code", get_line_no(), function(_code)
+      self:define_compile_action("=lua %code", get_line_no(), function(__callsite, _code)
         local lua = nomsu_string_as_lua(_code)
         return {
           expr = lua
         }
       end)
-      self:define_compile_action("!! code location !!", get_line_no(), function()
+      self:define_compile_action("!! code location !!", get_line_no(), function(__callsite)
         local tree = nomsu.compilestack[#nomsu.compilestack - 1]
         local metadata = self.tree_metadata[tree]
         if metadata then
@@ -1534,10 +1534,10 @@ do
           }
         end
       end)
-      self:define_action("run file %filename", get_line_no(), function(_filename)
+      self:define_action("run file %filename", get_line_no(), function(__callsite, _filename)
         return nomsu:run_file(_filename)
       end)
-      return self:define_compile_action("use %filename", get_line_no(), function(_filename)
+      return self:define_compile_action("use %filename", get_line_no(), function(__callsite, _filename)
         local filename = nomsu:tree_to_value(_filename)
         nomsu:use_file(filename)
         return {
@@ -1708,7 +1708,7 @@ if arg and debug_getinfo(2).func ~= require then
   local files = setmetatable({ }, {
     __index = function(self, filename)
       local file = io.open(filename)
-      local source = file:read("*a")
+      local source = file:read("a")
       file:close()
       self[filename] = source
       return source
@@ -1742,6 +1742,13 @@ if arg and debug_getinfo(2).func ~= require then
           end
           info.short_src, info.linedefined = filename, line_no
           info.currentline = line_no
+          if type(select(1, ...)) == 'number' then
+            local varname, callsite = debug.getlocal(select(1, ...), 1)
+            if varname == "__callsite" then
+              info.short_src, info.currentline = callsite:match("^(.*):(%d+)$")
+              info.currentline = tonumber(info.currentline)
+            end
+          end
           info.source = file
         else
           info.source = "@" .. metadata.source
@@ -1779,7 +1786,7 @@ if arg and debug_getinfo(2).func ~= require then
       else
         local retval, code
         if args.input == '-' then
-          retval, code = nomsu:run(io.read('*a'), 'stdin')
+          retval, code = nomsu:run(io.read('a'), 'stdin')
         else
           retval, code = nomsu:run_file(args.input)
         end
@@ -1834,7 +1841,7 @@ if arg and debug_getinfo(2).func ~= require then
       end
     end
     local nomsu_file = io.open("nomsu.moon")
-    local nomsu_source = nomsu_file:read("*a")
+    local nomsu_source = nomsu_file:read("a")
     local _, line_table = to_lua(nomsu_source)
     nomsu_file:close()
     local level = 2
@@ -1860,7 +1867,7 @@ if arg and debug_getinfo(2).func ~= require then
           if metadata then
             local filename, start, stop = metadata.source:match("([^:]*):([0-9]*),([0-9]*)")
             if filename then
-              local file = io.open(filename):read("*a")
+              local file = io.open(filename):read("a")
               local line_no = 1
               for _ in file:sub(1, tonumber(start)):gmatch("\n") do
                 line_no = line_no + 1
@@ -1903,7 +1910,6 @@ if arg and debug_getinfo(2).func ~= require then
     end
     return os.exit(false, true)
   end
-  local ldt = require('ldt')
-  ldt.guard(run)
+  require('ldt').guard(run)
 end
 return NomsuCompiler

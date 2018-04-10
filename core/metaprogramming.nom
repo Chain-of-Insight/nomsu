@@ -5,7 +5,7 @@
 # Compile-time action to make compile-time actions:
 immediately:
     lua> ".."
-        nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(\%actions, \%lua)
+        nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(__callsite, \%actions, \%lua)
             local stubs = {};
             for i, action in ipairs(\%actions.value) do
                 stubs[i] = nomsu:tree_to_named_stub(action);
@@ -30,6 +30,7 @@ immediately:
             if #undeclared_locals > 0 then
                 body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
             end
+            table.insert(args, 1, "__callsite");
             local lua_fn_args = table.concat(args, ", ");
             local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
             local code_location = (def_metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
@@ -66,6 +67,7 @@ immediately:
             if #undeclared_locals > 0 then
                 body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
             end
+            table.insert(args, 1, "__callsite");
             local lua_fn_args = table.concat(args, ", ");
             local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
             local code_location = (def_metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
@@ -88,6 +90,7 @@ immediately:
             for i,tok in ipairs(\%shorthand.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
             end
+            table.insert(args, 1, "__callsite");
             local lua_fn_args = table.concat(args, ", ");
             local template;
             if \%longhand.type == "Block" then
