@@ -23,6 +23,7 @@ colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 debug_getinfo = debug.getinfo
+{:Lua, :LuaValue, :Location} = require "lua_obj"
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -49,6 +50,7 @@ line_counter = re.compile([[
     line <- {} (!%nl .)*
 ]], nl:P("\r")^-1 * P("\n"))
 -- Mapping from line number -> character offset
+export LINE_STARTS
 LINE_STARTS = setmetatable {}, {
     __mode:"k"
     __index: (k)=>
@@ -86,7 +88,7 @@ do
 
 Types = {}
 type_tostring = =>
-    "#{@name}(#{concat [repr(x) for x in *@], ", "})"
+    "#{@name}(#{repr(@value)})"
 type_with_value = (value)=> getmetatable(self)(@source, value)
 Tuple = immutable(nil, {name:"Tuple"})
 for t in *{"File", "Nomsu", "Block", "List", "FunctionCall", "Text", "Dict", "Number", "Word", "Var", "Comment", "IndexChain"}
@@ -146,12 +148,12 @@ NOMSU_DEFS = with {}
         if lpeg.userdata.source_code\sub(pos,pos)\match("[\r\n]")
             pos += #lpeg.userdata.source_code\match("[ \t\n\r]*", pos)
         line_no = 1
-        text_loc = Source(lpeg.userdata.filename, src, pos)
+        text_loc = Location(lpeg.userdata.filename, src, pos)
         line_no = text_loc\get_line_number!
         prev_line = src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-1)
         err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-1)
         next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-1)
-        pointer = ("-")\rep(pos-LINE_STARTS[line_no]) .. "^"
+        pointer = ("-")\rep(pos-LINE_STARTS[src][line_no]) .. "^"
         err_msg = (err_msg or "Parse error").." in #{lpeg.userdata.filename} on line #{line_no}:\n"
         err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"
         error(err_msg)
@@ -159,7 +161,7 @@ NOMSU_DEFS = with {}
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop)->
         if type(value) == 'table' then error("Not a tuple: #{repr value}")-- = Tuple(value)
-        loc = Source(lpeg.userdata.filename, lpeg.userdata.source_code, start, stop)
+        loc = Location(lpeg.userdata.filename, lpeg.userdata.source_code, start, stop)
         node = Types[key](value, loc)
         return node
     self[key] = make_node
@@ -279,19 +281,11 @@ class NomsuCompiler
     indent: (code, levels=1)=>
         return code\gsub("\n","\n"..("    ")\rep(levels))
 
-    get_source_code: (tree)=>
-        -- Return the (dedented) source code of a tree, or construct some if the tree was
-        -- dynamically generated.
-        metadata = @tree_metadata[tree]
-        unless metadata
-            return @tree_to_nomsu(tree)
-        return @dedent metadata.source_code\sub(metadata.start, metadata.stop-1)
-
     parse: (nomsu_code, filename)=>
         assert type(filename) == "string", "Bad filename type: #{type filename}"
 
         userdata = {
-            source_code:nomsu_code, :filename, indent_stack: {""}, tree_metadata:@tree_metadata,
+            source_code:nomsu_code, :filename, indent_stack: {""}
         }
 
         old_userdata, lpeg.userdata = lpeg.userdata, userdata
@@ -355,9 +349,9 @@ class NomsuCompiler
                 _chunk_counter += 1
                 "<lua chunk ##{_chunk_counter}>"
             else
-                lua.source.filename..".lua"
+                lua.source.text_name..".lua"
         if type(lua) != 'string'
-            lua, metadata = make_offset_table(filename)
+            lua, metadata = lua\make_offset_table(filename)
             LUA_METADATA[lua] = metadata
             
         run_lua_fn, err = load(lua, filename, "t", @environment)
@@ -375,7 +369,7 @@ class NomsuCompiler
         if tree.type == 'Text' and #tree.value == 1 and type(tree.value[1]) == 'string'
             return tree.value[1]
         lua = Lua(tree.source, "return ",@tree_to_lua(tree),";")
-        return @run_lua(lua, tree.source.filename)
+        return @run_lua(lua, tree.source.text_name)
 
     tree_to_nomsu: (tree, indentation="", max_line=80, expr_type=nil)=>
         -- Convert a tree into nomsu code that satisfies the max line requirement or nil
@@ -640,22 +634,23 @@ class NomsuCompiler
         -- Return <lua code for value>, <additional lua code>
         assert tree, "No tree provided."
         if not Types.is_node(tree)
-            error("Invalid tree: #{repr(tree)}", 0)
+            --error("Invalid tree: #{repr(tree)}", 0)
+            error("Invalid tree")
         switch tree.type
             when "File"
                 if #tree.value == 1
                     return @tree_to_lua(tree.value[1])
                 file_lua = Lua(tree.source)
                 declared_locals = {}
-                for line in *tree.value
+                for i, line in ipairs tree.value
                     line_lua = @tree_to_lua line
                     if not line_lua
                         error("No lua produced by #{repr line}", 0)
-                    lua = lua\as_statements!
+                    line_lua = line_lua\as_statements!
                     if i < #tree.value
                         file_lua\append "\n"
                     
-                    file_lua\append lua
+                    file_lua\append line_lua
                 file_lua\declare_locals!
                 return file_lua
             
@@ -664,7 +659,7 @@ class NomsuCompiler
             
             when "Nomsu"
                 --return Lua(tree.source, repr(tree.value))
-                return Lua(tree.source, "nomsu:parse(",tree.source\get_text!,", ",repr(tree.source.filename),")")
+                return Lua(tree.source, "nomsu:parse(",tree.source\get_text!,", ",repr(tree.source.text_name),")")
 
             when "Block"
                 block_lua = Lua(tree.source)
@@ -688,7 +683,6 @@ class NomsuCompiler
                 if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
                     -- Force all compile-time actions to take a tree location
-                    table.insert args, 1, tree.source
                     if metadata and metadata.arg_orders
                         new_args = [args[p] for p in *metadata.arg_orders[stub]]
                         args = new_args
@@ -722,7 +716,7 @@ class NomsuCompiler
                     unless arg_lua.is_value
                         line, src = tok.source\get_line!, tok.source\get_text!
                         error "#{line}: Cannot use:\n#{colored.yellow src}\nas an argument to #{stub}, since it's not an expression, it produces: #{repr arg_lua}", 0
-                    insert args, lua
+                    insert args, arg_lua
 
                 if metadata and metadata.arg_orders
                     args = [args[p] for p in *metadata.arg_orders[stub]]
@@ -1023,7 +1017,7 @@ class NomsuCompiler
                     lua\append bit
                 else
                     bit_lua = nomsu\tree_to_lua bit
-                    unless lua.is_value
+                    unless bit_lua.is_value
                         line, src = bit.source\get_line!, bit.source\get_text!
                         error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
                     lua\append bit_lua
@@ -1047,11 +1041,7 @@ class NomsuCompiler
 
         @define_compile_action "!! code location !!", get_line_no!, ->
             tree = nomsu.compilestack[#nomsu.compilestack-1]
-            metadata = @tree_metadata[tree]
-            if metadata
-                return LuaValue(tree.source, {repr("#{metadata.filename}:#{metadata.start},#{metadata.stop}")})
-            else
-                return LuaValue(tree.source, {repr("<dynamically generated>")})
+            return LuaValue(tree.source, {repr(tostring(tree.source))})
 
         @define_action "run file %filename", get_line_no!, (_filename)->
             return nomsu\run_file(_filename)
@@ -1094,16 +1084,14 @@ if arg and debug_getinfo(2).func != require
     debug.getinfo = (...)->
         info = debug_getinfo(...)
         if not info or not info.func then return info
-        if info.source and NOMSU_LINE_TABLES[info.source]
+        if info.source and info.source\sub(1,1) != "@" and LINE_STARTS[info.source]
             if metadata = nomsu.action_metadata[info.func]
                 info.name = metadata.aliases[1]
-            info.short_src = NOMSU_SOURCE_FILE[info.source]
-            lua_line_to_nomsu_line(info.source, info)
-            info.short_src = metadata.source.text_name
-            info.source = metadata.source.text
-            info.linedefined = metadata.source\get_line_number!
-            info.currentline = LUA_LINE_TO_NOMSU_LINE[metadata.source.filename][info.currentline]
-            name = colored.bright(colored.yellow(metadata.aliases[1]))
+            if info.source\sub(1,1) == "@" then error("Not-yet-loaded source: #{info.source}")
+            --info.linedefined = lua_line_to_nomsu_line(info.short_src, info.linedefined)
+            --info.currentline = lua_line_to_nomsu_line(info.short_src, info.currentline)
+            --info.short_src = metadata.source.text_name
+            --info.source = metadata.source.text
         else
             if info.short_src and info.short_src\match("^.*%.moon$")
                 line_table = moonscript_line_tables[info.short_src]

@@ -26,7 +26,7 @@ immediately:
             end
             local body_lua = nomsu:tree_to_lua(\%lua):as_statements();
             body_lua:declare_locals(args);
-            lua:append("\n    ", body_lua, "\nend);")
+            lua:append("\\n    ", body_lua, "\\nend);")
             return lua;
         end);
 
@@ -51,7 +51,7 @@ immediately:
             end
             local body_lua = nomsu:tree_to_lua(\%lua):as_statements();
             body_lua:declare_locals(args);
-            lua:append("\n    ", body_lua, "\nend);")
+            lua:append("\\n    ", body_lua, "\\nend);")
             return lua;
 
 # Macro to make nomsu macros:
@@ -76,10 +76,10 @@ immediately:
             local template;
             if \%longhand.type == "Block" then
                 local lines = {};
-                for i, line in ipairs(\%longhand.value) do lines[i] = nomsu:get_source_code(line); end
+                for i, line in ipairs(\%longhand.value) do lines[i] = line.source:get_text(); end
                 template = repr(table.concat(lines, "\\n"));
             else
-                template = repr(nomsu:get_source_code(\%longhand));
+                template = repr(\%longhand.source:get_text());
             end
             local replacements = {};
             for i, a in ipairs(args) do replacements[i] = a.."="..a; end
@@ -109,19 +109,16 @@ immediately:
     action [%tree as lua expr]:
         lua> ".."
             local lua = nomsu:tree_to_lua(\%tree);
-            if lua.locals or not lua.expr then
-                error("Invalid thing to convert to lua expr: "..nomsu:get_source_code(\%tree));
+            if not lua.is_value then
+                error("Invalid thing to convert to lua expr: "..\%tree.source:get_text());
             end
-            return lua.expr;
+            return lua;
 
     action [%tree as lua statements]:
         lua> ".."
-            local lua = nomsu:tree_to_lua(\%tree);
-            local code = lua.statements or (lua.expr..";");
-            if lua.locals then
-                code = "local "..table.concat(lua.locals, ", ")..";\\n"..code;
-            end
-            return code;
+            local lua = nomsu:tree_to_lua(\%tree):as_statements();
+            lua:declare_locals();
+            return lua;
 
     action [%tree as value]:
         =lua "nomsu:tree_to_value(\%tree)"
@@ -130,7 +127,7 @@ immediately:
         =lua "nomsu:tree_to_stub(\%tree)"
     
 immediately:
-    compile [%tree's source code, %tree' source code] to {expr:"nomsu:get_source_code(\(%tree as lua expr))"}
+    compile [%tree's source code, %tree' source code] to {expr:"\(%tree as lua expr).source:get_text()"}
 
     compile [repr %obj] to {expr:"repr(\(%obj as lua expr))"}
     compile [type of %obj] to {expr:"type(\(%obj as lua expr))"}
@@ -190,7 +187,7 @@ immediately:
     compile [barf] to {statements:"error(nil, 0);"}
     compile [barf %msg] to {statements:"error(\(%msg as lua expr), 0);"}
     compile [assume %condition] to:
-        lua> "local \%assumption = 'Assumption failed: '..nomsu:get_source_code(\%condition);"
+        lua> "local \%assumption = 'Assumption failed: '..\%condition.source:get_text();"
         return {..}
             statements:".."
                 if not \(%condition as lua expr) then

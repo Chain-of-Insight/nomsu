@@ -1,10 +1,12 @@
 {:insert, :remove, :concat} = table
 immutable = require 'immutable'
 local Lua, LuaValue, Location
+export LINE_STARTS
 
 Location = immutable {"text_name","text","start","stop"}, {
-    __new: (text_name, text, start, stop)-> text_name, text, start, stop or start
-    __tostring: "#{text_name}[#{start}:#{stop}]"
+    name:"Location"
+    __new: (text_name, text, start, stop)=> text_name, text, start, stop or start
+    __tostring: => "#{@text_name}[#{@start}:#{@stop}]"
     __lt: (other)=>
         assert(@text == other.text, "Cannot compare sources from different texts")
         return if @start == other.start
@@ -20,10 +22,10 @@ Location = immutable {"text_name","text","start","stop"}, {
         -- TODO: do a binary search if this is actually slow, which I doubt
         line_starts = LINE_STARTS[@text]
         start_line = 1
-        while start_line < #line_starts and line_starts[start_line+1] <= @start
+        while (line_starts[start_line+1] or (#src+1)) <= @start
             start_line += 1
         stop_line = start_line
-        while stop_line < #line_starts and line_starts[stop_line+1] <= @stop
+        while (line_starts[stop_line+1] or (#src+1)) <= @stop
             stop_line += 1
         return start_line, stop_line
     get_line: => "#{@text_name}:#{@get_line_number}"
@@ -38,7 +40,7 @@ class Lua
     is_statement: true
     is_value: false
 
-    __new: (@source, ...)=>
+    new: (@source, ...)=>
         @bits = {...}
         @free_vars = {}
     
@@ -63,11 +65,7 @@ class Lua
     __tostring: =>
         buff = {}
         for b in *@bits
-            if type(b) == 'string'
-                buff[#buff+1] = b
-            else
-                for sub in *b\render!
-                    buff[#buff+1] = sub
+            buff[#buff+1] = tostring(b)
         return concat(buff, "")
 
     __len: =>
@@ -105,7 +103,7 @@ class Lua
                 lua_offset += #lua
             else
                 lua_start = lua_offset
-                for b in lua.bits
+                for b in *lua.bits
                     walk b
                 lua_stop = lua_offset
                 nomsu_src, lua_src = lua.souce, Location(lua_chunkname, lua_str, lua_start, lua_stop)
@@ -118,7 +116,7 @@ class LuaValue extends Lua
     is_statement: false
     is_value: true
 
-    __new: (@source, ...)=>
+    new: (@source, ...)=>
         @bits = {...}
 
     as_statements: =>
@@ -130,4 +128,4 @@ class LuaValue extends Lua
         @prepend "("
         @append ")"
 
-return {:Lua, :LuaValue}
+return {:Lua, :LuaValue, :Location}
