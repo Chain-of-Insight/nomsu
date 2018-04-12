@@ -100,10 +100,12 @@ indented_dict (Dict):
     |} -> Tuple)
     (dedent / (("" -> "Error while parsing dict") => error))
 dict_line:
-    (((inline_expression / word) %ws* ":" %ws* (functioncall / expression)) -> DictEntry !comma)
+    ((dict_key %ws* ":" %ws* (functioncall / expression)) -> DictEntry !comma)
     / (inline_dict_item (comma dict_line?)?)
 inline_dict_item:
-    ((inline_expression / word) %ws* ":" %ws* (inline_functioncall / inline_expression)) -> DictEntry
+    (dict_key %ws* ":" %ws* (inline_functioncall / inline_expression)) -> DictEntry
+dict_key:
+    (({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / inline_expression
 
 block_comment(Comment): "#.." { [^%nl]* (%nl+ %indent [^%nl]* (%nl+ %nodent [^%nl]*)* %dedent)? }
 line_comment(Comment): "#" { [^%nl]* }

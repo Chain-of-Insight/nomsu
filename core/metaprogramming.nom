@@ -5,93 +5,74 @@
 # Compile-time action to make compile-time actions:
 immediately:
     lua> ".."
-        nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(__callsite, \%actions, \%lua)
+        nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(\%actions, \%lua)
+            local tree = nomsu.compilestack[#nomsu.compilestack];
+            local lua = Lua(tree.source, "nomsu:define_compile_action(");
             local stubs = {};
             for i, action in ipairs(\%actions.value) do
                 stubs[i] = nomsu:tree_to_named_stub(action);
             end
+            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
             end
-            local arg_set = {};
-            for i, arg in ipairs(args) do arg_set[arg] = true; end
             if \%lua.type == "Text" then
                 error("Invalid type for 'compile % to %', expected a dict with expr/statements, but got text.", 0);
             end
-            local body_lua = nomsu:tree_to_lua(\%lua);
-            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            local undeclared_locals = {};
-            for i, body_local in ipairs(body_lua.locals or {}) do
-                if not arg_set[body_local] then
-                    table.insert(undeclared_locals, body_local);
-                end
+            for i, arg in ipairs(args) do
+                lua:append(arg);
+                if i < #args then lua:append(", ") end
             end
-            if #undeclared_locals > 0 then
-                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
-            end
-            table.insert(args, 1, "__callsite");
-            local lua_fn_args = table.concat(args, ", ");
-            local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            local code_location = (def_metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
-                                   or "<dynamically generated>");
-            return {statements=([[
-        nomsu:define_compile_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
-            ]]..body_code.."\\n"..[[
-        end);
-        ]])};
+            local body_lua = nomsu:tree_to_lua(\%lua):as_statements();
+            body_lua:declare_locals(args);
+            lua:append("\n    ", body_lua, "\nend);")
+            return lua;
         end);
 
 # Compile-time action to make actions
 immediately:
     compile [action %actions %body] to:
         lua> ".."
+            local tree = nomsu.compilestack[#nomsu.compilestack];
+            local lua = Lua(tree.source, "nomsu:define_action(");
             local stubs = {};
             for i, action in ipairs(\%actions.value) do
                 stubs[i] = nomsu:tree_to_named_stub(action);
             end
+            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
             end
-            local arg_set = {};
-            for i, arg in ipairs(args) do arg_set[arg] = true; end
-            local body_lua = nomsu:tree_to_lua(\%body);
-            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            local undeclared_locals = {};
-            for i, body_local in ipairs(body_lua.locals or {}) do
-                if not arg_set[body_local] then
-                    table.insert(undeclared_locals, body_local);
-                end
+            for i, arg in ipairs(args) do
+                lua:append(arg);
+                if i < #args then lua:append(", ") end
             end
-            if #undeclared_locals > 0 then
-                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
-            end
-            table.insert(args, 1, "__callsite");
-            local lua_fn_args = table.concat(args, ", ");
-            local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            local code_location = (def_metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
-                                   or "<dynamically generated>");
-            return {statements=[[
-            nomsu:define_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
-                ]]..body_code.."\\n"..[[
-            end);
-            ]]};
+            local body_lua = nomsu:tree_to_lua(\%lua):as_statements();
+            body_lua:declare_locals(args);
+            lua:append("\n    ", body_lua, "\nend);")
+            return lua;
 
 # Macro to make nomsu macros:
 immediately:
     compile [parse %shorthand as %longhand] to:
         lua> ".."
+            local tree = nomsu.compilestack[#nomsu.compilestack];
+            local lua = Lua(tree.source, "nomsu:define_compile_action(");
             local stubs = {};
             for i, action in ipairs(\%shorthand.value) do
                 stubs[i] = nomsu:tree_to_named_stub(action);
             end
+            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(");
             local args = {};
             for i,tok in ipairs(\%shorthand.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
             end
-            table.insert(args, 1, "__callsite");
-            local lua_fn_args = table.concat(args, ", ");
+            for i, arg in ipairs(args) do
+                lua:append(arg);
+                if i < #args then lua:append(", ") end
+            end
             local template;
             if \%longhand.type == "Block" then
                 local lines = {};
@@ -103,16 +84,13 @@ immediately:
             local replacements = {};
             for i, a in ipairs(args) do replacements[i] = a.."="..a; end
             replacements = "{"..table.concat(replacements, ", ").."}";
-            local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-            local code_location = (def_metadata and ("%s:%s,%s"):format(def_metadata.filename, def_metadata.start, def_metadata.stop)
-                                   or "<dynamically generated>");
-            return {statements=[[
-            nomsu:define_compile_action(]]..repr(stubs)..[[, ]]..repr(code_location)..[[, function(]]..lua_fn_args..[[)
-                local template = nomsu:parse(]]..template..[[, ]]..repr(def_metadata.filename)..[[);
+            lua:append([[)
+                local template = nomsu_parse(]]..template..[[, ]]..repr(tree.source.filename)..[[);
                 local replacement = nomsu:tree_with_replaced_vars(template, ]]..replacements..[[);
-                return nomsu:tree_to_lua(replacement);
+                return nomsu:tree_to_lua(replacement, nomsu.compilestack[#nomsu.compilestack].source.filename);
             end);
-            ]]};
+            ]]);
+            return lua;
 
 action [remove action %stub]:
     lua> ".."
