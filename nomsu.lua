@@ -32,7 +32,7 @@ do
   local _obj_0 = require("lua_obj")
   Lua, LuaValue, Location = _obj_0.Lua, _obj_0.LuaValue, _obj_0.Location
 end
-local FILE_CACHE = setmetatable({ }, {
+FILE_CACHE = setmetatable({ }, {
   __index = function(self, filename)
     local file = io.open(filename)
     if not (file) then
@@ -196,7 +196,7 @@ do
       pos = pos + #lpeg.userdata.source_code:match("[ \t\n\r]*", pos)
     end
     local line_no = 1
-    local text_loc = Location(lpeg.userdata.filename, src, pos)
+    local text_loc = Location(lpeg.userdata.filename, pos)
     line_no = text_loc:get_line_number()
     local prev_line = src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 1)
     local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 1)
@@ -215,7 +215,7 @@ setmetatable(NOMSU_DEFS, {
       if type(value) == 'table' then
         error("Not a tuple: " .. tostring(repr(value)))
       end
-      local loc = Location(lpeg.userdata.filename, lpeg.userdata.source_code, start, stop)
+      local loc = Location(lpeg.userdata.filename, start, stop)
       local node = Types[key](value, loc)
       return node
     end
@@ -281,9 +281,6 @@ do
               _len_0 = _len_0 + 1
             end
             arg_positions = _accum_0
-          end
-          if #arg_positions ~= #args then
-            error("Mismatch in args between lua function's " .. tostring(repr(fn_arg_positions)) .. " and stub's " .. tostring(repr(args)) .. " for " .. tostring(repr(stub)), 0)
           end
           arg_orders[stub] = arg_positions
         end
@@ -379,7 +376,8 @@ do
       local tree = self:parse(nomsu_code, filename)
       assert(tree, "Failed to parse: " .. tostring(nomsu_code))
       assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
-      local lua = self:tree_to_lua(tree):as_statements():with_locals_declared()
+      local lua = self:tree_to_lua(tree):as_statements()
+      lua:declare_locals()
       lua:prepend("-- File: " .. tostring(filename) .. "\n")
       return self:run_lua(lua, filename .. ".lua")
     end,
@@ -449,8 +447,9 @@ do
           _chunk_counter = _chunk_counter + 1
           filename = "<lua chunk #" .. tostring(_chunk_counter) .. ">"
         else
-          filename = lua.source.text_name .. ".lua"
+          filename = lua.source.filename .. ".lua"
         end
+        FILE_CACHE[filename] = tostring(lua)
       end
       if type(lua) ~= 'string' then
         local metadata
@@ -475,7 +474,7 @@ do
         return tree.value[1]
       end
       local lua = Lua(tree.source, "return ", self:tree_to_lua(tree), ";")
-      return self:run_lua(lua, tree.source.text_name)
+      return self:run_lua(lua, tree.source.filename)
     end,
     tree_to_nomsu = function(self, tree, indentation, max_line, expr_type)
       if indentation == nil then
@@ -896,9 +895,9 @@ do
         file_lua:declare_locals()
         return file_lua
       elseif "Comment" == _exp_0 then
-        return Lua(tree.source, "--" .. tree.value:gsub("\n", "\n--"))
+        return Lua(tree.source, "--" .. tree.value:gsub("\n", "\n--") .. "\n")
       elseif "Nomsu" == _exp_0 then
-        return Lua(tree.source, "nomsu:parse(", tree.source:get_text(), ", ", repr(tree.source.text_name), ")")
+        return Lua(tree.source, "nomsu:parse(", tree.source:get_text(), ", ", repr(tree.source.filename), ")")
       elseif "Block" == _exp_0 then
         local block_lua = Lua(tree.source)
         for i, arg in ipairs(tree.value) do
@@ -941,14 +940,14 @@ do
               local _list_1 = metadata.arg_orders[stub]
               for _index_0 = 1, #_list_1 do
                 local p = _list_1[_index_0]
-                _accum_0[_len_0] = args[p]
+                _accum_0[_len_0] = args[p - 1]
                 _len_0 = _len_0 + 1
               end
               new_args = _accum_0
             end
             args = new_args
           end
-          local lua = action(unpack(args))
+          local lua = action(tree, unpack(args))
           remove(self.compilestack)
           return lua
         elseif not metadata and self.__class.math_patt:match(stub) then
@@ -1367,15 +1366,61 @@ do
         return "nomsu.moon:" .. tostring(debug_getinfo(2).currentline)
       end
       local nomsu = self
-      self:define_compile_action("immediately %block", get_line_no(), function(_block)
+      self:define_compile_action("immediately %block", get_line_no(), function(self, _block)
         local lua = nomsu:tree_to_lua(_block):as_statements()
         lua:declare_locals()
         nomsu:run_lua(lua)
-        return Lua(_block.source, "if IMMEDIATE then\n", lua, "\nend")
+        return Lua(self.source, "if IMMEDIATE then\n", lua, "\nend")
       end)
-      self:define_compile_action("lua> %code", get_line_no(), function(_code)
+      self:define_compile_action("Lua %code", get_line_no(), function(self, _code)
         if _code.type ~= "Text" then
-          return LuaValue(_code.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
+          return LuaValue(self.source, "Lua(", repr(_code.source), ", ", nomsu:tree_to_lua(_code), ")")
+        end
+        local lua = LuaValue(self.source, "Lua(", repr(_code.source))
+        local _list_1 = _code.value
+        for _index_0 = 1, #_list_1 do
+          local bit = _list_1[_index_0]
+          lua:append(", ")
+          if type(bit) == "string" then
+            lua:append(repr(bit))
+          else
+            local bit_lua = nomsu:tree_to_lua(bit)
+            if not (bit_lua.is_value) then
+              local line, src = bit.source:get_line(), bit.source:get_text()
+              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.", 0)
+            end
+            lua:append(bit_lua)
+          end
+        end
+        lua:append(")")
+        return lua
+      end)
+      self:define_compile_action("LuaValue %code", get_line_no(), function(self, _code)
+        if _code.type ~= "Text" then
+          return LuaValue(self.source, "LuaValue(", repr(_code.source), ", ", nomsu:tree_to_lua(_code), ")")
+        end
+        local lua = LuaValue(self.source, "LuaValue(", repr(_code.source))
+        local _list_1 = _code.value
+        for _index_0 = 1, #_list_1 do
+          local bit = _list_1[_index_0]
+          lua:append(", ")
+          if type(bit) == "string" then
+            lua:append(repr(bit))
+          else
+            local bit_lua = nomsu:tree_to_lua(bit)
+            if not (bit_lua.is_value) then
+              local line, src = bit.source:get_line(), bit.source:get_text()
+              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.", 0)
+            end
+            lua:append(bit_lua)
+          end
+        end
+        lua:append(")")
+        return lua
+      end)
+      self:define_compile_action("lua> %code", get_line_no(), function(self, _code)
+        if _code.type ~= "Text" then
+          return LuaValue(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
         end
         local lua = Lua(_code.source)
         local _list_1 = _code.value
@@ -1394,11 +1439,11 @@ do
         end
         return lua
       end)
-      self:define_compile_action("=lua %code", get_line_no(), function(_code)
+      self:define_compile_action("=lua %code", get_line_no(), function(self, _code)
         if _code.type ~= "Text" then
-          return LuaValue(_code.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
+          return LuaValue(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
         end
-        local lua = LuaValue(_code.source)
+        local lua = LuaValue(self.source)
         local _list_1 = _code.value
         for _index_0 = 1, #_list_1 do
           local bit = _list_1[_index_0]
@@ -1415,18 +1460,16 @@ do
         end
         return lua
       end)
-      self:define_compile_action("!! code location !!", get_line_no(), function()
-        local tree = nomsu.compilestack[#nomsu.compilestack - 1]
-        return LuaValue(tree.source, repr(tostring(tree.source)))
+      self:define_compile_action("!! code location !!", get_line_no(), function(self)
+        return LuaValue(self.source, repr(self.source))
       end)
       self:define_action("run file %filename", get_line_no(), function(_filename)
         return nomsu:run_file(_filename)
       end)
-      return self:define_compile_action("use %filename", get_line_no(), function(_filename)
-        local tree = nomsu.compilestack[#nomsu.compilestack - 1]
+      return self:define_compile_action("use %filename", get_line_no(), function(self, _filename)
         local filename = nomsu:tree_to_value(_filename)
         nomsu:use_file(filename)
-        return LuaValue(tree.source, "nomsu:use_file(" .. tostring(repr(filename)) .. ")")
+        return LuaValue(self.source, "nomsu:use_file(" .. tostring(repr(filename)) .. ")")
       end)
     end
   }

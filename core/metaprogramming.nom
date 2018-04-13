@@ -5,14 +5,13 @@
 # Compile-time action to make compile-time actions:
 immediately:
     lua> ".."
-        nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(\%actions, \%lua)
-            local tree = nomsu.compilestack[#nomsu.compilestack];
+        nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(tree, \%actions, \%lua)
             local lua = Lua(tree.source, "nomsu:define_compile_action(");
             local stubs = {};
             for i, action in ipairs(\%actions.value) do
                 stubs[i] = nomsu:tree_to_named_stub(action);
             end
-            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(");
+            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(tree");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
@@ -21,10 +20,10 @@ immediately:
                 error("Invalid type for 'compile % to %', expected a dict with expr/statements, but got text.", 0);
             end
             for i, arg in ipairs(args) do
+                lua:append(", ");
                 lua:append(arg);
-                if i < #args then lua:append(", ") end
             end
-            local body_lua = nomsu:tree_to_lua(\%lua):as_statements();
+            local body_lua = nomsu:tree_to_lua(\%lua):as_statements("return ");
             body_lua:declare_locals(args);
             lua:append(")\\n    ", body_lua, "\\nend);")
             return lua;
@@ -34,7 +33,6 @@ immediately:
 immediately:
     compile [action %actions %body] to:
         lua> ".."
-            local tree = nomsu.compilestack[#nomsu.compilestack];
             local lua = Lua(tree.source, "nomsu:define_action(");
             local stubs = {};
             for i, action in ipairs(\%actions.value) do
@@ -49,7 +47,7 @@ immediately:
                 lua:append(arg);
                 if i < #args then lua:append(", ") end
             end
-            local body_lua = nomsu:tree_to_lua(\%body):as_statements();
+            local body_lua = nomsu:tree_to_lua(\%body):as_statements("return ");
             body_lua:declare_locals(args);
             lua:append(")\\n    ", body_lua, "\\nend);")
             return lua;
@@ -58,20 +56,19 @@ immediately:
 immediately:
     compile [parse %shorthand as %longhand] to:
         lua> ".."
-            local tree = nomsu.compilestack[#nomsu.compilestack];
             local lua = Lua(tree.source, "nomsu:define_compile_action(");
             local stubs = {};
             for i, action in ipairs(\%shorthand.value) do
                 stubs[i] = nomsu:tree_to_named_stub(action);
             end
-            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(");
+            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(tree");
             local args = {};
             for i,tok in ipairs(\%shorthand.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
             end
             for i, arg in ipairs(args) do
+                lua:append(", ");
                 lua:append(arg);
-                if i < #args then lua:append(", ") end
             end
             local template;
             if \%longhand.type == "Block" then
@@ -127,14 +124,14 @@ immediately:
         =lua "nomsu:tree_to_stub(\%tree)"
     
 immediately:
-    compile [%tree's source code, %tree' source code] to {expr:"\(%tree as lua expr).source:get_text()"}
+    compile [%tree's source code, %tree' source code] to: LuaValue "\(%tree as lua expr).source:get_text()"
 
-    compile [repr %obj] to {expr:"repr(\(%obj as lua expr))"}
-    compile [type of %obj] to {expr:"type(\(%obj as lua expr))"}
+    compile [repr %obj] to: LuaValue "repr(\(%obj as lua expr))"
+    compile [type of %obj] to: LuaValue "type(\(%obj as lua expr))"
 
 immediately:
-    compile [nomsu] to {expr:"nomsu"}
-    compile [%var as lua identifier] to {expr:"nomsu:var_to_lua_identifier(\(%var as lua expr))"}
+    compile [nomsu] to: LuaValue "nomsu"
+    compile [%var as lua identifier] to: LuaValue "nomsu:var_to_lua_identifier(\(%var as lua expr))"
 
 action [action %names metadata]:
     =lua "nomsu.action_metadata[ACTIONS[\%names]]"
@@ -151,9 +148,8 @@ action [help %action]:
 
 # Compiler tools
 immediately:
-    #local def_metadata = nomsu.tree_metadata[nomsu.compilestack[#nomsu.compilestack]];
-    compile [run %code] to {..}
-        expr: ".."
+    compile [run %code] to:
+        LuaValue ".."
             nomsu:run(\(%code as lua expr), '\
                 =lua "nomsu:get_line_number(nomsu.compilestack[#nomsu.compilestack])"
             ..')
@@ -164,44 +160,40 @@ immediately:
     compile [show lua %block] to:
         lua> ".."
             local \%lua = nomsu:tree_to_lua(\%block);
-            return {statements = "print("..repr(\%lua.statements or \%lua.expr)..");"};
+            return Lua(\%block.source, "print(", repr(tostring(\%lua)), ");");
 
 immediately:
     compile [say %message] to:
         lua> ".."
+            local tree = nomsu.compilestack[#nomsu.compilestack];
             if \%message.type == "Text" then
-                return {statements="print("..\(%message as lua expr)..");"};
+                return Lua(tree.source, "print(", \(%message as lua expr), ");");
             else
-                return {statements="print(stringify("..\(%message as lua expr).."));"};
+                return Lua(tree.source, "print(stringify(", \(%message as lua expr), "));");
             end
 
 # Return
 immediately:
     #.. Return statement is wrapped in a do..end block because Lua is unhappy if you
         put code after a return statement, unless you wrap it in a block.
-    compile [return] to {statements:"do return; end"}
-    compile [return %return_value] to {statements:"do return \(%return_value as lua expr); end"}
+    compile [return] to: Lua "do return; end"
+    compile [return %return_value] to: Lua "do return \(%return_value as lua expr); end"
 
 # Error functions
 immediately:
-    compile [barf] to {statements:"error(nil, 0);"}
-    compile [barf %msg] to {statements:"error(\(%msg as lua expr), 0);"}
+    compile [barf] to: LuaValue "error(nil, 0);"
+    compile [barf %msg] to: LuaValue "error(\(%msg as lua expr), 0);"
     compile [assume %condition] to:
         lua> "local \%assumption = 'Assumption failed: '..\%condition.source:get_text();"
-        return {..}
-            statements:".."
+        return:
+            Lua ".."
                 if not \(%condition as lua expr) then
                     error(\(repr %assumption), 0);
                 end
-    compile [assume %condition or barf %msg] to {..}
-        statements:".."
-            if not \(%condition as lua expr) then
-                error(\(%msg as lua expr), 0);
-            end
 
 # Literals
 immediately:
-    compile [yes] to {expr:"true"}
-    compile [no] to {expr:"false"}
-    compile [nothing, nil, null] to {expr:"nil"}
+    compile [yes] to: LuaValue "true"
+    compile [no] to: LuaValue "false"
+    compile [nothing, nil, null] to: LuaValue "nil"
 
