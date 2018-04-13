@@ -82,7 +82,7 @@ immediately:
             for i, a in ipairs(args) do replacements[i] = a.."="..a; end
             replacements = "{"..table.concat(replacements, ", ").."}";
             lua:append([[)
-                local template = nomsu_parse(]]..template..[[, ]]..repr(tree.source.filename)..[[);
+                local template = nomsu:parse(]]..template..[[, ]]..repr(tree.source.filename)..[[);
                 local replacement = nomsu:tree_with_replaced_vars(template, ]]..replacements..[[);
                 return nomsu:tree_to_lua(replacement, nomsu.compilestack[#nomsu.compilestack].source.filename);
             end);
@@ -190,6 +190,13 @@ immediately:
                 if not \(%condition as lua expr) then
                     error(\(repr %assumption), 0);
                 end
+    
+    # TODO: factor this out and replace with "unless %condition: barf %message"
+    compile [assume %condition or barf %message] to:
+        Lua ".."
+            if not \(%condition as lua expr) then
+                error(\(%message as lua expr), 0);
+            end
 
 # Literals
 immediately:

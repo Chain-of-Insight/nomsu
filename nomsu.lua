@@ -1658,7 +1658,12 @@ if arg and debug_getinfo(2).func ~= require then
         local metadata = nomsu.action_metadata[info.func]
         if metadata then
           info.name = metadata.aliases[1]
-          local filename = metadata.source:match("^[^[:]*")
+          local filename
+          if type(metadata.source) == 'string' then
+            filename = metadata.source:match("^[^[:]*")
+          else
+            filename = metadata.source.filename
+          end
           info.short_src = filename
           info.source = FILE_CACHE[filename]
           local linedefined

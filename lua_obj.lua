@@ -126,10 +126,11 @@ do
     end,
     __tostring = function(self)
       local buff = { }
-      local _list_0 = self.bits
-      for _index_0 = 1, #_list_0 do
-        local b = _list_0[_index_0]
+      for i, b in ipairs(self.bits) do
         buff[#buff + 1] = tostring(b)
+        if i < #self.bits and type(b) ~= 'string' and b.is_statement then
+          buff[#buff + 1] = "\n"
+        end
       end
       local ret = concat(buff, "")
       assert(not ret:match(".*table: 0x.*"))

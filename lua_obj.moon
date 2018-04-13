@@ -73,8 +73,10 @@ class Lua
 
     __tostring: =>
         buff = {}
-        for b in *@bits
+        for i,b in ipairs @bits
             buff[#buff+1] = tostring(b)
+            if i < #@bits and type(b) != 'string' and b.is_statement
+                buff[#buff+1] = "\n"
         ret = concat(buff, "")
         assert(not ret\match(".*table: 0x.*"))
         return ret

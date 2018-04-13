@@ -1133,7 +1133,9 @@ if arg and debug_getinfo(2).func != require
         if info.short_src or info.source or info.linedefine or info.currentline
             if metadata = nomsu.action_metadata[info.func]
                 info.name = metadata.aliases[1]
-                filename = metadata.source\match("^[^[:]*")
+                filename = if type(metadata.source) == 'string'
+                    metadata.source\match("^[^[:]*")
+                else metadata.source.filename
                 info.short_src = filename
                 info.source = FILE_CACHE[filename]
                 ok, linedefined = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
