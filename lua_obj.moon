@@ -56,7 +56,8 @@ class Lua
     declare_locals: (skip={})=>
         if next(skip) == 1
             skip = {[s]:true for s in *skip}
-        @prepend "local #{concat @free_vars, ", "};\n"
+        if #@free_vars > 0
+            @prepend "local #{concat @free_vars, ", "};\n"
         for var in *@free_vars do skip[var] = true
         for bit in *@bits
             if type(bit) == Lua
@@ -66,7 +67,9 @@ class Lua
         buff = {}
         for b in *@bits
             buff[#buff+1] = tostring(b)
-        return concat(buff, "")
+        ret = concat(buff, "")
+        assert(not ret\match(".*table: 0x.*"))
+        return ret
 
     __len: =>
         len = 0
@@ -96,7 +99,6 @@ class Lua
             lua_filename:lua_chunkname, lua_file:lua_str
             lua_to_nomsu: {}, nomsu_to_lua: {}
         }
-        metadata, lua_offset = {}, 1
         lua_offset = 1
         walk = (lua)->
             if type(lua) == 'string'
@@ -106,7 +108,7 @@ class Lua
                 for b in *lua.bits
                     walk b
                 lua_stop = lua_offset
-                nomsu_src, lua_src = lua.souce, Location(lua_chunkname, lua_str, lua_start, lua_stop)
+                nomsu_src, lua_src = lua.source, Location(lua_chunkname, lua_str, lua_start, lua_stop)
                 metadata.lua_to_nomsu[lua_src] = nomsu_src
                 metadata.nomsu_to_lua[nomsu_src] = lua_src
         walk self
@@ -118,6 +120,14 @@ class LuaValue extends Lua
 
     new: (@source, ...)=>
         @bits = {...}
+
+    __tostring: =>
+        buff = {}
+        for b in *@bits
+            buff[#buff+1] = tostring(b)
+        ret = concat(buff, "")
+        assert(not ret\match(".*table: 0x.*"))
+        return ret
 
     as_statements: =>
         bits = {unpack @bits}

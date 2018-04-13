@@ -26,7 +26,7 @@ immediately:
             end
             local body_lua = nomsu:tree_to_lua(\%lua):as_statements();
             body_lua:declare_locals(args);
-            lua:append("\\n    ", body_lua, "\\nend);")
+            lua:append(")\\n    ", body_lua, "\\nend);")
             return lua;
         end);
 

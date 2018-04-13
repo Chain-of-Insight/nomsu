@@ -916,8 +916,8 @@ do
       elseif "FunctionCall" == _exp_0 then
         insert(self.compilestack, tree)
         local stub = self:tree_to_stub(tree)
-        local fn = rawget(self.environment.ACTIONS, stub)
-        local metadata = self.action_metadata[fn]
+        local action = rawget(self.environment.ACTIONS, stub)
+        local metadata = self.action_metadata[action]
         if metadata and metadata.compile_time then
           local args
           do
@@ -948,7 +948,7 @@ do
             end
             args = new_args
           end
-          local lua = fn(unpack(args))
+          local lua = action(unpack(args))
           remove(self.compilestack)
           return lua
         elseif not metadata and self.__class.math_patt:match(stub) then
@@ -1419,9 +1419,7 @@ do
       end)
       self:define_compile_action("!! code location !!", get_line_no(), function()
         local tree = nomsu.compilestack[#nomsu.compilestack - 1]
-        return LuaValue(tree.source, {
-          repr(tostring(tree.source))
-        })
+        return LuaValue(tree.source, repr(tostring(tree.source)))
       end)
       self:define_action("run file %filename", get_line_no(), function(_filename)
         return nomsu:run_file(_filename)
@@ -1430,9 +1428,7 @@ do
         local tree = nomsu.compilestack[#nomsu.compilestack - 1]
         local filename = nomsu:tree_to_value(_filename)
         nomsu:use_file(filename)
-        return LuaValue(tree.source, {
-          "nomsu:use_file(" .. tostring(repr(filename)) .. ")"
-        })
+        return LuaValue(tree.source, "nomsu:use_file(" .. tostring(repr(filename)) .. ")")
       end)
     end
   }
@@ -1510,6 +1506,9 @@ do
         self.environment[k] = v
       end
       self.environment.Tuple = Tuple
+      self.environment.Lua = Lua
+      self.environment.LuaValue = LuaValue
+      self.environment.Location = Location
       self.environment.ACTIONS = setmetatable({ }, {
         __index = function(self, key)
           return error("Attempt to run undefined action: " .. tostring(key), 0)
@@ -1597,21 +1596,37 @@ if arg and debug_getinfo(2).func ~= require then
       return line_table
     end
   })
-  debug.getinfo = function(...)
-    local info = debug_getinfo(...)
+  debug.getinfo = function(thread, f, what)
+    if what == nil then
+      f, what, thread = thread, f, nil
+    end
+    if type(f) == 'number' then
+      f = f + 1
+    end
+    local info
+    if thread == nil then
+      info = debug_getinfo(f, what)
+    else
+      info = debug_getinfo(thread, f, what)
+    end
     if not info or not info.func then
       return info
     end
-    if info.source and info.source:sub(1, 1) ~= "@" and LINE_STARTS[info.source] then
-      do
-        local metadata = nomsu.action_metadata[info.func]
-        if metadata then
-          info.name = metadata.aliases[1]
-        end
+    do
+      local metadata = nomsu.action_metadata[info.func]
+      if metadata then
+        info.name = metadata.aliases[1]
       end
+    end
+    local is_nomsu, nomsu_line = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
+    if is_nomsu then
       if info.source:sub(1, 1) == "@" then
         error("Not-yet-loaded source: " .. tostring(info.source))
       end
+      info.linedefined = nomsu_line
+      info.currentline = lua_line_to_nomsu_line(info.short_src, info.currentline)
+      info.short_src = metadata.source.text_name
+      info.source = metadata.source.text
     else
       if info.short_src and info.short_src:match("^.*%.moon$") then
         local line_table = moonscript_line_tables[info.short_src]

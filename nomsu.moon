@@ -34,6 +34,7 @@ debug_getinfo = debug.getinfo
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
 -- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
+-- Allow plain text backslash like: "\n" in longstrings without requiring "\\n"
 
 FILE_CACHE = setmetatable {}, {
     __index: (filename)=>
@@ -215,6 +216,9 @@ class NomsuCompiler
         }
         for k,v in pairs(Types) do @environment[k] = v
         @environment.Tuple = Tuple
+        @environment.Lua = Lua
+        @environment.LuaValue = LuaValue
+        @environment.Location = Location
         @environment.ACTIONS = setmetatable({}, {__index:(key)=>
             error("Attempt to run undefined action: #{key}", 0)
         })
@@ -677,16 +681,16 @@ class NomsuCompiler
                 insert @compilestack, tree
 
                 stub = @tree_to_stub tree
-                fn = rawget(@environment.ACTIONS, stub)
+                action = rawget(@environment.ACTIONS, stub)
 
-                metadata = @action_metadata[fn]
+                metadata = @action_metadata[action]
                 if metadata and metadata.compile_time
                     args = [arg for arg in *tree.value when arg.type != "Word"]
                     -- Force all compile-time actions to take a tree location
                     if metadata and metadata.arg_orders
                         new_args = [args[p] for p in *metadata.arg_orders[stub]]
                         args = new_args
-                    lua = fn(unpack(args))
+                    lua = action(unpack(args))
                     remove @compilestack
                     return lua
                 elseif not metadata and @@math_patt\match(stub)
@@ -1005,13 +1009,13 @@ class NomsuCompiler
             lua = nomsu\tree_to_lua(_block)\as_statements!
             lua\declare_locals!
             nomsu\run_lua(lua)
-            return Lua _block.source, "if IMMEDIATE then\n", lua, "\nend"
+            return Lua(_block.source, "if IMMEDIATE then\n", lua, "\nend")
 
         @define_compile_action "lua> %code", get_line_no!, (_code)->
             if _code.type != "Text"
                 return LuaValue(_code.source, "nomsu:run_lua(",nomsu\tree_to_lua(_code),")")
 
-            lua = Lua _code.source
+            lua = Lua(_code.source)
             for bit in *_code.value
                 if type(bit) == "string"
                     lua\append bit
@@ -1041,7 +1045,7 @@ class NomsuCompiler
 
         @define_compile_action "!! code location !!", get_line_no!, ->
             tree = nomsu.compilestack[#nomsu.compilestack-1]
-            return LuaValue(tree.source, {repr(tostring(tree.source))})
+            return LuaValue(tree.source, repr(tostring(tree.source)))
 
         @define_action "run file %filename", get_line_no!, (_filename)->
             return nomsu\run_file(_filename)
@@ -1050,7 +1054,7 @@ class NomsuCompiler
             tree = nomsu.compilestack[#nomsu.compilestack-1]
             filename = nomsu\tree_to_value(_filename)
             nomsu\use_file(filename)
-            return LuaValue(tree.source, {"nomsu:use_file(#{repr filename})"})
+            return LuaValue(tree.source, "nomsu:use_file(#{repr filename})")
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug_getinfo(2).func != require
@@ -1081,17 +1085,23 @@ if arg and debug_getinfo(2).func != require
             return line_table
     }
 
-    debug.getinfo = (...)->
-        info = debug_getinfo(...)
+    debug.getinfo = (thread,f,what)->
+        if what == nil
+            f,what,thread = thread,f,nil
+        if type(f) == 'number' then f += 1 -- Account for this wrapper function
+        info = if thread == nil
+            debug_getinfo(f,what)
+        else debug_getinfo(thread,f,what)
         if not info or not info.func then return info
-        if info.source and info.source\sub(1,1) != "@" and LINE_STARTS[info.source]
-            if metadata = nomsu.action_metadata[info.func]
-                info.name = metadata.aliases[1]
+        if metadata = nomsu.action_metadata[info.func]
+            info.name = metadata.aliases[1]
+        is_nomsu, nomsu_line = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
+        if is_nomsu
             if info.source\sub(1,1) == "@" then error("Not-yet-loaded source: #{info.source}")
-            --info.linedefined = lua_line_to_nomsu_line(info.short_src, info.linedefined)
-            --info.currentline = lua_line_to_nomsu_line(info.short_src, info.currentline)
-            --info.short_src = metadata.source.text_name
-            --info.source = metadata.source.text
+            info.linedefined = nomsu_line
+            info.currentline = lua_line_to_nomsu_line(info.short_src, info.currentline)
+            info.short_src = metadata.source.text_name
+            info.source = metadata.source.text
         else
             if info.short_src and info.short_src\match("^.*%.moon$")
                 line_table = moonscript_line_tables[info.short_src]
