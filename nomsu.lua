@@ -973,11 +973,9 @@ do
           return lua
         end
         local args = { }
-        local _list_1 = tree.value
-        for _index_0 = 1, #_list_1 do
+        for i, tok in ipairs(tree.value) do
           local _continue_0 = false
           repeat
-            local i, tok = _list_1[_index_0]
             if tok.type == "Word" then
               _continue_0 = true
               break
@@ -998,9 +996,9 @@ do
           do
             local _accum_0 = { }
             local _len_0 = 1
-            local _list_2 = metadata.arg_orders[stub]
-            for _index_0 = 1, #_list_2 do
-              local p = _list_2[_index_0]
+            local _list_1 = metadata.arg_orders[stub]
+            for _index_0 = 1, #_list_1 do
+              local p = _list_1[_index_0]
               _accum_0[_len_0] = args[p]
               _len_0 = _len_0 + 1
             end
@@ -1612,26 +1610,22 @@ if arg and debug_getinfo(2).func ~= require then
     if not info or not info.func then
       return info
     end
-    do
-      local metadata = nomsu.action_metadata[info.func]
-      if metadata then
-        info.name = metadata.aliases[1]
-      end
-    end
-    local is_nomsu, nomsu_line = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
-    if is_nomsu then
-      if info.source:sub(1, 1) == "@" then
-        error("Not-yet-loaded source: " .. tostring(info.source))
-      end
-      info.linedefined = nomsu_line
-      info.currentline = lua_line_to_nomsu_line(info.short_src, info.currentline)
-      info.short_src = metadata.source.text_name
-      info.source = metadata.source.text
-    else
-      if info.short_src and info.short_src:match("^.*%.moon$") then
-        local line_table = moonscript_line_tables[info.short_src]
-        local file = FILE_CACHE[info.short_src]
-        info.source = file or info.source
+    if info.short_src or info.source or info.linedefine or info.currentline then
+      do
+        local metadata = nomsu.action_metadata[info.func]
+        if metadata then
+          info.name = metadata.aliases[1]
+          local filename = metadata.source:match("^[^[:]*")
+          info.short_src = filename
+          info.source = FILE_CACHE[filename]
+          local linedefined
+          ok, linedefined = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
+          if ok then
+            info.linedefined = linedefined
+          end
+          local currentline
+          ok, currentline = pcall(lua_line_to_nomsu_line, info.short_src, info.currentline)
+        end
       end
     end
     return info

@@ -49,9 +49,9 @@ immediately:
                 lua:append(arg);
                 if i < #args then lua:append(", ") end
             end
-            local body_lua = nomsu:tree_to_lua(\%lua):as_statements();
+            local body_lua = nomsu:tree_to_lua(\%body):as_statements();
             body_lua:declare_locals(args);
-            lua:append("\\n    ", body_lua, "\\nend);")
+            lua:append(")\\n    ", body_lua, "\\nend);")
             return lua;
 
 # Macro to make nomsu macros:

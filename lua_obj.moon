@@ -5,7 +5,12 @@ export LINE_STARTS
 
 Location = immutable {"text_name","text","start","stop"}, {
     name:"Location"
-    __new: (text_name, text, start, stop)=> text_name, text, start, stop or start
+    __new: (text_name, text, start, stop)=>
+        assert(type(text_name) == 'string')
+        assert(type(text) == 'string')
+        assert(type(start) == 'number')
+        assert(type(stop or start) == 'number')
+        return text_name, text, start, stop or start
     __tostring: => "#{@text_name}[#{@start}:#{@stop}]"
     __lt: (other)=>
         assert(@text == other.text, "Cannot compare sources from different texts")
@@ -28,9 +33,9 @@ Location = immutable {"text_name","text","start","stop"}, {
         while (line_starts[stop_line+1] or (#src+1)) <= @stop
             stop_line += 1
         return start_line, stop_line
-    get_line: => "#{@text_name}:#{@get_line_number}"
+    get_line: => "#{@text_name}:#{@get_line_number!}"
     get_line_range: =>
-        start_line, stop_line = @get_line_number
+        start_line, stop_line = @get_line_number!
         return if stop_line == start_line
             "#{text_name}:#{start_line}"
         else "#{text_name}:#{start_line}-#{stop_line}"
@@ -41,6 +46,9 @@ class Lua
     is_value: false
 
     new: (@source, ...)=>
+        for i=1,select("#",...)
+            x = select(i,...)
+            assert(type(x) != 'table' or getmetatable(x))
         @bits = {...}
         @free_vars = {}
     
@@ -81,14 +89,20 @@ class Lua
         n = select("#",...)
         bits = @bits
         for i=1,n
+            x = select(i,...)
+            assert(type(x) != 'table' or getmetatable(x))
             bits[#bits+1] = select(i, ...)
     
     prepend: (...)=>
         n = select("#",...)
         bits = @bits
         for i=#bits+n,n+1,-1
+            x = select(i,...)
+            assert(type(x) != 'table' or getmetatable(x))
             bits[i] = bits[i-n]
         for i=1,n
+            x = select(i,...)
+            assert(type(x) != 'table' or getmetatable(x))
             bits[i] = select(i, ...)
 
     make_offset_table: (lua_chunkname)=>
@@ -132,7 +146,7 @@ class LuaValue extends Lua
     as_statements: =>
         bits = {unpack @bits}
         bits[#bits+1] = ";"
-        return Lua(@source, bits)
+        return Lua(@source, unpack(bits))
 
     parenthesize: =>
         @prepend "("

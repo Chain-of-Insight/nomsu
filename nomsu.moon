@@ -714,7 +714,7 @@ class NomsuCompiler
                     return lua
 
                 args = {}
-                for i, tok in *tree.value
+                for i, tok in ipairs tree.value
                     if tok.type == "Word" then continue
                     arg_lua = @tree_to_lua(tok)
                     unless arg_lua.is_value
@@ -1093,20 +1093,16 @@ if arg and debug_getinfo(2).func != require
             debug_getinfo(f,what)
         else debug_getinfo(thread,f,what)
         if not info or not info.func then return info
-        if metadata = nomsu.action_metadata[info.func]
-            info.name = metadata.aliases[1]
-        is_nomsu, nomsu_line = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
-        if is_nomsu
-            if info.source\sub(1,1) == "@" then error("Not-yet-loaded source: #{info.source}")
-            info.linedefined = nomsu_line
-            info.currentline = lua_line_to_nomsu_line(info.short_src, info.currentline)
-            info.short_src = metadata.source.text_name
-            info.source = metadata.source.text
-        else
-            if info.short_src and info.short_src\match("^.*%.moon$")
-                line_table = moonscript_line_tables[info.short_src]
-                file = FILE_CACHE[info.short_src]
-                info.source = file or info.source
+        if info.short_src or info.source or info.linedefine or info.currentline
+            if metadata = nomsu.action_metadata[info.func]
+                info.name = metadata.aliases[1]
+                filename = metadata.source\match("^[^[:]*")
+                info.short_src = filename
+                info.source = FILE_CACHE[filename]
+                ok, linedefined = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
+                if ok then info.linedefined = linedefined
+                ok, currentline = pcall(lua_line_to_nomsu_line, info.short_src, info.currentline)
+                --if ok then info.currentline = currentline
         return info
 
     
