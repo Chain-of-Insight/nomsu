@@ -171,7 +171,6 @@ immediately:
 immediately:
     compile [say %message] to:
         lua> ".."
-            local tree = nomsu.compilestack[#nomsu.compilestack];
             if \%message.type == "Text" then
                 return Lua(tree.source, "print(", \(%message as lua expr), ");");
             else
@@ -182,8 +181,8 @@ immediately:
     compile [source] to: Lua value (=lua "tree.source") "tree.source"
 
 immediately:
-    action [Lua %]: Lua (=lua "nomsu.compilestack[#nomsu.compilestack]") %
-    action [Lua value %]: Lua value (=lua "nomsu.compilestack[#nomsu.compilestack]") %
+    action [Lua %]: Lua (=lua "tree.source") %
+    action [Lua value %]: Lua value (=lua "tree.source") %
 
 # Return
 immediately:

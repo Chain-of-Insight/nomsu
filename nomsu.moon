@@ -37,6 +37,7 @@ debug_getinfo = debug.getinfo
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
 -- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
 -- Allow plain text backslash like: "\n" in longstrings without requiring "\\n"
+-- Maybe support some kind of regex action definitions like "foo %first (and %next)*"?
 
 export FILE_CACHE
 FILE_CACHE = setmetatable {}, {
@@ -892,7 +893,7 @@ if arg and debug_getinfo(2).func != require
             return line_table
     }
 
-    debug.getinfo = (thread,f,what)->
+    debug.getinfoXXXXXX = (thread,f,what)->
         if what == nil
             f,what,thread = thread,f,nil
         if type(f) == 'number' then f += 1 -- Account for this wrapper function

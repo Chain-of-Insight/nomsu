@@ -65,7 +65,7 @@ Tree "Block",
             lua\append line_lua
         return lua
 
-math_patt = re.compile [[ "%" (" " [*/^+-] " %")+ ]]
+math_expression = re.compile [[ "%" (" " [*/^+-] " %")+ ]]
 Tree "Action",
     as_lua: (nomsu)=>
         stub = @get_stub!
@@ -77,10 +77,12 @@ Tree "Action",
             if metadata.arg_orders
                 new_args = [args[p-1] for p in *metadata.arg_orders[stub]]
                 args = new_args
-            return action(Lua(@source), unpack(args))
+            -- Force Lua to avoid tail call optimization for debugging purposes
+            ret = action(Lua(@source), unpack(args))
+            return ret
 
         lua = Lua.Value(@source)
-        if not metadata and math_patt\match(stub)
+        if not metadata and math_expression\match(stub)
             -- This is a bit of a hack, but this code handles arbitrarily complex
             -- math expressions like 2*x + 3^2 without having to define a single
             -- action for every possibility.

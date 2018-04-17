@@ -1292,7 +1292,7 @@ if arg and debug_getinfo(2).func ~= require then
       return line_table
     end
   })
-  debug.getinfo = function(thread, f, what)
+  debug.getinfoXXXXXX = function(thread, f, what)
     if what == nil then
       f, what, thread = thread, f, nil
     end
