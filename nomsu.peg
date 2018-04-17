@@ -7,7 +7,7 @@ file (File):
 
 shebang: "#!" [^%nl]* %nl
 
-statement: functioncall / expression
+statement: action / expression
 
 indented_block (Block):
     {| (":" / "(..)")? indent
@@ -17,27 +17,27 @@ indented_block (Block):
 
 inline_nomsu (Nomsu): "\" noindex_inline_expression
 indented_nomsu (Nomsu):
-    "\" (noindex_inline_expression / (":" %ws* (inline_functioncall / inline_expression) eol) / indented_expression)
+    "\" (noindex_inline_expression / (":" %ws* (inline_action / inline_expression) eol) / indented_expression)
 
 index_chain (IndexChain):
     {| noindex_inline_expression ("." ((({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / noindex_inline_expression))+ |} -> Tuple
 
 noindex_inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
-    / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")")
+    / ("(" %ws* (inline_action / inline_expression) %ws* ")")
 
 inline_expression:
     index_chain / noindex_inline_expression 
 indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict / indented_block
 expression:
-    inline_expression / (":" %ws* (inline_functioncall / inline_expression) eol) / indented_expression
+    inline_expression / (":" %ws* (inline_action / inline_expression) eol) / indented_expression
 
 -- Function calls need at least one word in them
-inline_functioncall (FunctionCall):
+inline_action (Action):
     {| (inline_expression %ws*)* word (%ws* (inline_expression / word))*
-        (%ws* ":" %ws* (inline_functioncall / inline_expression))?|} -> Tuple
-functioncall (FunctionCall):
+        (%ws* ":" %ws* (inline_action / inline_expression))?|} -> Tuple
+action (Action):
     {| (expression (dotdot / %ws*))* word ((dotdot / %ws*) (expression / word))* |} -> Tuple
 
 word (Word): { %operator / (!number plain_word) }
@@ -60,13 +60,13 @@ indented_text (Text):
 inline_text_interpolation:
     "\" (
         variable / inline_list / inline_dict / inline_text
-        / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")")
+        / ("(" %ws* (inline_action / inline_expression) %ws* ")")
     )
 text_interpolation:
     inline_text_interpolation /
     ("\" (
         variable / inline_list / inline_dict / inline_text
-        / ("(" %ws* (inline_functioncall / inline_expression) %ws* ")")
+        / ("(" %ws* (inline_action / inline_expression) %ws* ")")
         / (%ws* (block_comment / line_comment)? nodent "..")
         / (indented_text %nl+ %nodent "..")
         / ((indented_list / indented_block) nodent "..")
@@ -87,9 +87,9 @@ indented_list (List):
     |} -> Tuple)
     (dedent / (("" -> "Error while parsing list") => error))
 list_line:
-     ((functioncall / expression) !comma)
+     ((action / expression) !comma)
      / (inline_list_item (comma list_line?)?)
-inline_list_item: inline_functioncall / inline_expression
+inline_list_item: inline_action / inline_expression
 
 inline_dict (Dict):
     !('{..}')
@@ -100,10 +100,10 @@ indented_dict (Dict):
     |} -> Tuple)
     (dedent / (("" -> "Error while parsing dict") => error))
 dict_line:
-    ((dict_key %ws* ":" %ws* (functioncall / expression)) -> DictEntry !comma)
+    ((dict_key %ws* ":" %ws* (action / expression)) -> DictEntry !comma)
     / (inline_dict_item (comma dict_line?)?)
 inline_dict_item:
-    (dict_key %ws* ":" %ws* (inline_functioncall / inline_expression)) -> DictEntry
+    (dict_key %ws* ":" %ws* (inline_action / inline_expression)) -> DictEntry
 dict_key:
     (({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / inline_expression
 

@@ -7,6 +7,9 @@ P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C,
 local utils = require('utils')
 local new_uuid = require('uuid')
 local immutable = require('immutable')
+Tuple = immutable(nil, {
+  name = "Tuple"
+})
 local repr, stringify, min, max, equivalent, set, is_list, sum
 repr, stringify, min, max, equivalent, set, is_list, sum = utils.repr, utils.stringify, utils.min, utils.max, utils.equivalent, utils.set, utils.is_list, utils.sum
 local colors = setmetatable({ }, {
@@ -27,10 +30,10 @@ do
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
 local debug_getinfo = debug.getinfo
-local Lua, LuaValue, Location
+local Lua, Location
 do
   local _obj_0 = require("lua_obj")
-  Lua, LuaValue, Location = _obj_0.Lua, _obj_0.LuaValue, _obj_0.Location
+  Lua, Location = _obj_0.Lua, _obj_0.Location
 end
 FILE_CACHE = setmetatable({ }, {
   __index = function(self, filename)
@@ -85,53 +88,7 @@ do
     end
   end
 end
-local Types = { }
-local type_tostring
-type_tostring = function(self)
-  return tostring(self.name) .. "(" .. tostring(repr(self.value)) .. ")"
-end
-local type_with_value
-type_with_value = function(self, value)
-  return getmetatable(self)(self.source, value)
-end
-local Tuple = immutable(nil, {
-  name = "Tuple"
-})
-local _list_0 = {
-  "File",
-  "Nomsu",
-  "Block",
-  "List",
-  "FunctionCall",
-  "Text",
-  "Dict",
-  "Number",
-  "Word",
-  "Var",
-  "Comment",
-  "IndexChain"
-}
-for _index_0 = 1, #_list_0 do
-  local t = _list_0[_index_0]
-  Types[t] = immutable({
-    "value",
-    "source"
-  }, {
-    type = t,
-    name = t,
-    __tostring = type_tostring,
-    with_value = type_with_value
-  })
-end
-Types.DictEntry = immutable({
-  "key",
-  "value"
-}, {
-  name = "DictEntry"
-})
-Types.is_node = function(n)
-  return type(n) == 'userdata' and n.type
-end
+local Types = require("nomsu_tree")
 local NOMSU_DEFS
 do
   local _with_0 = { }
@@ -376,7 +333,8 @@ do
       local tree = self:parse(nomsu_code, filename)
       assert(tree, "Failed to parse: " .. tostring(nomsu_code))
       assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
-      local lua = self:tree_to_lua(tree):as_statements()
+      local lua = self:tree_to_lua(tree)
+      lua:convert_to_statements()
       lua:declare_locals()
       lua:prepend("-- File: " .. tostring(filename) .. "\n")
       return self:run_lua(lua, filename .. ".lua")
@@ -511,7 +469,7 @@ do
           end
           local nomsu = inline_expression(tok.value)
           return nomsu and "(: " .. tostring(nomsu) .. ")"
-        elseif "FunctionCall" == _exp_0 then
+        elseif "Action" == _exp_0 then
           local buff = ""
           for i, bit in ipairs(tok.value) do
             if bit.type == "Word" then
@@ -529,7 +487,7 @@ do
                 buff = buff .. " "
               end
               buff = buff .. (function()
-                if bit.type == "FunctionCall" then
+                if bit.type == "Action" then
                   return "(" .. nomsu .. ")"
                 else
                   return nomsu
@@ -540,9 +498,9 @@ do
           return buff
         elseif "IndexChain" == _exp_0 then
           local bits = { }
-          local _list_1 = tok.value
-          for _index_0 = 1, #_list_1 do
-            local bit = _list_1[_index_0]
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
             local nomsu = inline_expression(bit)
             if not (nomsu) then
               return nil
@@ -552,9 +510,9 @@ do
           return concat(bits, ".")
         elseif "List" == _exp_0 then
           local bits = { }
-          local _list_1 = tok.value
-          for _index_0 = 1, #_list_1 do
-            local bit = _list_1[_index_0]
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
             local nomsu = inline_expression(bit)
             if not (nomsu) then
               return nil
@@ -564,9 +522,9 @@ do
           return "[" .. concat(bits, ", ") .. "]"
         elseif "Dict" == _exp_0 then
           local bits = { }
-          local _list_1 = tok.value
-          for _index_0 = 1, #_list_1 do
-            local bit = _list_1[_index_0]
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
             local key_nomsu
             if bit.key.type == "Word" then
               key_nomsu = bit.key.value
@@ -576,7 +534,7 @@ do
             if not (key_nomsu) then
               return nil
             end
-            if bit.key.type == "FunctionCall" then
+            if bit.key.type == "Action" then
               key_nomsu = "(" .. key_nomsu .. ")"
             end
             local value_nomsu = inline_expression(bit.value)
@@ -588,9 +546,9 @@ do
           return "{" .. concat(bits, ", ") .. "}"
         elseif "Text" == _exp_0 then
           local buff = '"'
-          local _list_1 = tok.value
-          for _index_0 = 1, #_list_1 do
-            local bit = _list_1[_index_0]
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
             if type(bit) == 'string' then
               if bit:find("\n") then
                 return nil
@@ -636,9 +594,9 @@ do
         local _exp_0 = tok.type
         if "Block" == _exp_0 then
           local buff = ":"
-          local _list_1 = tok.value
-          for _index_0 = 1, #_list_1 do
-            local line = _list_1[_index_0]
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local line = _list_0[_index_0]
             nomsu = expression(line)
             if not (nomsu) then
               return nil
@@ -646,7 +604,7 @@ do
             buff = buff .. ("\n    " .. self:indent(nomsu))
           end
           return buff
-        elseif "FunctionCall" == _exp_0 then
+        elseif "Action" == _exp_0 then
           nomsu = expression(tok)
           if not (nomsu) then
             return nil
@@ -657,9 +615,9 @@ do
         elseif "List" == _exp_0 then
           local buff = "[..]"
           local line = "\n    "
-          local _list_1 = tok.value
-          for _index_0 = 1, #_list_1 do
-            local bit = _list_1[_index_0]
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
             nomsu = inline_expression(bit)
             if line ~= "\n    " and #line + #", " + #nomsu > max_line then
               buff = buff .. line
@@ -685,14 +643,14 @@ do
         elseif "Dict" == _exp_0 then
           local buff = "{..}"
           local line = "\n    "
-          local _list_1 = tok.value
-          for _index_0 = 1, #_list_1 do
-            local bit = _list_1[_index_0]
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
             local key_nomsu = inline_expression(bit.key)
             if not (key_nomsu) then
               return nil
             end
-            if bit.key.type == "FunctionCall" then
+            if bit.key.type == "Action" then
               key_nomsu = "(" .. key_nomsu .. ")"
             end
             local value_nomsu = inline_expression(bit.value)
@@ -714,9 +672,9 @@ do
           return buff
         elseif "Text" == _exp_0 then
           local buff = '".."\n    '
-          local _list_1 = tok.value
-          for _index_0 = 1, #_list_1 do
-            local bit = _list_1[_index_0]
+          local _list_0 = tok.value
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
             if type(bit) == 'string' then
               buff = buff .. bit:gsub("\\", "\\\\"):gsub("\n", "\n    ")
             else
@@ -758,7 +716,7 @@ do
         local _exp_0 = tok.type
         if "Block" == _exp_0 then
           if #tok.value == 1 then
-            if tok.value[1].type == "FunctionCall" then
+            if tok.value[1].type == "Action" then
               nomsu = inline_expression(tok.value[1])
             else
               nomsu = noeol_expression(tok.value[1])
@@ -768,7 +726,7 @@ do
             end
           end
           return noeol_expression(tok)
-        elseif "FunctionCall" == _exp_0 then
+        elseif "Action" == _exp_0 then
           local buff = ""
           for i, bit in ipairs(tok.value) do
             if bit.type == "Word" then
@@ -780,7 +738,7 @@ do
             else
               nomsu = inline_expression(bit)
               if nomsu and #nomsu < max_line then
-                if bit.type == "FunctionCall" then
+                if bit.type == "Action" then
                   nomsu = "(" .. nomsu .. ")"
                 end
               else
@@ -788,7 +746,7 @@ do
                 if not (nomsu) then
                   return nil
                 end
-                if bit.type == "FunctionCall" then
+                if bit.type == "Action" then
                   nomsu = "(..)\n    " .. self:indent(nomsu)
                 end
                 if i < #tok.value then
@@ -804,9 +762,9 @@ do
           return buff
         elseif "File" == _exp_0 then
           local lines = { }
-          local _list_1 = tree.value
-          for _index_0 = 1, #_list_1 do
-            local line = _list_1[_index_0]
+          local _list_0 = tree.value
+          for _index_0 = 1, #_list_0 do
+            local line = _list_0[_index_0]
             nomsu = expression(line)
             if not (nomsu) then
               error("Failed to produce output for:\n" .. tostring(colored.yellow(line.source:get_text())), 0)
@@ -870,309 +828,7 @@ do
       end
     end,
     tree_to_lua = function(self, tree)
-      assert(tree, "No tree provided.")
-      if not Types.is_node(tree) then
-        error("Invalid tree")
-      end
-      local _exp_0 = tree.type
-      if "File" == _exp_0 then
-        if #tree.value == 1 then
-          return self:tree_to_lua(tree.value[1])
-        end
-        local file_lua = Lua(tree.source)
-        local declared_locals = { }
-        for i, line in ipairs(tree.value) do
-          local line_lua = self:tree_to_lua(line)
-          if not line_lua then
-            error("No lua produced by " .. tostring(repr(line)), 0)
-          end
-          line_lua = line_lua:as_statements()
-          if i < #tree.value then
-            file_lua:append("\n")
-          end
-          file_lua:append(line_lua)
-        end
-        file_lua:declare_locals()
-        return file_lua
-      elseif "Comment" == _exp_0 then
-        return Lua(tree.source, "--" .. tree.value:gsub("\n", "\n--") .. "\n")
-      elseif "Nomsu" == _exp_0 then
-        return Lua(tree.source, "nomsu:parse(", tree.source:get_text(), ", ", repr(tree.source.filename), ")")
-      elseif "Block" == _exp_0 then
-        local block_lua = Lua(tree.source)
-        for i, arg in ipairs(tree.value) do
-          local lua = self:tree_to_lua(arg)
-          if i == 1 and #tree.value == 1 and lua.is_value then
-            return lua
-          end
-          lua = lua:as_statements()
-          if i < #tree.value then
-            block_lua:append("\n")
-          end
-          block_lua:append(lua)
-        end
-        return block_lua
-      elseif "FunctionCall" == _exp_0 then
-        insert(self.compilestack, tree)
-        local stub = self:tree_to_stub(tree)
-        local action = rawget(self.environment.ACTIONS, stub)
-        local metadata = self.action_metadata[action]
-        if metadata and metadata.compile_time then
-          local args
-          do
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_1 = tree.value
-            for _index_0 = 1, #_list_1 do
-              local arg = _list_1[_index_0]
-              if arg.type ~= "Word" then
-                _accum_0[_len_0] = arg
-                _len_0 = _len_0 + 1
-              end
-            end
-            args = _accum_0
-          end
-          if metadata and metadata.arg_orders then
-            local new_args
-            do
-              local _accum_0 = { }
-              local _len_0 = 1
-              local _list_1 = metadata.arg_orders[stub]
-              for _index_0 = 1, #_list_1 do
-                local p = _list_1[_index_0]
-                _accum_0[_len_0] = args[p - 1]
-                _len_0 = _len_0 + 1
-              end
-              new_args = _accum_0
-            end
-            args = new_args
-          end
-          local lua = action(tree, unpack(args))
-          remove(self.compilestack)
-          return lua
-        elseif not metadata and self.__class.math_patt:match(stub) then
-          local lua = LuaValue(tree.source)
-          for i, tok in ipairs(tree.value) do
-            if tok.type == "Word" then
-              lua:append(tok.value)
-            else
-              local tok_lua = self:tree_to_lua(tok)
-              if not (tok_lua.is_value) then
-                local src = tok.source:get_text()
-                error("non-expression value inside math expression: " .. tostring(colored.yellow(src)))
-              end
-              lua:append(tok_lua)
-            end
-            if i < #tree.value then
-              lua:append(" ")
-            end
-          end
-          remove(self.compilestack)
-          lua:parenthesize()
-          return lua
-        end
-        local args = { }
-        for i, tok in ipairs(tree.value) do
-          local _continue_0 = false
-          repeat
-            if tok.type == "Word" then
-              _continue_0 = true
-              break
-            end
-            local arg_lua = self:tree_to_lua(tok)
-            if not (arg_lua.is_value) then
-              local line, src = tok.source:get_line(), tok.source:get_text()
-              error(tostring(line) .. ": Cannot use:\n" .. tostring(colored.yellow(src)) .. "\nas an argument to " .. tostring(stub) .. ", since it's not an expression, it produces: " .. tostring(repr(arg_lua)), 0)
-            end
-            insert(args, arg_lua)
-            _continue_0 = true
-          until true
-          if not _continue_0 then
-            break
-          end
-        end
-        if metadata and metadata.arg_orders then
-          do
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_1 = metadata.arg_orders[stub]
-            for _index_0 = 1, #_list_1 do
-              local p = _list_1[_index_0]
-              _accum_0[_len_0] = args[p]
-              _len_0 = _len_0 + 1
-            end
-            args = _accum_0
-          end
-        end
-        local lua = LuaValue(tree.source, "ACTIONS[" .. tostring(repr(stub)) .. "](")
-        for i, arg in ipairs(args) do
-          lua:append(arg)
-          if i < #args then
-            lua:append(", ")
-          end
-        end
-        lua:append(")")
-        remove(self.compilestack)
-        return lua
-      elseif "Text" == _exp_0 then
-        local lua = LuaValue(tree.source)
-        local string_buffer = ""
-        local _list_1 = tree.value
-        for _index_0 = 1, #_list_1 do
-          local _continue_0 = false
-          repeat
-            local bit = _list_1[_index_0]
-            if type(bit) == "string" then
-              string_buffer = string_buffer .. bit
-              _continue_0 = true
-              break
-            end
-            if string_buffer ~= "" then
-              if #lua.bits > 0 then
-                lua:append("..")
-              end
-              lua:append(repr(string_buffer))
-              string_buffer = ""
-            end
-            local bit_lua = self:tree_to_lua(bit)
-            if not (bit_lua.is_value) then
-              local line, src = bit.source:get_line(), bit.source:get_text()
-              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(bit)) .. " as a string interpolation value, since it's not an expression.", 0)
-            end
-            if #lua.bits > 0 then
-              lua:append("..")
-            end
-            if bit.type ~= "Text" then
-              bit_lua = LuaValue(bit.source, "stringify(", bit_lua, ")")
-            end
-            lua:append(bit_lua)
-            _continue_0 = true
-          until true
-          if not _continue_0 then
-            break
-          end
-        end
-        if string_buffer ~= "" or #lua.bits == 0 then
-          if #lua.bits > 0 then
-            lua:append("..")
-          end
-          lua:append(repr(string_buffer))
-        end
-        if #lua.bits > 1 then
-          lua:parenthesize()
-        end
-        return lua
-      elseif "IndexChain" == _exp_0 then
-        local lua = self:tree_to_lua(tree.value[1])
-        if not (lua.is_value) then
-          local line, src = tree.value[1].source:get_line(), tree.value[1].source:get_text()
-          error(tostring(line) .. ": Cannot index " .. tostring(colored.yellow(src)) .. ", since it's not an expression.", 0)
-        end
-        local last_char = tostring(lua):sub(1, 1)
-        if last_char == "}" or last_char == '"' then
-          lua:parenthesize()
-        end
-        for i = 2, #tree.value do
-          local _continue_0 = false
-          repeat
-            local key = tree.value[i]
-            if key.type == 'Text' and #key.value == 1 and type(key.value[1]) == 'string' and key.value[1]:match("^[a-zA-Z_][a-zA-Z0-9_]$") then
-              lua:append("." .. tostring(key.value[1]))
-              _continue_0 = true
-              break
-            end
-            local key_lua = self:tree_to_lua(key)
-            if not (key_lua.is_value) then
-              local line, src = key.source:get_line(), key.source:get_text()
-              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as an index, since it's not an expression.", 0)
-            end
-            if tostring(key_lua):sub(1, 1) == '[' then
-              lua:append("[ ", key_lua, "]")
-            else
-              lua:append("[", key_lua, "]")
-            end
-            _continue_0 = true
-          until true
-          if not _continue_0 then
-            break
-          end
-        end
-        return lua
-      elseif "List" == _exp_0 then
-        local lua = LuaValue(tree.source, "{")
-        local line_length = 0
-        for i, item in ipairs(tree.value) do
-          local item_lua = self:tree_to_lua(item)
-          if not (item_lua.is_value) then
-            local line, src = item.source:get_line(), item.source:get_text()
-            error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a list item, since it's not an expression.", 0)
-          end
-          lua:append(item_lua)
-          local newlines, last_line = tostring(item_lua):match("^(.-)([^\n]*)$")
-          if #newlines > 0 then
-            line_length = #last_line
-          else
-            line_length = line_length + #last_line
-          end
-          if i < #tree.value then
-            if line_length >= 80 then
-              lua:append(",\n")
-              line_length = 0
-            else
-              lua:append(", ")
-              line_length = line_length + 2
-            end
-          end
-        end
-        lua:append("}")
-        return lua
-      elseif "Dict" == _exp_0 then
-        local lua = LuaValue(tree.source, "{")
-        local line_length = 0
-        for i, entry in ipairs(tree.value) do
-          local key_lua = self:tree_to_lua(entry.key)
-          if not (key_lua.is_value) then
-            local line, src = key.source:get_line(), key.source:get_text()
-            error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict key, since it's not an expression.", 0)
-          end
-          local value_lua = self:tree_to_lua(entry.value)
-          if not (value_lua.is_value) then
-            local line, src = value.source:get_line(), value.source:get_text()
-            error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict value, since it's not an expression.", 0)
-          end
-          local key_str = tostring(key_lua):match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
-          if key_str then
-            lua:append(key_str, "=", value_lua)
-          elseif tostring(key_lua):sub(1, 1) == "[" then
-            lua:append("[ ", key_lua, "]=", value_lua)
-          else
-            lua:append("[", key_lua, "]=", value_lua)
-          end
-          local newlines, last_line = ("[" .. tostring(key_lua) .. "=" .. tostring(value_lua)):match("^(.-)([^\n]*)$")
-          if #newlines > 0 then
-            line_length = #last_line
-          else
-            line_length = line_length + #last_line
-          end
-          if i < #tree.value then
-            if line_length >= 80 then
-              lua:append(",\n")
-              line_length = 0
-            else
-              lua:append(", ")
-              line_length = line_length + 2
-            end
-          end
-        end
-        lua:append("}")
-        return lua
-      elseif "Number" == _exp_0 then
-        return LuaValue(tree.source, tostring(tree.value))
-      elseif "Var" == _exp_0 then
-        return LuaValue(tree.source, self:var_to_lua_identifier(tree.value))
-      else
-        return error("Unknown/unimplemented thingy: " .. tostring(tree.type), 0)
-      end
+      return tree:as_lua(self)
     end,
     walk_tree = function(self, tree, depth)
       if depth == nil then
@@ -1183,16 +839,16 @@ do
         return 
       end
       local _exp_0 = tree.type
-      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
-        local _list_1 = tree.value
-        for _index_0 = 1, #_list_1 do
-          local v = _list_1[_index_0]
+      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "Action" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local v = _list_0[_index_0]
           self:walk_tree(v, depth + 1)
         end
       elseif "Dict" == _exp_0 then
-        local _list_1 = tree.value
-        for _index_0 = 1, #_list_1 do
-          local e = _list_1[_index_0]
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local e = _list_0[_index_0]
           self:walk_tree(e.key, depth + 1)
           self:walk_tree(e.value, depth + 1)
         end
@@ -1236,7 +892,7 @@ do
         return replacement
       end
       local _exp_0 = tree.type
-      if "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "FunctionCall" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
+      if "File" == _exp_0 or "Nomsu" == _exp_0 or "Block" == _exp_0 or "List" == _exp_0 or "Action" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
         local new_values, is_changed = { }, false
         for i, old_value in ipairs(tree.value) do
           local new_value = type(old_value) ~= "string" and self:tree_map(old_value, fn) or nil
@@ -1281,15 +937,15 @@ do
       end)
     end,
     tree_to_stub = function(self, tree)
-      if tree.type ~= "FunctionCall" then
+      if tree.type ~= "Action" then
         error("Tried to get stub from non-functioncall tree: " .. tostring(tree.type), 0)
       end
       return concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        local _list_1 = tree.value
-        for _index_0 = 1, #_list_1 do
-          local t = _list_1[_index_0]
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local t = _list_0[_index_0]
           _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
           _len_0 = _len_0 + 1
         end
@@ -1297,15 +953,15 @@ do
       end)(), " ")
     end,
     tree_to_named_stub = function(self, tree)
-      if tree.type ~= "FunctionCall" then
+      if tree.type ~= "Action" then
         error("Tried to get stub from non-functioncall tree: " .. tostring(tree.type), 0)
       end
       return concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        local _list_1 = tree.value
-        for _index_0 = 1, #_list_1 do
-          local t = _list_1[_index_0]
+        local _list_0 = tree.value
+        for _index_0 = 1, #_list_0 do
+          local t = _list_0[_index_0]
           _accum_0[_len_0] = (t.type == "Word" and t.value or "%" .. tostring(t.value))
           _len_0 = _len_0 + 1
         end
@@ -1367,19 +1023,20 @@ do
       end
       local nomsu = self
       self:define_compile_action("immediately %block", get_line_no(), function(self, _block)
-        local lua = nomsu:tree_to_lua(_block):as_statements()
+        local lua = nomsu:tree_to_lua(_block)
+        lua:convert_to_statements()
         lua:declare_locals()
         nomsu:run_lua(lua)
         return Lua(self.source, "if IMMEDIATE then\n", lua, "\nend")
       end)
-      self:define_compile_action("Lua %code", get_line_no(), function(self, _code)
+      self:define_compile_action("Lua %source %code", get_line_no(), function(self, _source, _code)
         if _code.type ~= "Text" then
-          return LuaValue(self.source, "Lua(", repr(_code.source), ", ", nomsu:tree_to_lua(_code), ")")
+          return Lua.Value(_source, "Lua(", repr(_code.source), ", ", nomsu:tree_to_lua(_code), ")")
         end
-        local lua = LuaValue(self.source, "Lua(", repr(_code.source))
-        local _list_1 = _code.value
-        for _index_0 = 1, #_list_1 do
-          local bit = _list_1[_index_0]
+        local lua = Lua.Value(_source, "Lua(", repr(_code.source))
+        local _list_0 = _code.value
+        for _index_0 = 1, #_list_0 do
+          local bit = _list_0[_index_0]
           lua:append(", ")
           if type(bit) == "string" then
             lua:append(repr(bit))
@@ -1395,14 +1052,14 @@ do
         lua:append(")")
         return lua
       end)
-      self:define_compile_action("LuaValue %code", get_line_no(), function(self, _code)
+      self:define_compile_action("Lua value %source %code", get_line_no(), function(self, _source, _code)
         if _code.type ~= "Text" then
-          return LuaValue(self.source, "LuaValue(", repr(_code.source), ", ", nomsu:tree_to_lua(_code), ")")
+          return Lua.Value(_source, "Lua.Value(", repr(_code.source), ", ", nomsu:tree_to_lua(_code), ")")
         end
-        local lua = LuaValue(self.source, "LuaValue(", repr(_code.source))
-        local _list_1 = _code.value
-        for _index_0 = 1, #_list_1 do
-          local bit = _list_1[_index_0]
+        local lua = Lua.Value(_source, "Lua.Value(", repr(_code.source))
+        local _list_0 = _code.value
+        for _index_0 = 1, #_list_0 do
+          local bit = _list_0[_index_0]
           lua:append(", ")
           if type(bit) == "string" then
             lua:append(repr(bit))
@@ -1420,12 +1077,12 @@ do
       end)
       self:define_compile_action("lua> %code", get_line_no(), function(self, _code)
         if _code.type ~= "Text" then
-          return LuaValue(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
+          return Lua.Value(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
         end
         local lua = Lua(_code.source)
-        local _list_1 = _code.value
-        for _index_0 = 1, #_list_1 do
-          local bit = _list_1[_index_0]
+        local _list_0 = _code.value
+        for _index_0 = 1, #_list_0 do
+          local bit = _list_0[_index_0]
           if type(bit) == "string" then
             lua:append(bit)
           else
@@ -1441,12 +1098,12 @@ do
       end)
       self:define_compile_action("=lua %code", get_line_no(), function(self, _code)
         if _code.type ~= "Text" then
-          return LuaValue(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
+          return Lua.Value(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
         end
-        local lua = LuaValue(self.source)
-        local _list_1 = _code.value
-        for _index_0 = 1, #_list_1 do
-          local bit = _list_1[_index_0]
+        local lua = Lua.Value(self.source)
+        local _list_0 = _code.value
+        for _index_0 = 1, #_list_0 do
+          local bit = _list_0[_index_0]
           if type(bit) == "string" then
             lua:append(bit)
           else
@@ -1461,7 +1118,7 @@ do
         return lua
       end)
       self:define_compile_action("!! code location !!", get_line_no(), function(self)
-        return LuaValue(self.source, repr(self.source))
+        return Lua.Value(self.source, repr(tostring(self.source)))
       end)
       self:define_action("run file %filename", get_line_no(), function(_filename)
         return nomsu:run_file(_filename)
@@ -1469,7 +1126,7 @@ do
       return self:define_compile_action("use %filename", get_line_no(), function(self, _filename)
         local filename = nomsu:tree_to_value(_filename)
         nomsu:use_file(filename)
-        return LuaValue(self.source, "nomsu:use_file(" .. tostring(repr(filename)) .. ")")
+        return Lua.Value(self.source, "nomsu:use_file(" .. tostring(repr(filename)) .. ")")
       end)
     end
   }
@@ -1548,7 +1205,6 @@ do
       end
       self.environment.Tuple = Tuple
       self.environment.Lua = Lua
-      self.environment.LuaValue = LuaValue
       self.environment.Location = Location
       self.environment.ACTIONS = setmetatable({ }, {
         __index = function(self, key)
@@ -1572,7 +1228,6 @@ do
   _base_0.__class = _class_0
   local self = _class_0
   _chunk_counter = 0
-  self.math_patt = re.compile([[ "%" (" " [*/^+-] " %")+ ]])
   self.unescape_string = function(self, str)
     return Cs(((P("\\\\") / "\\") + (P("\\\"") / '"') + NOMSU_DEFS.escaped_char + P(1)) ^ 0):match(str)
   end

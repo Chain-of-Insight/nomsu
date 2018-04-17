@@ -4,7 +4,7 @@ do
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
 local immutable = require('immutable')
-local Lua, LuaValue, Location
+local Lua, Location
 Location = immutable({
   "filename",
   "start",
@@ -12,7 +12,6 @@ Location = immutable({
 }, {
   name = "Location",
   __new = function(self, filename, start, stop)
-    assert(type(filename) == 'string' and type(start) == 'number' and type(stop) == 'number')
     return filename, start, stop or start
   end,
   __tostring = function(self)
@@ -38,13 +37,14 @@ Location = immutable({
     return FILE_CACHE[self.filename]:sub(self.start, self.stop)
   end,
   get_line_number = function(self)
-    local line_starts = LINE_STARTS[FILE_CACHE[self.filename]]
+    local src = FILE_CACHE[self.filename]
+    local line_starts = LINE_STARTS[src]
     local start_line = 1
-    while (line_starts[start_line + 1] or (#src + 1)) <= self.start do
+    while (line_starts[start_line + 1] or math.huge) <= self.start do
       start_line = start_line + 1
     end
     local stop_line = start_line
-    while (line_starts[stop_line + 1] or (#src + 1)) <= self.stop do
+    while (line_starts[stop_line + 1] or math.huge) <= self.stop do
       stop_line = stop_line + 1
     end
     return start_line, stop_line
@@ -64,9 +64,17 @@ Location = immutable({
 do
   local _class_0
   local _base_0 = {
-    is_statement = true,
-    is_value = false,
-    add_free_vars = function(self, free_vars)
+    clone = function(self)
+      local copy = Lua(self.source, {
+        unpack(self.bits)
+      })
+      copy.is_value = self.is_value
+      for k, v in pairs(self.free_vars) do
+        copy.free_vars[k] = v
+      end
+      return copy
+    end,
+    add_free_vars = function(self, ...)
       local seen
       do
         local _tbl_0 = { }
@@ -80,16 +88,30 @@ do
         end
         seen = _tbl_0
       end
-      for _index_0 = 1, #free_vars do
-        local var = free_vars[_index_0]
+      for i = 1, select("#", ...) do
+        local var = select(i, ...)
         if not (seen[var]) then
           self.free_vars[#self.free_vars + 1] = var
           seen[var] = true
         end
       end
     end,
-    as_statements = function(self)
-      return self
+    convert_to_statements = function(self, prefix, suffix)
+      if prefix == nil then
+        prefix = ""
+      end
+      if suffix == nil then
+        suffix = ";"
+      end
+      if not (self.is_value) then
+        return 
+      end
+      if prefix ~= "" then
+        self:prepend(prefix)
+      end
+      if suffix ~= "" then
+        return self:append(suffix)
+      end
     end,
     declare_locals = function(self, skip)
       if skip == nil then
@@ -128,12 +150,11 @@ do
       local buff = { }
       for i, b in ipairs(self.bits) do
         buff[#buff + 1] = tostring(b)
-        if i < #self.bits and type(b) ~= 'string' and b.is_statement then
+        if i < #self.bits and type(b) ~= 'string' and not b.is_value then
           buff[#buff + 1] = "\n"
         end
       end
       local ret = concat(buff, "")
-      assert(not ret:match(".*table: 0x.*"))
       return ret
     end,
     __len = function(self)
@@ -145,12 +166,16 @@ do
       end
       return len
     end,
+    __add = function(self, other)
+      return Lua(nil, self, other)
+    end,
+    __concat = function(self, other)
+      return Lua(nil, self, other)
+    end,
     append = function(self, ...)
       local n = select("#", ...)
       local bits = self.bits
       for i = 1, n do
-        local x = select(i, ...)
-        assert(type(x) ~= 'table' or getmetatable(x))
         bits[#bits + 1] = select(i, ...)
       end
     end,
@@ -158,13 +183,9 @@ do
       local n = select("#", ...)
       local bits = self.bits
       for i = #bits + n, n + 1, -1 do
-        local x = select(i, ...)
-        assert(type(x) ~= 'table' or getmetatable(x))
         bits[i] = bits[i - n]
       end
       for i = 1, n do
-        local x = select(i, ...)
-        assert(type(x) ~= 'table' or getmetatable(x))
         bits[i] = select(i, ...)
       end
     end,
@@ -197,6 +218,14 @@ do
       end
       walk(self)
       return lua_str, metadata
+    end,
+    parenthesize = function(self)
+      if self.is_value then
+        self:prepend("(")
+        return self:append(")")
+      else
+        return error("Cannot parenthesize lua statements")
+      end
     end
   }
   _base_0.__index = _base_0
@@ -207,14 +236,11 @@ do
         local filename, start, stop = self.source:match("^(.-)[(%d+):(%d+)]$")
         self.source = Location(filename, tonumber(start), tonumber(stop))
       end
-      for i = 1, select("#", ...) do
-        local x = select(i, ...)
-        assert(type(x) ~= 'table' or getmetatable(x))
-      end
       self.bits = {
         ...
       }
       self.free_vars = { }
+      self.is_value = false
     end,
     __base = _base_0,
     __name = "Lua"
@@ -227,82 +253,15 @@ do
     end
   })
   _base_0.__class = _class_0
-  Lua = _class_0
-end
-do
-  local _class_0
-  local _parent_0 = Lua
-  local _base_0 = {
-    is_statement = false,
-    is_value = true,
-    __tostring = function(self)
-      local buff = { }
-      local _list_0 = self.bits
-      for _index_0 = 1, #_list_0 do
-        local b = _list_0[_index_0]
-        buff[#buff + 1] = tostring(b)
-      end
-      local ret = concat(buff, "")
-      assert(not ret:match(".*table: 0x.*"))
-      return ret
-    end,
-    as_statements = function(self, prefix, suffix)
-      if prefix == nil then
-        prefix = ""
-      end
-      if suffix == nil then
-        suffix = ";"
-      end
-      local bits = {
-        prefix,
-        unpack(self.bits)
-      }
-      bits[#bits + 1] = suffix
-      return Lua(self.source, unpack(bits))
-    end,
-    parenthesize = function(self)
-      self:prepend("(")
-      return self:append(")")
-    end
-  }
-  _base_0.__index = _base_0
-  setmetatable(_base_0, _parent_0.__base)
-  _class_0 = setmetatable({
-    __init = function(self, source, ...)
-      self.source = source
-      self.bits = {
-        ...
-      }
-    end,
-    __base = _base_0,
-    __name = "LuaValue",
-    __parent = _parent_0
-  }, {
-    __index = function(cls, name)
-      local val = rawget(_base_0, name)
-      if val == nil then
-        local parent = rawget(cls, "__parent")
-        if parent then
-          return parent[name]
-        end
-      else
-        return val
-      end
-    end,
-    __call = function(cls, ...)
-      local _self_0 = setmetatable({}, _base_0)
-      cls.__init(_self_0, ...)
-      return _self_0
-    end
-  })
-  _base_0.__class = _class_0
-  if _parent_0.__inherited then
-    _parent_0.__inherited(_parent_0, _class_0)
+  local self = _class_0
+  self.Value = function(...)
+    local lua = Lua(...)
+    lua.is_value = true
+    return lua
   end
-  LuaValue = _class_0
+  Lua = _class_0
 end
 return {
   Lua = Lua,
-  LuaValue = LuaValue,
   Location = Location
 }

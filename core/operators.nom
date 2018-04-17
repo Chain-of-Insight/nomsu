@@ -18,31 +18,31 @@ immediately:
 
 # Comparison Operators
 immediately:
-    compile [%x < %y] to: LuaValue "(\(%x as lua expr) < \(%y as lua expr))"
-    compile [%x > %y] to: LuaValue "(\(%x as lua expr) > \(%y as lua expr))"
-    compile [%x <= %y] to: LuaValue "(\(%x as lua expr) <= \(%y as lua expr))"
-    compile [%x >= %y] to: LuaValue "(\(%x as lua expr) >= \(%y as lua expr))"
+    compile [%x < %y] to: Lua value "(\(%x as lua expr) < \(%y as lua expr))"
+    compile [%x > %y] to: Lua value "(\(%x as lua expr) > \(%y as lua expr))"
+    compile [%x <= %y] to: Lua value "(\(%x as lua expr) <= \(%y as lua expr))"
+    compile [%x >= %y] to: Lua value "(\(%x as lua expr) >= \(%y as lua expr))"
     # TODO: optimize case of [%x,%y] = [1,2]
     compile [%a is %b, %a = %b, %a == %b] to:
         lua> ".."
             local safe = {Text=true, Number=true};
             local a_lua, b_lua = nomsu:tree_to_lua(\%a), nomsu:tree_to_lua(\%b);
             if safe[\%a.type] or safe[\%b.type] then
-                return LuaValue(tree.source, "(", a_lua, " == ", b_lua, ")");
+                return Lua.Value(tree.source, "(", a_lua, " == ", b_lua, ")");
             else
-                return LuaValue(tree.source, "utils.equivalent(", a_lua, ", ", b_lua, ")");
+                return Lua.Value(tree.source, "utils.equivalent(", a_lua, ", ", b_lua, ")");
             end
     compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to:
         lua> ".."
             local safe = {Text=true, Number=true};
             local a_lua, b_lua = nomsu:tree_to_lua(\%a), nomsu:tree_to_lua(\%b);
             if safe[\%a.type] or safe[\%b.type] then
-                return LuaValue(tree.source, "(", a_lua, " ~= ", b_lua, ")");
+                return Lua.Value(tree.source, "(", a_lua, " ~= ", b_lua, ")");
             else
-                return LuaValue(tree.source, "(not utils.equivalent(", a_lua, ", ", b_lua, "))");
+                return Lua.Value(tree.source, "(not utils.equivalent(", a_lua, ", ", b_lua, "))");
             end
     # For strict identity checking, use (%x's id) is (%y's id)
-    compile [%'s id, id of %] to: LuaValue "nomsu.ids[\(% as lua expr)]"
+    compile [%'s id, id of %] to: Lua value "nomsu.ids[\(% as lua expr)]"
 
 # Variable assignment operator
 immediately:
@@ -72,7 +72,7 @@ immediately:
                 local value_lua = nomsu:tree_to_lua(value);
                 if not value_lua.is_value then error("Invalid value for assignment: "..value:get_src()); end
                 if target.type == "Var" then
-                    lhs:add_free_var(nomsu:var_to_lua_identifier(target.value));
+                    lhs:add_free_vars(nomsu:var_to_lua_identifier(target.value));
                 end
                 if i > 1 then
                     lhs:append(", ");
@@ -104,12 +104,12 @@ immediately:
 
 immediately:
     # Math Operators
-    compile [%x + %y] to: LuaValue "(\(%x as lua expr) + \(%y as lua expr))"
-    compile [%x - %y] to: LuaValue "(\(%x as lua expr) - \(%y as lua expr))"
-    compile [%x * %y] to: LuaValue "(\(%x as lua expr) * \(%y as lua expr))"
-    compile [%x / %y] to: LuaValue "(\(%x as lua expr) / \(%y as lua expr))"
-    compile [%x ^ %y] to: LuaValue "(\(%x as lua expr) ^ \(%y as lua expr))"
-    compile [%x wrapped around %y, %x mod %y] to: LuaValue "(\(%x as lua expr) % \(%y as lua expr))"
+    compile [%x + %y] to: Lua value "(\(%x as lua expr) + \(%y as lua expr))"
+    compile [%x - %y] to: Lua value "(\(%x as lua expr) - \(%y as lua expr))"
+    compile [%x * %y] to: Lua value "(\(%x as lua expr) * \(%y as lua expr))"
+    compile [%x / %y] to: Lua value "(\(%x as lua expr) / \(%y as lua expr))"
+    compile [%x ^ %y] to: Lua value "(\(%x as lua expr) ^ \(%y as lua expr))"
+    compile [%x wrapped around %y, %x mod %y] to: Lua value "(\(%x as lua expr) % \(%y as lua expr))"
 
     # 3-part chained comparisons
     # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
@@ -124,22 +124,22 @@ immediately:
     # TODO: optimize for common case where x,y,z are all either variables or number literals
 
     # Boolean Operators
-    compile [%x and %y] to: LuaValue "(\(%x as lua expr) and \(%y as lua expr))"
-    compile [%x or %y] to: LuaValue "(\(%x as lua expr) or \(%y as lua expr))"
+    compile [%x and %y] to: Lua value "(\(%x as lua expr) and \(%y as lua expr))"
+    compile [%x or %y] to: Lua value "(\(%x as lua expr) or \(%y as lua expr))"
 
     # Bitwise Operators
-    compile [%a OR %b, %a | %b] to: LuaValue "bit32.bor(\(%a as lua expr), \(%b as lua expr))"
-    compile [%a XOR %b] to: LuaValue "bit32.bxor(\(%a as lua expr), \(%b as lua expr))"
-    compile [%a AND %b, %a & %b] to: LuaValue "bit32.band(\(%a as lua expr), \(%b as lua expr))"
-    compile [NOT %, ~ %] to: LuaValue "bit32.bnot(\(% as lua expr))"
-    compile [%x LSHIFT %shift, %x << %shift] to: LuaValue "bit32.lshift(\(%x as lua expr), \(%shift as lua expr))"
-    compile [%x RSHIFT %shift, %x >>> %shift] to: LuaValue "bit32.rshift(\(%x as lua expr), \(%shift as lua expr))"
-    compile [%x ARSHIFT %shift, %x >> %shift] to: LuaValue "bit32.arshift(\(%x as lua expr), \(%shift as lua expr))"
+    compile [%a OR %b, %a | %b] to: Lua value "bit32.bor(\(%a as lua expr), \(%b as lua expr))"
+    compile [%a XOR %b] to: Lua value "bit32.bxor(\(%a as lua expr), \(%b as lua expr))"
+    compile [%a AND %b, %a & %b] to: Lua value "bit32.band(\(%a as lua expr), \(%b as lua expr))"
+    compile [NOT %, ~ %] to: Lua value "bit32.bnot(\(% as lua expr))"
+    compile [%x LSHIFT %shift, %x << %shift] to: Lua value "bit32.lshift(\(%x as lua expr), \(%shift as lua expr))"
+    compile [%x RSHIFT %shift, %x >>> %shift] to: Lua value "bit32.rshift(\(%x as lua expr), \(%shift as lua expr))"
+    compile [%x ARSHIFT %shift, %x >> %shift] to: Lua value "bit32.arshift(\(%x as lua expr), \(%shift as lua expr))"
     # TODO: implement OR, XOR, AND for multiple operands?
 
     # Unary operators
-    compile [- %] to: LuaValue "(- \(% as lua expr))"
-    compile [not %] to: LuaValue "(not \(% as lua expr))"
+    compile [- %] to: Lua value "(- \(% as lua expr))"
+    compile [not %] to: Lua value "(not \(% as lua expr))"
 
 # Update operators
 immediately:

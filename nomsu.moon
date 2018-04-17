@@ -18,12 +18,14 @@ lpeg.setmaxstack 10000
 utils = require 'utils'
 new_uuid = require 'uuid'
 immutable = require 'immutable'
+export Tuple
+Tuple = immutable(nil, {name:"Tuple"})
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 debug_getinfo = debug.getinfo
-{:Lua, :LuaValue, :Location} = require "lua_obj"
+{:Lua, :Location} = require "lua_obj"
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -88,16 +90,7 @@ do
     -- Can't use this because it breaks some LPEG stuff
     --STRING_METATABLE.__mul = (other)=> string.rep(@, other)
 
-Types = {}
-type_tostring = =>
-    "#{@name}(#{repr(@value)})"
-type_with_value = (value)=> getmetatable(self)(@source, value)
-Tuple = immutable(nil, {name:"Tuple"})
-for t in *{"File", "Nomsu", "Block", "List", "FunctionCall", "Text", "Dict", "Number", "Word", "Var", "Comment", "IndexChain"}
-    Types[t] = immutable({"value","source"}, {type:t, name:t, __tostring:type_tostring, with_value:type_with_value})
-Types.DictEntry = immutable({"key","value"}, {name:"DictEntry"})
-Types.is_node = (n)->
-    type(n) == 'userdata' and n.type
+Types = require "nomsu_tree"
 
 NOMSU_DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
@@ -218,7 +211,6 @@ class NomsuCompiler
         for k,v in pairs(Types) do @environment[k] = v
         @environment.Tuple = Tuple
         @environment.Lua = Lua
-        @environment.LuaValue = LuaValue
         @environment.Location = Location
         @environment.ACTIONS = setmetatable({}, {__index:(key)=>
             error("Attempt to run undefined action: #{key}", 0)
@@ -305,7 +297,8 @@ class NomsuCompiler
         tree = @parse(nomsu_code, filename)
         assert tree, "Failed to parse: #{nomsu_code}"
         assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
-        lua = @tree_to_lua(tree)\as_statements!
+        lua = @tree_to_lua(tree)
+        lua\convert_to_statements!
         lua\declare_locals!
         lua\prepend "-- File: #{filename}\n"
         return @run_lua(lua, filename..".lua")
@@ -404,7 +397,7 @@ class NomsuCompiler
                     if #tok.value > 1 then return nil
                     nomsu = inline_expression tok.value
                     return nomsu and "(: #{nomsu})"
-                when "FunctionCall"
+                when "Action"
                     buff = ""
                     for i,bit in ipairs tok.value
                         if bit.type == "Word"
@@ -416,7 +409,7 @@ class NomsuCompiler
                             return nil unless nomsu
                             unless i == 1 or bit.type == "Block"
                                 buff ..= " "
-                            buff ..= if bit.type == "FunctionCall"
+                            buff ..= if bit.type == "Action"
                                 "("..nomsu..")"
                             else nomsu
                     return buff
@@ -441,7 +434,7 @@ class NomsuCompiler
                             bit.key.value
                         else inline_expression bit.key
                         return nil unless key_nomsu
-                        if bit.key.type == "FunctionCall"
+                        if bit.key.type == "Action"
                             key_nomsu = "("..key_nomsu..")"
                         value_nomsu = inline_expression bit.value
                         return nil unless value_nomsu
@@ -482,7 +475,7 @@ class NomsuCompiler
                         return nil unless nomsu
                         buff ..= "\n    "..@indent(nomsu)
                     return buff
-                when "FunctionCall"
+                when "Action"
                     nomsu = expression(tok)
                     return nil unless nomsu
                     return "(..)\n    "..@indent(nomsu)
@@ -515,7 +508,7 @@ class NomsuCompiler
                     for bit in *tok.value
                         key_nomsu = inline_expression bit.key
                         return nil unless key_nomsu
-                        if bit.key.type == "FunctionCall"
+                        if bit.key.type == "Action"
                             key_nomsu = "("..key_nomsu..")"
                         value_nomsu = inline_expression bit.value
                         if value_nomsu and #key_nomsu + #value_nomsu < max_line
@@ -560,14 +553,14 @@ class NomsuCompiler
             switch tok.type
                 when "Block"
                     if #tok.value == 1
-                        nomsu = if tok.value[1].type == "FunctionCall"
+                        nomsu = if tok.value[1].type == "Action"
                             inline_expression(tok.value[1])
                         else
                             noeol_expression(tok.value[1])
                         if nomsu and #(nomsu\match("[^\n]*")) < max_line
                             return ": "..nomsu
                     return noeol_expression(tok)
-                when "FunctionCall"
+                when "Action"
                     -- The hard task
                     buff = ""
                     for i,bit in ipairs tok.value
@@ -579,12 +572,12 @@ class NomsuCompiler
                         else
                             nomsu = inline_expression(bit)
                             if nomsu and #nomsu < max_line
-                                if bit.type == "FunctionCall"
+                                if bit.type == "Action"
                                     nomsu = "("..nomsu..")"
                             else
                                 nomsu = expression(bit)
                                 return nil unless nomsu
-                                if bit.type == "FunctionCall"
+                                if bit.type == "Action"
                                     nomsu = "(..)\n    "..@indent(nomsu)
                                 if i < #tok.value
                                     nomsu ..= "\n.."
@@ -636,238 +629,14 @@ class NomsuCompiler
             else
                 error("Unsupported value_to_nomsu type: #{type(value)}", 0)
 
-    @math_patt: re.compile [[ "%" (" " [*/^+-] " %")+ ]]
     tree_to_lua: (tree)=>
-        -- Return <lua code for value>, <additional lua code>
-        assert tree, "No tree provided."
-        if not Types.is_node(tree)
-            --error("Invalid tree: #{repr(tree)}", 0)
-            error("Invalid tree")
-        switch tree.type
-            when "File"
-                if #tree.value == 1
-                    return @tree_to_lua(tree.value[1])
-                file_lua = Lua(tree.source)
-                declared_locals = {}
-                for i, line in ipairs tree.value
-                    line_lua = @tree_to_lua line
-                    if not line_lua
-                        error("No lua produced by #{repr line}", 0)
-                    line_lua = line_lua\as_statements!
-                    if i < #tree.value
-                        file_lua\append "\n"
-                    
-                    file_lua\append line_lua
-                file_lua\declare_locals!
-                return file_lua
-            
-            when "Comment"
-                return Lua(tree.source, "--"..tree.value\gsub("\n","\n--").."\n")
-            
-            when "Nomsu"
-                --return Lua(tree.source, repr(tree.value))
-                return Lua(tree.source, "nomsu:parse(",tree.source\get_text!,", ",repr(tree.source.filename),")")
+        return tree\as_lua(self)
 
-            when "Block"
-                block_lua = Lua(tree.source)
-                for i,arg in ipairs tree.value
-                    lua = @tree_to_lua arg
-                    if i == 1 and #tree.value == 1 and lua.is_value
-                        return lua
-                    lua = lua\as_statements!
-                    if i < #tree.value
-                        block_lua\append "\n"
-                    block_lua\append lua
-                return block_lua
-
-            when "FunctionCall"
-                insert @compilestack, tree
-
-                stub = @tree_to_stub tree
-                action = rawget(@environment.ACTIONS, stub)
-
-                metadata = @action_metadata[action]
-                if metadata and metadata.compile_time
-                    args = [arg for arg in *tree.value when arg.type != "Word"]
-                    -- Force all compile-time actions to take a tree location
-                    if metadata and metadata.arg_orders
-                        new_args = [args[p-1] for p in *metadata.arg_orders[stub]]
-                        args = new_args
-                    lua = action(tree, unpack(args))
-                    remove @compilestack
-                    return lua
-                elseif not metadata and @@math_patt\match(stub)
-                    -- This is a bit of a hack, but this code handles arbitrarily complex
-                    -- math expressions like 2*x + 3^2 without having to define a single
-                    -- action for every possibility.
-                    lua = LuaValue(tree.source)
-                    for i,tok in ipairs tree.value
-                        if tok.type == "Word"
-                            lua\append tok.value
-                        else
-                            tok_lua = @tree_to_lua(tok)
-                            unless tok_lua.is_value
-                                src = tok.source\get_text!
-                                error("non-expression value inside math expression: #{colored.yellow src}")
-                            lua\append tok_lua
-                        if i < #tree.value
-                            lua\append " "
-                    remove @compilestack
-                    lua\parenthesize!
-                    return lua
-
-                args = {}
-                for i, tok in ipairs tree.value
-                    if tok.type == "Word" then continue
-                    arg_lua = @tree_to_lua(tok)
-                    unless arg_lua.is_value
-                        line, src = tok.source\get_line!, tok.source\get_text!
-                        error "#{line}: Cannot use:\n#{colored.yellow src}\nas an argument to #{stub}, since it's not an expression, it produces: #{repr arg_lua}", 0
-                    insert args, arg_lua
-
-                if metadata and metadata.arg_orders
-                    args = [args[p] for p in *metadata.arg_orders[stub]]
-
-                lua = LuaValue(tree.source, "ACTIONS[#{repr stub}](")
-                for i, arg in ipairs args
-                    lua\append arg
-                    if i < #args then lua\append ", "
-                lua\append ")"
-                remove @compilestack
-                return lua
-
-            when "Text"
-                lua = LuaValue(tree.source)
-                string_buffer = ""
-                for bit in *tree.value
-                    if type(bit) == "string"
-                        string_buffer ..= bit
-                        continue
-                    if string_buffer ~= ""
-                        if #lua.bits > 0 then lua\append ".."
-                        lua\append repr(string_buffer)
-                        string_buffer = ""
-                    bit_lua = @tree_to_lua bit
-                    unless bit_lua.is_value
-                        line, src = bit.source\get_line!, bit.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow bit} as a string interpolation value, since it's not an expression.", 0
-                    if #lua.bits > 0 then lua\append ".."
-                    if bit.type != "Text"
-                        bit_lua = LuaValue(bit.source, "stringify(",bit_lua,")")
-                    lua\append bit_lua
-
-                if string_buffer ~= "" or #lua.bits == 0
-                    if #lua.bits > 0 then lua\append ".."
-                    lua\append repr(string_buffer)
-
-                if #lua.bits > 1
-                    lua\parenthesize!
-                return lua
-
-            when "IndexChain"
-                lua = @tree_to_lua tree.value[1]
-                unless lua.is_value
-                    line, src = tree.value[1].source\get_line!, tree.value[1].source\get_text!
-                    error "#{line}: Cannot index #{colored.yellow src}, since it's not an expression.", 0
-                last_char = tostring(lua)\sub(1,1)
-                if last_char == "}" or last_char == '"'
-                    lua\parenthesize!
-
-                for i=2,#tree.value
-                    key = tree.value[i]
-                    if key.type == 'Text' and #key.value == 1 and type(key.value[1]) == 'string' and key.value[1]\match("^[a-zA-Z_][a-zA-Z0-9_]$")
-                        lua\append ".#{key.value[1]}"
-                        continue
-                    key_lua = @tree_to_lua key
-                    unless key_lua.is_value
-                        line, src = key.source\get_line!, key.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as an index, since it's not an expression.", 0
-                    -- NOTE: this *must* use a space after the [ to avoid freaking out
-                    -- Lua's parser if the inner expression is a long string. Lua
-                    -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                    if tostring(key_lua)\sub(1,1) == '['
-                        lua\append "[ ",key_lua,"]"
-                    else
-                        lua\append "[",key_lua,"]"
-                return lua
-
-            when "List"
-                lua = LuaValue tree.source, "{"
-                line_length = 0
-                for i, item in ipairs tree.value
-                    item_lua = @tree_to_lua item
-                    unless item_lua.is_value
-                        line, src = item.source\get_line!, item.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as a list item, since it's not an expression.", 0
-                    lua\append item_lua
-                    newlines, last_line = tostring(item_lua)\match("^(.-)([^\n]*)$")
-                    if #newlines > 0
-                        line_length = #last_line
-                    else
-                        line_length += #last_line
-                    if i < #tree.value
-                        if line_length >= 80
-                            lua\append ",\n"
-                            line_length = 0
-                        else
-                            lua\append ", "
-                            line_length += 2
-                lua\append "}"
-                return lua
-
-            when "Dict"
-                lua = LuaValue tree.source, "{"
-                line_length = 0
-                for i, entry in ipairs tree.value
-                    key_lua = @tree_to_lua entry.key
-                    unless key_lua.is_value
-                        line, src = key.source\get_line!, key.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as a dict key, since it's not an expression.", 0
-                    value_lua = @tree_to_lua entry.value
-                    unless value_lua.is_value
-                        line, src = value.source\get_line!, value.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as a dict value, since it's not an expression.", 0
-                    key_str = tostring(key_lua)\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
-                    if key_str
-                        lua\append key_str,"=",value_lua
-                    elseif tostring(key_lua)\sub(1,1) == "["
-                        -- NOTE: this *must* use a space after the [ to avoid freaking out
-                        -- Lua's parser if the inner expression is a long string. Lua
-                        -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                        lua\append "[ ",key_lua,"]=",value_lua
-                    else
-                        lua\append "[",key_lua,"]=",value_lua
-
-                    -- TODO: maybe make this more accurate? It's only a heuristic, so eh...
-                    newlines, last_line = ("[#{key_lua}=#{value_lua}")\match("^(.-)([^\n]*)$")
-                    if #newlines > 0
-                        line_length = #last_line
-                    else
-                        line_length += #last_line
-                    if i < #tree.value
-                        if line_length >= 80
-                            lua\append ",\n"
-                            line_length = 0
-                        else
-                            lua\append ", "
-                            line_length += 2
-                lua\append "}"
-                return lua
-
-            when "Number"
-                return LuaValue(tree.source, tostring(tree.value))
-
-            when "Var"
-                return LuaValue(tree.source, @var_to_lua_identifier(tree.value))
-
-            else
-                error("Unknown/unimplemented thingy: #{tree.type}", 0)
-    
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
         return unless Types.is_node(tree)
         switch tree.type
-            when "List", "File", "Block", "FunctionCall", "Text", "IndexChain"
+            when "List", "File", "Block", "Action", "Text", "IndexChain"
                 for v in *tree.value
                     @walk_tree(v, depth+1)
             when "Dict"
@@ -919,7 +688,7 @@ class NomsuCompiler
         if replacement != nil
             return replacement
         switch tree.type
-            when "File", "Nomsu", "Block", "List", "FunctionCall", "Text", "IndexChain"
+            when "File", "Nomsu", "Block", "List", "Action", "Text", "IndexChain"
                 new_values, is_changed = {}, false
                 for i,old_value in ipairs(tree.value)
                     new_value = type(old_value) != "string" and @tree_map(old_value, fn) or nil
@@ -956,11 +725,11 @@ class NomsuCompiler
                     return replacements[id]
 
     tree_to_stub: (tree)=>
-        if tree.type != "FunctionCall" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
+        if tree.type != "Action" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
         return concat([(t.type == "Word" and t.value or "%") for t in *tree.value], " ")
 
     tree_to_named_stub: (tree)=>
-        if tree.type != "FunctionCall" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
+        if tree.type != "Action" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
         return concat([(t.type == "Word" and t.value or "%#{t.value}") for t in *tree.value], " ")
 
     stub_defs = {
@@ -1009,16 +778,17 @@ class NomsuCompiler
         get_line_no = -> "nomsu.moon:#{debug_getinfo(2).currentline}"
         nomsu = self
         @define_compile_action "immediately %block", get_line_no!, (_block)=>
-            lua = nomsu\tree_to_lua(_block)\as_statements!
+            lua = nomsu\tree_to_lua(_block)
+            lua\convert_to_statements!
             lua\declare_locals!
             nomsu\run_lua(lua)
             return Lua(@source, "if IMMEDIATE then\n", lua, "\nend")
 
-        @define_compile_action "Lua %code", get_line_no!, (_code)=>
+        @define_compile_action "Lua %source %code", get_line_no!, (_source, _code)=>
             if _code.type != "Text"
-                return LuaValue(@source, "Lua(", repr(_code.source),", ",nomsu\tree_to_lua(_code),")")
+                return Lua.Value(_source, "Lua(", repr(_code.source),", ",nomsu\tree_to_lua(_code),")")
 
-            lua = LuaValue(@source, "Lua(", repr(_code.source))
+            lua = Lua.Value(_source, "Lua(", repr(_code.source))
             for bit in *_code.value
                 lua\append ", "
                 if type(bit) == "string"
@@ -1032,11 +802,11 @@ class NomsuCompiler
             lua\append ")"
             return lua
 
-        @define_compile_action "LuaValue %code", get_line_no!, (_code)=>
+        @define_compile_action "Lua value %source %code", get_line_no!, (_source, _code)=>
             if _code.type != "Text"
-                return LuaValue(@source, "LuaValue(", repr(_code.source),", ",nomsu\tree_to_lua(_code),")")
+                return Lua.Value(_source, "Lua.Value(", repr(_code.source),", ",nomsu\tree_to_lua(_code),")")
 
-            lua = LuaValue(@source, "LuaValue(", repr(_code.source))
+            lua = Lua.Value(_source, "Lua.Value(", repr(_code.source))
             for bit in *_code.value
                 lua\append ", "
                 if type(bit) == "string"
@@ -1052,7 +822,7 @@ class NomsuCompiler
 
         @define_compile_action "lua> %code", get_line_no!, (_code)=>
             if _code.type != "Text"
-                return LuaValue(@source, "nomsu:run_lua(",nomsu\tree_to_lua(_code),")")
+                return Lua.Value(@source, "nomsu:run_lua(",nomsu\tree_to_lua(_code),")")
 
             lua = Lua(_code.source)
             for bit in *_code.value
@@ -1068,9 +838,9 @@ class NomsuCompiler
 
         @define_compile_action "=lua %code", get_line_no!, (_code)=>
             if _code.type != "Text"
-                return LuaValue(@source, "nomsu:run_lua(",nomsu\tree_to_lua(_code),")")
+                return Lua.Value(@source, "nomsu:run_lua(",nomsu\tree_to_lua(_code),")")
 
-            lua = LuaValue(@source)
+            lua = Lua.Value(@source)
             for bit in *_code.value
                 if type(bit) == "string"
                     lua\append bit
@@ -1083,7 +853,7 @@ class NomsuCompiler
             return lua
 
         @define_compile_action "!! code location !!", get_line_no!, =>
-            return LuaValue(@source, repr(@source))
+            return Lua.Value(@source, repr(tostring(@source)))
 
         @define_action "run file %filename", get_line_no!, (_filename)->
             return nomsu\run_file(_filename)
@@ -1091,7 +861,7 @@ class NomsuCompiler
         @define_compile_action "use %filename", get_line_no!, (_filename)=>
             filename = nomsu\tree_to_value(_filename)
             nomsu\use_file(filename)
-            return LuaValue(@source, "nomsu:use_file(#{repr filename})")
+            return Lua.Value(@source, "nomsu:use_file(#{repr filename})")
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug_getinfo(2).func != require

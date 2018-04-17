@@ -9,7 +9,7 @@ immediately:
             local lua = Lua(tree.source, "nomsu:define_compile_action(");
             local stubs = {};
             for i, action in ipairs(\%actions.value) do
-                stubs[i] = nomsu:tree_to_named_stub(action);
+                stubs[i] = action:get_stub(true);
             end
             lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(tree");
             local args = {};
@@ -23,7 +23,8 @@ immediately:
                 lua:append(", ");
                 lua:append(arg);
             end
-            local body_lua = nomsu:tree_to_lua(\%lua):as_statements("return ");
+            local body_lua = \%lua:as_lua(nomsu);
+            body_lua:convert_to_statements("return ");
             body_lua:declare_locals(args);
             lua:append(")\\n    ", body_lua, "\\nend);")
             return lua;
@@ -36,7 +37,7 @@ immediately:
             local lua = Lua(tree.source, "nomsu:define_action(");
             local stubs = {};
             for i, action in ipairs(\%actions.value) do
-                stubs[i] = nomsu:tree_to_named_stub(action);
+                stubs[i] = action:get_stub(true);
             end
             lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(");
             local args = {};
@@ -47,7 +48,8 @@ immediately:
                 lua:append(arg);
                 if i < #args then lua:append(", ") end
             end
-            local body_lua = nomsu:tree_to_lua(\%body):as_statements("return ");
+            local body_lua = \%body:as_lua(nomsu);
+            body_lua:convert_to_statements("return ");
             body_lua:declare_locals(args);
             lua:append(")\\n    ", body_lua, "\\nend);")
             return lua;
@@ -59,7 +61,7 @@ immediately:
             local lua = Lua(tree.source, "nomsu:define_compile_action(");
             local stubs = {};
             for i, action in ipairs(\%shorthand.value) do
-                stubs[i] = nomsu:tree_to_named_stub(action);
+                stubs[i] = action:get_stub(true);
             end
             lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(tree");
             local args = {};
@@ -84,7 +86,7 @@ immediately:
             lua:append([[)
                 local template = nomsu:parse(]]..template..[[, ]]..repr(tree.source.filename)..[[);
                 local replacement = nomsu:tree_with_replaced_vars(template, ]]..replacements..[[);
-                return nomsu:tree_to_lua(replacement, nomsu.compilestack[#nomsu.compilestack].source.filename);
+                return replacement:as_lua(nomsu);
             end);
             ]]);
             return lua;
@@ -101,11 +103,11 @@ action [remove action %stub]:
 
 immediately:
     action [%tree as lua]:
-        =lua "nomsu:tree_to_lua(\%tree)"
+        =lua "\%tree:as_lua(nomsu)"
 
     action [%tree as lua expr]:
         lua> ".."
-            local lua = nomsu:tree_to_lua(\%tree);
+            local lua = \%tree:as_lua(nomsu);
             if not lua.is_value then
                 error("Invalid thing to convert to lua expr: "..\%tree.source:get_text());
             end
@@ -113,7 +115,8 @@ immediately:
 
     action [%tree as lua statements]:
         lua> ".."
-            local lua = nomsu:tree_to_lua(\%tree):as_statements();
+            local lua = \%tree:as_lua(nomsu);
+            lua:convert_to_statements();
             lua:declare_locals();
             return lua;
 
@@ -124,14 +127,17 @@ immediately:
         =lua "nomsu:tree_to_stub(\%tree)"
     
 immediately:
-    compile [%tree's source code, %tree' source code] to: LuaValue "\(%tree as lua expr).source:get_text()"
-
-    compile [repr %obj] to: LuaValue "repr(\(%obj as lua expr))"
-    compile [type of %obj] to: LuaValue "type(\(%obj as lua expr))"
+    parse [%var write code %code] as: lua> "\%var:append(\%code);"
 
 immediately:
-    compile [nomsu] to: LuaValue "nomsu"
-    compile [%var as lua identifier] to: LuaValue "nomsu:var_to_lua_identifier(\(%var as lua expr))"
+    compile [%tree's source code, %tree' source code] to: Lua value "\(%tree as lua expr).source:get_text()"
+
+    compile [repr %obj] to: Lua value "repr(\(%obj as lua expr))"
+    compile [type of %obj] to: Lua value "type(\(%obj as lua expr))"
+
+immediately:
+    compile [nomsu] to: Lua value "nomsu"
+    compile [%var as lua identifier] to: Lua value "nomsu:var_to_lua_identifier(\(%var as lua expr))"
 
 action [action %names metadata]:
     =lua "nomsu.action_metadata[ACTIONS[\%names]]"
@@ -149,7 +155,7 @@ action [help %action]:
 # Compiler tools
 immediately:
     compile [run %code] to:
-        LuaValue ".."
+        Lua value ".."
             nomsu:run(\(%code as lua expr), '\
                 =lua "nomsu:get_line_number(nomsu.compilestack[#nomsu.compilestack])"
             ..')
@@ -159,7 +165,7 @@ immediately:
 immediately:
     compile [show lua %block] to:
         lua> ".."
-            local \%lua = nomsu:tree_to_lua(\%block);
+            local \%lua = \%block:as_lua(nomsu);
             return Lua(\%block.source, "print(", repr(tostring(\%lua)), ");");
 
 immediately:
@@ -172,6 +178,13 @@ immediately:
                 return Lua(tree.source, "print(stringify(", \(%message as lua expr), "));");
             end
 
+immediately:
+    compile [source] to: Lua value (=lua "tree.source") "tree.source"
+
+immediately:
+    action [Lua %]: Lua (=lua "nomsu.compilestack[#nomsu.compilestack]") %
+    action [Lua value %]: Lua value (=lua "nomsu.compilestack[#nomsu.compilestack]") %
+
 # Return
 immediately:
     #.. Return statement is wrapped in a do..end block because Lua is unhappy if you
@@ -181,8 +194,8 @@ immediately:
 
 # Error functions
 immediately:
-    compile [barf] to: LuaValue "error(nil, 0);"
-    compile [barf %msg] to: LuaValue "error(\(%msg as lua expr), 0);"
+    compile [barf] to: Lua value "error(nil, 0);"
+    compile [barf %msg] to: Lua value "error(\(%msg as lua expr), 0);"
     compile [assume %condition] to:
         lua> "local \%assumption = 'Assumption failed: '..\%condition.source:get_text();"
         return:
@@ -200,7 +213,7 @@ immediately:
 
 # Literals
 immediately:
-    compile [yes] to: LuaValue "true"
-    compile [no] to: LuaValue "false"
-    compile [nothing, nil, null] to: LuaValue "nil"
+    compile [yes] to: Lua value "true"
+    compile [no] to: Lua value "false"
+    compile [nothing, nil, null] to: Lua value "nil"
 

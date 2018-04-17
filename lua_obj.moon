@@ -1,12 +1,12 @@
 {:insert, :remove, :concat} = table
 immutable = require 'immutable'
-local Lua, LuaValue, Location
+local Lua, Location
 export LINE_STARTS
 
 Location = immutable {"filename","start","stop"}, {
     name:"Location"
     __new: (filename, start, stop)=>
-        assert(type(filename) == 'string' and type(start) == 'number' and type(stop) == 'number')
+        --assert(type(filename) == 'string' and type(start) == 'number' and type(stop) == 'number')
         return filename, start, stop or start
     __tostring: => "Location(\"#{@filename}\", #{@start}, #{@stop})"
     __lt: (other)=>
@@ -22,12 +22,13 @@ Location = immutable {"filename","start","stop"}, {
     get_text: => FILE_CACHE[@filename]\sub(@start,@stop)
     get_line_number: =>
         -- TODO: do a binary search if this is actually slow, which I doubt
-        line_starts = LINE_STARTS[FILE_CACHE[@filename]]
+        src = FILE_CACHE[@filename]
+        line_starts = LINE_STARTS[src]
         start_line = 1
-        while (line_starts[start_line+1] or (#src+1)) <= @start
+        while (line_starts[start_line+1] or math.huge) <= @start
             start_line += 1
         stop_line = start_line
-        while (line_starts[stop_line+1] or (#src+1)) <= @stop
+        while (line_starts[stop_line+1] or math.huge) <= @stop
             stop_line += 1
         return start_line, stop_line
     get_line: => "#{@filename}:#{@get_line_number!}"
@@ -39,27 +40,41 @@ Location = immutable {"filename","start","stop"}, {
 }
 
 class Lua
-    is_statement: true
-    is_value: false
-
     new: (@source, ...)=>
         if type(@source) == 'string'
             filename,start,stop = @source\match("^(.-)[(%d+):(%d+)]$")
             @source = Location(filename, tonumber(start), tonumber(stop))
-        for i=1,select("#",...)
-            x = select(i,...)
-            assert(type(x) != 'table' or getmetatable(x))
         @bits = {...}
         @free_vars = {}
+        @is_value = false
     
-    add_free_vars: (free_vars)=>
+    @Value = (...)->
+        lua = Lua(...)
+        lua.is_value = true
+        return lua
+
+    clone: =>
+        copy = Lua(@source, {unpack(@bits)})
+        copy.is_value = @is_value
+        for k,v in pairs @free_vars
+            copy.free_vars[k] = v
+        return copy
+    
+    add_free_vars: (...)=>
         seen = {[v]:true for v in *@free_vars}
-        for var in *free_vars
+        for i=1,select("#",...)
+            var = select(i, ...)
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
 
-    as_statements: => self
+    convert_to_statements: (prefix="", suffix=";")=>
+        unless @is_value
+            return
+        if prefix != ""
+            @prepend prefix
+        if suffix != ""
+            @append suffix
 
     declare_locals: (skip={})=>
         if next(skip) == 1
@@ -75,10 +90,9 @@ class Lua
         buff = {}
         for i,b in ipairs @bits
             buff[#buff+1] = tostring(b)
-            if i < #@bits and type(b) != 'string' and b.is_statement
+            if i < #@bits and type(b) != 'string' and not b.is_value
                 buff[#buff+1] = "\n"
         ret = concat(buff, "")
-        assert(not ret\match(".*table: 0x.*"))
         return ret
 
     __len: =>
@@ -87,24 +101,24 @@ class Lua
             len += #b
         return len
     
+    __add: (other)=>
+        Lua(nil, self, other)
+    
+    __concat: (other)=>
+        Lua(nil, self, other)
+
     append: (...)=>
         n = select("#",...)
         bits = @bits
         for i=1,n
-            x = select(i,...)
-            assert(type(x) != 'table' or getmetatable(x))
             bits[#bits+1] = select(i, ...)
     
     prepend: (...)=>
         n = select("#",...)
         bits = @bits
         for i=#bits+n,n+1,-1
-            x = select(i,...)
-            assert(type(x) != 'table' or getmetatable(x))
             bits[i] = bits[i-n]
         for i=1,n
-            x = select(i,...)
-            assert(type(x) != 'table' or getmetatable(x))
             bits[i] = select(i, ...)
 
     make_offset_table: (lua_chunkname)=>
@@ -130,28 +144,11 @@ class Lua
         walk self
         return lua_str, metadata
 
-class LuaValue extends Lua
-    is_statement: false
-    is_value: true
-
-    new: (@source, ...)=>
-        @bits = {...}
-
-    __tostring: =>
-        buff = {}
-        for b in *@bits
-            buff[#buff+1] = tostring(b)
-        ret = concat(buff, "")
-        assert(not ret\match(".*table: 0x.*"))
-        return ret
-
-    as_statements: (prefix="", suffix=";")=>
-        bits = {prefix, unpack @bits}
-        bits[#bits+1] = suffix
-        return Lua(@source, unpack(bits))
-
     parenthesize: =>
-        @prepend "("
-        @append ")"
+        if @is_value
+            @prepend "("
+            @append ")"
+        else
+            error "Cannot parenthesize lua statements"
 
-return {:Lua, :LuaValue, :Location}
+return {:Lua, :Location}
