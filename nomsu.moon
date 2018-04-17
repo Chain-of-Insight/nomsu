@@ -38,6 +38,7 @@ debug_getinfo = debug.getinfo
 -- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
 -- Allow plain text backslash like: "\n" in longstrings without requiring "\\n"
 -- Maybe support some kind of regex action definitions like "foo %first (and %next)*"?
+-- Re-implement nomsu-to-lua comment translation
 
 export FILE_CACHE
 FILE_CACHE = setmetatable {}, {
@@ -181,7 +182,7 @@ NOMSU_PATTERN = do
     re.compile(nomsu_peg, NOMSU_DEFS)
 
 class NomsuCompiler
-    new:()=>
+    new: =>
         -- Weak-key mapping from objects to randomly generated unique IDs
         NaN_surrogate = {}
         nil_surrogate = {}
@@ -195,7 +196,6 @@ class NomsuCompiler
                 return id
         })
         @use_stack = {}
-        @compilestack = {}
         @file_metadata = setmetatable({}, {__mode:"k"})
         @action_metadata = setmetatable({}, {__mode:"k"})
 
@@ -881,7 +881,7 @@ if arg and debug_getinfo(2).func != require
         print "Usage: lua nomsu.lua [-c] [-i] [-p] [-O] [--help] [input [-o output]]"
         os.exit!
 
-    nomsu = NomsuCompiler()
+    nomsu = NomsuCompiler!
 
     ok, to_lua = pcall -> require('moonscript.base').to_lua
     if not ok then to_lua = nil

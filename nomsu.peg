@@ -107,8 +107,8 @@ inline_dict_item:
 dict_key:
     (({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / inline_expression
 
-block_comment(Comment): "#.." { [^%nl]* (%nl+ %indent [^%nl]* (%nl+ %nodent [^%nl]*)* %dedent)? }
-line_comment(Comment): "#" { [^%nl]* }
+block_comment: "#.." [^%nl]* (%nl+ %indent [^%nl]* (%nl+ %nodent [^%nl]*)* %dedent)?
+line_comment: "#" [^%nl]*
 
 eol: %ws* line_comment? (!. / &%nl)
 ignored_line: (%nodent (block_comment / line_comment)) / (%ws* (!. / &%nl))

@@ -1149,7 +1149,6 @@ do
         end
       })
       self.use_stack = { }
-      self.compilestack = { }
       self.file_metadata = setmetatable({ }, {
         __mode = "k"
       })
