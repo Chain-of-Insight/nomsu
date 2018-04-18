@@ -78,13 +78,13 @@ immediately:
                 for i, line in ipairs(\%longhand.value) do lines[i] = line.source:get_text(); end
                 template = repr(table.concat(lines, "\\n"));
             else
-                template = repr(\%longhand.source:get_text());
+                template = repr(tostring(\%longhand.source:get_text()));
             end
             local replacements = {};
             for i, a in ipairs(args) do replacements[i] = a.."="..a; end
             replacements = "{"..table.concat(replacements, ", ").."}";
             lua:append([[)
-                local template = nomsu:parse(]]..template..[[, ]]..repr(tree.source.filename)..[[);
+                local template = nomsu:parse(Nomsu(]]..repr(tree.source)..[[, ]]..template..[[));
                 local replacement = nomsu:tree_with_replaced_vars(template, ]]..replacements..[[);
                 return replacement:as_lua(nomsu);
             end);

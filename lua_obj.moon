@@ -1,25 +1,46 @@
 {:insert, :remove, :concat} = table
 immutable = require 'immutable'
-local Lua, Location
+local Lua, Source
 export LINE_STARTS
 
-Location = immutable {"filename","start","stop"}, {
-    name:"Location"
+Source = immutable {"filename","start","stop"}, {
+    name:"Source"
     __new: (filename, start, stop)=>
-        --assert(type(filename) == 'string' and type(start) == 'number' and type(stop) == 'number')
-        return filename, start, stop or start
-    __tostring: => "Location(\"#{@filename}\", #{@start}, #{@stop})"
+        if stop then assert(start <= stop, "Invalid range: #{start}, #{stop}")
+        return filename, start, stop
+    __tostring: =>
+        if @stop
+            "Source(\"#{@filename}\", #{@start}, #{@stop})"
+        else
+            "Source(\"#{@filename}\", #{@start})"
     __lt: (other)=>
         assert(@filename == other.filename, "Cannot compare sources from different files")
         return if @start == other.start
-            @stop < other.stop
+            (@stop or @start) < (other.stop or other.start)
         else @start < other.start
     __le: (other)=>
         assert(@filename == other.filename, "Cannot compare sources from different files")
         return if @start == other.start
-            @stop <= other.stop
+            (@stop or @start) <= (other.stop or other.start)
         else @start <= other.start
-    get_text: => FILE_CACHE[@filename]\sub(@start,@stop)
+    __add: (offset)=>
+        if type(self) == 'number'
+            offset, self = self, offset
+        else assert(type(offset) == 'number', "Cannot add Source and #{type(offset)}")
+        return Source(@filename, @start+offset, @stop)
+    sub: (start, stop)=>
+        if not @stop
+            assert(not stop, "cannot subscript non-range with range")
+            assert(start > 0, "cannot subscript non-range with negative index")
+            return Source(@filename, @start + (start or 0))
+        else
+            start or= 1
+            if start < 0 then start = @stop + start + 1
+            stop or= -1
+            if stop < 0 then stop = @stop + stop + 1
+            return Source(@filename, @start + start - 1, @start + stop - 1)
+    get_text: =>
+        FILE_CACHE[@filename]\sub(@start,@stop)
     get_line_number: =>
         -- TODO: do a binary search if this is actually slow, which I doubt
         src = FILE_CACHE[@filename]
@@ -39,12 +60,56 @@ Location = immutable {"filename","start","stop"}, {
         else "#{@filename}:#{start_line}-#{stop_line}"
 }
 
-class Lua
+class Code
     new: (@source, ...)=>
         if type(@source) == 'string'
             filename,start,stop = @source\match("^(.-)[(%d+):(%d+)]$")
-            @source = Location(filename, tonumber(start), tonumber(stop))
+            @source = Source(filename, tonumber(start), tonumber(stop))
         @bits = {...}
+
+    clone: =>
+        cls = @__class
+        copy = cls(@source, unpack(@bits))
+        copy.is_value = @is_value
+        for k,v in pairs @free_vars
+            copy.free_vars[k] = v
+        return copy
+
+    __tostring: =>
+        buff = {}
+        for i,b in ipairs @bits
+            buff[#buff+1] = tostring(b)
+        ret = concat(buff, "")
+        return ret
+
+    __len: =>
+        len = 0
+        for b in *@bits
+            len += #b
+        return len
+    
+    sub: (start,stop)=>
+        str = tostring(self)\sub(start,stop)
+        cls = @__class
+        return cls(@source\sub(start-@source.start+1,stop-@source.stop+1), str)
+
+    append: (...)=>
+        n = select("#",...)
+        bits = @bits
+        for i=1,n
+            bits[#bits+1] = select(i, ...)
+    
+    prepend: (...)=>
+        n = select("#",...)
+        bits = @bits
+        for i=#bits+n,n+1,-1
+            bits[i] = bits[i-n]
+        for i=1,n
+            bits[i] = select(i, ...)
+
+class Lua extends Code
+    new: (...)=>
+        super ...
         @free_vars = {}
         @is_value = false
     
@@ -53,13 +118,6 @@ class Lua
         lua.is_value = true
         return lua
 
-    clone: =>
-        copy = Lua(@source, {unpack(@bits)})
-        copy.is_value = @is_value
-        for k,v in pairs @free_vars
-            copy.free_vars[k] = v
-        return copy
-    
     add_free_vars: (...)=>
         seen = {[v]:true for v in *@free_vars}
         for i=1,select("#",...)
@@ -90,8 +148,6 @@ class Lua
         buff = {}
         for i,b in ipairs @bits
             buff[#buff+1] = tostring(b)
-            if i < #@bits and type(b) != 'string' and not b.is_value
-                buff[#buff+1] = "\n"
         ret = concat(buff, "")
         return ret
 
@@ -100,29 +156,32 @@ class Lua
         for b in *@bits
             len += #b
         return len
-    
-    __add: (other)=>
-        Lua(nil, self, other)
-    
-    __concat: (other)=>
-        Lua(nil, self, other)
 
     append: (...)=>
         n = select("#",...)
         bits = @bits
         for i=1,n
-            bits[#bits+1] = select(i, ...)
+            bit = select(i, ...)
+            bits[#bits+1] = bit
+            if type(bit) != 'string' and not bit.is_value and #@bits > 0
+                bits[#bits+1] = "\n"
     
     prepend: (...)=>
         n = select("#",...)
         bits = @bits
-        for i=#bits+n,n+1,-1
-            bits[i] = bits[i-n]
+        insert_index = 1
+        -- TODO: optimize?
         for i=1,n
-            bits[i] = select(i, ...)
+            bit = select(i, ...)
+            insert bits, insert_index, bit
+            insert_index += 1
+            if type(bit) != 'string' and not bit.is_value and insert_index < #@bits + 1
+                insert bits, insert_index, "\n"
+                insert_index += 1
 
-    make_offset_table: (lua_chunkname)=>
+    make_offset_table: =>
         -- Return a mapping from output (lua) character number to input (nomsu) character number
+        lua_chunkname = tostring(@source)..".lua"
         lua_str = tostring(self)
         metadata = {
             nomsu_filename:@source.filename
@@ -138,7 +197,7 @@ class Lua
                 for b in *lua.bits
                     walk b
                 lua_stop = lua_offset
-                nomsu_src, lua_src = lua.source, Location(lua_chunkname, lua_start, lua_stop)
+                nomsu_src, lua_src = lua.source, Source(lua_chunkname, lua_start, lua_stop)
                 metadata.lua_to_nomsu[lua_src] = nomsu_src
                 metadata.nomsu_to_lua[nomsu_src] = lua_src
         walk self
@@ -151,4 +210,18 @@ class Lua
         else
             error "Cannot parenthesize lua statements"
 
-return {:Lua, :Location}
+class Nomsu extends Code
+    __tostring: =>
+        buff = {}
+        for i,b in ipairs @bits
+            buff[#buff+1] = tostring(b)
+        ret = concat(buff, "")
+        return ret
+
+    __len: =>
+        len = 0
+        for b in *@bits
+            len += #b
+        return len
+
+return {:Code, :Nomsu, :Lua, :Source}

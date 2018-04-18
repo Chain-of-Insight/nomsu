@@ -50,7 +50,7 @@ Tree "File",
 
 Tree "Nomsu",
     as_lua: (nomsu)=>
-        Lua.Value(@source, "nomsu:parse(",repr(@source\get_text!),", ",repr(@source.filename),")")
+        Lua.Value(@source, "nomsu:parse(Nomsu(",repr(@source),", ",repr(@source\get_text!),"))")
 
 Tree "Block",
     as_lua: (nomsu)=>

@@ -30,10 +30,10 @@ do
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
 local debug_getinfo = debug.getinfo
-local Lua, Location
+local Nomsu, Lua, Source
 do
   local _obj_0 = require("lua_obj")
-  Lua, Location = _obj_0.Lua, _obj_0.Location
+  Nomsu, Lua, Source = _obj_0.Nomsu, _obj_0.Lua, _obj_0.Source
 end
 FILE_CACHE = setmetatable({ }, {
   __index = function(self, filename)
@@ -41,10 +41,16 @@ FILE_CACHE = setmetatable({ }, {
     if not (file) then
       return nil
     end
-    local source = file:read("a"):sub(1, -2)
+    local code = file:read("a"):sub(1, -2)
     file:close()
-    self[filename] = source
-    return source
+    local source = Source(filename, 1, #code)
+    if filename:match("%.nom$") then
+      code = Nomsu(source, code)
+    elseif filename:match("%.lua$") then
+      code = Lua(source, code)
+    end
+    self[filename] = code
+    return code
   end
 })
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
@@ -55,7 +61,7 @@ local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
 LINE_STARTS = setmetatable({ }, {
   __mode = "k",
   __index = function(self, k)
-    local line_starts = line_counter:match(k)
+    local line_starts = line_counter:match(tostring(k))
     self[k] = line_starts
     return line_starts
   end
@@ -149,17 +155,17 @@ do
     end
   end)
   _with_0.error = function(src, pos, err_msg)
-    if lpeg.userdata.source_code:sub(pos, pos):match("[\r\n]") then
-      pos = pos + #lpeg.userdata.source_code:match("[ \t\n\r]*", pos)
+    if src:sub(pos, pos):match("[\r\n]") then
+      pos = pos + #src:match("[ \t\n\r]*", pos)
     end
     local line_no = 1
-    local text_loc = Location(lpeg.userdata.filename, pos)
+    local text_loc = lpeg.userdata.source_code.source:sub(pos, pos)
     line_no = text_loc:get_line_number()
     local prev_line = src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 1)
     local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 1)
     local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 1)
     local pointer = ("-"):rep(pos - LINE_STARTS[src][line_no]) .. "^"
-    err_msg = (err_msg or "Parse error") .. " in " .. tostring(lpeg.userdata.filename) .. " on line " .. tostring(line_no) .. ":\n"
+    err_msg = (err_msg or "Parse error") .. " in " .. tostring(lpeg.userdata.source_code.source.filename) .. " on line " .. tostring(line_no) .. ":\n"
     err_msg = err_msg .. "\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n"
     return error(err_msg)
   end
@@ -172,8 +178,8 @@ setmetatable(NOMSU_DEFS, {
       if type(value) == 'table' then
         error("Not a tuple: " .. tostring(repr(value)))
       end
-      local loc = Location(lpeg.userdata.filename, start, stop)
-      local node = Types[key](value, loc)
+      local source = lpeg.userdata.source_code.source:sub(start, stop)
+      local node = Types[key](value, source)
       return node
     end
     self[key] = make_node
@@ -197,7 +203,7 @@ end
 local NomsuCompiler
 do
   local _class_0
-  local _chunk_counter, stub_defs, stub_pattern, var_pattern
+  local stub_defs, stub_pattern, var_pattern
   local _base_0 = {
     define_action = function(self, signature, source, fn)
       if type(fn) ~= 'function' then
@@ -310,34 +316,35 @@ do
       end
       return code:gsub("\n", "\n" .. ("    "):rep(levels))
     end,
-    parse = function(self, nomsu_code, filename)
-      assert(type(filename) == "string", "Bad filename type: " .. tostring(type(filename)))
+    parse = function(self, nomsu_code)
       local userdata = {
         source_code = nomsu_code,
-        filename = filename,
         indent_stack = {
           ""
         }
       }
       local old_userdata
       old_userdata, lpeg.userdata = lpeg.userdata, userdata
-      local tree = NOMSU_PATTERN:match(nomsu_code)
+      local tree = NOMSU_PATTERN:match(tostring(nomsu_code))
       lpeg.userdata = old_userdata
       assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
       return tree
     end,
-    run = function(self, nomsu_code, filename)
-      if nomsu_code == "" then
-        return nil, ""
+    run = function(self, nomsu_code, source)
+      if type(source) == 'string' then
+        source = Source(source, 1, #nomsu_code)
       end
-      local tree = self:parse(nomsu_code, filename)
+      if nomsu_code == "" then
+        return nil
+      end
+      local tree = self:parse(nomsu_code, source)
       assert(tree, "Failed to parse: " .. tostring(nomsu_code))
       assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local lua = self:tree_to_lua(tree)
       lua:convert_to_statements()
       lua:declare_locals()
-      lua:prepend("-- File: " .. tostring(filename) .. "\n")
-      return self:run_lua(lua, filename .. ".lua")
+      lua:prepend("-- File: " .. tostring(source) .. "\n")
+      return self:run_lua(lua)
     end,
     run_file = function(self, filename)
       local file_attributes = assert(lfs.attributes(filename), "File not found: " .. tostring(filename))
@@ -396,25 +403,17 @@ do
       end
       return loaded[filename]
     end,
-    run_lua = function(self, lua, filename)
-      if filename == nil then
-        filename = nil
+    run_lua = function(self, lua)
+      assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
+      local lua_string, metadata = lua:make_offset_table()
+      LUA_METADATA[metadata.lua_filename] = metadata
+      if rawget(FILE_CACHE, lua.source.filename) == nil then
+        FILE_CACHE[lua.source.filename] = lua_string
       end
-      if filename == nil then
-        if type(lua) == 'string' then
-          _chunk_counter = _chunk_counter + 1
-          filename = "<lua chunk #" .. tostring(_chunk_counter) .. ">"
-        else
-          filename = lua.source.filename .. ".lua"
-        end
-        FILE_CACHE[filename] = tostring(lua)
+      if rawget(FILE_CACHE, lua.source) == nil then
+        FILE_CACHE[lua.source] = lua_string
       end
-      if type(lua) ~= 'string' then
-        local metadata
-        lua, metadata = lua:make_offset_table(filename)
-        LUA_METADATA[lua] = metadata
-      end
-      local run_lua_fn, err = load(lua, filename, "t", self.environment)
+      local run_lua_fn, err = load(lua_string, filename, "t", self.environment)
       if not run_lua_fn then
         local n = 1
         local fn
@@ -422,7 +421,7 @@ do
           n = n + 1
           return ("\n%-3d|"):format(n)
         end
-        local line_numbered_lua = "1  |" .. lua:gsub("\n", fn)
+        local line_numbered_lua = "1  |" .. lua_string:gsub("\n", fn)
         error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(line_numbered_lua)))) .. "\n\n" .. tostring(err), 0)
       end
       return run_lua_fn()
@@ -1204,7 +1203,8 @@ do
       end
       self.environment.Tuple = Tuple
       self.environment.Lua = Lua
-      self.environment.Location = Location
+      self.environment.Nomsu = Nomsu
+      self.environment.Source = Source
       self.environment.ACTIONS = setmetatable({ }, {
         __index = function(self, key)
           return error("Attempt to run undefined action: " .. tostring(key), 0)
@@ -1226,7 +1226,6 @@ do
   })
   _base_0.__class = _class_0
   local self = _class_0
-  _chunk_counter = 0
   self.unescape_string = function(self, str)
     return Cs(((P("\\\\") / "\\") + (P("\\\"") / '"') + NOMSU_DEFS.escaped_char + P(1)) ^ 0):match(str)
   end

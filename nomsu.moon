@@ -25,7 +25,7 @@ colors = setmetatable({}, {__index:->""})
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 debug_getinfo = debug.getinfo
-{:Lua, :Location} = require "lua_obj"
+{:Nomsu, :Lua, :Source} = require "lua_obj"
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -45,10 +45,15 @@ FILE_CACHE = setmetatable {}, {
     __index: (filename)=>
         file = io.open(filename)
         return nil unless file
-        source = file\read("a")\sub(1,-2) -- Lua appends trailing newline for no apparent reason.
+        code = file\read("a")\sub(1,-2) -- Lua appends trailing newline for no apparent reason.
         file\close!
-        self[filename] = source
-        return source
+        source = Source(filename, 1, #code)
+        if filename\match("%.nom$")
+            code = Nomsu(source, code)
+        elseif filename\match("%.lua$")
+            code = Lua(source, code)
+        self[filename] = code
+        return code
 }
 
 line_counter = re.compile([[
@@ -60,7 +65,7 @@ export LINE_STARTS
 LINE_STARTS = setmetatable {}, {
     __mode:"k"
     __index: (k)=>
-        line_starts = line_counter\match(k)
+        line_starts = line_counter\match(tostring(k))
         self[k] = line_starts
         return line_starts
 }
@@ -142,24 +147,24 @@ NOMSU_DEFS = with {}
             return start + #nodent
 
     .error = (src,pos,err_msg)->
-        if lpeg.userdata.source_code\sub(pos,pos)\match("[\r\n]")
-            pos += #lpeg.userdata.source_code\match("[ \t\n\r]*", pos)
+        if src\sub(pos,pos)\match("[\r\n]")
+            pos += #src\match("[ \t\n\r]*", pos)
         line_no = 1
-        text_loc = Location(lpeg.userdata.filename, pos)
+        text_loc = lpeg.userdata.source_code.source\sub(pos,pos)
         line_no = text_loc\get_line_number!
         prev_line = src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-1)
         err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-1)
         next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-1)
         pointer = ("-")\rep(pos-LINE_STARTS[src][line_no]) .. "^"
-        err_msg = (err_msg or "Parse error").." in #{lpeg.userdata.filename} on line #{line_no}:\n"
+        err_msg = (err_msg or "Parse error").." in #{lpeg.userdata.source_code.source.filename} on line #{line_no}:\n"
         err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"
         error(err_msg)
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop)->
         if type(value) == 'table' then error("Not a tuple: #{repr value}")-- = Tuple(value)
-        loc = Location(lpeg.userdata.filename, start, stop)
-        node = Types[key](value, loc)
+        source = lpeg.userdata.source_code.source\sub(start,stop)
+        node = Types[key](value, source)
         return node
     self[key] = make_node
     return make_node
@@ -212,7 +217,8 @@ class NomsuCompiler
         for k,v in pairs(Types) do @environment[k] = v
         @environment.Tuple = Tuple
         @environment.Lua = Lua
-        @environment.Location = Location
+        @environment.Nomsu = Nomsu
+        @environment.Source = Source
         @environment.ACTIONS = setmetatable({}, {__index:(key)=>
             error("Attempt to run undefined action: #{key}", 0)
         })
@@ -279,30 +285,30 @@ class NomsuCompiler
     indent: (code, levels=1)=>
         return code\gsub("\n","\n"..("    ")\rep(levels))
 
-    parse: (nomsu_code, filename)=>
-        assert type(filename) == "string", "Bad filename type: #{type filename}"
-
+    parse: (nomsu_code)=>
         userdata = {
-            source_code:nomsu_code, :filename, indent_stack: {""}
+            source_code:nomsu_code, indent_stack: {""}
         }
 
         old_userdata, lpeg.userdata = lpeg.userdata, userdata
-        tree = NOMSU_PATTERN\match(nomsu_code)
+        tree = NOMSU_PATTERN\match(tostring(nomsu_code))
         lpeg.userdata = old_userdata
         
         assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
         return tree
 
-    run: (nomsu_code, filename)=>
-        if nomsu_code == "" then return nil, ""
-        tree = @parse(nomsu_code, filename)
+    run: (nomsu_code, source)=>
+        if type(source) == 'string'
+            source = Source(source,1,#nomsu_code)
+        if nomsu_code == "" then return nil
+        tree = @parse(nomsu_code, source)
         assert tree, "Failed to parse: #{nomsu_code}"
         assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
         lua = @tree_to_lua(tree)
         lua\convert_to_statements!
         lua\declare_locals!
-        lua\prepend "-- File: #{filename}\n"
-        return @run_lua(lua, filename..".lua")
+        lua\prepend "-- File: #{source}\n"
+        return @run_lua(lua)
 
     run_file: (filename)=>
         file_attributes = assert(lfs.attributes(filename), "File not found: #{filename}")
@@ -342,26 +348,22 @@ class NomsuCompiler
             loaded[filename] = @run_file(filename) or true
         return loaded[filename]
 
-    _chunk_counter = 0
-    run_lua: (lua, filename=nil)=>
-        if filename == nil
-            filename = if type(lua) == 'string'
-                _chunk_counter += 1
-                "<lua chunk ##{_chunk_counter}>"
-            else
-                lua.source.filename..".lua"
-            FILE_CACHE[filename] = tostring(lua)
-        if type(lua) != 'string'
-            lua, metadata = lua\make_offset_table(filename)
-            LUA_METADATA[lua] = metadata
+    run_lua: (lua)=>
+        assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
+        lua_string, metadata = lua\make_offset_table!
+        LUA_METADATA[metadata.lua_filename] = metadata
+        if rawget(FILE_CACHE, lua.source.filename) == nil
+            FILE_CACHE[lua.source.filename] = lua_string
+        if rawget(FILE_CACHE, lua.source) == nil
+            FILE_CACHE[lua.source] = lua_string
             
-        run_lua_fn, err = load(lua, filename, "t", @environment)
+        run_lua_fn, err = load(lua_string, filename, "t", @environment)
         if not run_lua_fn
             n = 1
             fn = ->
                 n = n + 1
                 ("\n%-3d|")\format(n)
-            line_numbered_lua = "1  |"..lua\gsub("\n", fn)
+            line_numbered_lua = "1  |"..lua_string\gsub("\n", fn)
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack line_numbered_lua}\n\n#{err}", 0)
         return run_lua_fn!
     
