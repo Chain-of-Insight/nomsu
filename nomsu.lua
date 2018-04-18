@@ -61,7 +61,16 @@ local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
 LINE_STARTS = setmetatable({ }, {
   __mode = "k",
   __index = function(self, k)
-    local line_starts = line_counter:match(tostring(k))
+    if type(k) ~= 'string' then
+      k = tostring(k)
+      do
+        local v = rawget(self, k)
+        if v then
+          return v
+        end
+      end
+    end
+    local line_starts = line_counter:match(k)
     self[k] = line_starts
     return line_starts
   end
@@ -203,7 +212,7 @@ end
 local NomsuCompiler
 do
   local _class_0
-  local stub_defs, stub_pattern, var_pattern
+  local _nomsu_chunk_counter, stub_defs, stub_pattern, var_pattern
   local _base_0 = {
     define_action = function(self, signature, source, fn)
       if type(fn) ~= 'function' then
@@ -330,11 +339,14 @@ do
       assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
       return tree
     end,
-    run = function(self, nomsu_code, source)
-      if type(source) == 'string' then
-        source = Source(source, 1, #nomsu_code)
+    run = function(self, nomsu_code)
+      if type(nomsu_code) == 'string' then
+        _nomsu_chunk_counter = _nomsu_chunk_counter + 1
+        local filename = "<nomsu chunk #" .. tostring(_nomsu_chunk_counter) .. ">.nom"
+        nomsu_code = Nomsu(filename, nomsu_code)
+        FILE_CACHE[filename] = nomsu_code
       end
-      if nomsu_code == "" then
+      if #nomsu_code == 0 then
         return nil
       end
       local tree = self:parse(nomsu_code, source)
@@ -367,14 +379,14 @@ do
           local lua_filename = filename:gsub("%.nom$", ".lua")
           local file = FILE_CACHE[lua_filename]
           if file then
-            return self:run_lua(file, lua_filename)
+            return self:run_lua(file)
           end
         end
         local file = file or FILE_CACHE[filename]
         if not file then
           error("File does not exist: " .. tostring(filename), 0)
         end
-        return self:run(file, filename)
+        return self:run(file)
       else
         return error("Invalid filetype for " .. tostring(filename), 0)
       end
@@ -1226,6 +1238,7 @@ do
   })
   _base_0.__class = _class_0
   local self = _class_0
+  _nomsu_chunk_counter = 0
   self.unescape_string = function(self, str)
     return Cs(((P("\\\\") / "\\") + (P("\\\"") / '"') + NOMSU_DEFS.escaped_char + P(1)) ^ 0):match(str)
   end
@@ -1353,7 +1366,7 @@ if arg and debug_getinfo(2).func ~= require then
       else
         local retval, code
         if args.input == '-' then
-          retval, code = nomsu:run(io.read('a'), 'stdin')
+          retval, code = nomsu:run(io.read('a'))
         else
           retval, code = nomsu:run_file(args.input)
         end
@@ -1367,7 +1380,7 @@ if arg and debug_getinfo(2).func ~= require then
       end
     end
     if args.flags["-i"] then
-      nomsu:run('use "core"', "stdin")
+      nomsu:run('use "core"')
       while true do
         io.write(colored.bright(colored.yellow(">> ")))
         local buff = ""
@@ -1384,9 +1397,7 @@ if arg and debug_getinfo(2).func ~= require then
           break
         end
         local ret
-        ok, ret = pcall(function()
-          return nomsu:run(buff, "stdin")
-        end)
+        ok, ret = pcall(nomsu.run, nomsu, buff)
         if ok and ret ~= nil then
           print("= " .. repr(ret))
         elseif not ok then

@@ -62,10 +62,13 @@ Source = immutable {"filename","start","stop"}, {
 
 class Code
     new: (@source, ...)=>
+        @bits = {...}
         if type(@source) == 'string'
             filename,start,stop = @source\match("^(.-)[(%d+):(%d+)]$")
-            @source = Source(filename, tonumber(start), tonumber(stop))
-        @bits = {...}
+            if start or stop
+                @source = Source(filename, tonumber(start), tonumber(stop))
+            else
+                @source = Source(@source, 1, #self)
 
     clone: =>
         cls = @__class

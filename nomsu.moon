@@ -41,6 +41,7 @@ debug_getinfo = debug.getinfo
 -- Re-implement nomsu-to-lua comment translation
 
 export FILE_CACHE
+-- FILE_CACHE is a map from filename (string) -> file contents (Lua or Nomsu object)
 FILE_CACHE = setmetatable {}, {
     __index: (filename)=>
         file = io.open(filename)
@@ -62,10 +63,16 @@ line_counter = re.compile([[
 ]], nl:P("\r")^-1 * P("\n"))
 -- Mapping from line number -> character offset
 export LINE_STARTS
+-- LINE_STARTS is a mapping from strings to a table that maps line number to character positions
 LINE_STARTS = setmetatable {}, {
     __mode:"k"
     __index: (k)=>
-        line_starts = line_counter\match(tostring(k))
+        -- Implicitly convert Lua and Nomsu objects to strings
+        if type(k) != 'string'
+            k = tostring(k)
+            if v = rawget(self, k)
+                return v
+        line_starts = line_counter\match(k)
         self[k] = line_starts
         return line_starts
 }
@@ -297,10 +304,14 @@ class NomsuCompiler
         assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
         return tree
 
-    run: (nomsu_code, source)=>
-        if type(source) == 'string'
-            source = Source(source,1,#nomsu_code)
-        if nomsu_code == "" then return nil
+    _nomsu_chunk_counter = 0
+    run: (nomsu_code)=>
+        if type(nomsu_code) == 'string'
+            _nomsu_chunk_counter += 1
+            filename = "<nomsu chunk ##{_nomsu_chunk_counter}>.nom"
+            nomsu_code = Nomsu(filename, nomsu_code)
+            FILE_CACHE[filename] = nomsu_code
+        if #nomsu_code == 0 then return nil
         tree = @parse(nomsu_code, source)
         assert tree, "Failed to parse: #{nomsu_code}"
         assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
@@ -328,11 +339,11 @@ class NomsuCompiler
                 lua_filename = filename\gsub("%.nom$", ".lua")
                 file = FILE_CACHE[lua_filename]
                 if file
-                    return @run_lua(file, lua_filename)
+                    return @run_lua(file)
             file = file or FILE_CACHE[filename]
             if not file
                 error("File does not exist: #{filename}", 0)
-            return @run(file, filename)
+            return @run(file)
         else
             error("Invalid filetype for #{filename}", 0)
     
@@ -939,7 +950,7 @@ if arg and debug_getinfo(2).func != require
             else
                 local retval, code
                 if args.input == '-'
-                    retval, code = nomsu\run(io.read('a'), 'stdin')
+                    retval, code = nomsu\run(io.read('a'))
                 else
                     retval, code = nomsu\run_file(args.input)
                 if compiled_output
@@ -951,7 +962,7 @@ if arg and debug_getinfo(2).func != require
 
         if args.flags["-i"]
             -- REPL
-            nomsu\run('use "core"', "stdin")
+            nomsu\run('use "core"')
             while true
                 io.write(colored.bright colored.yellow ">> ")
                 buff = ""
@@ -964,7 +975,7 @@ if arg and debug_getinfo(2).func != require
                     io.write(colored.dim colored.yellow ".. ")
                 if #buff == 0
                     break
-                ok, ret = pcall(-> nomsu\run(buff, "stdin"))
+                ok, ret = pcall(nomsu.run, nomsu, buff)
                 if ok and ret != nil
                     print "= "..repr(ret)
                 elseif not ok

@@ -150,13 +150,17 @@ do
   _class_0 = setmetatable({
     __init = function(self, source, ...)
       self.source = source
-      if type(self.source) == 'string' then
-        local filename, start, stop = self.source:match("^(.-)[(%d+):(%d+)]$")
-        self.source = Source(filename, tonumber(start), tonumber(stop))
-      end
       self.bits = {
         ...
       }
+      if type(self.source) == 'string' then
+        local filename, start, stop = self.source:match("^(.-)[(%d+):(%d+)]$")
+        if start or stop then
+          self.source = Source(filename, tonumber(start), tonumber(stop))
+        else
+          self.source = Source(self.source, 1, #self)
+        end
+      end
     end,
     __base = _base_0,
     __name = "Code"
