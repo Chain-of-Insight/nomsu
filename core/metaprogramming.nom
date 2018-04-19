@@ -26,7 +26,7 @@ immediately:
             local body_lua = \%lua:as_lua(nomsu);
             body_lua:convert_to_statements("return ");
             body_lua:declare_locals(args);
-            lua:append(")\\n    ", body_lua, "\\nend);")
+            lua:append(")\\n    ", body_lua, "\\nend);");
             return lua;
         end);
 
@@ -75,7 +75,7 @@ immediately:
             local template;
             if \%longhand.type == "Block" then
                 local lines = {};
-                for i, line in ipairs(\%longhand.value) do lines[i] = line.source:get_text(); end
+                for i, line in ipairs(\%longhand.value) do lines[i] = tostring(line.source:get_text()); end
                 template = repr(table.concat(lines, "\\n"));
             else
                 template = repr(tostring(\%longhand.source:get_text()));
@@ -117,7 +117,7 @@ immediately:
         lua> ".."
             local lua = \%tree:as_lua(nomsu);
             lua:convert_to_statements();
-            lua:declare_locals();
+            --lua:declare_locals();
             return lua;
 
     action [%tree as value]:
@@ -127,7 +127,7 @@ immediately:
         =lua "nomsu:tree_to_stub(\%tree)"
     
 immediately:
-    parse [%var write code %code] as: lua> "\%var:append(\%code);"
+    parse [%var <-write %code] as: lua> "\%var:append(\%code);"
 
 immediately:
     compile [%tree's source code, %tree' source code] to: Lua value "\(%tree as lua expr).source:get_text()"

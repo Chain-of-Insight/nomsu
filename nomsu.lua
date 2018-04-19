@@ -372,7 +372,7 @@ do
       end
       if filename:match(".*%.lua") then
         local file = assert(FILE_CACHE[filename], "Could not find file: " .. tostring(filename))
-        return self:run_lua(file, filename)
+        return self:run_lua(file)
       end
       if filename:match(".*%.nom") then
         if not self.skip_precompiled then
@@ -443,7 +443,7 @@ do
         return tree.value[1]
       end
       local lua = Lua(tree.source, "return ", self:tree_to_lua(tree), ";")
-      return self:run_lua(lua, tree.source.filename)
+      return self:run_lua(lua)
     end,
     tree_to_nomsu = function(self, tree, indentation, max_line, expr_type)
       if indentation == nil then
@@ -940,7 +940,7 @@ do
     tree_with_replaced_vars = function(self, tree, replacements)
       return self:tree_map(tree, function(t)
         if t.type == "Var" then
-          local id = self:var_to_lua_identifier(t.value)
+          local id = tostring(t:as_lua(self))
           if replacements[id] ~= nil then
             return replacements[id]
           end
@@ -1088,7 +1088,7 @@ do
       end)
       self:define_compile_action("lua> %code", get_line_no(), function(self, _code)
         if _code.type ~= "Text" then
-          return Lua.Value(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
+          return Lua.Value(self.source, "nomsu:run_lua(Lua(", repr(_code.source), ", ", repr(tostring(nomsu:tree_to_lua(_code))), "))")
         end
         local lua = Lua(_code.source)
         local _list_0 = _code.value
@@ -1109,7 +1109,7 @@ do
       end)
       self:define_compile_action("=lua %code", get_line_no(), function(self, _code)
         if _code.type ~= "Text" then
-          return Lua.Value(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ")")
+          return Lua.Value(self.source, "nomsu:run_lua(Lua(", repr(_code.source), ", ", repr(tostring(nomsu:tree_to_lua(_code))), "))")
         end
         local lua = Lua.Value(self.source)
         local _list_0 = _code.value
@@ -1303,7 +1303,7 @@ if arg and debug_getinfo(2).func ~= require then
       return line_table
     end
   })
-  debug.getinfoXXXXXX = function(thread, f, what)
+  debug.getinfo = function(thread, f, what)
     if what == nil then
       f, what, thread = thread, f, nil
     end
@@ -1324,21 +1324,16 @@ if arg and debug_getinfo(2).func ~= require then
         local metadata = nomsu.action_metadata[info.func]
         if metadata then
           info.name = metadata.aliases[1]
-          local filename
-          if type(metadata.source) == 'string' then
-            filename = metadata.source:match("^[^[:]*")
-          else
-            filename = metadata.source.filename
-          end
-          info.short_src = filename
-          info.source = FILE_CACHE[filename]
-          local linedefined
-          ok, linedefined = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
-          if ok then
-            info.linedefined = linedefined
-          end
-          local currentline
-          ok, currentline = pcall(lua_line_to_nomsu_line, info.short_src, info.currentline)
+          local _ = [=[                filename = if type(metadata.source) == 'string'
+                    metadata.source\match("^[^[:]*")
+                else metadata.source.filename
+                info.short_src = filename
+                info.source = FILE_CACHE[filename]
+                ok, linedefined = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
+                if ok then info.linedefined = linedefined
+                ok, currentline = pcall(lua_line_to_nomsu_line, info.short_src, info.currentline)
+                --if ok then info.currentline = currentline
+                ]=]
         end
       end
     end

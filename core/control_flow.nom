@@ -8,7 +8,7 @@ use "core/operators.nom"
 
 # No-Op
 immediately:
-    compile [do nothing] to {statements:""}
+    compile [do nothing] to: Lua ""
 
 # Conditionals
 immediately:
@@ -59,15 +59,15 @@ immediately
 
 # GOTOs
 immediately:
-    compile [=== %label ===, --- %label ---, *** %label ***] to {..}
-        statements:"::label_\(%label as lua identifier)::;"
-    compile [go to %label] to {..}
-        statements:"goto label_\(%label as lua identifier);"
+    compile [=== %label ===, --- %label ---, *** %label ***] to
+        Lua "::label_\(%label as lua identifier)::;"
+    compile [go to %label] to
+        Lua "goto label_\(%label as lua identifier);"
 
 # Basic loop control
 immediately:
-    compile [do next] to {statements:"continue;"}
-    compile [stop] to {statements:"break;"}
+    compile [do next] to: Lua "continue;"
+    compile [stop] to: Lua "break;"
 
 # Helper function
 immediately:
@@ -84,17 +84,17 @@ immediately:
 
 # While loops
 immediately:
-    compile [do next repeat] to {statements:"goto continue_repeat;"}
-    compile [stop repeating] to {statements:"goto stop_repeat;"}
+    compile [do next repeat] to: Lua "goto continue_repeat;"
+    compile [stop repeating] to: Lua "goto stop_repeat;"
     compile [repeat while %condition %body] to
         %lua <-: Lua "while \(%condition as lua expr) do"
         if %body has subtree % where:
             (%.type = "Action") and ((%'s stub) is "do next repeat")
         ..:
-            %lua +<- "\n::continue_repeat::;"
-        %lua +<- "\n"
-        %lua +<- (%body as lua statements)
-        %lua +<- "\nend --while-loop"
+            %lua <-write "\n::continue_repeat::;"
+        %lua <-write "\n"
+        %lua <-write (%body as lua statements)
+        %lua <-write "\nend --while-loop"
         if %body has subtree % where:
             (%.type = "Action") and ((%'s stub) is "stop repeating")
         ..:
@@ -113,8 +113,8 @@ immediately:
         %lua <-: Lua "for i=1,\(%n as lua expr) do"
         if %body has subtree % where
             (%.type = "Action") and ((%'s stub) is "do next repeat")
-        ..: %lua +<- "\n::continue_repeat::;"
-        %lua +<- "\n\(%body as lua statements)\nend --numeric for-loop"
+        ..: %lua <-write "\n::continue_repeat::;"
+        %lua <-write "\n\(%body as lua statements)\nend --numeric for-loop"
         if %body has subtree % where:
             (%.type = "Action") and ((%'s stub) is "stop repeating")
         ..:
@@ -128,10 +128,10 @@ immediately:
 
 # For loop control flow:
 immediately:
-    compile [stop %var] to {..}
-        statements:"goto stop_\(%var as lua identifier);"
-    compile [do next %var] to {..}
-        statements:"goto continue_\(%var as lua identifier);"
+    compile [stop %var] to
+        Lua "goto stop_\(%var as lua identifier);"
+    compile [do next %var] to
+        Lua "goto continue_\(%var as lua identifier);"
 
 # Numeric range for loops
 immediately:
@@ -148,15 +148,15 @@ immediately:
             (%.type = "Action") and
                 ((%'s stub) is "do next %") and 
                     %.value.3.value is %var.value
-        ..: %lua write code "\n::continue_\(%var as lua identifier)::;"
-        %lua write code "\n\(%body as lua statements)\nend --numeric for-loop"
+        ..: %lua <-write "\n::continue_\(%var as lua identifier)::;"
+        %lua <-write "\n\(%body as lua statements)\nend --numeric for-loop"
 
         if %body has subtree % where:
             (%.type = "Action") and:
                 ((%'s stub) is "stop %") and:
                     %.value.2.value is %var.value
         ..:
-            %lua write code ".."
+            %lua <-write ".."
                 do -- scope for stopping for-loop
                     \%lua
                     ::stop_\(%var as lua identifier)::;
@@ -182,8 +182,8 @@ immediately:
             (%.type = "Action") and
                 ((%'s stub) is "do next %") and
                     %.value.3.value is %var.value
-        ..: %lua +<- (Lua "\n::continue_\(%var as lua identifier)::;")
-        %lua +<- (Lua "\n\(%body as lua statements)\nend --foreach-loop")
+        ..: %lua <-write (Lua "\n::continue_\(%var as lua identifier)::;")
+        %lua <-write (Lua "\n\(%body as lua statements)\nend --foreach-loop")
         if %body has subtree % where:
             (%.type = "Action") and
                 ((%'s stub) is "stop %") and
@@ -210,27 +210,27 @@ immediately:
             (%.type = "Action") and
                 ((%'s stub) is "do next %") and
                     %.value.3.value is %key.value
-        ..: %lua +<- (Lua "\n::continue_\(%key as lua identifier)::;")
+        ..: %lua <-write (Lua "\n::continue_\(%key as lua identifier)::;")
 
         if %body has subtree % where:
             (%.type = "Action") and
                 ((%'s stub) is "do next %") and
                     %.value.3.value is %value.value
-        ..: %lua +<- (Lua "\n::continue_\(%value as lua identifier)::;")
-        %lua +<- (Lua "\n\(%body as lua statements)\nend --foreach-loop")
+        ..: %lua <-write (Lua "\n::continue_\(%value as lua identifier)::;")
+        %lua <-write (Lua "\n\(%body as lua statements)\nend --foreach-loop")
         
         %stop_labels <- ""
         if %body has subtree % where:
             (%.type = "Action") and
                 ((%'s stub) is "stop %") and
                     %.value.2.value is %key.value
-        ..: %stop_labels +<- "\n::stop_\(%key as lua identifier)::;"
+        ..: %stop_labels <-write "\n::stop_\(%key as lua identifier)::;"
 
         if %body has subtree % where:
             (%.type = "Action") and
                 ((%'s stub) is "stop %") and
                     %.value.2.value is %value.value
-        ..: %stop_labels +<- "\n::stop_\(%value as lua identifier)::;"
+        ..: %stop_labels <-write "\n::stop_\(%value as lua identifier)::;"
 
         if: %stop_labels is not ""
             %lua <-
@@ -271,7 +271,7 @@ immediately:
 
                 if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
                     assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
-                    %code +<- ".."
+                    %code <-write ".."
                         
                         else
                         \%action_statements
@@ -280,7 +280,7 @@ immediately:
                     assume (not %seen_else) or barf "'else' clause needs to be last in 'when' block"
                     lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
                     %condition_code <- (%fallthroughs joined with " or ")
-                    %code +<- ".."
+                    %code <-write ".."
                         
                         \("if" if %is_first else "elseif") \%condition_code then
                         \%action_statements
@@ -290,7 +290,7 @@ immediately:
 
         assume (%fallthroughs = []) or barf "Unfinished fallthrough conditions in 'when' block"
         if: %code is not ""
-            %code +<- "\nend"
+            %code <-write "\nend"
         lua> "utils.deduplicate(\%locals);"
         return {statements:%code, locals:%locals}
 
@@ -322,7 +322,7 @@ immediately:
 
                 if: =lua "\%condition.type == 'Word' and \%condition.value == 'else'"
                     assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
-                    %code +<- ".."
+                    %code <-write ".."
 
                         else
                             \%action_statements
@@ -337,7 +337,7 @@ immediately:
                         ..else 
                             (%i'th in %fallthroughs) <- "utils.equivalent(branch_value, \%)"
                     %clause <- (%fallthroughs joined with " or ")
-                    %code +<- ".."
+                    %code <-write ".."
                         
                         \("if" if %is_first else "elseif") \%clause then
                         \%action_statements
@@ -348,7 +348,7 @@ immediately:
         assume (%fallthroughs = []) or barf "Unfinished fallthrough conditions in 'when' block"
         assume (%code is not "") or barf "No body for 'when % = ?' block!"
         unless %seen_else
-            %code +<- "\nend"
+            %code <-write "\nend"
         %code <- ".."
             do --when % = ?
             local branch_value = \(%branch_value as lua expr);\

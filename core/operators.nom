@@ -52,11 +52,12 @@ immediately:
         lua> "local \%value_lua = nomsu:tree_to_lua(\%value);"
         assume %value_lua.is_value or barf "Invalid value for assignment: \(%value's source code)"
         lua> ".."
-            local \%lua = Lua(tree.source, \%var_lua, ' = ', \%value_lua, ';');
+            local lua = Lua(tree.source, \%var_lua, ' = ', \%value_lua, ';');
             if \%var.type == 'Var' then
-                \%lua:add_free_vars(nomsu:var_to_lua_identifier(\%var.value));
+                print("Added var from assignment: "..tostring(\%var:as_lua(nomsu)));
+                lua:add_free_vars(\%var);
             end
-            return \%lua;
+            return lua;
 
 immediately:
     # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
@@ -72,7 +73,7 @@ immediately:
                 local value_lua = nomsu:tree_to_lua(value);
                 if not value_lua.is_value then error("Invalid value for assignment: "..value:get_src()); end
                 if target.type == "Var" then
-                    lhs:add_free_vars(nomsu:var_to_lua_identifier(target.value));
+                    lhs:add_free_vars(target);
                 end
                 if i > 1 then
                     lhs:append(", ");

@@ -126,7 +126,7 @@ do
     sub = function(self, start, stop)
       local str = tostring(self):sub(start, stop)
       local cls = self.__class
-      return cls(self.source:sub(start - self.source.start + 1, stop - self.source.stop + 1), str)
+      return cls(self.source:sub(start - self.source.start + 1, stop - self.source.start + 1), str)
     end,
     append = function(self, ...)
       local n = select("#", ...)
@@ -195,6 +195,11 @@ do
       end
       for i = 1, select("#", ...) do
         local var = select(i, ...)
+        if type(var) == 'userdata' and var.type == "Var" then
+          var = tostring(var:as_lua())
+        elseif type(var) ~= 'string' then
+          var = tostring(var)
+        end
         if not (seen[var]) then
           self.free_vars[#self.free_vars + 1] = var
           seen[var] = true
@@ -235,21 +240,40 @@ do
           skip = _tbl_0
         end
       end
-      if #self.free_vars > 0 then
-        self:prepend("local " .. tostring(concat(self.free_vars, ", ")) .. ";\n")
-      end
-      local _list_0 = self.free_vars
-      for _index_0 = 1, #_list_0 do
-        local var = _list_0[_index_0]
-        skip[var] = true
-      end
-      local _list_1 = self.bits
-      for _index_0 = 1, #_list_1 do
-        local bit = _list_1[_index_0]
-        if type(bit) == Lua then
-          bit:declare_locals(skip)
+      local to_declare = { }
+      local walk
+      walk = function(self)
+        local _list_0 = self.free_vars
+        for _index_0 = 1, #_list_0 do
+          local var = _list_0[_index_0]
+          if not (skip[var]) then
+            skip[var] = true
+            to_declare[#to_declare + 1] = var
+          end
+        end
+        local _list_1 = self.bits
+        for _index_0 = 1, #_list_1 do
+          local bit = _list_1[_index_0]
+          if bit.__class == Lua then
+            walk(bit)
+          end
+        end
+        if #self.free_vars > 0 then
+          self.free_vars = { }
         end
       end
+      walk(self)
+      if #to_declare > 0 then
+        self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
+      end
+      return [[        if #@free_vars > 0
+            @prepend "local #{concat @free_vars, ", "};\n"
+            for var in *@free_vars do skip[var] = true
+            @free_vars = {}
+        for bit in *@bits
+            if bit.__class == Lua
+                bit\declare_locals(skip)
+                    ]]
     end,
     __tostring = function(self)
       local buff = { }
@@ -303,25 +327,23 @@ do
         lua_to_nomsu = { },
         nomsu_to_lua = { }
       }
-      local lua_offset = 1
       local walk
-      walk = function(lua)
-        if type(lua) == 'string' then
-          lua_offset = lua_offset + #lua
-        else
-          local lua_start = lua_offset
-          local _list_0 = lua.bits
-          for _index_0 = 1, #_list_0 do
-            local b = _list_0[_index_0]
-            walk(b)
+      walk = function(lua, output_range)
+        local pos = 1
+        local _list_0 = lua.bits
+        for _index_0 = 1, #_list_0 do
+          local b = _list_0[_index_0]
+          if type(b) == 'string' then
+            local output = output_range:sub(pos, pos + #b)
+            metadata.lua_to_nomsu[output] = lua.source
+            metadata.nomsu_to_lua[lua.source] = output
+          else
+            walk(b, output_range:sub(pos, pos + #b))
           end
-          local lua_stop = lua_offset
-          local nomsu_src, lua_src = lua.source, Source(lua_chunkname, lua_start, lua_stop)
-          metadata.lua_to_nomsu[lua_src] = nomsu_src
-          metadata.nomsu_to_lua[nomsu_src] = lua_src
+          pos = pos + #b
         end
       end
-      walk(self)
+      walk(self, Source(lua_chunkname, 1, #lua_str))
       return lua_str, metadata
     end,
     parenthesize = function(self)

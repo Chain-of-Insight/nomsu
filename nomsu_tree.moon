@@ -35,7 +35,6 @@ Tree "File",
     as_lua: (nomsu)=>
         if #@value == 1
             return @value[1]\as_lua(nomsu)
-        declared_locals = {}
         lua = Lua(@source)
         for i, line in ipairs @value
             line_lua = line\as_lua(nomsu)

@@ -333,7 +333,7 @@ class NomsuCompiler
 
         if filename\match(".*%.lua")
             file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
-            return @run_lua(file, filename)
+            return @run_lua(file)
         if filename\match(".*%.nom")
             if not @skip_precompiled -- Look for precompiled version
                 lua_filename = filename\gsub("%.nom$", ".lua")
@@ -383,7 +383,7 @@ class NomsuCompiler
         if tree.type == 'Text' and #tree.value == 1 and type(tree.value[1]) == 'string'
             return tree.value[1]
         lua = Lua(tree.source, "return ",@tree_to_lua(tree),";")
-        return @run_lua(lua, tree.source.filename)
+        return @run_lua(lua)
 
     tree_to_nomsu: (tree, indentation="", max_line=80, expr_type=nil)=>
         -- Convert a tree into nomsu code that satisfies the max line requirement or nil
@@ -734,7 +734,7 @@ class NomsuCompiler
     tree_with_replaced_vars: (tree, replacements)=>
         return @tree_map tree, (t)->
             if t.type == "Var"
-                id = @var_to_lua_identifier t.value
+                id = tostring(t\as_lua(self))
                 if replacements[id] != nil
                     return replacements[id]
 
@@ -836,7 +836,8 @@ class NomsuCompiler
 
         @define_compile_action "lua> %code", get_line_no!, (_code)=>
             if _code.type != "Text"
-                return Lua.Value(@source, "nomsu:run_lua(",nomsu\tree_to_lua(_code),")")
+                return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
+                    ", ",repr(tostring(nomsu\tree_to_lua(_code))),"))"
 
             lua = Lua(_code.source)
             for bit in *_code.value
@@ -852,7 +853,8 @@ class NomsuCompiler
 
         @define_compile_action "=lua %code", get_line_no!, (_code)=>
             if _code.type != "Text"
-                return Lua.Value(@source, "nomsu:run_lua(",nomsu\tree_to_lua(_code),")")
+                return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
+                    ", ",repr(tostring(nomsu\tree_to_lua(_code))),"))"
 
             lua = Lua.Value(@source)
             for bit in *_code.value
@@ -906,7 +908,7 @@ if arg and debug_getinfo(2).func != require
             return line_table
     }
 
-    debug.getinfoXXXXXX = (thread,f,what)->
+    debug.getinfo = (thread,f,what)->
         if what == nil
             f,what,thread = thread,f,nil
         if type(f) == 'number' then f += 1 -- Account for this wrapper function
@@ -917,6 +919,7 @@ if arg and debug_getinfo(2).func != require
         if info.short_src or info.source or info.linedefine or info.currentline
             if metadata = nomsu.action_metadata[info.func]
                 info.name = metadata.aliases[1]
+                [=[
                 filename = if type(metadata.source) == 'string'
                     metadata.source\match("^[^[:]*")
                 else metadata.source.filename
@@ -926,6 +929,7 @@ if arg and debug_getinfo(2).func != require
                 if ok then info.linedefined = linedefined
                 ok, currentline = pcall(lua_line_to_nomsu_line, info.short_src, info.currentline)
                 --if ok then info.currentline = currentline
+                ]=]
         return info
 
     

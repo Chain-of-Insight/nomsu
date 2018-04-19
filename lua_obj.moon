@@ -94,7 +94,7 @@ class Code
     sub: (start,stop)=>
         str = tostring(self)\sub(start,stop)
         cls = @__class
-        return cls(@source\sub(start-@source.start+1,stop-@source.stop+1), str)
+        return cls(@source\sub(start-@source.start+1,stop-@source.start+1), str)
 
     append: (...)=>
         n = select("#",...)
@@ -125,6 +125,10 @@ class Lua extends Code
         seen = {[v]:true for v in *@free_vars}
         for i=1,select("#",...)
             var = select(i, ...)
+            if type(var) == 'userdata' and var.type == "Var"
+                var = tostring(var\as_lua!)
+            elseif type(var) != 'string'
+                var = tostring(var)
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
@@ -140,12 +144,29 @@ class Lua extends Code
     declare_locals: (skip={})=>
         if next(skip) == 1
             skip = {[s]:true for s in *skip}
+        to_declare = {}
+        walk = =>
+            for var in *@free_vars
+                unless skip[var]
+                    skip[var] = true
+                    to_declare[#to_declare+1] = var
+            for bit in *@bits
+                if bit.__class == Lua
+                    walk bit
+            if #@free_vars > 0
+                @free_vars = {}
+        walk self
+        if #to_declare > 0
+            @prepend "local #{concat to_declare, ", "};\n"
+        [[
         if #@free_vars > 0
             @prepend "local #{concat @free_vars, ", "};\n"
-        for var in *@free_vars do skip[var] = true
+            for var in *@free_vars do skip[var] = true
+            @free_vars = {}
         for bit in *@bits
-            if type(bit) == Lua
+            if bit.__class == Lua
                 bit\declare_locals(skip)
+                    ]]
 
     __tostring: =>
         buff = {}
@@ -191,19 +212,18 @@ class Lua extends Code
             lua_filename:lua_chunkname, lua_file:lua_str
             lua_to_nomsu: {}, nomsu_to_lua: {}
         }
-        lua_offset = 1
-        walk = (lua)->
-            if type(lua) == 'string'
-                lua_offset += #lua
-            else
-                lua_start = lua_offset
-                for b in *lua.bits
-                    walk b
-                lua_stop = lua_offset
-                nomsu_src, lua_src = lua.source, Source(lua_chunkname, lua_start, lua_stop)
-                metadata.lua_to_nomsu[lua_src] = nomsu_src
-                metadata.nomsu_to_lua[nomsu_src] = lua_src
-        walk self
+        walk = (lua, output_range)->
+            pos = 1
+            for b in *lua.bits
+                if type(b) == 'string'
+                    output = output_range\sub(pos, pos+#b)
+                    metadata.lua_to_nomsu[output] = lua.source
+                    metadata.nomsu_to_lua[lua.source] = output
+                else
+                    walk b, output_range\sub(pos, pos+#b)
+                pos += #b
+        
+        walk self, Source(lua_chunkname, 1, #lua_str)
         return lua_str, metadata
 
     parenthesize: =>
