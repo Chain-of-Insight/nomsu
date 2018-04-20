@@ -10,9 +10,9 @@ Source = immutable {"filename","start","stop"}, {
         return filename, start, stop
     __tostring: =>
         if @stop
-            "Source(\"#{@filename}\", #{@start}, #{@stop})"
+            "\"#{@filename}[#{@start}:#{@stop}]\""
         else
-            "Source(\"#{@filename}\", #{@start})"
+            "\"#{@filename}[#{@start}]\""
     __lt: (other)=>
         assert(@filename == other.filename, "Cannot compare sources from different files")
         return if @start == other.start
@@ -62,11 +62,13 @@ class Code
     new: (@source, ...)=>
         @bits = {...}
         if type(@source) == 'string'
-            filename,start,stop = @source\match("^(.-)[(%d+):(%d+)]$")
+            filename,start,stop = @source\match("^(.-)%[(%d+):(%d+)%]$")
+            unless filename
+                filename,start = @source\match("^(.-)%[(%d+)%]$")
             if start or stop
                 @source = Source(filename, tonumber(start), tonumber(stop))
             else
-                @source = Source(@source, 1, #self)
+                @source = Source(@source, 1, #self+1)
 
     clone: =>
         cls = @__class

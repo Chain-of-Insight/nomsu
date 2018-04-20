@@ -19,9 +19,9 @@ Source = immutable({
   end,
   __tostring = function(self)
     if self.stop then
-      return "Source(\"" .. tostring(self.filename) .. "\", " .. tostring(self.start) .. ", " .. tostring(self.stop) .. ")"
+      return "\"" .. tostring(self.filename) .. "[" .. tostring(self.start) .. ":" .. tostring(self.stop) .. "]\""
     else
-      return "Source(\"" .. tostring(self.filename) .. "\", " .. tostring(self.start) .. ")"
+      return "\"" .. tostring(self.filename) .. "[" .. tostring(self.start) .. "]\""
     end
   end,
   __lt = function(self, other)
@@ -148,11 +148,14 @@ do
         ...
       }
       if type(self.source) == 'string' then
-        local filename, start, stop = self.source:match("^(.-)[(%d+):(%d+)]$")
+        local filename, start, stop = self.source:match("^(.-)%[(%d+):(%d+)%]$")
+        if not (filename) then
+          filename, start = self.source:match("^(.-)%[(%d+)%]$")
+        end
         if start or stop then
           self.source = Source(filename, tonumber(start), tonumber(stop))
         else
-          self.source = Source(self.source, 1, #self)
+          self.source = Source(self.source, 1, #self + 1)
         end
       end
     end,
