@@ -236,8 +236,8 @@ Tree "IndexChain",
         unless lua.is_value
             line, src = @value[1].source\get_line!, @value[1].source\get_text!
             error "#{line}: Cannot index #{colored.yellow src}, since it's not an expression.", 0
-        last_char = tostring(lua)\sub(-1,-1)
-        if last_char == "}" or last_char == '"' or last_char == "]"
+        first_char = tostring(lua)\sub(1,1)
+        if first_char == "{" or first_char == '"' or first_char == "["
             lua\parenthesize!
 
         for i=2,#@value
