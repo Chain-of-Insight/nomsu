@@ -296,6 +296,11 @@ class NomsuCompiler
         return code\gsub("\n","\n"..("    ")\rep(levels))
 
     parse: (nomsu_code)=>
+        if type(nomsu_code) == 'string'
+            _nomsu_chunk_counter += 1
+            filename = "<nomsu chunk ##{_nomsu_chunk_counter}>.nom"
+            nomsu_code = Nomsu(filename, nomsu_code)
+            FILE_CACHE[filename] = nomsu_code
         userdata = {
             source_code:nomsu_code, indent_stack: {""}
         }
@@ -308,30 +313,27 @@ class NomsuCompiler
         return tree
 
     _nomsu_chunk_counter = 0
-    run: (nomsu_code)=>
-        if type(nomsu_code) == 'string'
-            _nomsu_chunk_counter += 1
-            filename = "<nomsu chunk ##{_nomsu_chunk_counter}>.nom"
-            nomsu_code = Nomsu(filename, nomsu_code)
-            FILE_CACHE[filename] = nomsu_code
+    run: (nomsu_code, compile_fn=nil)=>
         if #nomsu_code == 0 then return nil
-        tree = @parse(nomsu_code, source)
+        tree = @parse(nomsu_code)
         assert tree, "Failed to parse: #{nomsu_code}"
         assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
         lua = @tree_to_lua(tree)
         lua\convert_to_statements!
         lua\declare_locals!
-        lua\prepend "-- File: #{source}\n"
+        lua\prepend "-- File: #{nomsu_code.source or ""}\n"
+        if compile_fn
+            compile_fn(lua)
         return @run_lua(lua)
 
-    run_file: (filename)=>
+    run_file: (filename, compile_fn=nil)=>
         file_attributes = assert(lfs.attributes(filename), "File not found: #{filename}")
         if file_attributes.mode == "directory"
             for short_filename in lfs.dir(filename)
                 full_filename = filename..'/'..short_filename
                 attr = lfs.attributes(full_filename)
                 if attr.mode ~= "directory" and short_filename\match(".*%.nom")
-                    @run_file full_filename
+                    @run_file full_filename, compile_fn
             return
 
         if filename\match(".*%.lua")
@@ -346,7 +348,7 @@ class NomsuCompiler
             file = file or FILE_CACHE[filename]
             if not file
                 error("File does not exist: #{filename}", 0)
-            return @run(file)
+            return @run(file, compile_fn)
         else
             error("Invalid filetype for #{filename}", 0)
     
@@ -945,24 +947,21 @@ if arg and debug_getinfo(2).func != require
             -- Read a file or stdin and output either the printouts or the compiled lua
             if args.flags["-c"] and not args.output
                 args.output = args.input\gsub("%.nom", ".lua")
-            compiled_output = nil
+            compile_fn = nil
             if args.flags["-p"]
                 nomsu.environment.print = ->
-                compiled_output = io.output()
+                compile_fn = (code)->
+                    io.output!\write("local IMMEDIATE = true;\n"..tostring(code))
             elseif args.output
-                compiled_output = io.open(args.output, 'w')
+                compile_fn = (code)->
+                    io.open(args.output, 'w')\write("local IMMEDIATE = true;\n"..tostring(code))
 
             if args.input\match(".*%.lua")
-                retval = dofile(args.input)(nomsu, {})
+                dofile(args.input)(nomsu, {})
             else
-                local retval, code
-                if args.input == '-'
-                    retval, code = nomsu\run(io.read('a'))
-                else
-                    retval, code = nomsu\run_file(args.input)
-                if compiled_output
-                    compiled_output\write("local IMMEDIATE = true;\n")
-                    compiled_output\write(code)
+                if args.input == "-"
+                    nomsu\run(io.read('a'), compile_fn)
+                else nomsu\run_file(args.input, compile_fn)
 
             if args.flags["-p"]
                 nomsu.environment.print = print

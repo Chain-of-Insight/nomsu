@@ -162,7 +162,7 @@ action [help %action]:
 # Compiler tools
 immediately:
     compile [run %code] to:
-        Lua value "nomsu:run(\(%code as lua expr), \(=lua "tree.source"))"
+        Lua value "nomsu:run(Nomsu(\(=lua "tree.source"), \(%code as lua expr)))"
     parse [enable debugging] as: lua> "nomsu.debug = true;"
     parse [disable debugging] as: lua> "nomsu.debug = false;"
 

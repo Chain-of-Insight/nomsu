@@ -327,6 +327,12 @@ do
       return code:gsub("\n", "\n" .. ("    "):rep(levels))
     end,
     parse = function(self, nomsu_code)
+      if type(nomsu_code) == 'string' then
+        _nomsu_chunk_counter = _nomsu_chunk_counter + 1
+        local filename = "<nomsu chunk #" .. tostring(_nomsu_chunk_counter) .. ">.nom"
+        nomsu_code = Nomsu(filename, nomsu_code)
+        FILE_CACHE[filename] = nomsu_code
+      end
       local userdata = {
         source_code = nomsu_code,
         indent_stack = {
@@ -340,33 +346,36 @@ do
       assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
       return tree
     end,
-    run = function(self, nomsu_code)
-      if type(nomsu_code) == 'string' then
-        _nomsu_chunk_counter = _nomsu_chunk_counter + 1
-        local filename = "<nomsu chunk #" .. tostring(_nomsu_chunk_counter) .. ">.nom"
-        nomsu_code = Nomsu(filename, nomsu_code)
-        FILE_CACHE[filename] = nomsu_code
+    run = function(self, nomsu_code, compile_fn)
+      if compile_fn == nil then
+        compile_fn = nil
       end
       if #nomsu_code == 0 then
         return nil
       end
-      local tree = self:parse(nomsu_code, source)
+      local tree = self:parse(nomsu_code)
       assert(tree, "Failed to parse: " .. tostring(nomsu_code))
       assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local lua = self:tree_to_lua(tree)
       lua:convert_to_statements()
       lua:declare_locals()
-      lua:prepend("-- File: " .. tostring(source) .. "\n")
+      lua:prepend("-- File: " .. tostring(nomsu_code.source or "") .. "\n")
+      if compile_fn then
+        compile_fn(lua)
+      end
       return self:run_lua(lua)
     end,
-    run_file = function(self, filename)
+    run_file = function(self, filename, compile_fn)
+      if compile_fn == nil then
+        compile_fn = nil
+      end
       local file_attributes = assert(lfs.attributes(filename), "File not found: " .. tostring(filename))
       if file_attributes.mode == "directory" then
         for short_filename in lfs.dir(filename) do
           local full_filename = filename .. '/' .. short_filename
           local attr = lfs.attributes(full_filename)
           if attr.mode ~= "directory" and short_filename:match(".*%.nom") then
-            self:run_file(full_filename)
+            self:run_file(full_filename, compile_fn)
           end
         end
         return 
@@ -387,7 +396,7 @@ do
         if not file then
           error("File does not exist: " .. tostring(filename), 0)
         end
-        return self:run(file)
+        return self:run(file, compile_fn)
       else
         return error("Invalid filetype for " .. tostring(filename), 0)
       end
@@ -1350,25 +1359,24 @@ if arg and debug_getinfo(2).func ~= require then
       if args.flags["-c"] and not args.output then
         args.output = args.input:gsub("%.nom", ".lua")
       end
-      local compiled_output = nil
+      local compile_fn = nil
       if args.flags["-p"] then
         nomsu.environment.print = function() end
-        compiled_output = io.output()
+        compile_fn = function(code)
+          return io.output():write("local IMMEDIATE = true;\n" .. tostring(code))
+        end
       elseif args.output then
-        compiled_output = io.open(args.output, 'w')
+        compile_fn = function(code)
+          return io.open(args.output, 'w'):write("local IMMEDIATE = true;\n" .. tostring(code))
+        end
       end
       if args.input:match(".*%.lua") then
-        local retval = dofile(args.input)(nomsu, { })
+        dofile(args.input)(nomsu, { })
       else
-        local retval, code
-        if args.input == '-' then
-          retval, code = nomsu:run(io.read('a'))
+        if args.input == "-" then
+          nomsu:run(io.read('a'), compile_fn)
         else
-          retval, code = nomsu:run_file(args.input)
-        end
-        if compiled_output then
-          compiled_output:write("local IMMEDIATE = true;\n")
-          compiled_output:write(code)
+          nomsu:run_file(args.input, compile_fn)
         end
       end
       if args.flags["-p"] then
