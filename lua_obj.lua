@@ -49,19 +49,13 @@ Source = immutable({
     return Source(self.filename, self.start + offset, self.stop)
   end,
   sub = function(self, start, stop)
+    start = start or 1
+    assert(start > 0 and (stop == nil or stop > 0), "Negative subscripts not supported")
     if not self.stop then
       assert(not stop, "cannot subscript non-range with range")
-      assert(start > 0, "cannot subscript non-range with negative index")
-      return Source(self.filename, self.start + (start or 0))
+      return Source(self.filename, self.start + start - 1)
     else
-      start = start or 1
-      if start < 0 then
-        start = self.stop + start + 1
-      end
-      stop = stop or -1
-      if stop < 0 then
-        stop = self.stop + stop + 1
-      end
+      stop = stop or self.stop
       return Source(self.filename, self.start + start - 1, self.start + stop - 1)
     end
   end,
@@ -126,7 +120,7 @@ do
     sub = function(self, start, stop)
       local str = tostring(self):sub(start, stop)
       local cls = self.__class
-      return cls(self.source:sub(start - self.source.start + 1, stop - self.source.start + 1), str)
+      return cls(self.source:sub(start, stop), str)
     end,
     append = function(self, ...)
       local n = select("#", ...)
@@ -206,6 +200,34 @@ do
         end
       end
     end,
+    remove_free_vars = function(self, ...)
+      local removals = { }
+      for i = 1, select("#", ...) do
+        local var = select(i, ...)
+        if type(var) == 'userdata' and var.type == "Var" then
+          var = tostring(var:as_lua())
+        elseif type(var) ~= 'string' then
+          var = tostring(var)
+        end
+        removals[var] = true
+      end
+      local remove_from
+      remove_from = function(self)
+        for i = #self.free_vars, 1, -1 do
+          if removals[self.free_vars[i]] then
+            remove(self.free_vars, i)
+          end
+        end
+        local _list_0 = self.bits
+        for _index_0 = 1, #_list_0 do
+          local b = _list_0[_index_0]
+          if type(b) ~= 'string' then
+            remove_from(b)
+          end
+        end
+      end
+      return remove_from(self)
+    end,
     convert_to_statements = function(self, prefix, suffix)
       if prefix == nil then
         prefix = ""
@@ -223,57 +245,37 @@ do
         return self:append(suffix)
       end
     end,
-    declare_locals = function(self, skip)
-      if skip == nil then
-        skip = { }
+    declare_locals = function(self, to_declare)
+      if to_declare == nil then
+        to_declare = nil
       end
-      if next(skip) == 1 then
-        do
-          local _tbl_0 = { }
-          for _index_0 = 1, #skip do
-            local s = skip[_index_0]
-            local _key_0, _val_0 = {
-              [s] = true
-            }
-            _tbl_0[_key_0] = _val_0
+      if to_declare == nil then
+        local seen
+        to_declare, seen = { }, { }
+        local gather_from
+        gather_from = function(self)
+          local _list_0 = self.free_vars
+          for _index_0 = 1, #_list_0 do
+            local var = _list_0[_index_0]
+            if not (seen[var]) then
+              seen[var] = true
+              to_declare[#to_declare + 1] = var
+            end
           end
-          skip = _tbl_0
-        end
-      end
-      local to_declare = { }
-      local walk
-      walk = function(self)
-        local _list_0 = self.free_vars
-        for _index_0 = 1, #_list_0 do
-          local var = _list_0[_index_0]
-          if not (skip[var]) then
-            skip[var] = true
-            to_declare[#to_declare + 1] = var
+          local _list_1 = self.bits
+          for _index_0 = 1, #_list_1 do
+            local bit = _list_1[_index_0]
+            if bit.__class == Lua then
+              gather_from(bit)
+            end
           end
         end
-        local _list_1 = self.bits
-        for _index_0 = 1, #_list_1 do
-          local bit = _list_1[_index_0]
-          if bit.__class == Lua then
-            walk(bit)
-          end
-        end
-        if #self.free_vars > 0 then
-          self.free_vars = { }
-        end
+        gather_from(self)
       end
-      walk(self)
+      self:remove_free_vars(to_declare)
       if #to_declare > 0 then
-        self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
+        return self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
       end
-      return [[        if #@free_vars > 0
-            @prepend "local #{concat @free_vars, ", "};\n"
-            for var in *@free_vars do skip[var] = true
-            @free_vars = {}
-        for bit in *@bits
-            if bit.__class == Lua
-                bit\declare_locals(skip)
-                    ]]
     end,
     __tostring = function(self)
       local buff = { }

@@ -17,7 +17,7 @@ local colors = setmetatable({ }, {
     return ""
   end
 })
-local colored = setmetatable({ }, {
+colored = setmetatable({ }, {
   __index = function(_, color)
     return (function(msg)
       return colors[color] .. tostring(msg or '') .. colors.reset
@@ -170,6 +170,7 @@ do
     local line_no = 1
     local text_loc = lpeg.userdata.source_code.source:sub(pos, pos)
     line_no = text_loc:get_line_number()
+    src = FILE_CACHE[text_loc.filename]
     local prev_line = src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 1)
     local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 1)
     local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 1)
@@ -187,7 +188,7 @@ setmetatable(NOMSU_DEFS, {
       if type(value) == 'table' then
         error("Not a tuple: " .. tostring(repr(value)))
       end
-      local source = lpeg.userdata.source_code.source:sub(start, stop)
+      local source = lpeg.userdata.source_code.source:sub(start, stop - 1)
       local node = Types[key](value, source)
       return node
     end

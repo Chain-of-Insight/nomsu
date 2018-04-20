@@ -25,7 +25,8 @@ immediately:
             end
             local body_lua = \%lua:as_lua(nomsu);
             body_lua:convert_to_statements("return ");
-            body_lua:declare_locals(args);
+            body_lua:remove_free_vars(args);
+            body_lua:declare_locals();
             lua:append(")\\n    ", body_lua, "\\nend);");
             return lua;
         end);
@@ -50,7 +51,8 @@ immediately:
             end
             local body_lua = \%body:as_lua(nomsu);
             body_lua:convert_to_statements("return ");
-            body_lua:declare_locals(args);
+            body_lua:remove_free_vars(args);
+            body_lua:declare_locals();
             lua:append(")\\n    ", body_lua, "\\nend);")
             return lua;
 
@@ -72,14 +74,7 @@ immediately:
                 lua:append(", ");
                 lua:append(arg);
             end
-            local template;
-            if \%longhand.type == "Block" then
-                local lines = {};
-                for i, line in ipairs(\%longhand.value) do lines[i] = tostring(line.source:get_text()); end
-                template = repr(table.concat(lines, "\\n"));
-            else
-                template = repr(tostring(\%longhand.source:get_text()));
-            end
+            local template = repr(tostring(\%longhand:as_nomsu()));
             local replacements = {};
             for i, a in ipairs(args) do replacements[i] = a.."="..a; end
             replacements = "{"..table.concat(replacements, ", ").."}";
@@ -117,22 +112,34 @@ immediately:
         lua> ".."
             local lua = \%tree:as_lua(nomsu);
             lua:convert_to_statements();
-            --lua:declare_locals();
             return lua;
+    
+    compile [declare locals in %tree] to
+        Lua "\(%tree as lua expr):declare_locals();"
+    
+    compile [declare locals %locals in %tree] to
+        Lua "\(%tree as lua expr):declare_locals(\(%locals as lua expr));"
+    
+    compile [remove free vars %vars from %tree] to:
+        Lua "\(%tree as lua expr):remove_free_vars(unpack(\(%vars as lua expr)));"
 
     action [%tree as value]:
         =lua "nomsu:tree_to_value(\%tree)"
+
     
     action [%tree's stub]:
         =lua "nomsu:tree_to_stub(\%tree)"
     
 immediately:
     parse [%var <-write %code] as: lua> "\%var:append(\%code);"
+    parse [to %var write %code] as: lua> "\%var:append(\%code);"
 
 immediately:
-    compile [%tree's source code, %tree' source code] to: Lua value "\(%tree as lua expr).source:get_text()"
+    action [%tree's source code, %tree' source code]:
+        =lua "\%tree.source:get_text()"
 
     compile [repr %obj] to: Lua value "repr(\(%obj as lua expr))"
+    compile [%obj as text] to: Lua value "tostring(\(%obj as lua expr))"
     compile [type of %obj] to: Lua value "type(\(%obj as lua expr))"
 
 immediately:
@@ -190,10 +197,10 @@ immediately:
 
 # Error functions
 immediately:
-    compile [barf] to: Lua value "error(nil, 0);"
-    compile [barf %msg] to: Lua value "error(\(%msg as lua expr), 0);"
+    compile [barf] to: Lua "error(nil, 0);"
+    compile [barf %msg] to: Lua "error(\(%msg as lua expr), 0);"
     compile [assume %condition] to:
-        lua> "local \%assumption = 'Assumption failed: '..\%condition.source:get_text();"
+        lua> "local \%assumption = 'Assumption failed: '..tostring(\%condition.source:get_text());"
         return:
             Lua ".."
                 if not \(%condition as lua expr) then

@@ -54,7 +54,6 @@ immediately:
         lua> ".."
             local lua = Lua(tree.source, \%var_lua, ' = ', \%value_lua, ';');
             if \%var.type == 'Var' then
-                print("Added var from assignment: "..tostring(\%var:as_lua(nomsu)));
                 lua:add_free_vars(\%var);
             end
             return lua;
@@ -93,15 +92,43 @@ immediately:
         return: Lua "\(%var_lua) = \(%value_lua);"
 
     compile [exporting %exported %body] to:
-        %body_lua <- (%body as lua)
-        lua> "\%body_lua:declare_locals(\%exported);"
+        %body_lua <- (%body as lua statements)
+        lua> "\%body_lua:remove_free_vars(unpack(\(%exported.value)));"
         return %body_lua
 
-    parse [with %assignments %body] as:
-        # TODO: clean up and handle: with {%x:1}: %y <- 2
-        lua> "do"
-        <- %assignments
-        lua> "end"
+    compile [with %assignments %body] to:
+        %lua <- (%body as lua statements)
+        lua> ".."
+            local lhs, rhs = Lua(tree.source), Lua(\%assignments.source);
+            local vars = {};
+            for i, item in ipairs(\%assignments.value) do
+                local target, value = item.key, item.value;
+                if not target.type == "Var" then
+                    error("Invalid target for 'with' assignment: "..tostring(target.source:get_text()));
+                end
+                local target_lua = nomsu:tree_to_lua(target);
+                local value_lua = nomsu:tree_to_lua(value);
+                if not value_lua.is_value then
+                    error("Invalid value for assignment: "..tostring(value.source:get_text()));
+                end
+                if target.type == "Var" then
+                    lhs:add_free_vars(target);
+                end
+                if i > 1 then
+                    lhs:append(", ");
+                    rhs:append(", ");
+                end
+                lhs:append(target_lua);
+                rhs:append(value_lua);
+                vars[i] = tostring(target_lua);
+            end
+            \%lua:remove_free_vars(vars);
+            \%lua:prepend("local ", lhs, " = ", rhs, ";\\n");
+        return
+            Lua ".."
+                do
+                    \%lua
+                end -- 'with' block
 
 immediately:
     # Math Operators
@@ -141,6 +168,7 @@ immediately:
     # Unary operators
     compile [- %] to: Lua value "(- \(% as lua expr))"
     compile [not %] to: Lua value "(not \(% as lua expr))"
+    compile [length of %list] to: Lua value "(#\(%list as lua expr))"
 
 # Update operators
 immediately:

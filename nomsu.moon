@@ -22,6 +22,7 @@ export Tuple
 Tuple = immutable(nil, {name:"Tuple"})
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
+export colored
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 debug_getinfo = debug.getinfo
@@ -154,11 +155,13 @@ NOMSU_DEFS = with {}
             return start + #nodent
 
     .error = (src,pos,err_msg)->
+        --src = tostring(FILE_CACHE[lpeg.userdata.source_code.source.filename])
         if src\sub(pos,pos)\match("[\r\n]")
             pos += #src\match("[ \t\n\r]*", pos)
         line_no = 1
         text_loc = lpeg.userdata.source_code.source\sub(pos,pos)
         line_no = text_loc\get_line_number!
+        src = FILE_CACHE[text_loc.filename]
         prev_line = src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-1)
         err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-1)
         next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-1)
@@ -170,7 +173,7 @@ NOMSU_DEFS = with {}
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop)->
         if type(value) == 'table' then error("Not a tuple: #{repr value}")-- = Tuple(value)
-        source = lpeg.userdata.source_code.source\sub(start,stop)
+        source = lpeg.userdata.source_code.source\sub(start,stop-1)
         node = Types[key](value, source)
         return node
     self[key] = make_node

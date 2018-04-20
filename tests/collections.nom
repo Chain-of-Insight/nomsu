@@ -11,7 +11,7 @@ assume (99 isn't in [1,2,3])
 assume ({x:no} has key "x")
 assume ({x:no} doesn't have key "y")
 assume (not ({x:no} doesn't have key "x"))
-assume ((size of [1,2,3]) = 3)
+assume ((length of [1,2,3]) = 3)
 %list <- [1,2,3,4,5]
 append 6 to %list
 assume ((last in %list) = 6)

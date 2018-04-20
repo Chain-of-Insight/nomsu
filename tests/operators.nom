@@ -17,23 +17,23 @@ assume ((%y = 10) and (%x = 20)) or barf "swapping vars failed."
 assume ({} is {}) or barf "Equality check failed."
 assume (({}'s id) is not ({}'s id)) or barf "Identity check failed."
 
-<-{%x:"outer",%y:"outer"}
+<-{%foozle:"outer",%y:"outer"}
 action [set global x local y]
-    export %x <- "inner"
+    export %foozle <- "inner"
     %y <- "inner"
 set global x local y
-assume ((%x = "inner") and (%y = "outer")) or barf "export failed."
+assume ((%foozle = "inner") and (%y = "outer")) or barf "export failed."
 
-<-{%x:"outer",%y:"outer"}
+<-{%foozle:"outer",%y:"outer"}
 action [set global x local y]
-    exporting [%x]
-        %x <- "inner"
+    exporting [%foozle]
+        %foozle <- "inner"
         %y <- "inner"
 set global x local y
-assume ((%x = "inner") and (%y = "outer")) or barf "export failed."
+assume ((%foozle = "inner") and (%y = "outer")) or barf "exporting failed."
 
 <-{%x:1,%y:2}
-with [%z, %x<-999]
+with {%z:nil, %x:999}
     %z <- 999
     assume (%z = 999) or barf "'with' failed."
     assume (%x = 999) or barf "'with' assignment failed."

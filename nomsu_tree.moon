@@ -27,6 +27,15 @@ Tree = (name, methods)->
         .with_value = (value)=> getmetatable(self)(value, @source)
         .type = name
         .name = name
+        .as_nomsu = =>
+            leading_space = 0
+            src_file = FILE_CACHE[@source.filename]
+            while src_file\sub(@source.start-leading_space-1, @source.start-leading_space-1) == " "
+                leading_space += 1
+            if src_file\sub(@source.start-leading_space-1, @source.start-leading_space-1) != "\n"
+                leading_space = 0
+            ret = tostring(@source\get_text!)\gsub("\n"..((" ")\rep(leading_space)), "\n")
+            return ret
 
     Types[name] = immutable {"value","source"}, methods
 
@@ -49,7 +58,7 @@ Tree "File",
 
 Tree "Nomsu",
     as_lua: (nomsu)=>
-        Lua.Value(@source, "nomsu:parse(Nomsu(",repr(@source),", ",repr(@source\get_text!),"))")
+        Lua.Value(@source, "nomsu:parse(Nomsu(",repr(@value.source),", ",repr(tostring(@value.source\get_text!)),")).value[1]")
 
 Tree "Block",
     as_lua: (nomsu)=>

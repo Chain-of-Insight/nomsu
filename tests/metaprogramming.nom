@@ -4,11 +4,11 @@
 use "core"
 
 immediately
-    compile [five] to {expr:"5"}
+    compile [five] to: Lua value "5"
 assume ((five) = 5) or barf "Compile to expression failed."
 
 immediately
-    compile [loc x] to {statements:"_x = 99", locals:["_x"]}
+    compile [loc x] to: Lua "local _x = 99;"
 lua> "do"
 loc x
 assume (%x is 99) or barf "Compile to statements with locals failed."
@@ -18,7 +18,7 @@ assume (%x is (nil)) or barf "Failed to properly localize a variable."
 immediately
     compile [asdf] to
         %tmp <- ""
-        return {statements:%tmp}
+        return: Lua %tmp
 asdf
 assume (%tmp is (nil)) or barf "compile to is leaking variables"
 
@@ -42,7 +42,7 @@ try: foo 99
 
 assume ((\(5 + 5) as value) = 10) or barf "%tree as value failed."
 
-assume ((\(foo %x)'s source code) = "foo %x") or barf "source code failed."
+assume (((\(foo %x)'s source code) as text) = "foo %x") or barf "source code failed."
 
 assume ((repr [1,2]) = "{1, 2}") or barf "repr failed."
 

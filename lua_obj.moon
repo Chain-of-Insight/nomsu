@@ -29,15 +29,13 @@ Source = immutable {"filename","start","stop"}, {
         else assert(type(offset) == 'number', "Cannot add Source and #{type(offset)}")
         return Source(@filename, @start+offset, @stop)
     sub: (start, stop)=>
+        start or= 1
+        assert(start > 0 and (stop == nil or stop > 0), "Negative subscripts not supported")
         if not @stop
             assert(not stop, "cannot subscript non-range with range")
-            assert(start > 0, "cannot subscript non-range with negative index")
-            return Source(@filename, @start + (start or 0))
+            return Source(@filename, @start + start - 1)
         else
-            start or= 1
-            if start < 0 then start = @stop + start + 1
-            stop or= -1
-            if stop < 0 then stop = @stop + stop + 1
+            stop or= @stop
             return Source(@filename, @start + start - 1, @start + stop - 1)
     get_text: =>
         FILE_CACHE[@filename]\sub(@start,@stop)
@@ -94,7 +92,7 @@ class Code
     sub: (start,stop)=>
         str = tostring(self)\sub(start,stop)
         cls = @__class
-        return cls(@source\sub(start-@source.start+1,stop-@source.start+1), str)
+        return cls(@source\sub(start,stop), str)
 
     append: (...)=>
         n = select("#",...)
@@ -132,6 +130,24 @@ class Lua extends Code
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
+    
+    remove_free_vars: (...)=>
+        removals = {}
+        for i=1,select("#",...)
+            var = select(i, ...)
+            if type(var) == 'userdata' and var.type == "Var"
+                var = tostring(var\as_lua!)
+            elseif type(var) != 'string'
+                var = tostring(var)
+            removals[var] = true
+        remove_from = =>
+            for i=#@free_vars,1,-1
+                if removals[@free_vars[i]]
+                    remove @free_vars, i
+            for b in *@bits
+                if type(b) != 'string'
+                    remove_from b
+        remove_from self
 
     convert_to_statements: (prefix="", suffix=";")=>
         unless @is_value
@@ -141,32 +157,21 @@ class Lua extends Code
         if suffix != ""
             @append suffix
 
-    declare_locals: (skip={})=>
-        if next(skip) == 1
-            skip = {[s]:true for s in *skip}
-        to_declare = {}
-        walk = =>
-            for var in *@free_vars
-                unless skip[var]
-                    skip[var] = true
-                    to_declare[#to_declare+1] = var
-            for bit in *@bits
-                if bit.__class == Lua
-                    walk bit
-            if #@free_vars > 0
-                @free_vars = {}
-        walk self
+    declare_locals: (to_declare=nil)=>
+        if to_declare == nil
+            to_declare, seen = {}, {}
+            gather_from = =>
+                for var in *@free_vars
+                    unless seen[var]
+                        seen[var] = true
+                        to_declare[#to_declare+1] = var
+                for bit in *@bits
+                    if bit.__class == Lua
+                        gather_from bit
+            gather_from self
+        @remove_free_vars to_declare
         if #to_declare > 0
             @prepend "local #{concat to_declare, ", "};\n"
-        [[
-        if #@free_vars > 0
-            @prepend "local #{concat @free_vars, ", "};\n"
-            for var in *@free_vars do skip[var] = true
-            @free_vars = {}
-        for bit in *@bits
-            if bit.__class == Lua
-                bit\declare_locals(skip)
-                    ]]
 
     __tostring: =>
         buff = {}

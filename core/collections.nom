@@ -13,7 +13,7 @@ immediately:
     compile [..]
         %index st to last in %list, %index nd to last in %list, %index rd to last in %list
         %index th to last in %list
-    ..to {expr:"utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))"}
+    ..to: Lua value "utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))"
 
 immediately:
     parse [first in %list, first %list] as: 1 st in %list
@@ -37,35 +37,35 @@ immediately:
 
 immediately:
     # Note: it's important to have the space after "[" to prevent confusion if %index is a string
-    compile [%list has key %index, %list has index %index] to {..}
-        expr: ".."
+    compile [%list has key %index, %list has index %index] to
+        Lua value ".."
             ((\(%list as lua expr))[ \(%index as lua expr)] ~= nil)
 
     # Note: it's important to have the space after "[" to prevent confusion if %index is a string
     compile [..]
         %list doesn't have key %index, %list does not have key %index
         %list doesn't have index %index, %list does not have index %index
-    ..to {expr:"((\(%list as lua expr))[ \(%index as lua expr)] == nil)"}
+    ..to: Lua value "((\(%list as lua expr))[ \(%index as lua expr)] == nil)"
 
-    compile [length of %list, size of %list, size %list, number of %list, len %list] to:
-        {expr:"utils.size(\(%list as lua expr))"}
+    compile [number of keys in %list] to:
+        Lua value "utils.size(\(%list as lua expr))"
 
     compile [append %item to %list, add %item to %list, to %list add %item, to %list append %item] to:
-        {statements:"table.insert(\(%list as lua expr), \(%item as lua expr))"}
+        Lua "table.insert(\(%list as lua expr), \(%item as lua expr))"
 
     compile [pop from %list, remove last from %list] to:
-        {statements:"table.remove(\(%list as lua expr))"}
+        Lua "table.remove(\(%list as lua expr))"
 
     compile [remove index %index from %list] to:
-        {statements:"table.remove(\(%list as lua expr), \(%index as lua expr))"}
+        Lua "table.remove(\(%list as lua expr), \(%index as lua expr))"
 
 # List Comprehension
 immediately:
     compile [%expression for %item in %iterable] to:
         assume (%item.type is "Var") or barf ".."
             List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item.type)
-        return {..}
-            expr:".."
+        return
+            Lua value ".."
                 (function()
                     local comprehension = {};
                     for i,\(%item as lua expr) in ipairs(\(%iterable as lua expr)) do
@@ -81,8 +81,8 @@ immediately:
     ..to:
         assume (%index.type is "Var") or barf ".."
             List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%index.type)
-        return {..}
-            expr:".."
+        return
+            Lua value ".."
                 (function()
                     local comprehension = {};
                     for \(%index as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(%step as lua expr) do
@@ -103,8 +103,8 @@ immediately:
             List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key.type)
         assume (%value.type is "Var") or barf ".."
             List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value.type)
-        return {..}
-            expr: ".."
+        return
+            Lua value ".."
                 (function()
                     local comprehension = {};
                     for \(%key as lua expr), \(%value as lua expr) in pairs(\(%iterable as lua expr)) do
@@ -119,8 +119,8 @@ immediately:
         assume (%item.type is "Var") or barf ".."
             Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item.type)
         # Note: it's important to have the space after "[" to prevent confusion if %key is a string
-        return {..}
-            expr: ".."
+        return
+            Lua value ".."
                 (function()
                     local comprehension = {};
                     for i,\(%item as lua expr) in ipairs(\(%iterable as lua expr)) do
@@ -136,8 +136,8 @@ immediately:
         assume (%src_value.type is "Var") or barf ".."
             Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value.type)
         # Note: it's important to have the space after "[" to prevent confusion if %key is a string
-        return {..}
-            expr: ".."
+        return
+            Lua value ".."
                 (function()
                     local comprehension = {};
                     for \(%src_key as lua expr), \(%src_value as lua expr) in pairs(\(%iterable as lua expr)) do
@@ -160,12 +160,12 @@ immediately:
 
 # Sorting:
 immediately:
-    compile [sort %items] to {statements:"table.sort(\(%items as lua expr))"}
-    compile [sort %items by %key_expr] to {..}
-        statements: ".."
-            utils.sort(\(%items as lua expr), function(\(\% as lua expr))
+    compile [sort %items] to: Lua "table.sort(\(%items as lua expr));"
+    compile [sort %items by %key_expr] to
+        Lua ".."
+            utils.sort(\(%items as lua expr), function(_)
                 return \(%key_expr as lua expr);
-            end)
+            end);
 
 immediately:
     action [%items sorted, sorted %items]:
@@ -188,13 +188,13 @@ immediately:
 
 immediately:
     # Metatable stuff
-    compile [set %dict's metatable to %metatable] to {..}
-        statements: "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
+    compile [set %dict's metatable to %metatable] to
+        Lua "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
 
-    compile [new counter] to {expr:"setmetatable({}, {__index=function() return 0; end})"}
+    compile [new counter] to: Lua value "setmetatable({}, {__index=function() return 0; end})"
 
-    compile [new default dict] to {..}
-        expr: ".."
+    compile [new default dict] to
+        Lua value ".."
             setmetatable({}, {__index=function(self, key)
                 t = {};
                 self[key] = t;
