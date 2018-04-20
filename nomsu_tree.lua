@@ -46,6 +46,18 @@ Tree = function(name, methods)
     end
     methods.type = name
     methods.name = name
+    methods.as_nomsu = function(self)
+      local leading_space = 0
+      local src_file = FILE_CACHE[self.source.filename]
+      while src_file:sub(self.source.start - leading_space - 1, self.source.start - leading_space - 1) == " " do
+        leading_space = leading_space + 1
+      end
+      if src_file:sub(self.source.start - leading_space - 1, self.source.start - leading_space - 1) ~= "\n" then
+        leading_space = 0
+      end
+      local ret = tostring(self.source:get_text()):gsub("\n" .. ((" "):rep(leading_space)), "\n")
+      return ret
+    end
   end
   Types[name] = immutable({
     "value",
@@ -57,7 +69,6 @@ Tree("File", {
     if #self.value == 1 then
       return self.value[1]:as_lua(nomsu)
     end
-    local declared_locals = { }
     local lua = Lua(self.source)
     for i, line in ipairs(self.value) do
       local line_lua = line:as_lua(nomsu)
@@ -76,7 +87,7 @@ Tree("File", {
 })
 Tree("Nomsu", {
   as_lua = function(self, nomsu)
-    return Lua.Value(self.source, "nomsu:parse(", repr(self.source:get_text()), ", ", repr(self.source.filename), ")")
+    return Lua.Value(self.source, "nomsu:parse(Nomsu(", repr(self.value.source), ", ", repr(tostring(self.value.source:get_text())), ")).value[1]")
   end
 })
 Tree("Block", {
@@ -96,7 +107,7 @@ Tree("Block", {
     return lua
   end
 })
-local math_patt = re.compile([[ "%" (" " [*/^+-] " %")+ ]])
+local math_expression = re.compile([[ "%" (" " [*/^+-] " %")+ ]])
 Tree("Action", {
   as_lua = function(self, nomsu)
     local stub = self:get_stub()
@@ -132,10 +143,11 @@ Tree("Action", {
         end
         args = new_args
       end
-      return action(Lua(self.source), unpack(args))
+      local ret = action(Lua(self.source), unpack(args))
+      return ret
     end
     local lua = Lua.Value(self.source)
-    if not metadata and math_patt:match(stub) then
+    if not metadata and math_expression:match(stub) then
       for i, tok in ipairs(self.value) do
         if tok.type == "Word" then
           lua:append(tok.value)
@@ -187,7 +199,7 @@ Tree("Action", {
         args = _accum_0
       end
     end
-    lua:append("ACTIONS[", repr(stub), "(")
+    lua:append("ACTIONS[", repr(stub), "](")
     for i, arg in ipairs(args) do
       lua:append(arg)
       if i < #args then
@@ -197,18 +209,37 @@ Tree("Action", {
     lua:append(")")
     return lua
   end,
-  get_stub = function(self)
-    return concat((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local t = _list_0[_index_0]
-        _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
-        _len_0 = _len_0 + 1
+  get_stub = function(self, include_names)
+    if include_names == nil then
+      include_names = false
+    end
+    local bits
+    if include_names then
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = self.value
+        for _index_0 = 1, #_list_0 do
+          local t = _list_0[_index_0]
+          _accum_0[_len_0] = (t.type == "Word" and t.value or "%" .. tostring(t.value))
+          _len_0 = _len_0 + 1
+        end
+        bits = _accum_0
       end
-      return _accum_0
-    end)(), " ")
+    else
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = self.value
+        for _index_0 = 1, #_list_0 do
+          local t = _list_0[_index_0]
+          _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
+          _len_0 = _len_0 + 1
+        end
+        bits = _accum_0
+      end
+    end
+    return concat(bits, " ")
   end
 })
 Tree("Text", {
@@ -343,8 +374,8 @@ Tree("IndexChain", {
       local line, src = self.value[1].source:get_line(), self.value[1].source:get_text()
       error(tostring(line) .. ": Cannot index " .. tostring(colored.yellow(src)) .. ", since it's not an expression.", 0)
     end
-    local last_char = tostring(lua):sub(-1, -1)
-    if last_char == "}" or last_char == '"' or last_char == "]" then
+    local first_char = tostring(lua):sub(1, 1)
+    if first_char == "{" or first_char == '"' or first_char == "[" then
       lua:parenthesize()
     end
     for i = 2, #self.value do
@@ -356,7 +387,7 @@ Tree("IndexChain", {
           _continue_0 = true
           break
         end
-        local key_lua = self:tree_to_lua(key)
+        local key_lua = key:as_lua(nomsu)
         if not (key_lua.is_value) then
           local line, src = key.source:get_line(), key.source:get_text()
           error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as an index, since it's not an expression.", 0)
