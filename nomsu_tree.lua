@@ -131,7 +131,7 @@ Tree("Action", {
         end
         args = new_args
       end
-      local ret = action(Lua(self.source), unpack(args))
+      local ret = action(self, unpack(args))
       return ret
     end
     local lua = Lua.Value(self.source)

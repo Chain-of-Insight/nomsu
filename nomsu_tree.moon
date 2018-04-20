@@ -79,7 +79,7 @@ Tree "Action",
                 new_args = [args[p-1] for p in *metadata.arg_orders[stub]]
                 args = new_args
             -- Force Lua to avoid tail call optimization for debugging purposes
-            ret = action(Lua(@source), unpack(args))
+            ret = action(self, unpack(args))
             return ret
 
         lua = Lua.Value(@source)

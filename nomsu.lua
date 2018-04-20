@@ -41,16 +41,10 @@ FILE_CACHE = setmetatable({ }, {
     if not (file) then
       return nil
     end
-    local code = file:read("a"):sub(1, -2)
+    local contents = file:read("a"):sub(1, -2)
     file:close()
-    local source = Source(filename, 1, #code)
-    if filename:match("%.nom$") then
-      code = Nomsu(source, code)
-    elseif filename:match("%.lua$") then
-      code = Lua(source, code)
-    end
-    self[filename] = code
-    return code
+    self[filename] = contents
+    return contents
   end
 })
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
@@ -188,7 +182,10 @@ setmetatable(NOMSU_DEFS, {
       if type(value) == 'table' then
         error("Not a tuple: " .. tostring(repr(value)))
       end
-      local source = lpeg.userdata.source_code.source:sub(start, stop - 1)
+      local source = lpeg.userdata.source_code.source
+      start = start + (source.start - 1)
+      stop = stop + (source.start - 1)
+      source = Source(source.filename, start, stop - 1)
       local node = Types[key](value, source)
       return node
     end
@@ -330,8 +327,8 @@ do
       if type(nomsu_code) == 'string' then
         _nomsu_chunk_counter = _nomsu_chunk_counter + 1
         local filename = "<nomsu chunk #" .. tostring(_nomsu_chunk_counter) .. ">.nom"
-        nomsu_code = Nomsu(filename, nomsu_code)
         FILE_CACHE[filename] = nomsu_code
+        nomsu_code = Nomsu(filename, nomsu_code)
       end
       local userdata = {
         source_code = nomsu_code,
@@ -382,21 +379,21 @@ do
       end
       if filename:match(".*%.lua") then
         local file = assert(FILE_CACHE[filename], "Could not find file: " .. tostring(filename))
-        return self:run_lua(file)
+        return self:run_lua(Lua(Source(filename), file))
       end
       if filename:match(".*%.nom") then
         if not self.skip_precompiled then
           local lua_filename = filename:gsub("%.nom$", ".lua")
           local file = FILE_CACHE[lua_filename]
           if file then
-            return self:run_lua(file)
+            return self:run_lua(Lua(Source(filename), file))
           end
         end
         local file = file or FILE_CACHE[filename]
         if not file then
           error("File does not exist: " .. tostring(filename), 0)
         end
-        return self:run(file, compile_fn)
+        return self:run(Nomsu(Source(filename), file), compile_fn)
       else
         return error("Invalid filetype for " .. tostring(filename), 0)
       end
@@ -427,8 +424,7 @@ do
     end,
     run_lua = function(self, lua)
       assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
-      local lua_string, metadata = lua:make_offset_table()
-      LUA_METADATA[metadata.lua_filename] = metadata
+      local lua_string = lua:stringify()
       if rawget(FILE_CACHE, lua.source.filename) == nil then
         FILE_CACHE[lua.source.filename] = lua_string
       end
@@ -950,7 +946,7 @@ do
     tree_with_replaced_vars = function(self, tree, replacements)
       return self:tree_map(tree, function(t)
         if t.type == "Var" then
-          local id = tostring(t:as_lua(self))
+          local id = t:as_lua(self):stringify()
           if replacements[id] ~= nil then
             return replacements[id]
           end
@@ -1050,12 +1046,13 @@ do
         nomsu:run_lua(lua)
         return Lua(self.source, "if IMMEDIATE then\n", lua, "\nend")
       end)
-      self:define_compile_action("Lua %source %code", get_line_no(), function(self, _source, _code)
-        if _code.type ~= "Text" then
-          return Lua.Value(_source, "Lua(", repr(_code.source), ", ", nomsu:tree_to_lua(_code), ")")
+      local add_lua_bits
+      add_lua_bits = function(lua, code)
+        if code.type ~= "Text" then
+          lua:append(", ", code:as_lua(nomsu))
+          return 
         end
-        local lua = Lua.Value(_source, "Lua(", repr(_code.source))
-        local _list_0 = _code.value
+        local _list_0 = code.value
         for _index_0 = 1, #_list_0 do
           local bit = _list_0[_index_0]
           lua:append(", ")
@@ -1065,40 +1062,39 @@ do
             local bit_lua = nomsu:tree_to_lua(bit)
             if not (bit_lua.is_value) then
               local line, src = bit.source:get_line(), bit.source:get_text()
-              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.", 0)
+              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.")
             end
             lua:append(bit_lua)
           end
         end
+      end
+      self:define_compile_action("Lua %code", get_line_no(), function(self, _code)
+        local lua = Lua.Value(self.source, "Lua(", tostring(_code.source))
+        add_lua_bits(lua, _code)
+        lua:append(")")
+        return lua
+      end)
+      self:define_compile_action("Lua %source %code", get_line_no(), function(self, _source, _code)
+        local lua = Lua.Value(self.source, "Lua(", _source:as_lua(nomsu))
+        add_lua_bits(lua, _code)
+        lua:append(")")
+        return lua
+      end)
+      self:define_compile_action("Lua value %code", get_line_no(), function(self, _code)
+        local lua = Lua.Value(self.source, "Lua.Value(", tostring(_code.source))
+        add_lua_bits(lua, _code)
         lua:append(")")
         return lua
       end)
       self:define_compile_action("Lua value %source %code", get_line_no(), function(self, _source, _code)
-        if _code.type ~= "Text" then
-          return Lua.Value(_source, "Lua.Value(", repr(_code.source), ", ", nomsu:tree_to_lua(_code), ")")
-        end
-        local lua = Lua.Value(_source, "Lua.Value(", repr(_code.source))
-        local _list_0 = _code.value
-        for _index_0 = 1, #_list_0 do
-          local bit = _list_0[_index_0]
-          lua:append(", ")
-          if type(bit) == "string" then
-            lua:append(repr(bit))
-          else
-            local bit_lua = nomsu:tree_to_lua(bit)
-            if not (bit_lua.is_value) then
-              local line, src = bit.source:get_line(), bit.source:get_text()
-              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.", 0)
-            end
-            lua:append(bit_lua)
-          end
-        end
+        local lua = Lua.Value(self.source, "Lua.Value(", _source:as_lua(nomsu))
+        add_lua_bits(lua, _code)
         lua:append(")")
         return lua
       end)
       self:define_compile_action("lua> %code", get_line_no(), function(self, _code)
         if _code.type ~= "Text" then
-          return Lua.Value(self.source, "nomsu:run_lua(Lua(", repr(_code.source), ", ", repr(tostring(nomsu:tree_to_lua(_code))), "))")
+          return Lua.Value(self.source, "nomsu:run_lua(Lua(", repr(_code.source), ", ", repr(nomsu:tree_to_lua(_code):stringify()), "))")
         end
         local lua = Lua(_code.source)
         local _list_0 = _code.value
@@ -1119,7 +1115,7 @@ do
       end)
       self:define_compile_action("=lua %code", get_line_no(), function(self, _code)
         if _code.type ~= "Text" then
-          return Lua.Value(self.source, "nomsu:run_lua(Lua(", repr(_code.source), ", ", repr(tostring(nomsu:tree_to_lua(_code))), "))")
+          return Lua.Value(self.source, "nomsu:run_lua(Lua(", repr(_code.source), ", ", repr(nomsu:tree_to_lua(_code):stringify()), "))")
         end
         local lua = Lua.Value(self.source)
         local _list_0 = _code.value
@@ -1363,11 +1359,11 @@ if arg and debug_getinfo(2).func ~= require then
       if args.flags["-p"] then
         nomsu.environment.print = function() end
         compile_fn = function(code)
-          return io.output():write("local IMMEDIATE = true;\n" .. tostring(code))
+          return io.output():write("local IMMEDIATE = true;\n" .. (code:stringify()))
         end
       elseif args.output then
         compile_fn = function(code)
-          return io.open(args.output, 'w'):write("local IMMEDIATE = true;\n" .. tostring(code))
+          return io.open(args.output, 'w'):write("local IMMEDIATE = true;\n" .. (code:stringify()))
         end
       end
       if args.input:match(".*%.lua") then
@@ -1422,10 +1418,8 @@ if arg and debug_getinfo(2).func ~= require then
         return nil
       end
     end
-    local nomsu_file = FILE_CACHE["nomsu.moon"]
-    local nomsu_source = nomsu_file:read("a")
+    local nomsu_source = FILE_CACHE["nomsu.moon"]
     local _, line_table = to_lua(nomsu_source)
-    nomsu_file:close()
     local level = 2
     while true do
       local _continue_0 = false

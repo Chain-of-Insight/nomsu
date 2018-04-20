@@ -6,6 +6,8 @@ export LINE_STARTS
 Source = immutable {"filename","start","stop"}, {
     name:"Source"
     __new: (filename, start, stop)=>
+        if not start
+            start, stop = 1, #FILE_CACHE[filename]
         if stop then assert(start <= stop, "Invalid range: #{start}, #{stop}")
         return filename, start, stop
     __tostring: =>
@@ -69,6 +71,9 @@ class Code
                 @source = Source(filename, tonumber(start), tonumber(stop))
             else
                 @source = Source(@source, 1, #self+1)
+        assert(@source == nil or Source\is_instance(@source))
+        for b in *@bits
+            assert(not Source\is_instance(b))
 
     clone: =>
         cls = @__class
@@ -144,14 +149,16 @@ class Lua extends Code
             elseif type(var) != 'string'
                 var = tostring(var)
             removals[var] = true
-        remove_from = =>
-            for i=#@free_vars,1,-1
-                if removals[@free_vars[i]]
-                    remove @free_vars, i
-            for b in *@bits
+        
+        stack = {self}
+        while #stack > 0
+            lua, stack[#stack] = stack[#stack], nil
+            for i=#lua.free_vars,1,-1
+                if removals[lua.free_vars[i]]
+                    remove lua.free_vars, i
+            for b in *lua.bits
                 if type(b) != 'string'
-                    remove_from b
-        remove_from self
+                    stack[#stack+1] = b
         @__str = nil
 
     convert_to_statements: (prefix="", suffix=";")=>
@@ -178,6 +185,15 @@ class Lua extends Code
         if #to_declare > 0
             @prepend "local #{concat to_declare, ", "};\n"
 
+    stringify: =>
+        if @__str == nil
+            buff = {}
+            for i,b in ipairs @bits
+                if type(b) != 'string'
+                    b = b\stringify!
+                buff[#buff+1] = b
+            @__str = concat(buff, "")
+        return @__str
     __tostring: =>
         if @__str == nil
             buff = {}
@@ -218,24 +234,22 @@ class Lua extends Code
 
     make_offset_table: =>
         -- Return a mapping from output (lua) character number to input (nomsu) character number
-        lua_chunkname = tostring(@source)..".lua"
-        lua_str = tostring(self)
-        metadata = {
-            nomsu_filename:@source.filename
-            lua_filename:lua_chunkname, lua_file:lua_str
-            lua_to_nomsu: {}, nomsu_to_lua: {}
-        }
+        lua_to_nomsu, nomsu_to_lua = {}, {}
         walk = (lua, pos)->
             for b in *lua.bits
                 if type(b) == 'string'
-                    output = Source(lua_chunkname, pos, pos+#b)
-                    metadata.lua_to_nomsu[output] = lua.source
-                    metadata.nomsu_to_lua[lua.source] = output
+                    if lua.source
+                        lua_to_nomsu[pos] = lua.source.start
+                        nomsu_to_lua[lua.source.start] = pos
                 else
-                    walk b, pos, pos+#b
+                    walk b, pos
                 pos += #b
         walk self, 1
-        return lua_str, metadata
+        return {
+            nomsu_filename:@source.filename
+            lua_filename:tostring(@source)..".lua", lua_file:@stringify!
+            :lua_to_nomsu, :nomsu_to_lua
+        }
 
     parenthesize: =>
         if @is_value

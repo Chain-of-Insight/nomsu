@@ -12,6 +12,9 @@ Source = immutable({
 }, {
   name = "Source",
   __new = function(self, filename, start, stop)
+    if not start then
+      start, stop = 1, #FILE_CACHE[filename]
+    end
     if stop then
       assert(start <= stop, "Invalid range: " .. tostring(start) .. ", " .. tostring(stop))
     end
@@ -158,6 +161,12 @@ do
           self.source = Source(self.source, 1, #self + 1)
         end
       end
+      assert(self.source == nil or Source:is_instance(self.source))
+      local _list_0 = self.bits
+      for _index_0 = 1, #_list_0 do
+        local b = _list_0[_index_0]
+        assert(not Source:is_instance(b))
+      end
     end,
     __base = _base_0,
     __name = "Code"
@@ -215,22 +224,25 @@ do
         end
         removals[var] = true
       end
-      local remove_from
-      remove_from = function(self)
-        for i = #self.free_vars, 1, -1 do
-          if removals[self.free_vars[i]] then
-            remove(self.free_vars, i)
+      local stack = {
+        self
+      }
+      while #stack > 0 do
+        local lua
+        lua, stack[#stack] = stack[#stack], nil
+        for i = #lua.free_vars, 1, -1 do
+          if removals[lua.free_vars[i]] then
+            remove(lua.free_vars, i)
           end
         end
-        local _list_0 = self.bits
+        local _list_0 = lua.bits
         for _index_0 = 1, #_list_0 do
           local b = _list_0[_index_0]
           if type(b) ~= 'string' then
-            remove_from(b)
+            stack[#stack + 1] = b
           end
         end
       end
-      remove_from(self)
       self.__str = nil
     end,
     convert_to_statements = function(self, prefix, suffix)
@@ -282,6 +294,19 @@ do
         return self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
       end
     end,
+    stringify = function(self)
+      if self.__str == nil then
+        local buff = { }
+        for i, b in ipairs(self.bits) do
+          if type(b) ~= 'string' then
+            b = b:stringify()
+          end
+          buff[#buff + 1] = b
+        end
+        self.__str = concat(buff, "")
+      end
+      return self.__str
+    end,
     __tostring = function(self)
       if self.__str == nil then
         local buff = { }
@@ -329,32 +354,31 @@ do
       self.__str = nil
     end,
     make_offset_table = function(self)
-      local lua_chunkname = tostring(self.source) .. ".lua"
-      local lua_str = tostring(self)
-      local metadata = {
-        nomsu_filename = self.source.filename,
-        lua_filename = lua_chunkname,
-        lua_file = lua_str,
-        lua_to_nomsu = { },
-        nomsu_to_lua = { }
-      }
+      local lua_to_nomsu, nomsu_to_lua = { }, { }
       local walk
       walk = function(lua, pos)
         local _list_0 = lua.bits
         for _index_0 = 1, #_list_0 do
           local b = _list_0[_index_0]
           if type(b) == 'string' then
-            local output = Source(lua_chunkname, pos, pos + #b)
-            metadata.lua_to_nomsu[output] = lua.source
-            metadata.nomsu_to_lua[lua.source] = output
+            if lua.source then
+              lua_to_nomsu[pos] = lua.source.start
+              nomsu_to_lua[lua.source.start] = pos
+            end
           else
-            walk(b, pos, pos + #b)
+            walk(b, pos)
           end
           pos = pos + #b
         end
       end
       walk(self, 1)
-      return lua_str, metadata
+      return {
+        nomsu_filename = self.source.filename,
+        lua_filename = tostring(self.source) .. ".lua",
+        lua_file = self:stringify(),
+        lua_to_nomsu = lua_to_nomsu,
+        nomsu_to_lua = nomsu_to_lua
+      }
     end,
     parenthesize = function(self)
       if self.is_value then

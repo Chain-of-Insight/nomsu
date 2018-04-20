@@ -42,20 +42,15 @@ debug_getinfo = debug.getinfo
 -- Re-implement nomsu-to-lua comment translation
 
 export FILE_CACHE
--- FILE_CACHE is a map from filename (string) -> file contents (Lua or Nomsu object)
+-- FILE_CACHE is a map from filename (string) -> string of file contents
 FILE_CACHE = setmetatable {}, {
     __index: (filename)=>
         file = io.open(filename)
         return nil unless file
-        code = file\read("a")\sub(1,-2) -- Lua appends trailing newline for no apparent reason.
+        contents = file\read("a")\sub(1,-2) -- Lua appends trailing newline for no apparent reason.
         file\close!
-        source = Source(filename, 1, #code)
-        if filename\match("%.nom$")
-            code = Nomsu(source, code)
-        elseif filename\match("%.lua$")
-            code = Lua(source, code)
-        self[filename] = code
-        return code
+        self[filename] = contents
+        return contents
 }
 
 line_counter = re.compile([[
@@ -173,7 +168,11 @@ NOMSU_DEFS = with {}
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop)->
         if type(value) == 'table' then error("Not a tuple: #{repr value}")-- = Tuple(value)
-        source = lpeg.userdata.source_code.source\sub(start,stop-1)
+        --source = lpeg.userdata.source_code.source\sub(start,stop-1)
+        source = lpeg.userdata.source_code.source
+        start += source.start-1
+        stop += source.start-1
+        source = Source(source.filename, start, stop-1)
         node = Types[key](value, source)
         return node
     self[key] = make_node
@@ -299,8 +298,8 @@ class NomsuCompiler
         if type(nomsu_code) == 'string'
             _nomsu_chunk_counter += 1
             filename = "<nomsu chunk ##{_nomsu_chunk_counter}>.nom"
-            nomsu_code = Nomsu(filename, nomsu_code)
             FILE_CACHE[filename] = nomsu_code
+            nomsu_code = Nomsu(filename, nomsu_code)
         userdata = {
             source_code:nomsu_code, indent_stack: {""}
         }
@@ -338,17 +337,17 @@ class NomsuCompiler
 
         if filename\match(".*%.lua")
             file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
-            return @run_lua(file)
+            return @run_lua(Lua(Source(filename), file))
         if filename\match(".*%.nom")
             if not @skip_precompiled -- Look for precompiled version
                 lua_filename = filename\gsub("%.nom$", ".lua")
                 file = FILE_CACHE[lua_filename]
                 if file
-                    return @run_lua(file)
+                    return @run_lua(Lua(Source(filename), file))
             file = file or FILE_CACHE[filename]
             if not file
                 error("File does not exist: #{filename}", 0)
-            return @run(file, compile_fn)
+            return @run(Nomsu(Source(filename), file), compile_fn)
         else
             error("Invalid filetype for #{filename}", 0)
     
@@ -366,8 +365,9 @@ class NomsuCompiler
 
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
-        lua_string, metadata = lua\make_offset_table!
-        LUA_METADATA[metadata.lua_filename] = metadata
+        lua_string = lua\stringify!
+        --metadata = lua\make_offset_table!
+        --LUA_METADATA[metadata.lua_filename] = metadata
         if rawget(FILE_CACHE, lua.source.filename) == nil
             FILE_CACHE[lua.source.filename] = lua_string
         if rawget(FILE_CACHE, lua.source) == nil
@@ -739,7 +739,7 @@ class NomsuCompiler
     tree_with_replaced_vars: (tree, replacements)=>
         return @tree_map tree, (t)->
             if t.type == "Var"
-                id = tostring(t\as_lua(self))
+                id = t\as_lua(self)\stringify!
                 if replacements[id] != nil
                     return replacements[id]
 
@@ -803,12 +803,11 @@ class NomsuCompiler
             nomsu\run_lua(lua)
             return Lua(@source, "if IMMEDIATE then\n", lua, "\nend")
 
-        @define_compile_action "Lua %source %code", get_line_no!, (_source, _code)=>
-            if _code.type != "Text"
-                return Lua.Value(_source, "Lua(", repr(_code.source),", ",nomsu\tree_to_lua(_code),")")
-
-            lua = Lua.Value(_source, "Lua(", repr(_code.source))
-            for bit in *_code.value
+        add_lua_bits = (lua, code)->
+            if code.type != "Text"
+                lua\append ", ", code\as_lua(nomsu)
+                return
+            for bit in *code.value
                 lua\append ", "
                 if type(bit) == "string"
                     lua\append repr(bit)
@@ -816,33 +815,37 @@ class NomsuCompiler
                     bit_lua = nomsu\tree_to_lua bit
                     unless bit_lua.is_value
                         line, src = bit.source\get_line!, bit.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
+                        error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression."
                     lua\append bit_lua
+
+        @define_compile_action "Lua %code", get_line_no!, (_code)=>
+            lua = Lua.Value(@source, "Lua(", tostring(_code.source))
+            add_lua_bits(lua, _code)
+            lua\append ")"
+            return lua
+
+        @define_compile_action "Lua %source %code", get_line_no!, (_source, _code)=>
+            lua = Lua.Value(@source, "Lua(", _source\as_lua(nomsu))
+            add_lua_bits(lua, _code)
+            lua\append ")"
+            return lua
+
+        @define_compile_action "Lua value %code", get_line_no!, (_code)=>
+            lua = Lua.Value(@source, "Lua.Value(", tostring(_code.source))
+            add_lua_bits(lua, _code)
             lua\append ")"
             return lua
 
         @define_compile_action "Lua value %source %code", get_line_no!, (_source, _code)=>
-            if _code.type != "Text"
-                return Lua.Value(_source, "Lua.Value(", repr(_code.source),", ",nomsu\tree_to_lua(_code),")")
-
-            lua = Lua.Value(_source, "Lua.Value(", repr(_code.source))
-            for bit in *_code.value
-                lua\append ", "
-                if type(bit) == "string"
-                    lua\append repr(bit)
-                else
-                    bit_lua = nomsu\tree_to_lua bit
-                    unless bit_lua.is_value
-                        line, src = bit.source\get_line!, bit.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
-                    lua\append bit_lua
+            lua = Lua.Value(@source, "Lua.Value(", _source\as_lua(nomsu))
+            add_lua_bits(lua, _code)
             lua\append ")"
             return lua
 
         @define_compile_action "lua> %code", get_line_no!, (_code)=>
             if _code.type != "Text"
                 return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
-                    ", ",repr(tostring(nomsu\tree_to_lua(_code))),"))"
+                    ", ",repr(nomsu\tree_to_lua(_code)\stringify!),"))"
 
             lua = Lua(_code.source)
             for bit in *_code.value
@@ -859,7 +862,7 @@ class NomsuCompiler
         @define_compile_action "=lua %code", get_line_no!, (_code)=>
             if _code.type != "Text"
                 return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
-                    ", ",repr(tostring(nomsu\tree_to_lua(_code))),"))"
+                    ", ",repr(nomsu\tree_to_lua(_code)\stringify!),"))"
 
             lua = Lua.Value(@source)
             for bit in *_code.value
@@ -951,10 +954,10 @@ if arg and debug_getinfo(2).func != require
             if args.flags["-p"]
                 nomsu.environment.print = ->
                 compile_fn = (code)->
-                    io.output!\write("local IMMEDIATE = true;\n"..tostring(code))
+                    io.output!\write("local IMMEDIATE = true;\n"..(code\stringify!))
             elseif args.output
                 compile_fn = (code)->
-                    io.open(args.output, 'w')\write("local IMMEDIATE = true;\n"..tostring(code))
+                    io.open(args.output, 'w')\write("local IMMEDIATE = true;\n"..(code\stringify!))
 
             if args.input\match(".*%.lua")
                 dofile(args.input)(nomsu, {})
@@ -996,10 +999,8 @@ if arg and debug_getinfo(2).func != require
 
         ok, to_lua = pcall -> require('moonscript.base').to_lua
         if not ok then to_lua = -> nil
-        nomsu_file = FILE_CACHE["nomsu.moon"]
-        nomsu_source = nomsu_file\read("a")
+        nomsu_source = FILE_CACHE["nomsu.moon"]
         _, line_table = to_lua(nomsu_source)
-        nomsu_file\close!
 
         level = 2
         while true
@@ -1046,7 +1047,11 @@ if arg and debug_getinfo(2).func != require
     -- for both APIs
     -- TODO: revert back to old error handler
 
+    --ProFi = require 'ProFi'
+    --ProFi\start()
     --require('ldt').guard run
     xpcall(run, err_hand)
+    --ProFi\stop()
+    --ProFi\writeReport( 'MyProfilingReport.txt' )
 
 return NomsuCompiler
