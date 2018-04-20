@@ -13,18 +13,6 @@ do
   local _obj_0 = require("lua_obj")
   Lua, Location = _obj_0.Lua, _obj_0.Location
 end
-local common_methods = {
-  __tostring = function(self)
-    return tostring(self.name) .. "(" .. tostring(repr(self.value)) .. ")"
-  end,
-  with_value = function(self, value)
-    return getmetatable(self)(value, self.source)
-  end
-}
-local fields = {
-  "value",
-  "source"
-}
 local Types = { }
 Types.DictEntry = immutable({
   "key",
@@ -39,7 +27,7 @@ local Tree
 Tree = function(name, methods)
   do
     methods.__tostring = function(self)
-      return tostring(self.name) .. "(" .. tostring(repr(self.value)) .. ")"
+      return tostring(self.name) .. "(" .. tostring(repr(self.value)) .. ", " .. tostring(repr(self.source)) .. ")"
     end
     methods.with_value = function(self, value)
       return getmetatable(self)(value, self.source)

@@ -1045,7 +1045,8 @@ if arg and debug_getinfo(2).func != require
     -- Note: xpcall has a slightly different API in Lua <=5.1 vs. >=5.2, but this works
     -- for both APIs
     -- TODO: revert back to old error handler
-    require('ldt').guard run
-    --xpcall(run, err_hand)
+
+    --require('ldt').guard run
+    xpcall(run, err_hand)
 
 return NomsuCompiler

@@ -8,13 +8,6 @@ immutable = require 'immutable'
 {:Lua, :Location} = require "lua_obj"
 
 
-common_methods = {
-    __tostring: =>
-        "#{@name}(#{repr(@value)})"
-    with_value: (value)=> getmetatable(self)(value, @source)
-}
-fields = {"value","source"}
-
 Types = {}
 Types.DictEntry = immutable({"key","value"}, {name:"DictEntry"})
 Types.is_node = (n)->
@@ -23,7 +16,7 @@ Types.is_node = (n)->
 -- Helper method:
 Tree = (name, methods)->
     with methods
-        .__tostring = => "#{@name}(#{repr(@value)})"
+        .__tostring = => "#{@name}(#{repr(@value)}, #{repr @source})"
         .with_value = (value)=> getmetatable(self)(value, @source)
         .type = name
         .name = name

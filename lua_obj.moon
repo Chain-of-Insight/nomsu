@@ -115,6 +115,7 @@ class Lua extends Code
         super ...
         @free_vars = {}
         @is_value = false
+        @__str = nil
     
     @Value = (...)->
         lua = Lua(...)
@@ -132,6 +133,7 @@ class Lua extends Code
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
+        @__str = nil
     
     remove_free_vars: (...)=>
         removals = {}
@@ -150,6 +152,7 @@ class Lua extends Code
                 if type(b) != 'string'
                     remove_from b
         remove_from self
+        @__str = nil
 
     convert_to_statements: (prefix="", suffix=";")=>
         unless @is_value
@@ -176,11 +179,12 @@ class Lua extends Code
             @prepend "local #{concat to_declare, ", "};\n"
 
     __tostring: =>
-        buff = {}
-        for i,b in ipairs @bits
-            buff[#buff+1] = tostring(b)
-        ret = concat(buff, "")
-        return ret
+        if @__str == nil
+            buff = {}
+            for i,b in ipairs @bits
+                buff[#buff+1] = tostring(b)
+            @__str = concat(buff, "")
+        return @__str
 
     __len: =>
         len = 0
@@ -196,6 +200,7 @@ class Lua extends Code
             bits[#bits+1] = bit
             if type(bit) != 'string' and not bit.is_value and #@bits > 0
                 bits[#bits+1] = "\n"
+        @__str = nil
     
     prepend: (...)=>
         n = select("#",...)
@@ -209,6 +214,7 @@ class Lua extends Code
             if type(bit) != 'string' and not bit.is_value and insert_index < #@bits + 1
                 insert bits, insert_index, "\n"
                 insert_index += 1
+        @__str = nil
 
     make_offset_table: =>
         -- Return a mapping from output (lua) character number to input (nomsu) character number
@@ -219,18 +225,16 @@ class Lua extends Code
             lua_filename:lua_chunkname, lua_file:lua_str
             lua_to_nomsu: {}, nomsu_to_lua: {}
         }
-        walk = (lua, output_range)->
-            pos = 1
+        walk = (lua, pos)->
             for b in *lua.bits
                 if type(b) == 'string'
-                    output = output_range\sub(pos, pos+#b)
+                    output = Source(lua_chunkname, pos, pos+#b)
                     metadata.lua_to_nomsu[output] = lua.source
                     metadata.nomsu_to_lua[lua.source] = output
                 else
-                    walk b, output_range\sub(pos, pos+#b)
+                    walk b, pos, pos+#b
                 pos += #b
-        
-        walk self, Source(lua_chunkname, 1, #lua_str)
+        walk self, 1
         return lua_str, metadata
 
     parenthesize: =>

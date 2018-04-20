@@ -202,6 +202,7 @@ do
           seen[var] = true
         end
       end
+      self.__str = nil
     end,
     remove_free_vars = function(self, ...)
       local removals = { }
@@ -229,7 +230,8 @@ do
           end
         end
       end
-      return remove_from(self)
+      remove_from(self)
+      self.__str = nil
     end,
     convert_to_statements = function(self, prefix, suffix)
       if prefix == nil then
@@ -281,12 +283,14 @@ do
       end
     end,
     __tostring = function(self)
-      local buff = { }
-      for i, b in ipairs(self.bits) do
-        buff[#buff + 1] = tostring(b)
+      if self.__str == nil then
+        local buff = { }
+        for i, b in ipairs(self.bits) do
+          buff[#buff + 1] = tostring(b)
+        end
+        self.__str = concat(buff, "")
       end
-      local ret = concat(buff, "")
-      return ret
+      return self.__str
     end,
     __len = function(self)
       local len = 0
@@ -307,6 +311,7 @@ do
           bits[#bits + 1] = "\n"
         end
       end
+      self.__str = nil
     end,
     prepend = function(self, ...)
       local n = select("#", ...)
@@ -321,6 +326,7 @@ do
           insert_index = insert_index + 1
         end
       end
+      self.__str = nil
     end,
     make_offset_table = function(self)
       local lua_chunkname = tostring(self.source) .. ".lua"
@@ -333,22 +339,21 @@ do
         nomsu_to_lua = { }
       }
       local walk
-      walk = function(lua, output_range)
-        local pos = 1
+      walk = function(lua, pos)
         local _list_0 = lua.bits
         for _index_0 = 1, #_list_0 do
           local b = _list_0[_index_0]
           if type(b) == 'string' then
-            local output = output_range:sub(pos, pos + #b)
+            local output = Source(lua_chunkname, pos, pos + #b)
             metadata.lua_to_nomsu[output] = lua.source
             metadata.nomsu_to_lua[lua.source] = output
           else
-            walk(b, output_range:sub(pos, pos + #b))
+            walk(b, pos, pos + #b)
           end
           pos = pos + #b
         end
       end
-      walk(self, Source(lua_chunkname, 1, #lua_str))
+      walk(self, 1)
       return lua_str, metadata
     end,
     parenthesize = function(self)
@@ -367,6 +372,7 @@ do
       _class_0.__parent.__init(self, ...)
       self.free_vars = { }
       self.is_value = false
+      self.__str = nil
     end,
     __base = _base_0,
     __name = "Lua",
