@@ -2,7 +2,7 @@ use "core"
 
 compile [@] to: Lua value "self"
 
-compile [@%var] to:
+compile [@%var] to
     lua> ".."
         local key_lua = repr(\%var.value);
         local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
@@ -14,7 +14,7 @@ compile [@%var] to:
         end
         return Lua.Value(tree.source, "self["..key_lua.."]");
 
-compile [@%var <- %val] to:
+compile [@%var <- %val] to
     lua> ".."
         local val_lua = \(%val as lua expr);
         local key_lua = repr(\%var.value);
@@ -27,7 +27,7 @@ compile [@%var <- %val] to:
         end
         return Lua(tree.source, "self[", key_lua, "] = ", val_lua, ";");
 
-compile [as %instance %body] to:
+compile [as %instance %body] to
     %body_lua <- (%body as lua)
     lua> "\%body_lua:convert_to_statements();"
     return
@@ -43,21 +43,21 @@ compile [as %instance %body] to:
             \%body_lua
             end
 
-compile [define object %classname %class_body] to:
+compile [define object %classname %class_body] to
     %class_identifier <- (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
     if: %class_identifier is ""
         %class_identifier <- "class"
     %methods <- []
     %__index <- %class_identifier
     %__newindex <- "nil"
-    for %line in (%class_body's "value"):
+    for %line in (%class_body's "value")
         if: (%line's "type") is "Comment"
             do next %line
         if: ((%line's "type") is "FunctionCall") and ((%line's stub) is "slots %")
             %slot_index_clauses <- []
             %slot_newindex_clauses <- []
             %slots <- %line.value.2.value
-            for %slot_index = %slot_var in %slots:
+            for %slot_index = %slot_var in %slots
                 to %slot_index_clauses add ".."
                     if key == \(repr (%slot_var's "value")) or key == \(repr (%slot_var as lua expr)) then
                         return rawget(self, \%slot_index);
@@ -115,7 +115,7 @@ compile [define object %classname %class_body] to:
     return
         Lua ".."
             do -- \%class_identifier
-                -- Create the class object:
+                -- Create the class object
                 local \%class_identifier = setmetatable({
                     name=\(%classname as lua expr), instances=setmetatable({}, {__mode="k"}),
                 }, {
@@ -132,10 +132,10 @@ compile [define object %classname %class_body] to:
                 });
                 \%class_identifier.class = \%class_identifier;
 
-                -- Define the methods:
+                -- Define the methods
             \(%methods joined with "\n")
 
-                -- Define class methods for instantiating and accessing instances:
+                -- Define class methods for instantiating and accessing instances
                 \%class_identifier.instance_metatable = {
                     __index=\%__index,
                     __newindex=\%__newindex,

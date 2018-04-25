@@ -5,7 +5,7 @@
 use "core/metaprogramming.nom"
 
 # Text functions
-action [%texts joined with %glue]:
+action [%texts joined with %glue]
     lua> ".."
         local text_bits = {}
         for i,bit in ipairs(\%texts) do text_bits[i] = stringify(bit) end

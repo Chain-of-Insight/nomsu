@@ -8,6 +8,7 @@ immutable = require 'immutable'
 {:insert, :remove, :concat} = table
 {:Lua, :Nomsu, :Location} = require "lua_obj"
 
+MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 
 Types = {}
 Types.DictEntry = immutable({"key","value"}, {name:"DictEntry"})
@@ -177,20 +178,19 @@ Tree "Action",
             return nomsu
         else
             inline_version = @as_nomsu(true)
-            if inline_version and #inline_version <= 80
+            if inline_version and #inline_version <= MAX_LINE
                 return inline_version
             nomsu = Nomsu(@source)
             spacer = nil
             for i,bit in ipairs @value
-                if spacer
-                    nomsu\append spacer
-
                 if bit.type == "Word"
+                    if spacer then nomsu\append spacer
                     nomsu\append bit.value
                     spacer = " "
                 else
                     arg_nomsu = bit\as_nomsu(true)
-                    if arg_nomsu and #arg_nomsu < 80
+                    if arg_nomsu and #arg_nomsu < MAX_LINE
+                        if spacer then nomsu\append spacer
                         if bit.type == "Action" or bit.type == "Block"
                             arg_nomsu\parenthesize!
                         spacer = " "
@@ -199,6 +199,8 @@ Tree "Action",
                         return nil unless nomsu
                         if bit.type == "Action" or bit.type == "Block"
                             nomsu\append "\n    "
+                        else
+                            if spacer then nomsu\append spacer
                         spacer = "\n.."
                     nomsu\append arg_nomsu
             return nomsu
@@ -253,7 +255,7 @@ Tree "Text",
             return nomsu
         else
             inline_version = @as_nomsu(true)
-            if inline_version and #inline_version <= 80
+            if inline_version and #inline_version <= MAX_LINE
                 return inline_version
             nomsu = Nomsu(@source, '".."\n    ')
             for i, bit in ipairs @value
@@ -290,7 +292,7 @@ Tree "List",
             else
                 line_length += #last_line
             if i < #@value
-                if line_length >= 80
+                if line_length >= MAX_LINE
                     lua\append ",\n"
                     line_length = 0
                 else
@@ -312,13 +314,13 @@ Tree "List",
             return nomsu
         else
             inline_version = @as_nomsu(true)
-            if inline_version and #inline_version <= 80
+            if inline_version and #inline_version <= MAX_LINE
                 return inline_version
             nomsu = Nomsu(@source, "[..]")
             line = Nomsu(@source, "\n    ")
             for item in *@value
                 item_nomsu = item\as_nomsu(true)
-                if item_nomsu and #line + #", " + #item_nomsu <= 80
+                if item_nomsu and #line + #", " + #item_nomsu <= MAX_LINE
                     if #line.bits > 1
                         line\append ", "
                     line\append item_nomsu
@@ -365,7 +367,7 @@ Tree "Dict",
             else
                 line_length += #last_line
             if i < #@value
-                if line_length >= 80
+                if line_length >= MAX_LINE
                     lua\append ",\n"
                     line_length = 0
                 else
@@ -400,7 +402,7 @@ Tree "Dict",
                 if entry.key.type == "Action" or entry.key.type == "Block"
                     key_nomsu\parenthesize!
                 value_nomsu = entry.value\as_nomsu(true)
-                if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= 80
+                if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= MAX_LINE
                     if #line.bits > 1
                         line\append ", "
                     line\append key_nomsu,":",value_nomsu

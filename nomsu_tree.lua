@@ -14,6 +14,7 @@ do
   local _obj_0 = require("lua_obj")
   Lua, Nomsu, Location = _obj_0.Lua, _obj_0.Nomsu, _obj_0.Location
 end
+local MAX_LINE = 80
 local Types = { }
 Types.DictEntry = immutable({
   "key",
@@ -307,21 +308,24 @@ Tree("Action", {
       return nomsu
     else
       local inline_version = self:as_nomsu(true)
-      if inline_version and #inline_version <= 80 then
+      if inline_version and #inline_version <= MAX_LINE then
         return inline_version
       end
       local nomsu = Nomsu(self.source)
       local spacer = nil
       for i, bit in ipairs(self.value) do
-        if spacer then
-          nomsu:append(spacer)
-        end
         if bit.type == "Word" then
+          if spacer then
+            nomsu:append(spacer)
+          end
           nomsu:append(bit.value)
           spacer = " "
         else
           local arg_nomsu = bit:as_nomsu(true)
-          if arg_nomsu and #arg_nomsu < 80 then
+          if arg_nomsu and #arg_nomsu < MAX_LINE then
+            if spacer then
+              nomsu:append(spacer)
+            end
             if bit.type == "Action" or bit.type == "Block" then
               arg_nomsu:parenthesize()
             end
@@ -333,6 +337,10 @@ Tree("Action", {
             end
             if bit.type == "Action" or bit.type == "Block" then
               nomsu:append("\n    ")
+            else
+              if spacer then
+                nomsu:append(spacer)
+              end
             end
             spacer = "\n.."
           end
@@ -423,7 +431,7 @@ Tree("Text", {
       return nomsu
     else
       local inline_version = self:as_nomsu(true)
-      if inline_version and #inline_version <= 80 then
+      if inline_version and #inline_version <= MAX_LINE then
         return inline_version
       end
       local nomsu = Nomsu(self.source, '".."\n    ')
@@ -472,7 +480,7 @@ Tree("List", {
         line_length = line_length + #last_line
       end
       if i < #self.value then
-        if line_length >= 80 then
+        if line_length >= MAX_LINE then
           lua:append(",\n")
           line_length = 0
         else
@@ -504,7 +512,7 @@ Tree("List", {
       return nomsu
     else
       local inline_version = self:as_nomsu(true)
-      if inline_version and #inline_version <= 80 then
+      if inline_version and #inline_version <= MAX_LINE then
         return inline_version
       end
       local nomsu = Nomsu(self.source, "[..]")
@@ -513,7 +521,7 @@ Tree("List", {
       for _index_0 = 1, #_list_0 do
         local item = _list_0[_index_0]
         local item_nomsu = item:as_nomsu(true)
-        if item_nomsu and #line + #", " + #item_nomsu <= 80 then
+        if item_nomsu and #line + #", " + #item_nomsu <= MAX_LINE then
           if #line.bits > 1 then
             line:append(", ")
           end
@@ -569,7 +577,7 @@ Tree("Dict", {
         line_length = line_length + #last_line
       end
       if i < #self.value then
-        if line_length >= 80 then
+        if line_length >= MAX_LINE then
           lua:append(",\n")
           line_length = 0
         else
@@ -624,7 +632,7 @@ Tree("Dict", {
           key_nomsu:parenthesize()
         end
         local value_nomsu = entry.value:as_nomsu(true)
-        if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= 80 then
+        if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= MAX_LINE then
           if #line.bits > 1 then
             line:append(", ")
           end

@@ -34,37 +34,37 @@ compile [log % base %base, log_%base %, log base %base %] to: Lua value "math.lo
 compile [floor %] to: Lua value "math.floor(\(% as lua expr))"
 compile [ceiling %, ceil %] to: Lua value "math.ceil(\(% as lua expr))"
 compile [round %, % rounded] to: Lua value "math.floor(\(% as lua expr) + .5)"
-action [%n to the nearest %rounder]:
+action [%n to the nearest %rounder]
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 
 # Any/all/none
-compile [all of %items, all %items] to:
+compile [all of %items, all %items] to
     unless: (%items' "type") is "List"
         return: Lua value "utils.all(\(%items as lua expr))"
     %clauses <- []
     for all (%items' "value"): lua> "table.insert(\%clauses, \(% as lua expr));"
     return: Lua value "(\(%clauses joined with " and "))"
 parse [not all of %items, not all %items] as: not (all of %items)
-compile [any of %items, any %items] to:
+compile [any of %items, any %items] to
     unless: (%items' "type") is "List"
         return: Lua value "utils.any(\(%items as lua expr))"
     %clauses <- []
     for all (%items' "value"): lua> "table.insert(\%clauses, \(% as lua expr));"
     return: Lua value "(\(%clauses joined with " or "))"
 parse [none of %items, none %items] as: not (any of %items)
-compile [sum of %items, sum %items] to:
+compile [sum of %items, sum %items] to
     unless: (%items' "type") is "List"
         return: Lua value "utils.sum(\(%items as lua expr))"
     %clauses <- []
     for all (%items' "value"): lua> "table.insert(\%clauses, \(% as lua expr));"
     return: Lua value "(\(%clauses joined with " + "))"
-compile [product of %items, product %items] to:
+compile [product of %items, product %items] to
     unless: (%items' "type") is "List"
         return: Lua value "utils.product(\(%items as lua expr))"
     %clauses <- []
     for all (%items' "value"): lua> "table.insert(\%clauses, \(% as lua expr));"
     return: Lua value "(\(%clauses joined with " * "))"
-action [avg of %items, average of %items]:
+action [avg of %items, average of %items]
     =lua "(utils.sum(\%items)/#\%items)"
 compile [min of %items, smallest of %items, lowest of %items] to
     Lua value "utils.min(\(%items as lua expr))"
@@ -82,7 +82,7 @@ compile [max of %items by %value_expr] to
         end)
 
 # Random functions
-action [seed random with %]:
+action [seed random with %]
     lua> ".."
         math.randomseed(\%);
         for i=1,20 do math.random(); end
@@ -91,5 +91,5 @@ compile [random number, random, rand] to: Lua value "math.random()"
 compile [random int %n, random integer %n, randint %n] to: Lua value "math.random(\(%n as lua expr))"
 compile [random from %low to %high, random number from %low to %high, rand %low %high] to
     "math.random(\(%low as lua expr), \(%high as lua expr))"
-action [random choice from %elements, random choice %elements, random %elements]:
+action [random choice from %elements, random choice %elements, random %elements]
     =lua "\%elements[math.random(#\%elements)]"

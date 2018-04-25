@@ -3,8 +3,8 @@
 
 use "core/metaprogramming.nom"
 
-# Indexing:
-immediately:
+# Indexing
+immediately
     #.. NOTE!!! It's critical that there are spaces around %key if it's a string,
         otherwise, Lua will get confused and interpret %obj[[[foo]]] as %obj("[foo]")
         instead of %obj[ "foo" ].
@@ -17,13 +17,13 @@ immediately:
     ..as: %obj.%key
 
 # Comparison Operators
-immediately:
+immediately
     compile [%x < %y] to: Lua value "(\(%x as lua expr) < \(%y as lua expr))"
     compile [%x > %y] to: Lua value "(\(%x as lua expr) > \(%y as lua expr))"
     compile [%x <= %y] to: Lua value "(\(%x as lua expr) <= \(%y as lua expr))"
     compile [%x >= %y] to: Lua value "(\(%x as lua expr) >= \(%y as lua expr))"
     # TODO: optimize case of [%x,%y] = [1,2]
-    compile [%a is %b, %a = %b, %a == %b] to:
+    compile [%a is %b, %a = %b, %a == %b] to
         lua> ".."
             local safe = {Text=true, Number=true};
             local a_lua, b_lua = \%a:as_lua(nomsu), \%b:as_lua(nomsu);
@@ -32,7 +32,7 @@ immediately:
             else
                 return Lua.Value(tree.source, "utils.equivalent(", a_lua, ", ", b_lua, ")");
             end
-    compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to:
+    compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
         lua> ".."
             local safe = {Text=true, Number=true};
             local a_lua, b_lua = \%a:as_lua(nomsu), \%b:as_lua(nomsu);
@@ -45,8 +45,8 @@ immediately:
     compile [%'s id, id of %] to: Lua value "nomsu.ids[\(% as lua expr)]"
 
 # Variable assignment operator
-immediately:
-    compile [%var <- %value] to:
+immediately
+    compile [%var <- %value] to
         lua> "local \%var_lua = \%var:as_lua(nomsu);"
         assume %var_lua.is_value or barf "Invalid target for assignment: \(%var's source code)"
         lua> "local \%value_lua = \%value:as_lua(nomsu);"
@@ -58,9 +58,9 @@ immediately:
             end
             return lua;
 
-immediately:
+immediately
     # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
-    compile [<- %assignments] to:
+    compile [<- %assignments] to
         assume ((%assignments' "type") is "Dict") or barf ".."
             Expected a Dict for the assignments part of '<- %' statement, not \(%assignments' source code)
         lua> ".."
@@ -83,20 +83,20 @@ immediately:
             end
             return Lua(tree.source, lhs, " = ", rhs, ";");
 
-immediately:
-    compile [export %var <- %value] to:
+immediately
+    compile [export %var <- %value] to
         %var_lua <- (%var as lua)
         assume %var_lua.is_value or barf "Invalid target for assignment: \(%var's source code)"
         %value_lua <- (%value as lua)
         assume %value_lua.is_value or barf "Invalid value for assignment: \(%value's source code)"
         return: Lua "\(%var_lua) = \(%value_lua);"
 
-    compile [exporting %exported %body] to:
+    compile [exporting %exported %body] to
         %body_lua <- (%body as lua statements)
         lua> "\%body_lua:remove_free_vars(unpack(\(%exported.value)));"
         return %body_lua
 
-    compile [with %assignments %body] to:
+    compile [with %assignments %body] to
         %lua <- (%body as lua statements)
         lua> ".."
             local lhs, rhs = Lua(tree.source), Lua(\%assignments.source);
@@ -130,7 +130,7 @@ immediately:
                     \%lua
                 end -- 'with' block
 
-immediately:
+immediately
     # Math Operators
     compile [%x + %y] to: Lua value "(\(%x as lua expr) + \(%y as lua expr))"
     compile [%x - %y] to: Lua value "(\(%x as lua expr) - \(%y as lua expr))"
@@ -171,7 +171,7 @@ immediately:
     compile [length of %list] to: Lua value "(#\(%list as lua expr))"
 
 # Update operators
-immediately:
+immediately
     parse [%var + <- %, %var +<- %] as: %var <- (%var + %)
     parse [%var - <- %, %var -<- %] as: %var <- (%var - %)
     parse [%var * <- %, %var *<- %] as: %var <- (%var * %)

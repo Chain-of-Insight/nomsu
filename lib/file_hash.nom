@@ -28,15 +28,15 @@ lua> ".."
     end
     attrdir(".");
 
-action [sha1 %]:
+action [sha1 %]
     lua> "return sha1(\%);"
 
-action [file with hash %hash]:
+action [file with hash %hash]
     %file <- (%hash in %hash_to_filename)
     assume %file or barf "File with SHA1 hash \%hash not found!"
     return %file
 
-action [hash of file %filename]:
+action [hash of file %filename]
     lua> ".."
         local f = io.open(\%filename);
         local hash = sha1(f:read("*a"));
