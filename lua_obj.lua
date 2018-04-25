@@ -94,32 +94,6 @@ local Code
 do
   local _class_0
   local _base_0 = {
-    clone = function(self)
-      local cls = self.__class
-      local copy = cls(self.source, unpack(self.bits))
-      copy.is_value = self.is_value
-      for k, v in pairs(self.free_vars) do
-        copy.free_vars[k] = v
-      end
-      return copy
-    end,
-    __tostring = function(self)
-      local buff = { }
-      for i, b in ipairs(self.bits) do
-        buff[#buff + 1] = tostring(b)
-      end
-      local ret = concat(buff, "")
-      return ret
-    end,
-    __len = function(self)
-      local len = 0
-      local _list_0 = self.bits
-      for _index_0 = 1, #_list_0 do
-        local b = _list_0[_index_0]
-        len = len + #b
-      end
-      return len
-    end,
     sub = function(self, start, stop)
       local str = tostring(self):sub(start, stop)
       local cls = self.__class
@@ -129,24 +103,53 @@ do
       local n = select("#", ...)
       local bits = self.bits
       for i = 1, n do
-        bits[#bits + 1] = select(i, ...)
+        local b = select(i, ...)
+        bits[#bits + 1] = b
+        if type(b) == 'string' then
+          do
+            local spaces = b:match("\n([ ]*)[^\n]*$")
+            if spaces then
+              self.current_indent = #spaces
+            end
+          end
+        elseif self.current_indent ~= 0 then
+          self.indents[#bits] = self.current_indent
+        end
       end
+      self.__str = nil
     end,
     prepend = function(self, ...)
       local n = select("#", ...)
-      local bits = self.bits
+      local bits, indents = self.bits, self.indents
       for i = #bits + n, n + 1, -1 do
         bits[i] = bits[i - n]
       end
       for i = 1, n do
         bits[i] = select(i, ...)
       end
+      self.current_indent = 0
+      for i, b in ipairs(bits) do
+        if type(b) == 'string' then
+          do
+            local spaces = b:match("\n([ ]*)[^\n]*$")
+            if spaces then
+              self.current_indent = #spaces
+            end
+          end
+        elseif self.current_indent ~= 0 then
+          indents[i] = self.current_indent
+        else
+          indents[i] = nil
+        end
+      end
+      self.__str = nil
     end
   }
   _base_0.__index = _base_0
   _class_0 = setmetatable({
     __init = function(self, source, ...)
       self.source = source
+      self.indents = { }
       self.bits = {
         ...
       }
@@ -162,11 +165,22 @@ do
         end
       end
       assert(self.source == nil or Source:is_instance(self.source))
-      local _list_0 = self.bits
-      for _index_0 = 1, #_list_0 do
-        local b = _list_0[_index_0]
+      local indent = 0
+      for i, b in ipairs(self.bits) do
         assert(not Source:is_instance(b))
+        if type(b) == 'string' then
+          do
+            local spaces = b:match("\n([ ]*)[^\n]*$")
+            if spaces then
+              indent = #spaces
+            end
+          end
+        elseif indent ~= 0 then
+          self.indents[i] = indent
+        end
       end
+      self.current_indent = indent
+      self.__str = nil
     end,
     __base = _base_0,
     __name = "Code"
@@ -289,17 +303,18 @@ do
         end
         gather_from(self)
       end
-      self:remove_free_vars(to_declare)
       if #to_declare > 0 then
+        self:remove_free_vars(unpack(to_declare))
         return self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
       end
     end,
-    stringify = function(self)
+    __tostring = function(self)
       if self.__str == nil then
-        local buff = { }
+        local buff, indents = { }, self.indents
         for i, b in ipairs(self.bits) do
-          if type(b) ~= 'string' then
-            b = b:stringify()
+          b = tostring(b)
+          if indents[i] then
+            b = b:gsub("\n", "\n" .. ((" "):rep(indents[i])))
           end
           buff[#buff + 1] = b
         end
@@ -307,51 +322,8 @@ do
       end
       return self.__str
     end,
-    __tostring = function(self)
-      if self.__str == nil then
-        local buff = { }
-        for i, b in ipairs(self.bits) do
-          buff[#buff + 1] = tostring(b)
-        end
-        self.__str = concat(buff, "")
-      end
-      return self.__str
-    end,
     __len = function(self)
-      local len = 0
-      local _list_0 = self.bits
-      for _index_0 = 1, #_list_0 do
-        local b = _list_0[_index_0]
-        len = len + #b
-      end
-      return len
-    end,
-    append = function(self, ...)
-      local n = select("#", ...)
-      local bits = self.bits
-      for i = 1, n do
-        local bit = select(i, ...)
-        bits[#bits + 1] = bit
-        if type(bit) ~= 'string' and not bit.is_value and #self.bits > 0 then
-          bits[#bits + 1] = "\n"
-        end
-      end
-      self.__str = nil
-    end,
-    prepend = function(self, ...)
-      local n = select("#", ...)
-      local bits = self.bits
-      local insert_index = 1
-      for i = 1, n do
-        local bit = select(i, ...)
-        insert(bits, insert_index, bit)
-        insert_index = insert_index + 1
-        if type(bit) ~= 'string' and not bit.is_value and insert_index < #self.bits + 1 then
-          insert(bits, insert_index, "\n")
-          insert_index = insert_index + 1
-        end
-      end
-      self.__str = nil
+      return #tostring(self)
     end,
     make_offset_table = function(self)
       local lua_to_nomsu, nomsu_to_lua = { }, { }
@@ -437,21 +409,21 @@ do
   local _parent_0 = Code
   local _base_0 = {
     __tostring = function(self)
-      local buff = { }
-      for i, b in ipairs(self.bits) do
-        buff[#buff + 1] = tostring(b)
+      if self.__str == nil then
+        local buff, indents = { }, self.indents
+        for i, b in ipairs(self.bits) do
+          b = tostring(b)
+          if indents[i] then
+            b = b:gsub("\n", "\n" .. ((" "):rep(indents[i])))
+          end
+          buff[#buff + 1] = b
+        end
+        self.__str = concat(buff, "")
       end
-      local ret = concat(buff, "")
-      return ret
+      return self.__str
     end,
     __len = function(self)
-      local len = 0
-      local _list_0 = self.bits
-      for _index_0 = 1, #_list_0 do
-        local b = _list_0[_index_0]
-        len = len + #b
-      end
-      return len
+      return #tostring(self)
     end
   }
   _base_0.__index = _base_0
