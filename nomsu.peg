@@ -64,13 +64,9 @@ inline_text_interpolation:
     )
 text_interpolation:
     inline_text_interpolation /
-    ("\" (
-        variable / inline_list / inline_dict / inline_text
-        / ("(" %ws* (inline_action / inline_expression) %ws* ")")
-        / (%ws* (block_comment / line_comment)? nodent "..")
-        / (indented_text %nl+ %nodent "..")
-        / ((indented_list / indented_block) nodent "..")
-    ))
+    ("\" 
+        (block_comment / line_comment / indented_text / indented_list / indented_block)?
+    nodent "..")
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 

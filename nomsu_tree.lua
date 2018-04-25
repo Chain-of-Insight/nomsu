@@ -9,10 +9,10 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local Lua, Location
+local Lua, Nomsu, Location
 do
   local _obj_0 = require("lua_obj")
-  Lua, Location = _obj_0.Lua, _obj_0.Location
+  Lua, Nomsu, Location = _obj_0.Lua, _obj_0.Nomsu, _obj_0.Location
 end
 local Types = { }
 Types.DictEntry = immutable({
@@ -35,7 +35,7 @@ Tree = function(name, methods)
     end
     methods.type = name
     methods.name = name
-    methods.as_nomsu = function(self)
+    methods.as_nomsuXXXX = function(self)
       local leading_space = 0
       local src_file = FILE_CACHE[self.source.filename]
       while src_file:sub(self.source.start - leading_space - 1, self.source.start - leading_space - 1) == " " do
@@ -438,9 +438,9 @@ Tree("Text", {
             if not (interp_nomsu) then
               return nil
             end
-            nomsu:append("\\\n    ", interp_nomsu)
+            nomsu:append("\\\n        ", interp_nomsu)
             if i < #self.value then
-              nomsu:append("\n..")
+              nomsu:append("\n    ..")
             end
           end
         end

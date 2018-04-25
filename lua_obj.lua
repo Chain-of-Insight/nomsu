@@ -424,6 +424,10 @@ do
     end,
     __len = function(self)
       return #tostring(self)
+    end,
+    parenthesize = function(self)
+      self:prepend("(")
+      return self:append(")")
     end
   }
   _base_0.__index = _base_0
