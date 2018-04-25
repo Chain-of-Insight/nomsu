@@ -1,5 +1,6 @@
 local utils = require('utils')
 local re = require('re')
+local lpeg = require('lpeg')
 local repr, stringify, min, max, equivalent, set, is_list, sum
 repr, stringify, min, max, equivalent, set, is_list, sum = utils.repr, utils.stringify, utils.min, utils.max, utils.equivalent, utils.set, utils.is_list, utils.sum
 local immutable = require('immutable')
@@ -63,7 +64,7 @@ Tree("File", {
       if not line_lua then
         error("No lua produced by " .. tostring(repr(line)), 0)
       end
-      if i < #self.value then
+      if i > 1 then
         lua:append("\n")
       end
       lua:convert_to_statements()
@@ -71,11 +72,38 @@ Tree("File", {
     end
     lua:declare_locals()
     return lua
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    if inline then
+      return nil
+    end
+    local nomsu = Nomsu(self.source)
+    for i, line in ipairs(self.value) do
+      nomsu:append(assert(line:as_nomsu(), "Could not convert line to nomsu: " .. tostring(line)))
+      if i < #self.value then
+        nomsu:append("\n")
+      end
+    end
+    return nomsu
   end
 })
 Tree("Nomsu", {
   as_lua = function(self, nomsu)
     return Lua.Value(self.source, "nomsu:parse(Nomsu(", repr(self.value.source), ", ", repr(tostring(self.value.source:get_text())), ")).value[1]")
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    local nomsu = self.value:as_nomsu(true)
+    if nomsu == nil and not inline then
+      nomsu = self.value:as_nomsu()
+      return nomsu and Nomsu(self.source, "\\:\n    ", nomsu)
+    end
+    return nomsu and Nomsu(self.source, "\\(", nomsu, ")")
   end
 })
 Tree("Block", {
@@ -86,13 +114,33 @@ Tree("Block", {
     local lua = Lua(self.source)
     for i, line in ipairs(self.value) do
       local line_lua = line:as_lua(nomsu)
-      if i < #self.value then
+      if i > 1 then
         lua:append("\n")
       end
       line_lua:convert_to_statements()
       lua:append(line_lua)
     end
     return lua
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    if inline then
+      if #self.value == 1 then
+        return self.value[1]:as_nomsu(true)
+      else
+        return nil
+      end
+    end
+    local nomsu = Nomsu(self.source)
+    for i, line in ipairs(self.value) do
+      nomsu:append(assert(line:as_nomsu(), "Could not convert line to nomsu: " .. tostring(line)))
+      if i < #self.value then
+        nomsu:append("\n")
+      end
+    end
+    return nomsu
   end
 })
 local math_expression = re.compile([[ "%" (" " [*/^+-] " %")+ ]])
@@ -228,6 +276,70 @@ Tree("Action", {
       end
     end
     return concat(bits, " ")
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    if inline then
+      local nomsu = Nomsu(self.source)
+      for i, bit in ipairs(self.value) do
+        if bit.type == "Word" then
+          if i > 1 then
+            nomsu:append(" ")
+          end
+          nomsu:append(bit.value)
+        else
+          local arg_nomsu = bit:as_nomsu(true)
+          if not (arg_nomsu) then
+            return nil
+          end
+          if not (i == 1) then
+            nomsu:append(" ")
+          end
+          if bit.type == "Action" then
+            arg_nomsu:parenthesize()
+          end
+          nomsu:append(arg_nomsu)
+        end
+      end
+      return nomsu
+    else
+      local inline_version = self:as_nomsu(true)
+      if inline_version and #inline_version <= 80 then
+        return inline_version
+      end
+      local nomsu = Nomsu(self.source)
+      local spacer = nil
+      for i, bit in ipairs(self.value) do
+        if spacer then
+          nomsu:append(spacer)
+        end
+        if bit.type == "Word" then
+          nomsu:append(bit.value)
+          spacer = " "
+        else
+          local arg_nomsu = bit:as_nomsu(true)
+          if arg_nomsu and #arg_nomsu < 80 then
+            if bit.type == "Action" then
+              arg_nomsu:parenthesize()
+            end
+            spacer = " "
+          else
+            arg_nomsu = bit:as_nomsu()
+            if not (nomsu) then
+              return nil
+            end
+            if bit.type == "Action" then
+              nomsu:append("\n    ", nomsu)
+            end
+            spacer = "\n.."
+          end
+          nomsu:append(arg_nomsu)
+        end
+      end
+      return nomsu
+    end
   end
 })
 Tree("Text", {
@@ -279,6 +391,62 @@ Tree("Text", {
       lua:parenthesize()
     end
     return lua
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    if inline then
+      local nomsu = Nomsu(self.source, '"')
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local bit = _list_0[_index_0]
+        if type(bit) == 'string' then
+          if bit:find("\n") then
+            return nil
+          end
+          nomsu:append((bit:gsub("\\", "\\\\"):gsub("\n", "\\n")))
+        else
+          local interp_nomsu = bit:as_nomsu(true)
+          if interp_nomsu then
+            if bit.type ~= "Word" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
+              interp_nomsu:parenthesize()
+            end
+            nomsu:append("\\", interp_nomsu)
+          else
+            return nil
+          end
+        end
+      end
+      nomsu:append('"')
+      if #nomsu > 80 then
+        return nil
+      end
+    else
+      local nomsu = Nomsu(self.source, '".."\n    ')
+      for i, bit in ipairs(self.value) do
+        if type(bit) == 'string' then
+          nomsu:append((bit:gsub("\\", "\\\\"):gsub("\n", "\n    ")))
+        else
+          if interp_nomsu then
+            if bit.type ~= "Word" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
+              interp_nomsu:parenthesize()
+            end
+            nomsu:append("\\", interp_nomsu)
+          else
+            local interp_nomsu = bit:as_nomsu()
+            if not (interp_nomsu) then
+              return nil
+            end
+            nomsu:append("\\\n    ", interp_nomsu)
+            if i < #self.value then
+              nomsu:append("\n..")
+            end
+          end
+        end
+      end
+      return nomsu
+    end
   end
 })
 Tree("List", {
@@ -292,8 +460,9 @@ Tree("List", {
         error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a list item, since it's not an expression.", 0)
       end
       lua:append(item_lua)
-      local newlines, last_line = tostring(item_lua):match("^(.-)([^\n]*)$")
-      if #newlines > 0 then
+      local item_string = tostring(item_lua)
+      local last_line = item_string:match("[^\n]*$")
+      if item_string:match("\n") then
         line_length = #last_line
       else
         line_length = line_length + #last_line
@@ -310,6 +479,56 @@ Tree("List", {
     end
     lua:append("}")
     return lua
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    if inline then
+      local nomsu = Nomsu(self.source, "[")
+      for i, item in ipairs(self.value) do
+        local item_nomsu = item:as_nomsu(true)
+        if not (item_nomsu) then
+          return nil
+        end
+        if i > 1 then
+          nomsu:append(", ")
+        end
+        nomsu:append(item_nomsu)
+      end
+      nomsu:append("]")
+      return nomsu
+    else
+      local nomsu = Nomsu(self.source, "[..]")
+      local line = Nomsu(self.source, "\n    ")
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local item = _list_0[_index_0]
+        local item_nomsu = item:as_nomsu(true)
+        if item_nomsu and #line + #", " + #item_nomsu <= 80 then
+          if #line.bits > 1 then
+            line:append(", ")
+          end
+          line:append(item_nomsu)
+        else
+          if not (item_nomsu) then
+            item_nomsu = item:as_nomsu()
+            if not (item_nomsu) then
+              return nil
+            end
+          end
+          if #line.bits > 1 then
+            nomsu:append(line)
+            line = Nomsu(bit.source, "\n    ")
+          end
+          line:append(item_nomsu)
+        end
+      end
+      if #line.bits > 1 then
+        nomsu:append(line)
+      end
+      return nomsu
+    end
   end
 })
 Tree("Dict", {
@@ -353,6 +572,70 @@ Tree("Dict", {
     end
     lua:append("}")
     return lua
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    if inline then
+      local nomsu = Nomsu(self.source, "{")
+      for i, entry in ipairs(self.value) do
+        local key_nomsu = entry.key:as_nomsu(true)
+        if not (key_nomsu) then
+          return nil
+        end
+        if entry.key.type == "Action" then
+          key_nomsu:parenthesize()
+        end
+        local value_nomsu = entry.value:as_nomsu(true)
+        if not (value_nomsu) then
+          return nil
+        end
+        if i > 1 then
+          nomsu:append(", ")
+        end
+        nomsu:append(key_nomsu, ":", value_nomsu)
+      end
+      nomsu:append("}")
+      return nomsu
+    else
+      local nomsu = Nomsu(self.source, "{..}")
+      local line = Nomsu(self.source, "\n    ")
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local entry = _list_0[_index_0]
+        local key_nomsu = entry.key:as_nomsu(true)
+        if not (key_nomsu) then
+          return nil
+        end
+        if entry.key.type == "Action" then
+          key_nomsu:parenthesize()
+        end
+        local value_nomsu = entry.value:as_nomsu(true)
+        if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= 80 then
+          if #line.bits > 1 then
+            line:append(", ")
+          end
+          line:append(key_nomsu, ":", value_nomsu)
+        else
+          if not (value_nomsu) then
+            value_nomsu = entry.value:as_nomsu()
+            if not (value_nomsu) then
+              return nil
+            end
+          end
+          if #line.bits > 1 then
+            nomsu:append(line)
+            line = Nomsu(bit.source, "\n    ")
+          end
+          line:append(key_nomsu, ":", value_nomsu)
+        end
+      end
+      if #line.bits > 1 then
+        nomsu:append(line)
+      end
+      return nomsu
+    end
   end
 })
 Tree("IndexChain", {
@@ -392,11 +675,34 @@ Tree("IndexChain", {
       end
     end
     return lua
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    local nomsu = Nomsu(self.source)
+    for i, bit in ipairs(self.value) do
+      if i > 1 then
+        nomsu:append(".")
+      end
+      local bit_nomsu = bit:as_nomsu(true)
+      if not (bit_nomsu) then
+        return nil
+      end
+      nomsu:append(bit_nomsu)
+    end
+    return nomsu
   end
 })
 Tree("Number", {
   as_lua = function(self, nomsu)
     return Lua.Value(self.source, tostring(self.value))
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    return Nomsu(self.source, tostring(self.value))
   end
 })
 Tree("Var", {
@@ -409,16 +715,41 @@ Tree("Var", {
       end
     end))
     return Lua.Value(self.source, lua_id)
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    return Nomsu(self.source, "%", self.value)
   end
 })
 Tree("Word", {
   as_lua = function(self, nomsu)
     return error("Attempt to convert Word to lua")
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    return Nomsu(self.source, self.value)
   end
 })
 Tree("Comment", {
   as_lua = function(self, nomsu)
     return Lua(self.source, "--" .. self.value:gsub("\n", "\n--") .. "\n")
+  end,
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = false
+    end
+    if inline then
+      return nil
+    end
+    if self.value:match("\n") then
+      return Nomsu(self.source, "#..", self.value:gsub("\n", "\n    "))
+    else
+      return Nomsu(self.source, "#", self.value)
+    end
   end
 })
 return Types

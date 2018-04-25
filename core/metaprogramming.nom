@@ -11,7 +11,13 @@ immediately:
             for i, action in ipairs(\%actions.value) do
                 stubs[i] = action:get_stub(true);
             end
-            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(tree");
+            stubs = repr(stubs);
+            if #stubs > 80 then
+                lua:append("\\n    ",stubs,",\\n    ");
+            else
+                lua:append(stubs,", ");
+            end
+            lua:append(repr(tree.source:get_line()), ", function(tree");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
@@ -40,7 +46,13 @@ immediately:
             for i, action in ipairs(\%actions.value) do
                 stubs[i] = action:get_stub(true);
             end
-            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(");
+            stubs = repr(stubs);
+            if #stubs > 80 then
+                lua:append("\\n    ",stubs,",\\n    ");
+            else
+                lua:append(stubs,", ");
+            end
+            lua:append(repr(tree.source:get_line()), ", function(");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
@@ -65,7 +77,13 @@ immediately:
             for i, action in ipairs(\%shorthand.value) do
                 stubs[i] = action:get_stub(true);
             end
-            lua:append(repr(stubs), ", ", repr(tree.source:get_line()), ", function(tree");
+            stubs = repr(stubs);
+            if #stubs > 80 then
+                lua:append("\\n    ",stubs,",\\n    ");
+            else
+                lua:append(stubs,", ");
+            end
+            lua:append(repr(tree.source:get_line()), ", function(tree");
             local args = {};
             for i,tok in ipairs(\%shorthand.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end

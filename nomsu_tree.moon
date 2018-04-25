@@ -278,8 +278,9 @@ Tree "List",
                 line, src = item.source\get_line!, item.source\get_text!
                 error "#{line}: Cannot use #{colored.yellow src} as a list item, since it's not an expression.", 0
             lua\append item_lua
-            newlines, last_line = tostring(item_lua)\match("^(.-)([^\n]*)$")
-            if #newlines > 0
+            item_string = tostring(item_lua)
+            last_line = item_string\match("[^\n]*$")
+            if item_string\match("\n")
                 line_length = #last_line
             else
                 line_length += #last_line

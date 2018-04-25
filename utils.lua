@@ -25,25 +25,6 @@ local function size(t)
     return n
 end
 
-local _quote_state = {}
-local max = math.max
-local _quote_patt = re.compile("(({'\n' / '\"' / \"'\" / '\\'}->mark_char) / (']' ({'='*}->mark_eq) (']' / !.)) / .)*",
-    {mark_char=function(q)
-        if q == "\n" or q == "\\" then
-            _quote_state["'"] = false
-            _quote_state['"'] = false
-            if _quote_state.min_eq == nil then
-                _quote_state.min_eq = 0
-            end
-        elseif q == "'" then
-            _quote_state["'"] = false
-        elseif q == '"' then
-            _quote_state['"'] = false
-        end
-    end,
-    mark_eq=function(eq)
-        _quote_state.min_eq = max(_quote_state.min_eq or 0, #eq+1)
-    end})
 local function repr(x, depth)
     -- Create a string representation of the object that is close to the lua code that will
     -- reproduce the object (similar to Python's "repr" function)
@@ -74,25 +55,8 @@ local function repr(x, depth)
         if x == "\n" then
             return "'\\n'"
         end
-        _quote_state = {}
-        _quote_patt:match(x)
-        if _quote_state["'"] ~= false then
-            return "\'" .. x .. "\'"
-        elseif _quote_state['"'] ~= false then
-            return "\"" .. x .. "\""
-        else
-            local eq = ("="):rep(_quote_state.min_eq or 0)
-            -- BEWARE!!!
-            -- Lua's parser and syntax are dumb, so Lua interprets x[[=[asdf]=]] as
-            -- a function call to x (i.e. x("=[asdf]=")), instead of indexing x
-            -- (i.e. x["asdf"]), which it obviously should be. This can be fixed by
-            -- slapping spaces or parens around the [=[asdf]=].
-            if x:sub(1, 1) == "\n" then
-                return "["..eq.."[\n"..x.."]"..eq.."]"
-            else
-                return "["..eq.."["..x.."]"..eq.."]"
-            end
-        end
+        local escaped = x:gsub("\\", "\\\\"):gsub("\n","\\n"):gsub('"', '\\"')
+        return '"'..escaped..'"'
     else
         return tostring(x)
     end
