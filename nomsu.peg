@@ -5,7 +5,7 @@ file (File):
         (%nl ignored_line)*
     (!. / (("" -> "Parse error") => error)?) |} -> Tuple
 
-shebang: "#!" [^%nl]* %nl
+shebang: "#!" [^%nl]* (!. / %nl)
 
 statement: action / expression
 

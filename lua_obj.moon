@@ -62,6 +62,7 @@ Source = immutable {"filename","start","stop"}, {
 
 class Code
     new: (@source, ...)=>
+        @indents = {}
         @bits = {...}
         if type(@source) == 'string'
             filename,start,stop = @source\match("^(.-)%[(%d+):(%d+)%]$")
@@ -72,31 +73,19 @@ class Code
             else
                 @source = Source(@source, 1, #self+1)
         assert(@source == nil or Source\is_instance(@source))
-        for b in *@bits
-            assert(not Source\is_instance(b))
-
-    clone: =>
-        cls = @__class
-        copy = cls(@source, unpack(@bits))
-        copy.is_value = @is_value
-        for k,v in pairs @free_vars
-            copy.free_vars[k] = v
-        return copy
-
-    __tostring: =>
-        buff = {}
+        indent = 0
         for i,b in ipairs @bits
-            buff[#buff+1] = tostring(b)
-        ret = concat(buff, "")
-        return ret
-
-    __len: =>
-        len = 0
-        for b in *@bits
-            len += #b
-        return len
-    
+            assert(not Source\is_instance(b))
+            if type(b) == 'string'
+                if spaces = b\match("\n([ ]*)[^\n]*$")
+                    indent = #spaces
+            elseif indent != 0
+                @indents[i] = indent
+        @current_indent = indent
+        @__str = nil
+            
     sub: (start,stop)=>
+        -- TODO: implement this better
         str = tostring(self)\sub(start,stop)
         cls = @__class
         return cls(@source\sub(start,stop), str)
@@ -105,15 +94,31 @@ class Code
         n = select("#",...)
         bits = @bits
         for i=1,n
-            bits[#bits+1] = select(i, ...)
+            b = select(i, ...)
+            bits[#bits+1] = b
+            if type(b) == 'string'
+                if spaces = b\match("\n([ ]*)[^\n]*$")
+                    @current_indent = #spaces
+            elseif @current_indent != 0
+                @indents[#bits] = @current_indent
+        @__str = nil
     
     prepend: (...)=>
         n = select("#",...)
-        bits = @bits
+        bits, indents = @bits, @indents
         for i=#bits+n,n+1,-1
             bits[i] = bits[i-n]
         for i=1,n
             bits[i] = select(i, ...)
+        @current_indent = 0
+        for i,b in ipairs(bits)
+            if type(b) == 'string'
+                if spaces = b\match("\n([ ]*)[^\n]*$")
+                    @current_indent = #spaces
+            elseif @current_indent != 0
+                indents[i] = @current_indent
+            else indents[i] = nil
+        @__str = nil
 
 class Lua extends Code
     new: (...)=>
@@ -181,56 +186,23 @@ class Lua extends Code
                     if bit.__class == Lua
                         gather_from bit
             gather_from self
-        @remove_free_vars to_declare
         if #to_declare > 0
+            @remove_free_vars unpack(to_declare)
             @prepend "local #{concat to_declare, ", "};\n"
 
-    stringify: =>
-        if @__str == nil
-            buff = {}
-            for i,b in ipairs @bits
-                if type(b) != 'string'
-                    b = b\stringify!
-                buff[#buff+1] = b
-            @__str = concat(buff, "")
-        return @__str
     __tostring: =>
         if @__str == nil
-            buff = {}
+            buff, indents = {}, @indents
             for i,b in ipairs @bits
-                buff[#buff+1] = tostring(b)
+                b = tostring(b)
+                if indents[i]
+                    b = b\gsub("\n", "\n"..((" ")\rep(indents[i])))
+                buff[#buff+1] = b
             @__str = concat(buff, "")
         return @__str
 
     __len: =>
-        len = 0
-        for b in *@bits
-            len += #b
-        return len
-
-    append: (...)=>
-        n = select("#",...)
-        bits = @bits
-        for i=1,n
-            bit = select(i, ...)
-            bits[#bits+1] = bit
-            if type(bit) != 'string' and not bit.is_value and #@bits > 0
-                bits[#bits+1] = "\n"
-        @__str = nil
-    
-    prepend: (...)=>
-        n = select("#",...)
-        bits = @bits
-        insert_index = 1
-        -- TODO: optimize?
-        for i=1,n
-            bit = select(i, ...)
-            insert bits, insert_index, bit
-            insert_index += 1
-            if type(bit) != 'string' and not bit.is_value and insert_index < #@bits + 1
-                insert bits, insert_index, "\n"
-                insert_index += 1
-        @__str = nil
+        #tostring(self)
 
     make_offset_table: =>
         -- Return a mapping from output (lua) character number to input (nomsu) character number
@@ -260,16 +232,17 @@ class Lua extends Code
 
 class Nomsu extends Code
     __tostring: =>
-        buff = {}
-        for i,b in ipairs @bits
-            buff[#buff+1] = tostring(b)
-        ret = concat(buff, "")
-        return ret
+        if @__str == nil
+            buff, indents = {}, @indents
+            for i,b in ipairs @bits
+                b = tostring(b)
+                if indents[i]
+                    b = b\gsub("\n", "\n"..((" ")\rep(indents[i])))
+                buff[#buff+1] = b
+            @__str = concat(buff, "")
+        return @__str
 
     __len: =>
-        len = 0
-        for b in *@bits
-            len += #b
-        return len
+        #tostring(self)
 
 return {:Code, :Nomsu, :Lua, :Source}

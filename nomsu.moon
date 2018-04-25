@@ -365,7 +365,7 @@ class NomsuCompiler
 
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
-        lua_string = lua\stringify!
+        lua_string = tostring(lua)
         --metadata = lua\make_offset_table!
         --LUA_METADATA[metadata.lua_filename] = metadata
         if rawget(FILE_CACHE, lua.source.filename) == nil
@@ -390,238 +390,8 @@ class NomsuCompiler
         lua = Lua(tree.source, "return ",@tree_to_lua(tree),";")
         return @run_lua(lua)
 
-    tree_to_nomsu: (tree, indentation="", max_line=80, expr_type=nil)=>
-        -- Convert a tree into nomsu code that satisfies the max line requirement or nil
-        -- if that's not possible
-        -- expr_type is either:
-        --   nil for code that goes at the top level and can contain anything
-        --   "noeol" for code that can contain anything except an end-of-line component
-        --       like a colon (i.e. it already occurs after a colon on the same line)
-        --   "inline" for code that cannot contain indented code or an end-of-line component
-        --       e.g. code that is meant to go inside parentheses
-        assert tree, "No tree provided to tree_to_nomsu."
-        assert Types.is_node(tree), "Invalid tree: #{repr(tree)}"
-        join_lines = (lines)->
-            for line in *lines
-                if #indentation + #line > max_line
-                    return nil
-            return concat(lines, "\n"..indentation)
-
-        is_operator = (tok)-> tok and tok.type == "Word" and NOMSU_DEFS.operator\match(tok.value)
-
-        local inline_expression, noeol_expression, expression
-        inline_expression = (tok)->
-            switch tok.type
-                when "Block"
-                    if #tok.value > 1 then return nil
-                    nomsu = inline_expression tok.value
-                    return nomsu and "(: #{nomsu})"
-                when "Action"
-                    buff = ""
-                    for i,bit in ipairs tok.value
-                        if bit.type == "Word"
-                            if i == 1 or (is_operator(bit) and is_operator(tok.value[i-1]))
-                                buff ..= bit.value
-                            else buff ..= " "..bit.value
-                        else
-                            nomsu = inline_expression bit
-                            return nil unless nomsu
-                            unless i == 1 or bit.type == "Block"
-                                buff ..= " "
-                            buff ..= if bit.type == "Action"
-                                "("..nomsu..")"
-                            else nomsu
-                    return buff
-                when "IndexChain"
-                    bits = {}
-                    for bit in *tok.value
-                        nomsu = inline_expression bit
-                        return nil unless nomsu
-                        insert bits, nomsu
-                    return concat(bits, ".")
-                when "List"
-                    bits = {}
-                    for bit in *tok.value
-                        nomsu = inline_expression bit
-                        return nil unless nomsu
-                        insert bits, nomsu
-                    return "["..concat(bits, ", ").."]"
-                when "Dict"
-                    bits = {}
-                    for bit in *tok.value
-                        key_nomsu = if bit.key.type == "Word"
-                            bit.key.value
-                        else inline_expression bit.key
-                        return nil unless key_nomsu
-                        if bit.key.type == "Action"
-                            key_nomsu = "("..key_nomsu..")"
-                        value_nomsu = inline_expression bit.value
-                        return nil unless value_nomsu
-                        insert bits, key_nomsu.."="..value_nomsu
-                    return "{"..concat(bits, ", ").."}"
-                when "Text"
-                    buff = '"'
-                    for bit in *tok.value
-                        if type(bit) == 'string'
-                            -- Force indented text
-                            return nil if bit\find("\n")
-                            buff ..= bit\gsub("\\","\\\\")\gsub("\n","\\n")
-                        else
-                            nomsu = inline_expression(bit)
-                            return nil unless nomsu
-                            buff ..= if bit.type == "Var" or bit.type == "List" or bit.type == "Dict"
-                                "\\"..nomsu
-                            else "\\("..nomsu..")"
-                        if #buff > max_line then return nil
-                    return buff..'"'
-                when "Nomsu"
-                    nomsu = inline_expression(tok.value)
-                    return nil if not nomsu
-                    return "\\("..nomsu..")"
-                when "Number" then tostring(tok.value)
-                when "Var" then "%"..tok.value
-                else return nil
-
-        noeol_expression = (tok)->
-            nomsu = inline_expression(tok)
-            if nomsu and #nomsu < max_line
-                return nomsu
-            switch tok.type
-                when "Block"
-                    buff = ":"
-                    for line in *tok.value
-                        nomsu = expression(line)
-                        return nil unless nomsu
-                        buff ..= "\n    "..@indent(nomsu)
-                    return buff
-                when "Action"
-                    nomsu = expression(tok)
-                    return nil unless nomsu
-                    return "(..)\n    "..@indent(nomsu)
-                when "IndexChain"
-                    return nil
-                when "List"
-                    buff = "[..]"
-                    line = "\n    "
-                    for bit in *tok.value
-                        nomsu = inline_expression bit
-                        if line != "\n    " and #line + #", " + #nomsu > max_line
-                            buff ..= line
-                            line = "\n    "
-                        sep = line == "\n    " and "" or ", "
-                        if nomsu
-                            line ..= sep..nomsu
-                            if #line >= max_line
-                                buff ..= line
-                                line = "\n    "
-                        else
-                            line ..= sep..expression(bit)
-                            buff ..= line
-                            line = "\n    "
-                    if line ~= "\n    "
-                        buff ..= line
-                    return buff
-                when "Dict"
-                    buff = "{..}"
-                    line = "\n    "
-                    for bit in *tok.value
-                        key_nomsu = inline_expression bit.key
-                        return nil unless key_nomsu
-                        if bit.key.type == "Action"
-                            key_nomsu = "("..key_nomsu..")"
-                        value_nomsu = inline_expression bit.value
-                        if value_nomsu and #key_nomsu + #value_nomsu < max_line
-                            line ..= key_nomsu.."="..value_nomsu..","
-                            if #line >= max_line
-                                buff ..= line
-                                line = "\n    "
-                        else
-                            line ..= key_nomsu.."="..expression(bit.value)
-                            buff ..= line
-                            line = "\n    "
-                    if line ~= "\n    "
-                        buff ..= line
-                    return buff
-                when "Text"
-                    buff = '".."\n    '
-                    for bit in *tok.value
-                        if type(bit) == 'string'
-                            buff ..= bit\gsub("\\","\\\\")\gsub("\n","\n    ")
-                        else
-                            nomsu = inline_expression(bit)
-                            return nil unless nomsu
-                            buff ..= if bit.type == "Var" or bit.type == "List" or bit.type == "Dict"
-                                "\\"..nomsu
-                            else "\\("..nomsu..")"
-                    return buff
-                when "Nomsu"
-                    nomsu = expression(tok.value)
-                    return nil if not nomsu
-                    return "\\(..)\n    "..@indent(nomsu)
-                when "Comment"
-                    if tok.value\find("\n")
-                        return "#.."..tok.value\gsub("\n","\n    ")
-                    else
-                        return "#"..tok.value
-                else return inline_expression(tok)
-
-        expression = (tok)->
-            nomsu = inline_expression(tok)
-            if nomsu and #nomsu < max_line
-                return nomsu
-            switch tok.type
-                when "Block"
-                    if #tok.value == 1
-                        nomsu = if tok.value[1].type == "Action"
-                            inline_expression(tok.value[1])
-                        else
-                            noeol_expression(tok.value[1])
-                        if nomsu and #(nomsu\match("[^\n]*")) < max_line
-                            return ": "..nomsu
-                    return noeol_expression(tok)
-                when "Action"
-                    -- The hard task
-                    buff = ""
-                    for i,bit in ipairs tok.value
-                        if bit.type == "Word"
-                            if i == 1 or (is_operator(bit) and is_operator(tok.value[i-1])) or buff\sub(-2,-1) == ".."
-                                buff ..= bit.value
-                            else
-                                buff ..= " "..bit.value
-                        else
-                            nomsu = inline_expression(bit)
-                            if nomsu and #nomsu < max_line
-                                if bit.type == "Action"
-                                    nomsu = "("..nomsu..")"
-                            else
-                                nomsu = expression(bit)
-                                return nil unless nomsu
-                                if bit.type == "Action"
-                                    nomsu = "(..)\n    "..@indent(nomsu)
-                                if i < #tok.value
-                                    nomsu ..= "\n.."
-                            unless i == 1 or bit.type == "Block"
-                                buff ..= " "
-                            buff ..= nomsu
-                    return buff
-                when "File"
-                    lines = {}
-                    for line in *tree.value
-                        nomsu = expression(line)
-                        unless nomsu
-                            error "Failed to produce output for:\n#{colored.yellow line.source\get_text!}", 0
-                        
-                        insert lines, nomsu
-                    return concat lines, "\n"
-                when "Comment"
-                    if tok.value\find("\n")
-                        return "#.."..tok.value\gsub("\n","\n    ")
-                    else
-                        return "#"..tok.value
-                else return noeol_expression(tok)
-
-        return expression(tree)
-
+    tree_to_nomsu: (tree)=>
+        return tree\as_nomsu!
 
     value_to_nomsu: (value)=>
         switch type(value)
@@ -739,7 +509,7 @@ class NomsuCompiler
     tree_with_replaced_vars: (tree, replacements)=>
         return @tree_map tree, (t)->
             if t.type == "Var"
-                id = t\as_lua(self)\stringify!
+                id = tostring(t\as_lua(self))
                 if replacements[id] != nil
                     return replacements[id]
 
@@ -801,7 +571,7 @@ class NomsuCompiler
             lua\convert_to_statements!
             lua\declare_locals!
             nomsu\run_lua(lua)
-            return Lua(@source, "if IMMEDIATE then\n", lua, "\nend")
+            return Lua(@source, "if IMMEDIATE then\n    ", lua, "\nend")
 
         add_lua_bits = (lua, code)->
             if code.type != "Text"
@@ -845,7 +615,7 @@ class NomsuCompiler
         @define_compile_action "lua> %code", get_line_no!, (_code)=>
             if _code.type != "Text"
                 return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
-                    ", ",repr(nomsu\tree_to_lua(_code)\stringify!),"))"
+                    ", ",repr(tostring(nomsu\tree_to_lua(_code))),"))"
 
             lua = Lua(_code.source)
             for bit in *_code.value
@@ -862,7 +632,7 @@ class NomsuCompiler
         @define_compile_action "=lua %code", get_line_no!, (_code)=>
             if _code.type != "Text"
                 return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
-                    ", ",repr(nomsu\tree_to_lua(_code)\stringify!),"))"
+                    ", ",repr(tostring(nomsu\tree_to_lua(_code))),"))"
 
             lua = Lua.Value(@source)
             for bit in *_code.value
@@ -954,10 +724,10 @@ if arg and debug_getinfo(2).func != require
             if args.flags["-p"]
                 nomsu.environment.print = ->
                 compile_fn = (code)->
-                    io.output!\write("local IMMEDIATE = true;\n"..(code\stringify!))
+                    io.output!\write("local IMMEDIATE = true;\n"..tostring(code))
             elseif args.output
                 compile_fn = (code)->
-                    io.open(args.output, 'w')\write("local IMMEDIATE = true;\n"..(code\stringify!))
+                    io.open(args.output, 'w')\write("local IMMEDIATE = true;\n"..tostring(code))
 
             if args.input\match(".*%.lua")
                 dofile(args.input)(nomsu, {})
