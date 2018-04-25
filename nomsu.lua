@@ -1133,6 +1133,6 @@ if arg and debug_getinfo(2).func ~= require then
     end
     return os.exit(false, true)
   end
-  xpcall(run, err_hand)
+  require('ldt').guard(run)
 end
 return NomsuCompiler

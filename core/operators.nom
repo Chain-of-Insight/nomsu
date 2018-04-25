@@ -26,7 +26,7 @@ immediately:
     compile [%a is %b, %a = %b, %a == %b] to:
         lua> ".."
             local safe = {Text=true, Number=true};
-            local a_lua, b_lua = nomsu:tree_to_lua(\%a), nomsu:tree_to_lua(\%b);
+            local a_lua, b_lua = \%a:as_lua(nomsu), \%b:as_lua(nomsu);
             if safe[\%a.type] or safe[\%b.type] then
                 return Lua.Value(tree.source, "(", a_lua, " == ", b_lua, ")");
             else
@@ -35,7 +35,7 @@ immediately:
     compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to:
         lua> ".."
             local safe = {Text=true, Number=true};
-            local a_lua, b_lua = nomsu:tree_to_lua(\%a), nomsu:tree_to_lua(\%b);
+            local a_lua, b_lua = \%a:as_lua(nomsu), \%b:as_lua(nomsu);
             if safe[\%a.type] or safe[\%b.type] then
                 return Lua.Value(tree.source, "(", a_lua, " ~= ", b_lua, ")");
             else
@@ -47,9 +47,9 @@ immediately:
 # Variable assignment operator
 immediately:
     compile [%var <- %value] to:
-        lua> "local \%var_lua = nomsu:tree_to_lua(\%var);"
+        lua> "local \%var_lua = \%var:as_lua(nomsu);"
         assume %var_lua.is_value or barf "Invalid target for assignment: \(%var's source code)"
-        lua> "local \%value_lua = nomsu:tree_to_lua(\%value);"
+        lua> "local \%value_lua = \%value:as_lua(nomsu);"
         assume %value_lua.is_value or barf "Invalid value for assignment: \(%value's source code)"
         lua> ".."
             local lua = Lua(tree.source, \%var_lua, ' = ', \%value_lua, ';');
@@ -67,9 +67,9 @@ immediately:
             local lhs, rhs = Lua(tree.source), Lua(\%assignments.source);
             for i, item in ipairs(\%assignments.value) do
                 local target, value = item.key, item.value;
-                local target_lua = nomsu:tree_to_lua(target);
+                local target_lua = target:as_lua(nomsu);
                 if not target_lua.is_value then error("Invalid target for assignment: "..target:get_src()); end
-                local value_lua = nomsu:tree_to_lua(value);
+                local value_lua = value:as_lua(nomsu);
                 if not value_lua.is_value then error("Invalid value for assignment: "..value:get_src()); end
                 if target.type == "Var" then
                     lhs:add_free_vars(target);
@@ -106,8 +106,8 @@ immediately:
                 if not target.type == "Var" then
                     error("Invalid target for 'with' assignment: "..tostring(target.source:get_text()));
                 end
-                local target_lua = nomsu:tree_to_lua(target);
-                local value_lua = nomsu:tree_to_lua(value);
+                local target_lua = target:as_lua(nomsu);
+                local value_lua = value:as_lua(nomsu);
                 if not value_lua.is_value then
                     error("Invalid value for assignment: "..tostring(value.source:get_text()));
                 end

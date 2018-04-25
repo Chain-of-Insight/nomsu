@@ -49,7 +49,7 @@ lua> ".."
             local reset = "'"..colors["reset color"].."'";
             nomsu:define_compile_action(name, \(!! code location !!), function(tree) return Lua.Value(tree.source, color); end);
             nomsu:define_compile_action(name.." %", \(!! code location !!), function(\%)
-                return Lua.Value(tree.source, color, "..", nomsu:tree_to_lua(\%), "..", reset);
+                return Lua.Value(tree.source, color, "..", \%:as_lua(nomsu), "..", reset);
             end);
         end
     end

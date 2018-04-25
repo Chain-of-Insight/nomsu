@@ -6,7 +6,7 @@ lpeg = require 'lpeg'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 immutable = require 'immutable'
 {:insert, :remove, :concat} = table
-{:Lua, :Location} = require "lua_obj"
+{:Lua, :Nomsu, :Location} = require "lua_obj"
 
 
 Types = {}
@@ -21,7 +21,7 @@ Tree = (name, methods)->
         .with_value = (value)=> getmetatable(self)(value, @source)
         .type = name
         .name = name
-        .as_nomsu = =>
+        .original_nomsu = =>
             leading_space = 0
             src_file = FILE_CACHE[@source.filename]
             while src_file\sub(@source.start-leading_space-1, @source.start-leading_space-1) == " "
@@ -54,7 +54,8 @@ Tree "File",
         return nil if inline
         nomsu = Nomsu(@source)
         for i, line in ipairs @value
-            nomsu\append assert(line\as_nomsu!, "Could not convert line to nomsu: #{line}")
+            line = assert(line\as_nomsu!, "Could not convert line to nomsu")
+            nomsu\append line
             if i < #@value
                 nomsu\append "\n"
         return nomsu
@@ -84,13 +85,13 @@ Tree "Block",
         return lua
 
     as_nomsu: (inline=false)=>
-        if inline
-            if #@value == 1
-                return @value[1]\as_nomsu(true)
-            else return nil
+        if #@value == 1
+            return @value[1]\as_nomsu(inline)
+        return nil if inline
         nomsu = Nomsu(@source)
         for i, line in ipairs @value
-            nomsu\append assert(line\as_nomsu!, "Could not convert line to nomsu: #{line}")
+            line = assert(line\as_nomsu!, "Could not convert line to nomsu")
+            nomsu\append line
             if i < #@value
                 nomsu\append "\n"
         return nomsu
@@ -170,7 +171,7 @@ Tree "Action",
                     return nil unless arg_nomsu
                     unless i == 1
                         nomsu\append " "
-                    if bit.type == "Action"
+                    if bit.type == "Action" or bit.type == "Block"
                         arg_nomsu\parenthesize!
                     nomsu\append arg_nomsu
             return nomsu
@@ -190,14 +191,14 @@ Tree "Action",
                 else
                     arg_nomsu = bit\as_nomsu(true)
                     if arg_nomsu and #arg_nomsu < 80
-                        if bit.type == "Action"
+                        if bit.type == "Action" or bit.type == "Block"
                             arg_nomsu\parenthesize!
                         spacer = " "
                     else
                         arg_nomsu = bit\as_nomsu!
                         return nil unless nomsu
-                        if bit.type == "Action"
-                            nomsu\append "\n    ", nomsu
+                        if bit.type == "Action" or bit.type == "Block"
+                            nomsu\append "\n    "
                         spacer = "\n.."
                     nomsu\append arg_nomsu
             return nomsu
@@ -249,13 +250,17 @@ Tree "Text",
                         nomsu\append "\\", interp_nomsu
                     else return nil
             nomsu\append '"'
-            if #nomsu > 80 then return nil
+            return nomsu
         else
+            inline_version = @as_nomsu(true)
+            if inline_version and #inline_version <= 80
+                return inline_version
             nomsu = Nomsu(@source, '".."\n    ')
             for i, bit in ipairs @value
                 if type(bit) == 'string'
                     nomsu\append (bit\gsub("\\","\\\\")\gsub("\n","\n    "))
                 else
+                    interp_nomsu = bit\as_nomsu(true)
                     if interp_nomsu
                         if bit.type != "Word" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
                             interp_nomsu\parenthesize!
@@ -263,9 +268,9 @@ Tree "Text",
                     else
                         interp_nomsu = bit\as_nomsu!
                         return nil unless interp_nomsu
-                        nomsu\append "\\\n    ", interp_nomsu
+                        nomsu\append "\\\n        ", interp_nomsu
                         if i < #@value
-                            nomsu\append "\n.."
+                            nomsu\append "\n    .."
             return nomsu
 
 Tree "List",
@@ -306,6 +311,9 @@ Tree "List",
             nomsu\append "]"
             return nomsu
         else
+            inline_version = @as_nomsu(true)
+            if inline_version and #inline_version <= 80
+                return inline_version
             nomsu = Nomsu(@source, "[..]")
             line = Nomsu(@source, "\n    ")
             for item in *@value
@@ -320,7 +328,7 @@ Tree "List",
                         return nil unless item_nomsu
                     if #line.bits > 1
                         nomsu\append line
-                        line = Nomsu(bit.source, "\n    ")
+                        line = Nomsu(item.source, "\n    ")
                     line\append item_nomsu
             if #line.bits > 1
                 nomsu\append line
@@ -372,7 +380,7 @@ Tree "Dict",
             for i, entry in ipairs @value
                 key_nomsu = entry.key\as_nomsu(true)
                 return nil unless key_nomsu
-                if entry.key.type == "Action"
+                if entry.key.type == "Action" or entry.key.type == "Block"
                     key_nomsu\parenthesize!
                 value_nomsu = entry.value\as_nomsu(true)
                 return nil unless value_nomsu
@@ -382,12 +390,14 @@ Tree "Dict",
             nomsu\append "}"
             return nomsu
         else
+            inline_version = @as_nomsu(true)
+            if inline_version then return inline_version
             nomsu = Nomsu(@source, "{..}")
             line = Nomsu(@source, "\n    ")
             for entry in *@value
                 key_nomsu = entry.key\as_nomsu(true)
                 return nil unless key_nomsu
-                if entry.key.type == "Action"
+                if entry.key.type == "Action" or entry.key.type == "Block"
                     key_nomsu\parenthesize!
                 value_nomsu = entry.value\as_nomsu(true)
                 if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= 80

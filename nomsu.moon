@@ -317,7 +317,7 @@ class NomsuCompiler
         tree = @parse(nomsu_code)
         assert tree, "Failed to parse: #{nomsu_code}"
         assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
-        lua = @tree_to_lua(tree)
+        lua = tree\as_lua(@)
         lua\convert_to_statements!
         lua\declare_locals!
         lua\prepend "-- File: #{nomsu_code.source or ""}\n"
@@ -387,11 +387,8 @@ class NomsuCompiler
         -- Special case for text literals
         if tree.type == 'Text' and #tree.value == 1 and type(tree.value[1]) == 'string'
             return tree.value[1]
-        lua = Lua(tree.source, "return ",@tree_to_lua(tree),";")
+        lua = Lua(tree.source, "return ",tree\as_lua(@),";")
         return @run_lua(lua)
-
-    tree_to_nomsu: (tree)=>
-        return tree\as_nomsu!
 
     value_to_nomsu: (value)=>
         switch type(value)
@@ -417,9 +414,6 @@ class NomsuCompiler
                     return '".."\n    '..(@indent value)
             else
                 error("Unsupported value_to_nomsu type: #{type(value)}", 0)
-
-    tree_to_lua: (tree)=>
-        return tree\as_lua(self)
 
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
@@ -567,7 +561,7 @@ class NomsuCompiler
         get_line_no = -> "nomsu.moon:#{debug_getinfo(2).currentline}"
         nomsu = self
         @define_compile_action "immediately %block", get_line_no!, (_block)=>
-            lua = nomsu\tree_to_lua(_block)
+            lua = _block\as_lua(nomsu)
             lua\convert_to_statements!
             lua\declare_locals!
             nomsu\run_lua(lua)
@@ -582,7 +576,7 @@ class NomsuCompiler
                 if type(bit) == "string"
                     lua\append repr(bit)
                 else
-                    bit_lua = nomsu\tree_to_lua bit
+                    bit_lua = bit\as_lua(nomsu)
                     unless bit_lua.is_value
                         line, src = bit.source\get_line!, bit.source\get_text!
                         error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression."
@@ -615,14 +609,14 @@ class NomsuCompiler
         @define_compile_action "lua> %code", get_line_no!, (_code)=>
             if _code.type != "Text"
                 return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
-                    ", ",repr(tostring(nomsu\tree_to_lua(_code))),"))"
+                    ", ",repr(tostring(_code\as_lua(nomsu))),"))"
 
             lua = Lua(_code.source)
             for bit in *_code.value
                 if type(bit) == "string"
                     lua\append bit
                 else
-                    bit_lua = nomsu\tree_to_lua bit
+                    bit_lua = bit\as_lua(nomsu)
                     unless bit_lua.is_value
                         line, src = bit.source\get_line!, bit.source\get_text!
                         error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
@@ -632,14 +626,14 @@ class NomsuCompiler
         @define_compile_action "=lua %code", get_line_no!, (_code)=>
             if _code.type != "Text"
                 return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
-                    ", ",repr(tostring(nomsu\tree_to_lua(_code))),"))"
+                    ", ",repr(tostring(_code\as_lua(nomsu))),"))"
 
             lua = Lua.Value(@source)
             for bit in *_code.value
                 if type(bit) == "string"
                     lua\append bit
                 else
-                    bit_lua = nomsu\tree_to_lua bit
+                    bit_lua = bit\as_lua(nomsu)
                     unless lua.is_value
                         line, src = bit.source\get_line!, bit.source\get_text!
                         error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
@@ -819,8 +813,8 @@ if arg and debug_getinfo(2).func != require
 
     --ProFi = require 'ProFi'
     --ProFi\start()
-    --require('ldt').guard run
-    xpcall(run, err_hand)
+    require('ldt').guard run
+    --xpcall(run, err_hand)
     --ProFi\stop()
     --ProFi\writeReport( 'MyProfilingReport.txt' )
 

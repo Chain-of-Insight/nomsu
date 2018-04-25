@@ -95,6 +95,7 @@ class Code
         bits = @bits
         for i=1,n
             b = select(i, ...)
+            assert(b != self, "No recursion please.")
             bits[#bits+1] = b
             if type(b) == 'string'
                 if spaces = b\match("\n([ ]*)[^\n]*$")
@@ -112,6 +113,7 @@ class Code
             bits[i] = select(i, ...)
         @current_indent = 0
         for i,b in ipairs(bits)
+            assert(b != self, "No recursion please.")
             if type(b) == 'string'
                 if spaces = b\match("\n([ ]*)[^\n]*$")
                     @current_indent = #spaces
@@ -244,5 +246,9 @@ class Nomsu extends Code
 
     __len: =>
         #tostring(self)
+
+    parenthesize: =>
+        @prepend "("
+        @append ")"
 
 return {:Code, :Nomsu, :Lua, :Source}

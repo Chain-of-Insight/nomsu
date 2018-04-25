@@ -35,7 +35,7 @@ Tree = function(name, methods)
     end
     methods.type = name
     methods.name = name
-    methods.as_nomsuXXXX = function(self)
+    methods.original_nomsu = function(self)
       local leading_space = 0
       local src_file = FILE_CACHE[self.source.filename]
       while src_file:sub(self.source.start - leading_space - 1, self.source.start - leading_space - 1) == " " do
@@ -82,7 +82,8 @@ Tree("File", {
     end
     local nomsu = Nomsu(self.source)
     for i, line in ipairs(self.value) do
-      nomsu:append(assert(line:as_nomsu(), "Could not convert line to nomsu: " .. tostring(line)))
+      line = assert(line:as_nomsu(), "Could not convert line to nomsu")
+      nomsu:append(line)
       if i < #self.value then
         nomsu:append("\n")
       end
@@ -126,16 +127,16 @@ Tree("Block", {
     if inline == nil then
       inline = false
     end
+    if #self.value == 1 then
+      return self.value[1]:as_nomsu(inline)
+    end
     if inline then
-      if #self.value == 1 then
-        return self.value[1]:as_nomsu(true)
-      else
-        return nil
-      end
+      return nil
     end
     local nomsu = Nomsu(self.source)
     for i, line in ipairs(self.value) do
-      nomsu:append(assert(line:as_nomsu(), "Could not convert line to nomsu: " .. tostring(line)))
+      line = assert(line:as_nomsu(), "Could not convert line to nomsu")
+      nomsu:append(line)
       if i < #self.value then
         nomsu:append("\n")
       end
@@ -297,7 +298,7 @@ Tree("Action", {
           if not (i == 1) then
             nomsu:append(" ")
           end
-          if bit.type == "Action" then
+          if bit.type == "Action" or bit.type == "Block" then
             arg_nomsu:parenthesize()
           end
           nomsu:append(arg_nomsu)
@@ -321,7 +322,7 @@ Tree("Action", {
         else
           local arg_nomsu = bit:as_nomsu(true)
           if arg_nomsu and #arg_nomsu < 80 then
-            if bit.type == "Action" then
+            if bit.type == "Action" or bit.type == "Block" then
               arg_nomsu:parenthesize()
             end
             spacer = " "
@@ -330,8 +331,8 @@ Tree("Action", {
             if not (nomsu) then
               return nil
             end
-            if bit.type == "Action" then
-              nomsu:append("\n    ", nomsu)
+            if bit.type == "Action" or bit.type == "Block" then
+              nomsu:append("\n    ")
             end
             spacer = "\n.."
           end
@@ -419,22 +420,25 @@ Tree("Text", {
         end
       end
       nomsu:append('"')
-      if #nomsu > 80 then
-        return nil
-      end
+      return nomsu
     else
+      local inline_version = self:as_nomsu(true)
+      if inline_version and #inline_version <= 80 then
+        return inline_version
+      end
       local nomsu = Nomsu(self.source, '".."\n    ')
       for i, bit in ipairs(self.value) do
         if type(bit) == 'string' then
           nomsu:append((bit:gsub("\\", "\\\\"):gsub("\n", "\n    ")))
         else
+          local interp_nomsu = bit:as_nomsu(true)
           if interp_nomsu then
             if bit.type ~= "Word" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
               interp_nomsu:parenthesize()
             end
             nomsu:append("\\", interp_nomsu)
           else
-            local interp_nomsu = bit:as_nomsu()
+            interp_nomsu = bit:as_nomsu()
             if not (interp_nomsu) then
               return nil
             end
@@ -499,6 +503,10 @@ Tree("List", {
       nomsu:append("]")
       return nomsu
     else
+      local inline_version = self:as_nomsu(true)
+      if inline_version and #inline_version <= 80 then
+        return inline_version
+      end
       local nomsu = Nomsu(self.source, "[..]")
       local line = Nomsu(self.source, "\n    ")
       local _list_0 = self.value
@@ -519,7 +527,7 @@ Tree("List", {
           end
           if #line.bits > 1 then
             nomsu:append(line)
-            line = Nomsu(bit.source, "\n    ")
+            line = Nomsu(item.source, "\n    ")
           end
           line:append(item_nomsu)
         end
@@ -584,7 +592,7 @@ Tree("Dict", {
         if not (key_nomsu) then
           return nil
         end
-        if entry.key.type == "Action" then
+        if entry.key.type == "Action" or entry.key.type == "Block" then
           key_nomsu:parenthesize()
         end
         local value_nomsu = entry.value:as_nomsu(true)
@@ -599,6 +607,10 @@ Tree("Dict", {
       nomsu:append("}")
       return nomsu
     else
+      local inline_version = self:as_nomsu(true)
+      if inline_version then
+        return inline_version
+      end
       local nomsu = Nomsu(self.source, "{..}")
       local line = Nomsu(self.source, "\n    ")
       local _list_0 = self.value
@@ -608,7 +620,7 @@ Tree("Dict", {
         if not (key_nomsu) then
           return nil
         end
-        if entry.key.type == "Action" then
+        if entry.key.type == "Action" or entry.key.type == "Block" then
           key_nomsu:parenthesize()
         end
         local value_nomsu = entry.value:as_nomsu(true)

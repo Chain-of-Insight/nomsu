@@ -104,6 +104,7 @@ do
       local bits = self.bits
       for i = 1, n do
         local b = select(i, ...)
+        assert(b ~= self, "No recursion please.")
         bits[#bits + 1] = b
         if type(b) == 'string' then
           do
@@ -129,6 +130,7 @@ do
       end
       self.current_indent = 0
       for i, b in ipairs(bits) do
+        assert(b ~= self, "No recursion please.")
         if type(b) == 'string' then
           do
             local spaces = b:match("\n([ ]*)[^\n]*$")
