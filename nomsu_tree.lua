@@ -11,7 +11,7 @@ do
 end
 local Lua, Nomsu, Location
 do
-  local _obj_0 = require("lua_obj")
+  local _obj_0 = require("code_obj")
   Lua, Nomsu, Location = _obj_0.Lua, _obj_0.Nomsu, _obj_0.Location
 end
 local MAX_LINE = 80

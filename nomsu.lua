@@ -32,7 +32,7 @@ end
 local debug_getinfo = debug.getinfo
 local Nomsu, Lua, Source
 do
-  local _obj_0 = require("lua_obj")
+  local _obj_0 = require("code_obj")
   Nomsu, Lua, Source = _obj_0.Nomsu, _obj_0.Lua, _obj_0.Source
 end
 FILE_CACHE = setmetatable({ }, {

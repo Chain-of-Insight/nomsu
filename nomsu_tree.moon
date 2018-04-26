@@ -6,7 +6,7 @@ lpeg = require 'lpeg'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 immutable = require 'immutable'
 {:insert, :remove, :concat} = table
-{:Lua, :Nomsu, :Location} = require "lua_obj"
+{:Lua, :Nomsu, :Location} = require "code_obj"
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 

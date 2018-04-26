@@ -26,7 +26,7 @@ export colored
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 debug_getinfo = debug.getinfo
-{:Nomsu, :Lua, :Source} = require "lua_obj"
+{:Nomsu, :Lua, :Source} = require "code_obj"
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
