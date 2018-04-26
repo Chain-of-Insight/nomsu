@@ -97,8 +97,7 @@ immediately
                 local template = nomsu:parse(Nomsu(]]..repr(tree.source)..[[, ]]..template..[[));
                 local replacement = nomsu:tree_with_replaced_vars(template, ]]..replacements..[[);
                 return replacement:as_lua(nomsu);
-            end);
-            ]]);
+            end);]]);
             return lua;
 
 action [remove action %stub]

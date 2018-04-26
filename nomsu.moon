@@ -30,16 +30,14 @@ debug_getinfo = debug.getinfo
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
--- improve indentation of generated lua code
--- better error reporting
 -- type checking?
 -- Add compiler options for optimization level (compile-fast vs. run-fast, etc.)
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
 -- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
--- Allow plain text backslash like: "\n" in longstrings without requiring "\\n"
+-- Allow plain text backslash like: "\n" in indented text without requiring "\\n"
 -- Maybe support some kind of regex action definitions like "foo %first (and %next)*"?
--- Re-implement nomsu-to-lua comment translation
+-- Re-implement nomsu-to-lua comment translation?
 
 export FILE_CACHE
 -- FILE_CACHE is a map from filename (string) -> string of file contents
