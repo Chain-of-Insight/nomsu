@@ -110,9 +110,6 @@ Tree("Nomsu", {
 })
 Tree("Block", {
   as_lua = function(self, nomsu)
-    if #self.value == 1 then
-      return self.value[1]:as_lua(nomsu)
-    end
     local lua = Lua(self.source)
     for i, line in ipairs(self.value) do
       local line_lua = line:as_lua(nomsu)
@@ -128,11 +125,19 @@ Tree("Block", {
     if inline == nil then
       inline = false
     end
-    if #self.value == 1 then
-      return self.value[1]:as_nomsu(inline)
-    end
     if inline then
-      return nil
+      local nomsu = Nomsu(self.source)
+      for i, line in ipairs(self.value) do
+        if i > 1 then
+          nomsu:append("; ")
+        end
+        local line_nomsu = line:as_nomsu(true)
+        if not (line_nomsu) then
+          return nil
+        end
+        nomsu:append(line_nomsu)
+      end
+      return nomsu
     end
     local nomsu = Nomsu(self.source)
     for i, line in ipairs(self.value) do

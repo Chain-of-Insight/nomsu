@@ -74,8 +74,6 @@ Tree "Nomsu",
 
 Tree "Block",
     as_lua: (nomsu)=>
-        if #@value == 1
-            return @value[1]\as_lua(nomsu)
         lua = Lua(@source)
         for i,line in ipairs @value
             line_lua = line\as_lua(nomsu)
@@ -86,9 +84,15 @@ Tree "Block",
         return lua
 
     as_nomsu: (inline=false)=>
-        if #@value == 1
-            return @value[1]\as_nomsu(inline)
-        return nil if inline
+        if inline
+            nomsu = Nomsu(@source)
+            for i,line in ipairs @value
+                if i > 1
+                    nomsu\append "; "
+                line_nomsu = line\as_nomsu(true)
+                return nil unless line_nomsu
+                nomsu\append line_nomsu
+            return nomsu
         nomsu = Nomsu(@source)
         for i, line in ipairs @value
             line = assert(line\as_nomsu!, "Could not convert line to nomsu")

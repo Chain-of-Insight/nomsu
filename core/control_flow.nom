@@ -261,7 +261,9 @@ immediately
         %fallthroughs <- []
         %is_first <- (yes)
         %seen_else <- (no)
-        for %func_call in %body.value
+        %branches <-
+            %body.value if (%body.type = "Block") else [%body]
+        for %func_call in %branches
             assume (%func_call.type is "Action") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             %tokens <- %func_call.value
@@ -308,7 +310,9 @@ immediately
         %fallthroughs <- []
         %is_first <- (yes)
         %seen_else <- (no)
-        for %func_call in %body.value
+        %branches <-
+            %body.value if (%body.type = "Block") else [%body]
+        for %func_call in %branches
             assume (%func_call.type is "Action") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             %tokens <- %func_call.value

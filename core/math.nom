@@ -90,6 +90,6 @@ parse [seed random] as: seed random with (=lua "os.time()")
 compile [random number, random, rand] to: Lua value "math.random()"
 compile [random int %n, random integer %n, randint %n] to: Lua value "math.random(\(%n as lua expr))"
 compile [random from %low to %high, random number from %low to %high, rand %low %high] to
-    "math.random(\(%low as lua expr), \(%high as lua expr))"
+    Lua value "math.random(\(%low as lua expr), \(%high as lua expr))"
 action [random choice from %elements, random choice %elements, random %elements]
     =lua "\%elements[math.random(#\%elements)]"

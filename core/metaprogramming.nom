@@ -22,9 +22,6 @@ immediately
             for i,tok in ipairs(\%actions.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
             end
-            if \%lua.type == "Text" then
-                error("Invalid type for 'compile % to %', expected a dict with expr/statements, but got text.", 0);
-            end
             for i, arg in ipairs(args) do
                 lua:append(", ");
                 lua:append(arg);

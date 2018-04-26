@@ -8,12 +8,12 @@ file (File):
 shebang: "#!" [^%nl]* (!. / %nl)
 
 statement: action / expression
+inline_statement: inline_action / inline_expression
 
-indented_block (Block):
-    {| indent
-            statement (nodent statement)*
-        (dedent / (("" -> "Error while parsing block") => error))
-    |} -> Tuple
+inline_block (Block):
+    {| inline_statement (";" inline_statement)+ |}
+block (Block):
+    {| statement (nodent statement)+ |} -> Tuple
 
 inline_nomsu (Nomsu): "\" noindex_inline_expression
 indented_nomsu (Nomsu):
@@ -29,7 +29,12 @@ noindex_inline_expression:
 inline_expression:
     index_chain / noindex_inline_expression 
 indented_expression:
-    indented_text / indented_nomsu / indented_list / indented_dict / indented_block
+    indented_text / indented_nomsu / indented_list / indented_dict
+    / (indent
+        (action dedent
+        / expression dedent
+        / block (dedent / (("" -> "Error while parsing indented expression") => error)))
+      )
 expression:
     inline_expression / (":" %ws* (inline_action / inline_expression) eol) / indented_expression
 
@@ -65,7 +70,7 @@ inline_text_interpolation:
 text_interpolation:
     inline_text_interpolation /
     ("\" 
-        (block_comment / line_comment / indented_text / indented_list / indented_block)?
+        (block_comment / line_comment / indented_expression)?
     nodent "..")
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
