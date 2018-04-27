@@ -11,20 +11,20 @@ statement: action / expression
 inline_statement: inline_action / inline_expression
 
 inline_block (Block):
-    {| inline_statement (";" inline_statement)+ |}
+    {| inline_statement (%ws* ";" %ws*  inline_statement)+ |} -> Tuple
 block (Block):
     {| statement (nodent statement)+ |} -> Tuple
 
 inline_nomsu (Nomsu): "\" noindex_inline_expression
 indented_nomsu (Nomsu):
-    "\" (noindex_inline_expression / (":" %ws* (inline_action / inline_expression) eol) / indented_expression)
+    "\" (noindex_inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression)
 
 index_chain (IndexChain):
     {| noindex_inline_expression ("." ((({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / noindex_inline_expression))+ |} -> Tuple
 
 noindex_inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
-    / ("(" %ws* (inline_action / inline_expression) %ws* ")")
+    / ("(" %ws* (inline_block / inline_action / inline_expression) %ws* ")")
 
 inline_expression:
     index_chain / noindex_inline_expression 
@@ -36,12 +36,12 @@ indented_expression:
         / block (dedent / (("" -> "Error while parsing indented expression") => error)))
       )
 expression:
-    inline_expression / (":" %ws* (inline_action / inline_expression) eol) / indented_expression
+    inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression
 
 -- Function calls need at least one word in them
 inline_action (Action):
     {| (inline_expression %ws*)* word (%ws* (inline_expression / word))*
-        (%ws* ":" %ws* (inline_action / inline_expression))?|} -> Tuple
+        (%ws* ":" %ws* (inline_block / inline_action / inline_expression))?|} -> Tuple
 action (Action):
     {| (expression (dotdot / %ws*))* word ((dotdot / %ws*) (expression / word))* |} -> Tuple
 
@@ -58,20 +58,17 @@ indented_text (Text):
     '".."' eol %nl ({|
         {~ (%nl*) (%indent -> "") ~}
         ({~
-            (("\\" -> "\") / (("\" eol %nl+ %nodent "..") -> "")
-            / (%nl+ {~ %nodent -> "" ~}) / [^%nl\])+
+            (("\\" -> "\") / (("\" nodent "..") -> "")/ (%nl+ {~ %nodent -> "" ~}) / [^%nl\] / (!text_interpolation "\"))+
         ~} / text_interpolation)*
     |} -> Tuple) (((!.) &%dedent) / (&(%nl %dedent)) / (("" -> "Error while parsing Text") => error))
 inline_text_interpolation:
     "\" (
         variable / inline_list / inline_dict / inline_text
-        / ("(" %ws* (inline_action / inline_expression) %ws* ")")
+        / ("(" %ws* (inline_block / inline_action / inline_expression) %ws* ")")
     )
 text_interpolation:
     inline_text_interpolation /
-    ("\" 
-        (block_comment / line_comment / indented_expression)?
-    nodent "..")
+    ("\" indented_expression nodent "..")
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
@@ -90,7 +87,7 @@ indented_list (List):
 list_line:
      ((action / expression) !comma)
      / (inline_list_item (comma list_line?)?)
-inline_list_item: inline_action / inline_expression
+inline_list_item: inline_block / inline_action / inline_expression
 
 inline_dict (Dict):
     !('{..}')
@@ -104,7 +101,7 @@ dict_line:
     ((dict_key %ws* ":" %ws* (action / expression)) -> DictEntry !comma)
     / (inline_dict_item (comma dict_line?)?)
 inline_dict_item:
-    (dict_key %ws* ":" %ws* (inline_action / inline_expression)) -> DictEntry
+    (dict_key %ws* ":" %ws* (inline_block / inline_action / inline_expression)) -> DictEntry
 dict_key:
     (({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / inline_expression
 

@@ -165,9 +165,9 @@ do
     local text_loc = lpeg.userdata.source_code.source:sub(pos, pos)
     line_no = text_loc:get_line_number()
     src = FILE_CACHE[text_loc.filename]
-    local prev_line = src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 1)
-    local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 1)
-    local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 1)
+    local prev_line = src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 2)
+    local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 2)
+    local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 2)
     local pointer = ("-"):rep(pos - LINE_STARTS[src][line_no]) .. "^"
     err_msg = (err_msg or "Parse error") .. " in " .. tostring(lpeg.userdata.source_code.source.filename) .. " on line " .. tostring(line_no) .. ":\n"
     err_msg = err_msg .. "\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n"

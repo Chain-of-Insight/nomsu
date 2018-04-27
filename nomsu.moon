@@ -35,7 +35,6 @@ debug_getinfo = debug.getinfo
 -- Do a pass on all actions to enforce parameters-are-nouns heuristic
 -- Maybe do some sort of lazy definitions of actions that defer until they're used in code
 -- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
--- Allow plain text backslash like: "\n" in indented text without requiring "\\n"
 -- Maybe support some kind of regex action definitions like "foo %first (and %next)*"?
 -- Re-implement nomsu-to-lua comment translation?
 
@@ -155,9 +154,9 @@ NOMSU_DEFS = with {}
         text_loc = lpeg.userdata.source_code.source\sub(pos,pos)
         line_no = text_loc\get_line_number!
         src = FILE_CACHE[text_loc.filename]
-        prev_line = src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-1)
-        err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-1)
-        next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-1)
+        prev_line = src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-2)
+        err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-2)
+        next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-2)
         pointer = ("-")\rep(pos-LINE_STARTS[src][line_no]) .. "^"
         err_msg = (err_msg or "Parse error").." in #{lpeg.userdata.source_code.source.filename} on line #{line_no}:\n"
         err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"

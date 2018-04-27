@@ -123,7 +123,7 @@ immediately
                 vars[i] = tostring(target_lua);
             end
             \%lua:remove_free_vars(vars);
-            \%lua:prepend("local ", lhs, " = ", rhs, ";\\n");
+            \%lua:prepend("local ", lhs, " = ", rhs, ";\n");
         return
             Lua ".."
                 do

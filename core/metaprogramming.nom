@@ -13,7 +13,7 @@ immediately
             end
             stubs = repr(stubs);
             if #stubs > 80 then
-                lua:append("\\n    ",stubs,",\\n    ");
+                lua:append("\n    ",stubs,",\n    ");
             else
                 lua:append(stubs,", ");
             end
@@ -30,7 +30,7 @@ immediately
             body_lua:convert_to_statements("return ");
             body_lua:remove_free_vars(unpack(args));
             body_lua:declare_locals();
-            lua:append(")\\n    ", body_lua, "\\nend);");
+            lua:append(")\n    ", body_lua, "\nend);");
             return lua;
         end);
 
@@ -45,7 +45,7 @@ immediately
             end
             stubs = repr(stubs);
             if #stubs > 80 then
-                lua:append("\\n    ",stubs,",\\n    ");
+                lua:append("\n    ",stubs,",\n    ");
             else
                 lua:append(stubs,", ");
             end
@@ -62,7 +62,7 @@ immediately
             body_lua:convert_to_statements("return ");
             body_lua:remove_free_vars(unpack(args));
             body_lua:declare_locals();
-            lua:append(")\\n    ", body_lua, "\\nend);")
+            lua:append(")\n    ", body_lua, "\nend);")
             return lua;
 
 # Macro to make nomsu macros
@@ -76,7 +76,7 @@ immediately
             end
             stubs = repr(stubs);
             if #stubs > 80 then
-                lua:append("\\n    ",stubs,",\\n    ");
+                lua:append("\n    ",stubs,",\n    ");
             else
                 lua:append(stubs,", ");
             end
