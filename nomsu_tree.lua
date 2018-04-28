@@ -83,9 +83,12 @@ Tree("File", {
     end
     local nomsu = Nomsu(self.source)
     for i, line in ipairs(self.value) do
-      line = assert(line:as_nomsu(), "Could not convert line to nomsu")
+      line = assert(line:as_nomsu(nil, true), "Could not convert line to nomsu")
       nomsu:append(line)
       if i < #self.value then
+        if tostring(line):match("\n") then
+          nomsu:append("\n")
+        end
         nomsu:append("\n")
       end
     end
@@ -141,7 +144,7 @@ Tree("Block", {
     end
     local nomsu = Nomsu(self.source)
     for i, line in ipairs(self.value) do
-      line = assert(line:as_nomsu(), "Could not convert line to nomsu")
+      line = assert(line:as_nomsu(nil, true), "Could not convert line to nomsu")
       nomsu:append(line)
       if i < #self.value then
         nomsu:append("\n")
@@ -284,9 +287,12 @@ Tree("Action", {
     end
     return concat(bits, " ")
   end,
-  as_nomsu = function(self, inline)
+  as_nomsu = function(self, inline, can_use_colon)
     if inline == nil then
       inline = false
+    end
+    if can_use_colon == nil then
+      can_use_colon = false
     end
     if inline then
       local nomsu = Nomsu(self.source)
@@ -312,44 +318,47 @@ Tree("Action", {
       end
       return nomsu
     else
-      local inline_version = self:as_nomsu(true)
-      if inline_version and #inline_version <= MAX_LINE then
-        return inline_version
-      end
       local nomsu = Nomsu(self.source)
-      local spacer = nil
+      local next_space = ""
+      local last_colon = nil
       for i, bit in ipairs(self.value) do
         if bit.type == "Word" then
-          if spacer then
-            nomsu:append(spacer)
-          end
-          nomsu:append(bit.value)
-          spacer = " "
+          nomsu:append(next_space, bit.value)
+          next_space = " "
         else
-          local arg_nomsu = bit:as_nomsu(true)
+          local arg_nomsu = bit.type ~= "Block" and bit:as_nomsu(true)
           if arg_nomsu and #arg_nomsu < MAX_LINE then
-            if spacer then
-              nomsu:append(spacer)
+            if bit.type == "Action" then
+              if can_use_colon and i > 1 then
+                nomsu:append(next_space:match("[^ ]*"), ": ", arg_nomsu)
+                next_space = "\n.."
+                last_colon = i
+              else
+                nomsu:append(next_space, "(", arg_nomsu, ")")
+                next_space = " "
+              end
+            else
+              nomsu:append(next_space, arg_nomsu)
+              next_space = " "
             end
-            if bit.type == "Action" or bit.type == "Block" then
-              arg_nomsu:parenthesize()
-            end
-            spacer = " "
           else
-            arg_nomsu = bit:as_nomsu()
+            arg_nomsu = bit:as_nomsu(nil, true)
             if not (nomsu) then
               return nil
             end
-            if bit.type == "Action" or bit.type == "Block" then
-              nomsu:append("\n    ")
-            else
-              if spacer then
-                nomsu:append(spacer)
+            if bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
+              if i == 1 then
+                arg_nomsu = Nomsu(bit.source, "(..)\n    ", arg_nomsu)
+              else
+                arg_nomsu = Nomsu(bit.source, "\n    ", arg_nomsu)
               end
             end
-            spacer = "\n.."
+            if last_colon == i - 1 and (bit.type == "Action" or bit.type == "Block") then
+              next_space = ""
+            end
+            nomsu:append(next_space, arg_nomsu)
+            next_space = "\n.."
           end
-          nomsu:append(arg_nomsu)
         end
       end
       return nomsu
@@ -416,9 +425,6 @@ Tree("Text", {
       for _index_0 = 1, #_list_0 do
         local bit = _list_0[_index_0]
         if type(bit) == 'string' then
-          if bit:find("\n") then
-            return nil
-          end
           nomsu:append((bit:gsub("\\", "\\\\"):gsub("\n", "\\n")))
         else
           local interp_nomsu = bit:as_nomsu(true)

@@ -30,7 +30,7 @@ inline_expression:
     index_chain / noindex_inline_expression 
 indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict
-    / (indent
+    / ("(..)"? indent
         (action dedent
         / expression dedent
         / block (dedent / (("" -> "Error while parsing indented expression") => error)))

@@ -1,4 +1,3 @@
-local lfs = require('lfs')
 local re = require('re')
 local lpeg = require('lpeg')
 lpeg.setmaxstack(10000)
@@ -41,7 +40,7 @@ FILE_CACHE = setmetatable({ }, {
     if not (file) then
       return nil
     end
-    local contents = file:read("a"):sub(1, -2)
+    local contents = file:read("a"):sub(1, -1)
     file:close()
     self[filename] = contents
     return contents
@@ -362,41 +361,44 @@ do
       end
       return self:run_lua(lua)
     end,
-    run_file = function(self, filename, compile_fn)
+    run_file = function(self, path, compile_fn)
       if compile_fn == nil then
         compile_fn = nil
       end
-      local file_attributes = assert(lfs.attributes(filename), "File not found: " .. tostring(filename))
-      if file_attributes.mode == "directory" then
-        for short_filename in lfs.dir(filename) do
-          local full_filename = filename .. '/' .. short_filename
-          local attr = lfs.attributes(full_filename)
-          if attr.mode ~= "directory" and short_filename:match(".*%.nom") then
-            self:run_file(full_filename, compile_fn)
+      local ret = nil
+      for filename in io.popen("find " .. path .. " -type f"):lines() do
+        local _continue_0 = false
+        repeat
+          if filename:match("%.lua$") then
+            local file = assert(FILE_CACHE[filename], "Could not find file: " .. tostring(filename))
+            ret = self:run_lua(Lua(Source(filename), file))
+          elseif filename:match("%.nom$") then
+            if not self.skip_precompiled then
+              local lua_filename = filename:gsub("%.nom$", ".lua")
+              local file = FILE_CACHE[lua_filename]
+              if file then
+                ret = self:run_lua(Lua(Source(filename), file))
+                _continue_0 = true
+                break
+              end
+            end
+            local file = file or FILE_CACHE[filename]
+            if not file then
+              error("File does not exist: " .. tostring(filename), 0)
+            end
+            ret = self:run(Nomsu(Source(filename), file), compile_fn)
+            _continue_0 = true
+            break
+          else
+            error("Invalid filetype for " .. tostring(filename), 0)
           end
+          _continue_0 = true
+        until true
+        if not _continue_0 then
+          break
         end
-        return 
       end
-      if filename:match(".*%.lua") then
-        local file = assert(FILE_CACHE[filename], "Could not find file: " .. tostring(filename))
-        return self:run_lua(Lua(Source(filename), file))
-      end
-      if filename:match(".*%.nom") then
-        if not self.skip_precompiled then
-          local lua_filename = filename:gsub("%.nom$", ".lua")
-          local file = FILE_CACHE[lua_filename]
-          if file then
-            return self:run_lua(Lua(Source(filename), file))
-          end
-        end
-        local file = file or FILE_CACHE[filename]
-        if not file then
-          error("File does not exist: " .. tostring(filename), 0)
-        end
-        return self:run(Nomsu(Source(filename), file), compile_fn)
-      else
-        return error("Invalid filetype for " .. tostring(filename), 0)
-      end
+      return ret
     end,
     use_file = function(self, filename)
       local loaded = self.environment.LOADED
