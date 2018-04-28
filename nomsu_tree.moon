@@ -55,9 +55,11 @@ Tree "File",
         return nil if inline
         nomsu = Nomsu(@source)
         for i, line in ipairs @value
-            line = assert(line\as_nomsu!, "Could not convert line to nomsu")
+            line = assert(line\as_nomsu(nil,true), "Could not convert line to nomsu")
             nomsu\append line
             if i < #@value
+                if tostring(line)\match("\n")
+                    nomsu\append "\n"
                 nomsu\append "\n"
         return nomsu
 
@@ -95,7 +97,7 @@ Tree "Block",
             return nomsu
         nomsu = Nomsu(@source)
         for i, line in ipairs @value
-            line = assert(line\as_nomsu!, "Could not convert line to nomsu")
+            line = assert(line\as_nomsu(nil, true), "Could not convert line to nomsu")
             nomsu\append line
             if i < #@value
                 nomsu\append "\n"
@@ -163,7 +165,7 @@ Tree "Action",
         else [(t.type == "Word" and t.value or "%") for t in *@value]
         return concat(bits, " ")
 
-    as_nomsu: (inline=false)=>
+    as_nomsu: (inline=false, can_use_colon=false)=>
         if inline
             nomsu = Nomsu(@source)
             for i,bit in ipairs @value
@@ -181,32 +183,42 @@ Tree "Action",
                     nomsu\append arg_nomsu
             return nomsu
         else
-            inline_version = @as_nomsu(true)
-            if inline_version and #inline_version <= MAX_LINE
-                return inline_version
             nomsu = Nomsu(@source)
-            spacer = nil
+            next_space = ""
+            -- TODO: track line length as we go and use 80-that instead of 80 for wrapping
+            last_colon = nil
             for i,bit in ipairs @value
                 if bit.type == "Word"
-                    if spacer then nomsu\append spacer
-                    nomsu\append bit.value
-                    spacer = " "
+                    nomsu\append next_space, bit.value
+                    next_space = " "
                 else
-                    arg_nomsu = bit\as_nomsu(true)
+                    arg_nomsu = bit.type != "Block" and bit\as_nomsu(true)
                     if arg_nomsu and #arg_nomsu < MAX_LINE
-                        if spacer then nomsu\append spacer
-                        if bit.type == "Action" or bit.type == "Block"
-                            arg_nomsu\parenthesize!
-                        spacer = " "
-                    else
-                        arg_nomsu = bit\as_nomsu!
-                        return nil unless nomsu
-                        if bit.type == "Action" or bit.type == "Block"
-                            nomsu\append "\n    "
+                        if bit.type == "Action"
+                            if can_use_colon and i > 1
+                                nomsu\append next_space\match("[^ ]*"), ": ", arg_nomsu
+                                next_space = "\n.."
+                                last_colon = i
+                            else
+                                nomsu\append next_space, "(", arg_nomsu, ")"
+                                next_space = " "
                         else
-                            if spacer then nomsu\append spacer
-                        spacer = "\n.."
-                    nomsu\append arg_nomsu
+                            nomsu\append next_space, arg_nomsu
+                            next_space = " "
+                    else
+                        arg_nomsu = bit\as_nomsu(nil, true)
+                        return nil unless nomsu
+                        -- These types carry their own indentation
+                        if bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
+                            if i == 1
+                                arg_nomsu = Nomsu(bit.source, "(..)\n    ", arg_nomsu)
+                            else
+                                arg_nomsu = Nomsu(bit.source, "\n    ", arg_nomsu)
+                        
+                        if last_colon == i-1 and (bit.type == "Action" or bit.type == "Block")
+                            next_space = ""
+                        nomsu\append next_space, arg_nomsu
+                        next_space = "\n.."
             return nomsu
     
 
@@ -244,9 +256,7 @@ Tree "Text",
             nomsu = Nomsu(@source, '"')
             for bit in *@value
                 if type(bit) == 'string'
-                    -- Force indented text
-                    return nil if bit\find("\n")
-                    -- TODO: unescape better
+                    -- TODO: unescape better?
                     nomsu\append (bit\gsub("\\","\\\\")\gsub("\n","\\n"))
                 else
                     interp_nomsu = bit\as_nomsu(true)

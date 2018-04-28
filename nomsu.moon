@@ -10,7 +10,6 @@
 --        nomsu:run(your_nomsu_code)
 --    Or from the command line:
 --        lua nomsu.lua [input_file [output_file or -]]
-lfs = require 'lfs'
 re = require 're'
 lpeg = require 'lpeg'
 lpeg.setmaxstack 10000
@@ -44,7 +43,7 @@ FILE_CACHE = setmetatable {}, {
     __index: (filename)=>
         file = io.open(filename)
         return nil unless file
-        contents = file\read("a")\sub(1,-2) -- Lua appends trailing newline for no apparent reason.
+        contents = file\read("a")
         file\close!
         self[filename] = contents
         return contents
@@ -322,31 +321,27 @@ class NomsuCompiler
             compile_fn(lua)
         return @run_lua(lua)
 
-    run_file: (filename, compile_fn=nil)=>
-        file_attributes = assert(lfs.attributes(filename), "File not found: #{filename}")
-        if file_attributes.mode == "directory"
-            for short_filename in lfs.dir(filename)
-                full_filename = filename..'/'..short_filename
-                attr = lfs.attributes(full_filename)
-                if attr.mode ~= "directory" and short_filename\match(".*%.nom")
-                    @run_file full_filename, compile_fn
-            return
-
-        if filename\match(".*%.lua")
-            file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
-            return @run_lua(Lua(Source(filename), file))
-        if filename\match(".*%.nom")
-            if not @skip_precompiled -- Look for precompiled version
-                lua_filename = filename\gsub("%.nom$", ".lua")
-                file = FILE_CACHE[lua_filename]
-                if file
-                    return @run_lua(Lua(Source(filename), file))
-            file = file or FILE_CACHE[filename]
-            if not file
-                error("File does not exist: #{filename}", 0)
-            return @run(Nomsu(Source(filename), file), compile_fn)
-        else
-            error("Invalid filetype for #{filename}", 0)
+    run_file: (path, compile_fn=nil)=>
+        ret = nil
+        for filename in io.popen("find "..path.." -type f")\lines!
+            if filename\match("%.lua$")
+                file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
+                ret = @run_lua(Lua(Source(filename), file))
+            elseif filename\match("%.nom$")
+                if not @skip_precompiled -- Look for precompiled version
+                    lua_filename = filename\gsub("%.nom$", ".lua")
+                    file = FILE_CACHE[lua_filename]
+                    if file
+                        ret = @run_lua(Lua(Source(filename), file))
+                        continue
+                file = file or FILE_CACHE[filename]
+                if not file
+                    error("File does not exist: #{filename}", 0)
+                ret = @run(Nomsu(Source(filename), file), compile_fn)
+                continue
+            else
+                error("Invalid filetype for #{filename}", 0)
+        return ret
     
     use_file: (filename)=>
         loaded = @environment.LOADED

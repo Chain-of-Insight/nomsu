@@ -40,7 +40,7 @@ FILE_CACHE = setmetatable({ }, {
     if not (file) then
       return nil
     end
-    local contents = file:read("a"):sub(1, -1)
+    local contents = file:read("a")
     file:close()
     self[filename] = contents
     return contents
