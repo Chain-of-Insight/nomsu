@@ -18,12 +18,12 @@ fi
 
 for file in core/*.nom; do
     printf "Compiling $file ..."
-    ./nomsu.moon $file -o "$(basename $file .nom).lua"
+    ./nomsu.moon -o "$(basename $file .nom).lua" $file
     echo "done."
 done
 for file in lib/*.nom; do
     printf "Compiling $file ..."
-    ./nomsu.moon $file -o "$(basename $file .nom).lua"
+    ./nomsu.moon -o "$(basename $file .nom).lua" $file
     echo "done."
 done
 #for file in tests/*.nom; do

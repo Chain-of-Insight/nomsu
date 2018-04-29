@@ -71,16 +71,18 @@ immediately
 
 # Helper function
 immediately
-    compile [if %tree has subtree %subtree where %condition %body] to
-        Lua ".."
-            for \(%subtree as lua expr) in coroutine.wrap(function() nomsu:walk_tree(\(%tree as lua expr)) end) do
-                if Types.is_node(\(%subtree as lua expr)) then
-                    if \(%condition as lua expr) then
-                        \(%body as lua statements)
-                        break;
+    compile [%tree has subtree %subtree where %condition] to
+        Lua value ".."
+            (function()
+                for \(%subtree as lua expr) in coroutine.wrap(function() nomsu:walk_tree(\(%tree as lua expr)) end) do
+                    if Types.is_node(\(%subtree as lua expr)) then
+                        if \(%condition as lua expr) then
+                            return true;
+                        end
                     end
                 end
-            end
+                return false;
+            end)()
 
 # While loops
 immediately
@@ -91,13 +93,12 @@ immediately
             Lua ".."
                 while \(%condition as lua expr) do
                     \(%body as lua statements)
-        if %body has subtree % where
-            (%.type = "Action") and ((%'s stub) is "do next repeat")
-        ..
-            to %lua write "\n    ::continue_repeat::;"
+        if
+            %body has subtree % where: (%.type = "Action") and ((%'s stub) is "do next repeat")
+        ..: to %lua write "\n    ::continue_repeat::;"
         to %lua write "\nend --while-loop"
-        if %body has subtree % where
-            (%.type = "Action") and ((%'s stub) is "stop repeating")
+        if
+            %body has subtree % where: (%.type = "Action") and ((%'s stub) is "stop repeating")
         ..
             %lua <-
                 Lua ".."
@@ -116,12 +117,12 @@ immediately
             Lua ".."
                 for i=1,\(%n as lua expr) do
                     \(%body as lua statements)
-        if %body has subtree % where
-            (%.type = "Action") and ((%'s stub) is "do next repeat")
+        if
+            %body has subtree % where: (%.type = "Action") and ((%'s stub) is "do next repeat")
         ..: to %lua write "\n    ::continue_repeat::;"
         to %lua write "\nend --numeric for-loop"
-        if %body has subtree % where
-            (%.type = "Action") and ((%'s stub) is "stop repeating")
+        if
+            %body has subtree % where: (%.type = "Action") and ((%'s stub) is "stop repeating")
         ..
             %lua <-
                 Lua ".."
@@ -150,17 +151,19 @@ immediately
             Lua ".."
                 for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(%step as lua expr) do
                     \(%body as lua statements)
-        if %body has subtree % where
-            (%.type = "Action") and
-                ((%'s stub) is "do next %") and 
-                    %.value.3.value is %var.value
+        if
+            %body has subtree % where
+                (%.type = "Action") and
+                    ((%'s stub) is "do next %") and 
+                        %.value.3.value is %var.value
         ..: to %lua write "\n    ::continue_\(%var as lua identifier)::;"
         to %lua write "\nend --numeric for-loop"
 
-        if %body has subtree % where
-            (%.type = "Action") and
-                ((%'s stub) is "stop %") and
-                    %.value.2.value is %var.value
+        if
+            %body has subtree % where
+                (%.type = "Action") and
+                    ((%'s stub) is "stop %") and
+                        %.value.2.value is %var.value
         ..
             %lua <-
                 Lua ".."
@@ -188,16 +191,18 @@ immediately
             Lua ".."
                 for i,\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
                     \(%body as lua statements)
-        if %body has subtree % where
-            (%.type = "Action") and
-                ((%'s stub) is "do next %") and
-                    %.value.3.value is %var.value
+        if
+            %body has subtree % where
+                (%.type = "Action") and
+                    ((%'s stub) is "do next %") and
+                        %.value.3.value is %var.value
         ..: to %lua write (Lua "\n    ::continue_\(%var as lua identifier)::;")
         to %lua write "\nend --foreach-loop"
-        if %body has subtree % where
-            (%.type = "Action") and
-                ((%'s stub) is "stop %") and
-                    %.value.2.value is %var.value
+        if
+            %body has subtree % where
+                (%.type = "Action") and
+                    ((%'s stub) is "stop %") and
+                        %.value.2.value is %var.value
         ..
             %lua <-
                 Lua ".."
@@ -219,30 +224,34 @@ immediately
             Lua ".."
                 for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(%iterable as lua expr)) do
                     \(%body as lua statements)
-        if %body has subtree % where
-            (%.type = "Action") and
-                ((%'s stub) is "do next %") and
-                    %.value.3.value is %key.value
+        if
+            %body has subtree % where
+                (%.type = "Action") and
+                    ((%'s stub) is "do next %") and
+                        %.value.3.value is %key.value
         ..: to %lua write (Lua "\n    ::continue_\(%key as lua identifier)::;")
 
-        if %body has subtree % where
-            (%.type = "Action") and
-                ((%'s stub) is "do next %") and
-                    %.value.3.value is %value.value
+        if
+            %body has subtree % where
+                (%.type = "Action") and
+                    ((%'s stub) is "do next %") and
+                        %.value.3.value is %value.value
         ..: to %lua write (Lua "\n    ::continue_\(%value as lua identifier)::;")
         to %lua write "\nend --foreach-loop"
         
         %stop_labels <- (Lua "")
-        if %body has subtree % where
-            (%.type = "Action") and
-                ((%'s stub) is "stop %") and
-                    %.value.2.value is %key.value
+        if
+            %body has subtree % where
+                (%.type = "Action") and
+                    ((%'s stub) is "stop %") and
+                        %.value.2.value is %key.value
         ..: to %stop_labels write "\n::stop_\(%key as lua identifier)::;"
 
-        if %body has subtree % where
-            (%.type = "Action") and
-                ((%'s stub) is "stop %") and
-                    %.value.2.value is %value.value
+        if
+            %body has subtree % where
+                (%.type = "Action") and
+                    ((%'s stub) is "stop %") and
+                        %.value.2.value is %value.value
         ..: to %stop_labels write "\n::stop_\(%value as lua identifier)::;"
 
         if: (length of %stop_labels) > 0
