@@ -1,0 +1,2 @@
+use "core"
+say "Inner directory 'use' test passed."

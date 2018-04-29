@@ -49,6 +49,15 @@ FILE_CACHE = setmetatable {}, {
         return contents
 }
 
+iterate_single = (item, prev) -> if item == prev then nil else item
+all_files = (path)->
+    -- Sanitize path
+    if path\match("%.nom$") or path\match("%.lua$")
+        return iterate_single, path
+    -- TODO: improve sanitization
+    path = path\gsub("\\","\\\\")\gsub("`","")\gsub('"','\\"')\gsub("$","")
+    return io.popen("find \""..path.."\" -type f -name \"*.nom\"")\lines!
+
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*
@@ -321,9 +330,9 @@ class NomsuCompiler
             compile_fn(lua)
         return @run_lua(lua)
 
-    run_file: (path, compile_fn=nil)=>
+    run_file: (filename, compile_fn=nil)=>
         ret = nil
-        for filename in io.popen("find "..path.." -type f")\lines!
+        for filename in all_files(filename)
             if filename\match("%.lua$")
                 file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
                 ret = @run_lua(Lua(Source(filename), file))
@@ -338,7 +347,6 @@ class NomsuCompiler
                 if not file
                     error("File does not exist: #{filename}", 0)
                 ret = @run(Nomsu(Source(filename), file), compile_fn)
-                continue
             else
                 error("Invalid filetype for #{filename}", 0)
         return ret
@@ -346,13 +354,19 @@ class NomsuCompiler
     use_file: (filename)=>
         loaded = @environment.LOADED
         if not loaded[filename]
-            for i,f in ipairs @use_stack
-                if f == filename
-                    loop = [@use_stack[j] for j=i,#@use_stack]
-                    insert loop, filename
-                    error("Circular import, this loops forever: #{concat loop, " -> "}")
-            insert @use_stack, filename
-            loaded[filename] = @run_file(filename) or true
+            ret = nil
+            for filename in all_files(filename)
+                if not loaded[filename]
+                    for i,f in ipairs @use_stack
+                        if f == filename
+                            loop = [@use_stack[j] for j=i,#@use_stack]
+                            insert loop, filename
+                            error("Circular import, this loops forever: #{concat loop, " -> "}")
+                    insert @use_stack, filename
+                    loaded[filename] = @run_file(filename) or true
+                    ret = loaded[filename]
+                    remove @use_stack
+            loaded[filename] = ret
         return loaded[filename]
 
     run_lua: (lua)=>
@@ -638,26 +652,43 @@ class NomsuCompiler
         @define_action "run file %filename", get_line_no!, (_filename)->
             return nomsu\run_file(_filename)
 
-        @define_compile_action "use %filename", get_line_no!, (_filename)=>
-            filename = nomsu\tree_to_value(_filename)
-            nomsu\use_file(filename)
-            return Lua.Value(@source, "nomsu:use_file(#{repr filename})")
+        @define_compile_action "use %path", get_line_no!, (_path)=>
+            path = nomsu\tree_to_value(_path)
+            nomsu\use_file(path)
+            return Lua(@source, "nomsu:use_file(#{repr path});")
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug_getinfo(2).func != require
     export colors
     colors = require 'consolecolors'
     parser = re.compile([[
-        args <- {| {:flags: flags? :} ({:input: input :} ";" ("-o;"{:output: output :} ";")?)? (";")? |} !.
+        args <- {| {:flags: flags? :} (input ";" (output / print_file)*)? (";")? |} !.
         flags <- (({| ({flag} ";")* |}) -> set)
-        flag <- "-c" / "-i" / "-p" / "-O" / "--help" / "-h" / "-v"
-        input <- "-" / [^;]+
-        output <- "-" / [^;]+
+        flag <- "-i" / "-O" / "-f" / "--help" / "-h" / "-s" / "-p"
+        input <- {:input: file :}
+        output <- "-o;" {:output: file :}
+        print_file <- "-p;" {:print_file: file :}
+        file <- "-" / [^;]+
     ]], {:set})
     args = concat(arg, ";")..";"
     args = parser\match(args) or {}
     if not args or not args.flags or args.flags["--help"] or args.flags["-h"]
-        print "Usage: lua nomsu.lua [-c] [-i] [-p] [-O] [--help] [input [-o output]]"
+        print [=[
+Nomsu Compiler
+
+Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [input [-o output] [-p print_file]]
+
+OPTIONS
+    -i Run the compiler in interactive mode (REPL)
+    -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available)
+    -f Auto-format the given Nomsu file and print the result.
+    -s Check the program for syntax errors.
+    -v Verbose 
+    -h/--help Print this message.
+    <input> Input file can be "-" to use stdin.
+    -o <file> Output the compiled Lua file to the given file (use "-" to output to stdout; if outputting to stdout and -p is not specified, -p will default to /dev/null)
+    -p <file> Print to the specified file instead of stdout.
+]=]
         os.exit!
 
     nomsu = NomsuCompiler!
@@ -700,32 +731,47 @@ if arg and debug_getinfo(2).func != require
     run = ->
         if args.flags["-v"]
             nomsu.debug = true
+    
+        if args.input == "-" then args.input = "/dev/fd/0" -- stdin
+        if args.output == nil then args.output = "/dev/null"
+        elseif args.output == "-" then args.output = "/dev/fd/1" -- stdout
 
         nomsu.skip_precompiled = not args.flags["-O"]
         if args.input
-            -- Read a file or stdin and output either the printouts or the compiled lua
-            if args.flags["-c"] and not args.output
-                args.output = args.input\gsub("%.nom", ".lua")
             compile_fn = nil
-            if args.flags["-p"]
-                nomsu.environment.print = ->
-                compile_fn = (code)->
-                    io.output!\write("local IMMEDIATE = true;\n"..tostring(code))
-            elseif args.output
-                compile_fn = (code)->
-                    io.open(args.output, 'w')\write("local IMMEDIATE = true;\n"..tostring(code))
+            if args.output == "/dev/fd/1" and not args.print_file
+                args.print_file = "/dev/null"
+            elseif not args.print_file or args.print_file == "-"
+                args.print_file = "/dev/fd/1" -- stdout
 
-            if args.input\match(".*%.lua")
+            print_file = io.open(args.print_file, "w")
+            nomsu.environment.print = (...)->
+                N = select("#",...)
+                if N > 0
+                    print_file\write(tostring(select(1,...)))
+                    for i=2,N
+                        print_file\write('\t',tostring(select(1,...)))
+                print_file\write('\n')
+                print_file\flush!
+            
+            output_file = io.open(args.output, 'w')
+            compile_fn = (code)->
+                output_file\write("local IMMEDIATE = true;\n"..tostring(code))
+
+            if args.input\match("%.lua$")
                 dofile(args.input)(nomsu, {})
             else
-                if args.input == "-"
-                    nomsu\run(io.read('a'), compile_fn)
-                else nomsu\run_file(args.input, compile_fn)
+                for input_file in all_files(args.input)
+                    -- Check syntax:
+                    if args.flags["-s"]
+                        nomsu\parse(io.open(input_file)\read("*a"))
+                    elseif args.flags["-f"]
+                        tree = nomsu\parse(io.open(input_file)\read("*a"))
+                        output_file\write(tostring(tree\as_nomsu!))
+                    else
+                        nomsu\run_file(input_file, compile_fn)
 
-            if args.flags["-p"]
-                nomsu.environment.print = print
-
-        if args.flags["-i"]
+        if not args.input or args.flags["-i"]
             -- REPL
             nomsu\run('use "core"')
             while true

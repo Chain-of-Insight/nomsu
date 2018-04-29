@@ -359,6 +359,9 @@ Tree("Action", {
             nomsu:append(next_space, arg_nomsu)
             next_space = "\n.."
           end
+          if next_space == " " and #(tostring(nomsu):match("[^\n]*$")) > MAX_LINE then
+            next_space = "\n.."
+          end
         end
       end
       return nomsu

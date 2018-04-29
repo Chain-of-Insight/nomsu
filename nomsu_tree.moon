@@ -219,6 +219,9 @@ Tree "Action",
                             next_space = ""
                         nomsu\append next_space, arg_nomsu
                         next_space = "\n.."
+
+                    if next_space == " " and #(tostring(nomsu)\match("[^\n]*$")) > MAX_LINE
+                        next_space = "\n.."
             return nomsu
     
 
