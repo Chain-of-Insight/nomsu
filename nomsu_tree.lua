@@ -326,7 +326,14 @@ Tree("Action", {
           nomsu:append(next_space, bit.value)
           next_space = " "
         else
-          local arg_nomsu = bit.type ~= "Block" and bit:as_nomsu(true)
+          local arg_nomsu
+          if last_colon == i - 1 and bit.type == "Action" then
+            arg_nomsu = nil
+          elseif bit.type == "Block" then
+            arg_nomsu = nil
+          else
+            arg_nomsu = bit:as_nomsu(true)
+          end
           if arg_nomsu and #arg_nomsu < MAX_LINE then
             if bit.type == "Action" then
               if can_use_colon and i > 1 then

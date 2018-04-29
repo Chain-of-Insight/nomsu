@@ -192,7 +192,10 @@ Tree "Action",
                     nomsu\append next_space, bit.value
                     next_space = " "
                 else
-                    arg_nomsu = bit.type != "Block" and bit\as_nomsu(true)
+                    arg_nomsu = if last_colon == i-1 and bit.type == "Action" then nil
+                    elseif bit.type == "Block" then nil
+                    else bit\as_nomsu(true)
+
                     if arg_nomsu and #arg_nomsu < MAX_LINE
                         if bit.type == "Action"
                             if can_use_colon and i > 1
