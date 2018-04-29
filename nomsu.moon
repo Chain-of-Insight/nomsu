@@ -663,32 +663,36 @@ if arg and debug_getinfo(2).func != require
     export colors
     colors = require 'consolecolors'
     parser = re.compile([[
-        args <- {| {:flags: flags? :} (input ";" (output / print_file)*)? (";")? |} !.
-        flags <- (({| ({flag} ";")* |}) -> set)
-        flag <- "-i" / "-O" / "-f" / "--help" / "-h" / "-s" / "-p"
-        input <- {:input: file :}
-        output <- "-o;" {:output: file :}
-        print_file <- "-p;" {:print_file: file :}
+        args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} |} ";"? !.
+        flag <-
+            {:interactive: ("-i" -> true) :}
+          / {:verbose: ("-v" -> true) :}
+          / {:optimized: ("-O" -> true) :}
+          / {:format: ("-f" -> true) :}
+          / {:syntax: ("-s" -> true) :}
+          / {:print_file: "-p" ";" {file} :}
+          / {:output_file: "-o" ";" {file} :}
+          / {:help: (("-h" / "--help") -> true) :}
         file <- "-" / [^;]+
-    ]], {:set})
+    ]], {true: -> true})
     args = concat(arg, ";")..";"
-    args = parser\match(args) or {}
-    if not args or not args.flags or args.flags["--help"] or args.flags["-h"]
+    args = parser\match(args)
+    if not args or args.help
         print [=[
 Nomsu Compiler
 
-Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [input [-o output] [-p print_file]]
+Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [-o output] [-p print_file] file1 file2...
 
 OPTIONS
     -i Run the compiler in interactive mode (REPL)
     -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available)
     -f Auto-format the given Nomsu file and print the result.
     -s Check the program for syntax errors.
-    -v Verbose 
+    -v Verbose mode.
     -h/--help Print this message.
-    <input> Input file can be "-" to use stdin.
     -o <file> Output the compiled Lua file to the given file (use "-" to output to stdout; if outputting to stdout and -p is not specified, -p will default to /dev/null)
     -p <file> Print to the specified file instead of stdout.
+    <input> Input file can be "-" to use stdin.
 ]=]
         os.exit!
 
@@ -779,49 +783,54 @@ OPTIONS
         io.stderr\flush!
     
     run = ->
-        if args.flags["-v"]
+        if args.verbose
             nomsu.debug = true
     
-        if args.input == "-" then args.input = STDIN
+        for i,input in ipairs args.inputs
+            if input == "-" then args.inputs[i] = STDIN
 
-        output_file = if args.output == "-" then io.stdout
-        elseif args.output then io.open(args.output, 'w')
+        if #args.inputs == 0 and not args.interactive
+            args.inputs = {"core"}
+            args.interactive = true
+
+        output_file = if args.output_file == "-" then io.stdout
+        elseif args.output_file then io.open(args.output_file, 'w')
 
         print_file = if args.print_file == "-" then io.stdout
         elseif args.print_file then io.open(args.print_file, 'w')
         elseif output_file == io.stdout then nil
         else io.stdout
 
-        nomsu.skip_precompiled = not args.flags["-O"]
-        if args.input
-            compile_fn = nil
-            if print_file == nil
-                nomsu.environment.print = ->
-            elseif print_file != io.stdout
-                nomsu.environment.print = (...)->
-                    N = select("#",...)
-                    if N > 0
-                        print_file\write(tostring(select(1,...)))
-                        for i=2,N
-                            print_file\write('\t',tostring(select(1,...)))
-                    print_file\write('\n')
-                    print_file\flush!
-            
-            if output_file
-                compile_fn = (code)->
-                    output_file\write("local IMMEDIATE = true;\n"..tostring(code))
-                    output_file\flush!
+        nomsu.skip_precompiled = not args.optimized
+        compile_fn = nil
+        if print_file == nil
+            nomsu.environment.print = ->
+        elseif print_file != io.stdout
+            nomsu.environment.print = (...)->
+                N = select("#",...)
+                if N > 0
+                    print_file\write(tostring(select(1,...)))
+                    for i=2,N
+                        print_file\write('\t',tostring(select(1,...)))
+                print_file\write('\n')
+                print_file\flush!
 
-            if args.flags["-s"]
+        if output_file
+            compile_fn = (code)->
+                output_file\write("local IMMEDIATE = true;\n"..tostring(code))
+                output_file\flush!
+
+        for input in *args.inputs
+            if args.syntax
                 -- Check syntax:
-                for input_file in all_files(args.input)
+                for input_file in all_files(input)
                     nomsu\parse(io.open(input_file)\read("*a"))
                 if print_file
-                    print_file\write("Success!\n")
+                    print_file\write("All files parsed successfully!\n")
                     print_file\flush!
-            elseif args.flags["-f"]
+            elseif args.format
                 -- Auto-format
-                for input_file in all_files(args.input)
+                for input_file in all_files(input)
                     tree = nomsu\parse(io.open(input_file)\read("*a"))
                     formatted = tostring(tree\as_nomsu!)
                     if output_file
@@ -830,14 +839,13 @@ OPTIONS
                     if print_file
                         print_file\write(formatted, "\n")
                         print_file\flush!
-            elseif args.input == STDIN
+            elseif input == STDIN
                 nomsu\run(io.input!\read("*a"), compile_fn)
             else
-                nomsu\run_file(args.input, compile_fn)
+                nomsu\run_file(input, compile_fn)
 
-        if not args.input or args.flags["-i"]
+        if args.interactive
             -- REPL
-            nomsu\run('use "core"')
             while true
                 io.write(colored.bright colored.yellow ">> ")
                 buff = ""

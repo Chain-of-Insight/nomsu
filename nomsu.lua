@@ -950,33 +950,39 @@ do
 end
 if arg and debug_getinfo(2).func ~= require then
   colors = require('consolecolors')
-  local parser = re.compile([[        args <- {| {:flags: flags? :} (input ";" (output / print_file)*)? (";")? |} !.
-        flags <- (({| ({flag} ";")* |}) -> set)
-        flag <- "-i" / "-O" / "-f" / "--help" / "-h" / "-s" / "-p"
-        input <- {:input: file :}
-        output <- "-o;" {:output: file :}
-        print_file <- "-p;" {:print_file: file :}
+  local parser = re.compile([[        args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} |} ";"? !.
+        flag <-
+            {:interactive: ("-i" -> true) :}
+          / {:verbose: ("-v" -> true) :}
+          / {:optimized: ("-O" -> true) :}
+          / {:format: ("-f" -> true) :}
+          / {:syntax: ("-s" -> true) :}
+          / {:print_file: "-p" ";" {file} :}
+          / {:output_file: "-o" ";" {file} :}
+          / {:help: (("-h" / "--help") -> true) :}
         file <- "-" / [^;]+
     ]], {
-    set = set
+    ["true"] = function()
+      return true
+    end
   })
   local args = concat(arg, ";") .. ";"
-  args = parser:match(args) or { }
-  if not args or not args.flags or args.flags["--help"] or args.flags["-h"] then
+  args = parser:match(args)
+  if not args or args.help then
     print([=[Nomsu Compiler
 
-Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [input [-o output] [-p print_file]]
+Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [-o output] [-p print_file] file1 file2...
 
 OPTIONS
     -i Run the compiler in interactive mode (REPL)
     -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available)
     -f Auto-format the given Nomsu file and print the result.
     -s Check the program for syntax errors.
-    -v Verbose 
+    -v Verbose mode.
     -h/--help Print this message.
-    <input> Input file can be "-" to use stdin.
     -o <file> Output the compiled Lua file to the given file (use "-" to output to stdout; if outputting to stdout and -p is not specified, -p will default to /dev/null)
     -p <file> Print to the specified file instead of stdout.
+    <input> Input file can be "-" to use stdin.
 ]=])
     os.exit()
   end
@@ -1118,17 +1124,25 @@ OPTIONS
   end
   local run
   run = function()
-    if args.flags["-v"] then
+    if args.verbose then
       nomsu.debug = true
     end
-    if args.input == "-" then
-      args.input = STDIN
+    for i, input in ipairs(args.inputs) do
+      if input == "-" then
+        args.inputs[i] = STDIN
+      end
+    end
+    if #args.inputs == 0 and not args.interactive then
+      args.inputs = {
+        "core"
+      }
+      args.interactive = true
     end
     local output_file
-    if args.output == "-" then
+    if args.output_file == "-" then
       output_file = io.stdout
-    elseif args.output then
-      output_file = io.open(args.output, 'w')
+    elseif args.output_file then
+      output_file = io.open(args.output_file, 'w')
     end
     local print_file
     if args.print_file == "-" then
@@ -1140,40 +1154,42 @@ OPTIONS
     else
       print_file = io.stdout
     end
-    nomsu.skip_precompiled = not args.flags["-O"]
-    if args.input then
-      local compile_fn = nil
-      if print_file == nil then
-        nomsu.environment.print = function() end
-      elseif print_file ~= io.stdout then
-        nomsu.environment.print = function(...)
-          local N = select("#", ...)
-          if N > 0 then
-            print_file:write(tostring(select(1, ...)))
-            for i = 2, N do
-              print_file:write('\t', tostring(select(1, ...)))
-            end
+    nomsu.skip_precompiled = not args.optimized
+    local compile_fn = nil
+    if print_file == nil then
+      nomsu.environment.print = function() end
+    elseif print_file ~= io.stdout then
+      nomsu.environment.print = function(...)
+        local N = select("#", ...)
+        if N > 0 then
+          print_file:write(tostring(select(1, ...)))
+          for i = 2, N do
+            print_file:write('\t', tostring(select(1, ...)))
           end
-          print_file:write('\n')
-          return print_file:flush()
         end
+        print_file:write('\n')
+        return print_file:flush()
       end
-      if output_file then
-        compile_fn = function(code)
-          output_file:write("local IMMEDIATE = true;\n" .. tostring(code))
-          return output_file:flush()
-        end
+    end
+    if output_file then
+      compile_fn = function(code)
+        output_file:write("local IMMEDIATE = true;\n" .. tostring(code))
+        return output_file:flush()
       end
-      if args.flags["-s"] then
-        for input_file in all_files(args.input) do
+    end
+    local _list_0 = args.inputs
+    for _index_0 = 1, #_list_0 do
+      local input = _list_0[_index_0]
+      if args.syntax then
+        for input_file in all_files(input) do
           nomsu:parse(io.open(input_file):read("*a"))
         end
         if print_file then
-          print_file:write("Success!\n")
+          print_file:write("All files parsed successfully!\n")
           print_file:flush()
         end
-      elseif args.flags["-f"] then
-        for input_file in all_files(args.input) do
+      elseif args.format then
+        for input_file in all_files(input) do
           local tree = nomsu:parse(io.open(input_file):read("*a"))
           local formatted = tostring(tree:as_nomsu())
           if output_file then
@@ -1185,14 +1201,13 @@ OPTIONS
             print_file:flush()
           end
         end
-      elseif args.input == STDIN then
+      elseif input == STDIN then
         nomsu:run(io.input():read("*a"), compile_fn)
       else
-        nomsu:run_file(args.input, compile_fn)
+        nomsu:run_file(input, compile_fn)
       end
     end
-    if not args.input or args.flags["-i"] then
-      nomsu:run('use "core"')
+    if args.interactive then
       while true do
         io.write(colored.bright(colored.yellow(">> ")))
         local buff = ""
