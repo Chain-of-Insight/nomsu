@@ -26,6 +26,7 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring
 {:insert, :remove, :concat} = table
 debug_getinfo = debug.getinfo
 {:Nomsu, :Lua, :Source} = require "code_obj"
+STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -52,7 +53,7 @@ FILE_CACHE = setmetatable {}, {
 iterate_single = (item, prev) -> if item == prev then nil else item
 all_files = (path)->
     -- Sanitize path
-    if path\match("%.nom$") or path\match("%.lua$")
+    if path\match("%.nom$") or path\match("%.lua$") or path\match("^/dev/fd/[012]$")
         return iterate_single, path
     -- TODO: improve sanitization
     path = path\gsub("\\","\\\\")\gsub("`","")\gsub('"','\\"')\gsub("$","")
@@ -336,7 +337,7 @@ class NomsuCompiler
             if filename\match("%.lua$")
                 file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
                 ret = @run_lua(Lua(Source(filename), file))
-            elseif filename\match("%.nom$")
+            elseif filename\match("%.nom$") or filename\match("^/dev/fd/[012]$")
                 if not @skip_precompiled -- Look for precompiled version
                     lua_filename = filename\gsub("%.nom$", ".lua")
                     file = FILE_CACHE[lua_filename]
@@ -727,84 +728,17 @@ OPTIONS
                 ]=]
         return info
 
-    
-    run = ->
-        if args.flags["-v"]
-            nomsu.debug = true
-    
-        if args.input == "-" then args.input = "/dev/fd/0" -- stdin
-        if args.output == nil then args.output = "/dev/null"
-        elseif args.output == "-" then args.output = "/dev/fd/1" -- stdout
-
-        nomsu.skip_precompiled = not args.flags["-O"]
-        if args.input
-            compile_fn = nil
-            if args.output == "/dev/fd/1" and not args.print_file
-                args.print_file = "/dev/null"
-            elseif not args.print_file or args.print_file == "-"
-                args.print_file = "/dev/fd/1" -- stdout
-
-            print_file = io.open(args.print_file, "w")
-            nomsu.environment.print = (...)->
-                N = select("#",...)
-                if N > 0
-                    print_file\write(tostring(select(1,...)))
-                    for i=2,N
-                        print_file\write('\t',tostring(select(1,...)))
-                print_file\write('\n')
-                print_file\flush!
-            
-            output_file = io.open(args.output, 'w')
-            compile_fn = (code)->
-                output_file\write("local IMMEDIATE = true;\n"..tostring(code))
-
-            if args.input\match("%.lua$")
-                dofile(args.input)(nomsu, {})
-            else
-                for input_file in all_files(args.input)
-                    -- Check syntax:
-                    if args.flags["-s"]
-                        nomsu\parse(io.open(input_file)\read("*a"))
-                    elseif args.flags["-f"]
-                        tree = nomsu\parse(io.open(input_file)\read("*a"))
-                        output_file\write(tostring(tree\as_nomsu!))
-                    else
-                        nomsu\run_file(input_file, compile_fn)
-
-        if not args.input or args.flags["-i"]
-            -- REPL
-            nomsu\run('use "core"')
-            while true
-                io.write(colored.bright colored.yellow ">> ")
-                buff = ""
-                while true
-                    line = io.read("*L")
-                    if line == "\n" or not line
-                        break
-                    line = line\gsub("\t", "    ")
-                    buff ..= line
-                    io.write(colored.dim colored.yellow ".. ")
-                if #buff == 0
-                    break
-                ok, ret = pcall(nomsu.run, nomsu, buff)
-                if ok and ret != nil
-                    print "= "..repr(ret)
-                elseif not ok
-                    print colored.bright colored.red ret
-    
-    err_hand = (error_message)->
-        -- TODO: write properly to stderr
-        print("#{colored.red "ERROR:"} #{colored.bright colored.yellow colored.onred (error_message or "")}")
-        print("stack traceback:")
+    print_err_msg = (error_message, stack_offset=2)->
+        io.stderr\write("#{colored.red "ERROR:"} #{colored.bright colored.red (error_message or "")}\n")
+        io.stderr\write("stack traceback:\n")
 
         -- TODO: properly print out the calling site of nomsu code, not just the *called* code
-
         ok, to_lua = pcall -> require('moonscript.base').to_lua
         if not ok then to_lua = -> nil
         nomsu_source = FILE_CACHE["nomsu.moon"]
         _, line_table = to_lua(nomsu_source)
 
-        level = 2
+        level = stack_offset
         while true
             -- TODO: reduce duplicate code
             calling_fn = debug_getinfo(level)
@@ -841,8 +775,91 @@ OPTIONS
                     line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline}")
                     name = colored.bright(colored.blue(name or "???"))
             _from = colored.dim colored.white "|"
-            print(("%32s %s %s")\format(name, _from, line))
+            io.stderr\write(("%32s %s %s\n")\format(name, _from, line))
+        io.stderr\flush!
+    
+    run = ->
+        if args.flags["-v"]
+            nomsu.debug = true
+    
+        if args.input == "-" then args.input = STDIN
 
+        output_file = if args.output == "-" then io.stdout
+        elseif args.output then io.open(args.output, 'w')
+
+        print_file = if args.print_file == "-" then io.stdout
+        elseif args.print_file then io.open(args.print_file, 'w')
+        elseif output_file == io.stdout then nil
+        else io.stdout
+
+        nomsu.skip_precompiled = not args.flags["-O"]
+        if args.input
+            compile_fn = nil
+            if print_file == nil
+                nomsu.environment.print = ->
+            elseif print_file != io.stdout
+                nomsu.environment.print = (...)->
+                    N = select("#",...)
+                    if N > 0
+                        print_file\write(tostring(select(1,...)))
+                        for i=2,N
+                            print_file\write('\t',tostring(select(1,...)))
+                    print_file\write('\n')
+                    print_file\flush!
+            
+            if output_file
+                compile_fn = (code)->
+                    output_file\write("local IMMEDIATE = true;\n"..tostring(code))
+                    output_file\flush!
+
+            if args.flags["-s"]
+                -- Check syntax:
+                for input_file in all_files(args.input)
+                    nomsu\parse(io.open(input_file)\read("*a"))
+                if print_file
+                    print_file\write("Success!\n")
+                    print_file\flush!
+            elseif args.flags["-f"]
+                -- Auto-format
+                for input_file in all_files(args.input)
+                    tree = nomsu\parse(io.open(input_file)\read("*a"))
+                    formatted = tostring(tree\as_nomsu!)
+                    if output_file
+                        output_file\write(formatted, "\n")
+                        output_file\flush!
+                    if print_file
+                        print_file\write(formatted, "\n")
+                        print_file\flush!
+            elseif args.input == STDIN
+                nomsu\run(io.input!\read("*a"), compile_fn)
+            else
+                nomsu\run_file(args.input, compile_fn)
+
+        if not args.input or args.flags["-i"]
+            -- REPL
+            nomsu\run('use "core"')
+            while true
+                io.write(colored.bright colored.yellow ">> ")
+                buff = ""
+                while true
+                    line = io.read("*L")
+                    if line == "\n" or not line
+                        if #buff > 0
+                            io.write("\027[1A\027[2K")
+                        break -- Run buffer
+                    line = line\gsub("\t", "    ")
+                    buff ..= line
+                    io.write(colored.dim colored.yellow ".. ")
+                if #buff == 0
+                    break -- Exit
+                ok, ret = pcall(nomsu.run, nomsu, buff)
+                if ok and ret != nil
+                    print "= "..repr(ret)
+                elseif not ok
+                    print_err_msg ret
+    
+    err_hand = (error_message)->
+        print_err_msg error_message
         os.exit(false, true)
 
     -- Note: xpcall has a slightly different API in Lua <=5.1 vs. >=5.2, but this works
@@ -851,8 +868,9 @@ OPTIONS
 
     --ProFi = require 'ProFi'
     --ProFi\start()
-    require('ldt').guard run
-    --xpcall(run, err_hand)
+    if ldt = require('ldt')
+        ldt.guard run
+    else xpcall(run, err_hand)
     --ProFi\stop()
     --ProFi\writeReport( 'MyProfilingReport.txt' )
 
