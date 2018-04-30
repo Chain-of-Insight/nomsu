@@ -103,7 +103,7 @@ Tree "Block",
                 nomsu\append "\n"
         return nomsu
 
-math_expression = re.compile [[ "%" (" " [*/^+-] " %")+ ]]
+math_expression = re.compile [[ "%" (" " [*/^+-] " %")+ !. ]]
 Tree "Action",
     as_lua: (nomsu)=>
         stub = @get_stub!

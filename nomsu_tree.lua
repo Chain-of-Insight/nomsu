@@ -153,7 +153,7 @@ Tree("Block", {
     return nomsu
   end
 })
-local math_expression = re.compile([[ "%" (" " [*/^+-] " %")+ ]])
+local math_expression = re.compile([[ "%" (" " [*/^+-] " %")+ !. ]])
 Tree("Action", {
   as_lua = function(self, nomsu)
     local stub = self:get_stub()
