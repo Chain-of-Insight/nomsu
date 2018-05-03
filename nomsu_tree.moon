@@ -103,7 +103,7 @@ Tree "Block",
                 nomsu\append "\n"
         return nomsu
 
-math_expression = re.compile [[ "%" (" " [*/^+-] " %")+ !. ]]
+math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
 Tree "Action",
     as_lua: (nomsu)=>
         stub = @get_stub!
@@ -313,7 +313,7 @@ Tree "List",
                 line_length += #last_line
             if i < #@value
                 if line_length >= MAX_LINE
-                    lua\append ",\n"
+                    lua\append ",\n  "
                     line_length = 0
                 else
                     lua\append ", "
@@ -365,7 +365,7 @@ Tree "Dict",
             unless key_lua.is_value
                 line, src = key.source\get_line!, key.source\get_text!
                 error "#{line}: Cannot use #{colored.yellow src} as a dict key, since it's not an expression.", 0
-            value_lua = entry.value\as_lua(nomsu)
+            value_lua = entry.value and entry.value\as_lua(nomsu) or Lua.Value(entry.key.source, "true")
             unless value_lua.is_value
                 line, src = value.source\get_line!, value.source\get_text!
                 error "#{line}: Cannot use #{colored.yellow src} as a dict value, since it's not an expression.", 0
@@ -388,7 +388,7 @@ Tree "Dict",
                 line_length += #last_line
             if i < #@value
                 if line_length >= MAX_LINE
-                    lua\append ",\n"
+                    lua\append ",\n  "
                     line_length = 0
                 else
                     lua\append ", "
@@ -404,7 +404,7 @@ Tree "Dict",
                 return nil unless key_nomsu
                 if entry.key.type == "Action" or entry.key.type == "Block"
                     key_nomsu\parenthesize!
-                value_nomsu = entry.value\as_nomsu(true)
+                value_nomsu = entry.value and entry.value\as_nomsu(true) or Nomsu(entry.key.source, "")
                 return nil unless value_nomsu
                 if i > 1
                     nomsu\append ", "
@@ -421,11 +421,12 @@ Tree "Dict",
                 return nil unless key_nomsu
                 if entry.key.type == "Action" or entry.key.type == "Block"
                     key_nomsu\parenthesize!
-                value_nomsu = entry.value\as_nomsu(true)
+                value_nomsu = entry.value and entry.value\as_nomsu(true) or Nomsu(entry.key.source, "")
                 if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= MAX_LINE
                     if #line.bits > 1
                         line\append ", "
-                    line\append key_nomsu,":",value_nomsu
+                    line\append key_nomsu
+                    if entry.value then line\append ":",value_nomsu
                 else
                     unless value_nomsu
                         value_nomsu = entry.value\as_nomsu!
@@ -433,7 +434,8 @@ Tree "Dict",
                     if #line.bits > 1
                         nomsu\append line
                         line = Nomsu(bit.source, "\n    ")
-                    line\append key_nomsu,":",value_nomsu
+                    line\append key_nomsu
+                    if entry.value then line\append ":",value_nomsu
             if #line.bits > 1
                 nomsu\append line
             return nomsu
@@ -450,7 +452,7 @@ Tree "IndexChain",
 
         for i=2,#@value
             key = @value[i]
-            if key.type == 'Text' and #key.value == 1 and type(key.value[1]) == 'string' and key.value[1]\match("^[a-zA-Z_][a-zA-Z0-9_]$")
+            if key.type == 'Text' and #key.value == 1 and type(key.value[1]) == 'string' and key.value[1]\match("^[a-zA-Z_][a-zA-Z0-9_]*$")
                 lua\append ".#{key.value[1]}"
                 continue
             key_lua = key\as_lua(nomsu)

@@ -153,7 +153,7 @@ Tree("Block", {
     return nomsu
   end
 })
-local math_expression = re.compile([[ "%" (" " [*/^+-] " %")+ !. ]])
+local math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])
 Tree("Action", {
   as_lua = function(self, nomsu)
     local stub = self:get_stub()
@@ -502,7 +502,7 @@ Tree("List", {
       end
       if i < #self.value then
         if line_length >= MAX_LINE then
-          lua:append(",\n")
+          lua:append(",\n  ")
           line_length = 0
         else
           lua:append(", ")
@@ -578,7 +578,7 @@ Tree("Dict", {
         local line, src = key.source:get_line(), key.source:get_text()
         error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict key, since it's not an expression.", 0)
       end
-      local value_lua = entry.value:as_lua(nomsu)
+      local value_lua = entry.value and entry.value:as_lua(nomsu) or Lua.Value(entry.key.source, "true")
       if not (value_lua.is_value) then
         local line, src = value.source:get_line(), value.source:get_text()
         error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict value, since it's not an expression.", 0)
@@ -599,7 +599,7 @@ Tree("Dict", {
       end
       if i < #self.value then
         if line_length >= MAX_LINE then
-          lua:append(",\n")
+          lua:append(",\n  ")
           line_length = 0
         else
           lua:append(", ")
@@ -624,7 +624,7 @@ Tree("Dict", {
         if entry.key.type == "Action" or entry.key.type == "Block" then
           key_nomsu:parenthesize()
         end
-        local value_nomsu = entry.value:as_nomsu(true)
+        local value_nomsu = entry.value and entry.value:as_nomsu(true) or Nomsu(entry.key.source, "")
         if not (value_nomsu) then
           return nil
         end
@@ -652,12 +652,15 @@ Tree("Dict", {
         if entry.key.type == "Action" or entry.key.type == "Block" then
           key_nomsu:parenthesize()
         end
-        local value_nomsu = entry.value:as_nomsu(true)
+        local value_nomsu = entry.value and entry.value:as_nomsu(true) or Nomsu(entry.key.source, "")
         if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= MAX_LINE then
           if #line.bits > 1 then
             line:append(", ")
           end
-          line:append(key_nomsu, ":", value_nomsu)
+          line:append(key_nomsu)
+          if entry.value then
+            line:append(":", value_nomsu)
+          end
         else
           if not (value_nomsu) then
             value_nomsu = entry.value:as_nomsu()
@@ -669,7 +672,10 @@ Tree("Dict", {
             nomsu:append(line)
             line = Nomsu(bit.source, "\n    ")
           end
-          line:append(key_nomsu, ":", value_nomsu)
+          line:append(key_nomsu)
+          if entry.value then
+            line:append(":", value_nomsu)
+          end
         end
       end
       if #line.bits > 1 then
@@ -694,7 +700,7 @@ Tree("IndexChain", {
       local _continue_0 = false
       repeat
         local key = self.value[i]
-        if key.type == 'Text' and #key.value == 1 and type(key.value[1]) == 'string' and key.value[1]:match("^[a-zA-Z_][a-zA-Z0-9_]$") then
+        if key.type == 'Text' and #key.value == 1 and type(key.value[1]) == 'string' and key.value[1]:match("^[a-zA-Z_][a-zA-Z0-9_]*$") then
           lua:append("." .. tostring(key.value[1]))
           _continue_0 = true
           break

@@ -173,21 +173,29 @@ do
       return start + #nodent
     end
   end)
-  _with_0.error = function(src, pos, err_msg)
-    if src:sub(pos, pos):match("[\r\n]") then
-      pos = pos + #src:match("[ \t\n\r]*", pos)
+  _with_0.error = function(src, end_pos, start_pos, err_msg)
+    local seen_errors = lpeg.userdata.errors
+    if seen_errors[start_pos] then
+      return true
     end
-    local line_no = 1
-    local text_loc = lpeg.userdata.source_code.source:sub(pos, pos)
-    line_no = text_loc:get_line_number()
+    local err_pos = start_pos
+    local text_loc = lpeg.userdata.source_code.source:sub(err_pos, err_pos)
+    local line_no = text_loc:get_line_number()
     src = FILE_CACHE[text_loc.filename]
-    local prev_line = src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 2)
+    local prev_line = line_no == 1 and "" or src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 2)
     local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 2)
     local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 2)
-    local pointer = ("-"):rep(pos - LINE_STARTS[src][line_no]) .. "^"
-    err_msg = (err_msg or "Parse error") .. " in " .. tostring(lpeg.userdata.source_code.source.filename) .. " on line " .. tostring(line_no) .. ":\n"
-    err_msg = err_msg .. "\n" .. tostring(prev_line) .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer) .. "\n" .. tostring(next_line) .. "\n"
-    return error(err_msg)
+    local pointer = ("-"):rep(err_pos - LINE_STARTS[src][line_no]) .. "^"
+    err_msg = (err_msg or "Parse error") .. " at " .. tostring(lpeg.userdata.source_code.source.filename) .. ":" .. tostring(line_no) .. ":\n"
+    if #prev_line > 0 then
+      err_msg = err_msg .. ("\n" .. prev_line)
+    end
+    err_msg = err_msg .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer)
+    if #next_line > 0 then
+      err_msg = err_msg .. ("\n" .. next_line)
+    end
+    seen_errors[start_pos] = err_msg
+    return true
   end
   NOMSU_DEFS = _with_0
 end
@@ -350,13 +358,30 @@ do
         source_code = nomsu_code,
         indent_stack = {
           ""
-        }
+        },
+        errors = { }
       }
       local old_userdata
       old_userdata, lpeg.userdata = lpeg.userdata, userdata
       local tree = NOMSU_PATTERN:match(tostring(nomsu_code))
       lpeg.userdata = old_userdata
       assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
+      if next(userdata.errors) then
+        local keys = utils.keys(userdata.errors)
+        table.sort(keys)
+        local errors
+        do
+          local _accum_0 = { }
+          local _len_0 = 1
+          for _index_0 = 1, #keys do
+            local k = keys[_index_0]
+            _accum_0[_len_0] = userdata.errors[k]
+            _len_0 = _len_0 + 1
+          end
+          errors = _accum_0
+        end
+        error(concat(errors, "\n\n"), 0)
+      end
       return tree
     end,
     run = function(self, nomsu_code, compile_fn)
@@ -950,7 +975,7 @@ do
 end
 if arg and debug_getinfo(2).func ~= require then
   colors = require('consolecolors')
-  local parser = re.compile([[        args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} |} ";"? !.
+  local parser = re.compile([[        args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} {:nomsu_args: {| ("--;" ({[^;]*} ";")*)? |} :} ";"? |} !.
         flag <-
             {:interactive: ("-i" -> true) :}
           / {:verbose: ("-v" -> true) :}
@@ -971,7 +996,7 @@ if arg and debug_getinfo(2).func ~= require then
   if not args or args.help then
     print([=[Nomsu Compiler
 
-Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [-o output] [-p print_file] file1 file2...
+Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [-o output] [-p print_file] file1 file2... [-- nomsu args...]
 
 OPTIONS
     -i Run the compiler in interactive mode (REPL)
@@ -987,6 +1012,7 @@ OPTIONS
     os.exit()
   end
   local nomsu = NomsuCompiler()
+  nomsu.environment.arg = args.nomsu_args
   local ok, to_lua = pcall(function()
     return require('moonscript.base').to_lua
   end)
@@ -1177,16 +1203,20 @@ OPTIONS
         return output_file:flush()
       end
     end
+    local parse_errs = { }
     local _list_0 = args.inputs
     for _index_0 = 1, #_list_0 do
       local input = _list_0[_index_0]
       if args.syntax then
         for input_file in all_files(input) do
-          nomsu:parse(io.open(input_file):read("*a"))
-        end
-        if print_file then
-          print_file:write("All files parsed successfully!\n")
-          print_file:flush()
+          local err
+          ok, err = pcall(nomsu.parse, nomsu, Nomsu(input_file, io.open(input_file):read("*a")))
+          if not ok then
+            insert(parse_errs, err)
+          elseif print_file then
+            print_file:write("Parse succeeded: " .. tostring(input_file) .. "\n")
+            print_file:flush()
+          end
         end
       elseif args.format then
         for input_file in all_files(input) do
@@ -1206,6 +1236,13 @@ OPTIONS
       else
         nomsu:run_file(input, compile_fn)
       end
+    end
+    if #parse_errs > 0 then
+      io.stderr:write(concat(parse_errs, "\n\n"))
+      io.stderr:flush()
+      os.exit(false, true)
+    elseif args.syntax then
+      os.exit(true, true)
     end
     if args.interactive then
       while true do

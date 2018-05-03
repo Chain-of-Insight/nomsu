@@ -155,21 +155,27 @@ NOMSU_DEFS = with {}
         if @sub(start, start+#nodent-1) == nodent
             return start + #nodent
 
-    .error = (src,pos,err_msg)->
-        --src = tostring(FILE_CACHE[lpeg.userdata.source_code.source.filename])
-        if src\sub(pos,pos)\match("[\r\n]")
-            pos += #src\match("[ \t\n\r]*", pos)
-        line_no = 1
-        text_loc = lpeg.userdata.source_code.source\sub(pos,pos)
+    .error = (src,end_pos,start_pos,err_msg)->
+        seen_errors = lpeg.userdata.errors
+        if seen_errors[start_pos]
+            return true
+        err_pos = start_pos
+        --if src\sub(err_pos,err_pos)\match("[\r\n]")
+        --    err_pos += #src\match("[ \t\n\r]*", err_pos)
+        text_loc = lpeg.userdata.source_code.source\sub(err_pos,err_pos)
         line_no = text_loc\get_line_number!
         src = FILE_CACHE[text_loc.filename]
-        prev_line = src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-2)
+        prev_line = line_no == 1 and "" or src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-2)
         err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-2)
         next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-2)
-        pointer = ("-")\rep(pos-LINE_STARTS[src][line_no]) .. "^"
-        err_msg = (err_msg or "Parse error").." in #{lpeg.userdata.source_code.source.filename} on line #{line_no}:\n"
-        err_msg ..="\n#{prev_line}\n#{err_line}\n#{pointer}\n#{next_line}\n"
-        error(err_msg)
+        pointer = ("-")\rep(err_pos-LINE_STARTS[src][line_no]) .. "^"
+        err_msg = (err_msg or "Parse error").." at #{lpeg.userdata.source_code.source.filename}:#{line_no}:\n"
+        if #prev_line > 0 then err_msg ..= "\n"..prev_line
+        err_msg ..= "\n#{err_line}\n#{pointer}"
+        if #next_line > 0 then err_msg ..= "\n"..next_line
+        --error(err_msg)
+        seen_errors[start_pos] = err_msg
+        return true
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop)->
@@ -279,7 +285,6 @@ class NomsuCompiler
         -- TODO: repair
         error("Not currently functional.", 0)
 
-    -- TODO: figure out whether indent/dedent should affect first line
     dedent: (code)=>
         unless code\find("\n")
             return code
@@ -307,7 +312,7 @@ class NomsuCompiler
             FILE_CACHE[filename] = nomsu_code
             nomsu_code = Nomsu(filename, nomsu_code)
         userdata = {
-            source_code:nomsu_code, indent_stack: {""}
+            source_code:nomsu_code, indent_stack: {""}, errors: {},
         }
 
         old_userdata, lpeg.userdata = lpeg.userdata, userdata
@@ -315,6 +320,13 @@ class NomsuCompiler
         lpeg.userdata = old_userdata
         
         assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
+
+        if next(userdata.errors)
+            keys = utils.keys(userdata.errors)
+            table.sort(keys)
+            errors = [userdata.errors[k] for k in *keys]
+            error(concat(errors, "\n\n"), 0)
+            
         return tree
 
     _nomsu_chunk_counter = 0
@@ -663,7 +675,7 @@ if arg and debug_getinfo(2).func != require
     export colors
     colors = require 'consolecolors'
     parser = re.compile([[
-        args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} |} ";"? !.
+        args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} {:nomsu_args: {| ("--;" ({[^;]*} ";")*)? |} :} ";"? |} !.
         flag <-
             {:interactive: ("-i" -> true) :}
           / {:verbose: ("-v" -> true) :}
@@ -681,7 +693,7 @@ if arg and debug_getinfo(2).func != require
         print [=[
 Nomsu Compiler
 
-Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [-o output] [-p print_file] file1 file2...
+Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [-o output] [-p print_file] file1 file2... [-- nomsu args...]
 
 OPTIONS
     -i Run the compiler in interactive mode (REPL)
@@ -697,6 +709,7 @@ OPTIONS
         os.exit!
 
     nomsu = NomsuCompiler!
+    nomsu.environment.arg = args.nomsu_args
 
     ok, to_lua = pcall -> require('moonscript.base').to_lua
     if not ok then to_lua = nil
@@ -820,14 +833,17 @@ OPTIONS
                 output_file\write("local IMMEDIATE = true;\n"..tostring(code))
                 output_file\flush!
 
+        parse_errs = {}
         for input in *args.inputs
             if args.syntax
                 -- Check syntax:
                 for input_file in all_files(input)
-                    nomsu\parse(io.open(input_file)\read("*a"))
-                if print_file
-                    print_file\write("All files parsed successfully!\n")
-                    print_file\flush!
+                    ok,err = pcall nomsu.parse, nomsu, Nomsu(input_file, io.open(input_file)\read("*a"))
+                    if not ok
+                        insert parse_errs, err
+                    elseif print_file
+                        print_file\write("Parse succeeded: #{input_file}\n")
+                        print_file\flush!
             elseif args.format
                 -- Auto-format
                 for input_file in all_files(input)
@@ -843,6 +859,13 @@ OPTIONS
                 nomsu\run(io.input!\read("*a"), compile_fn)
             else
                 nomsu\run_file(input, compile_fn)
+
+        if #parse_errs > 0
+            io.stderr\write concat(parse_errs, "\n\n")
+            io.stderr\flush!
+            os.exit(false, true)
+        elseif args.syntax
+            os.exit(true, true)
 
         if args.interactive
             -- REPL
