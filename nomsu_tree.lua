@@ -203,13 +203,15 @@ Tree("Action", {
             local src = tok.source:get_text()
             error("non-expression value inside math expression: " .. tostring(colored.yellow(src)))
           end
+          if tok.type == "Action" then
+            tok_lua:parenthesize()
+          end
           lua:append(tok_lua)
         end
         if i < #self.value then
           lua:append(" ")
         end
       end
-      lua:parenthesize()
       return lua
     end
     local args = { }

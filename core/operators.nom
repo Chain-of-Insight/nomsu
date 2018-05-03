@@ -132,11 +132,6 @@ immediately
 
 immediately
     # Math Operators
-    compile [%x + %y] to: Lua value "(\(%x as lua expr) + \(%y as lua expr))"
-    compile [%x - %y] to: Lua value "(\(%x as lua expr) - \(%y as lua expr))"
-    compile [%x * %y] to: Lua value "(\(%x as lua expr) * \(%y as lua expr))"
-    compile [%x / %y] to: Lua value "(\(%x as lua expr) / \(%y as lua expr))"
-    compile [%x ^ %y] to: Lua value "(\(%x as lua expr) ^ \(%y as lua expr))"
     compile [%x wrapped around %y, %x mod %y] to: Lua value "(\(%x as lua expr) % \(%y as lua expr))"
 
     # 3-part chained comparisons

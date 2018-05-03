@@ -132,10 +132,11 @@ Tree "Action",
                     unless tok_lua.is_value
                         src = tok.source\get_text!
                         error("non-expression value inside math expression: #{colored.yellow src}")
+                    if tok.type == "Action"
+                        tok_lua\parenthesize!
                     lua\append tok_lua
                 if i < #@value
                     lua\append " "
-            lua\parenthesize!
             return lua
 
         args = {}
