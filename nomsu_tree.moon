@@ -116,13 +116,13 @@ math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ 
 Tree "Action",
     as_lua: (nomsu)=>
         stub = @get_stub!
-        macro = nomsu.environment.MACROS[stub]
-        if macro
+        compile_action = nomsu.environment.COMPILE_ACTIONS[stub]
+        if compile_action
             args = [arg for arg in *@value when arg.type != "Word"]
             -- Force all compile-time actions to take a tree location
-            args = [args[p-1] for p in *nomsu.environment.ARG_ORDERS[macro][stub]]
+            args = [args[p-1] for p in *nomsu.environment.ARG_ORDERS[compile_action][stub]]
             -- Force Lua to avoid tail call optimization for debugging purposes
-            ret = macro(self, unpack(args))
+            ret = compile_action(self, unpack(args))
             return ret
         action = rawget(nomsu.environment.ACTIONS, stub)
         lua = Lua.Value(@source)

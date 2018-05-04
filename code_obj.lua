@@ -16,7 +16,7 @@ Source = immutable({
       start, stop = 1, #FILE_CACHE[filename]
     end
     if stop then
-      assert(start <= stop, "Invalid range: " .. tostring(start) .. ", " .. tostring(stop))
+      assert(start <= stop + 1, "Invalid range: " .. tostring(start) .. ", " .. tostring(stop))
     end
     return filename, start, stop
   end,

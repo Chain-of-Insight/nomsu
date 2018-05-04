@@ -8,7 +8,7 @@ Source = immutable {"filename","start","stop"}, {
     __new: (filename, start, stop)=>
         if not start
             start, stop = 1, #FILE_CACHE[filename]
-        if stop then assert(start <= stop, "Invalid range: #{start}, #{stop}")
+        if stop then assert(start <= stop+1, "Invalid range: #{start}, #{stop}")
         return filename, start, stop
     __tostring: =>
         if @stop

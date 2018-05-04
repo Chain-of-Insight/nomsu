@@ -236,9 +236,9 @@ do
   local _class_0
   local stub_defs, stub_pattern, var_pattern, _nomsu_chunk_counter
   local _base_0 = {
-    define_action = function(self, signature, fn, is_macro)
-      if is_macro == nil then
-        is_macro = false
+    define_action = function(self, signature, fn, is_compile_action)
+      if is_compile_action == nil then
+        is_compile_action = false
       end
       assert(type(fn) == 'function', "Bad fn: " .. tostring(repr(fn)))
       if type(signature) == 'string' then
@@ -285,7 +285,7 @@ do
         local alias = signature[_index_0]
         local stub = assert(stub_pattern:match(alias))
         stub_args = assert(var_pattern:match(alias));
-        (is_macro and self.environment.MACROS or self.environment.ACTIONS)[stub] = fn
+        (is_compile_action and self.environment.COMPILE_ACTIONS or self.environment.ACTIONS)[stub] = fn
         do
           local _accum_0 = { }
           local _len_0 = 1
@@ -634,9 +634,6 @@ do
         end
         return lua
       end)
-      self:define_compile_action("!! code location !!", function(self)
-        return Lua.Value(self.source, repr(tostring(self.source)))
-      end)
       self:define_action("run file %filename", function(_filename)
         return nomsu:run_file(_filename)
       end)
@@ -727,7 +724,7 @@ do
           end
         end
       })
-      self.environment.MACROS = { }
+      self.environment.COMPILE_ACTIONS = { }
       self.environment.ARG_ORDERS = setmetatable({ }, {
         __mode = "k"
       })

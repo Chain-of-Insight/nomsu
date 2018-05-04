@@ -243,7 +243,7 @@ class NomsuCompiler
             (...)->
                 error("Attempt to run undefined action: #{key}", 0)
         })
-        @environment.MACROS = {}
+        @environment.COMPILE_ACTIONS = {}
         @environment.ARG_ORDERS = setmetatable({}, {__mode:"k"})
         @environment.LOADED = {}
         @environment.Types = Types
@@ -258,7 +258,7 @@ class NomsuCompiler
         {~ (%space->'') (('%' (%varname->'')) / %word)? ((%space->' ') (('%' (%varname->'')) / %word))* (%space->'') ~}
     ]=], stub_defs
     var_pattern = re.compile "{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs
-    define_action: (signature, fn, is_macro=false)=>
+    define_action: (signature, fn, is_compile_action=false)=>
         assert(type(fn) == 'function', "Bad fn: #{repr fn}")
         if type(signature) == 'string'
             signature = {signature}
@@ -275,7 +275,7 @@ class NomsuCompiler
         for alias in *signature
             stub = assert(stub_pattern\match(alias))
             stub_args = assert(var_pattern\match(alias))
-            (is_macro and @environment.MACROS or @environment.ACTIONS)[stub] = fn
+            (is_compile_action and @environment.COMPILE_ACTIONS or @environment.ACTIONS)[stub] = fn
             arg_orders[stub] = [fn_arg_positions[@var_to_lua_identifier(a)] for a in *stub_args]
         @environment.ARG_ORDERS[fn] = arg_orders
 
@@ -521,9 +521,6 @@ class NomsuCompiler
                         error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
                     lua\append bit_lua
             return lua
-
-        @define_compile_action "!! code location !!", =>
-            return Lua.Value(@source, repr(tostring(@source)))
 
         @define_action "run file %filename", (_filename)->
             return nomsu\run_file(_filename)

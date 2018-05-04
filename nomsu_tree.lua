@@ -186,8 +186,8 @@ local math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* "
 Tree("Action", {
   as_lua = function(self, nomsu)
     local stub = self:get_stub()
-    local macro = nomsu.environment.MACROS[stub]
-    if macro then
+    local compile_action = nomsu.environment.COMPILE_ACTIONS[stub]
+    if compile_action then
       local args
       do
         local _accum_0 = { }
@@ -205,7 +205,7 @@ Tree("Action", {
       do
         local _accum_0 = { }
         local _len_0 = 1
-        local _list_0 = nomsu.environment.ARG_ORDERS[macro][stub]
+        local _list_0 = nomsu.environment.ARG_ORDERS[compile_action][stub]
         for _index_0 = 1, #_list_0 do
           local p = _list_0[_index_0]
           _accum_0[_len_0] = args[p - 1]
@@ -213,7 +213,7 @@ Tree("Action", {
         end
         args = _accum_0
       end
-      local ret = macro(self, unpack(args))
+      local ret = compile_action(self, unpack(args))
       return ret
     end
     local action = rawget(nomsu.environment.ACTIONS, stub)
