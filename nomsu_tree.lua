@@ -93,6 +93,19 @@ Tree("File", {
       end
     end
     return nomsu
+  end,
+  map = function(self, fn)
+    return fn(self) or self:with_value(Tuple(unpack((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local v = _list_0[_index_0]
+        _accum_0[_len_0] = v:map(fn)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)())))
   end
 })
 Tree("Nomsu", {
@@ -109,6 +122,9 @@ Tree("Nomsu", {
       return nomsu and Nomsu(self.source, "\\:\n    ", nomsu)
     end
     return nomsu and Nomsu(self.source, "\\(", nomsu, ")")
+  end,
+  map = function(self, fn)
+    return fn(self) or self:with_value(self.value:map(fn))
   end
 })
 Tree("Block", {
@@ -151,15 +167,27 @@ Tree("Block", {
       end
     end
     return nomsu
+  end,
+  map = function(self, fn)
+    return fn(self) or self:with_value(Tuple(unpack((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local v = _list_0[_index_0]
+        _accum_0[_len_0] = v:map(fn)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)())))
   end
 })
 local math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])
 Tree("Action", {
   as_lua = function(self, nomsu)
     local stub = self:get_stub()
-    local action = rawget(nomsu.environment.ACTIONS, stub)
-    local metadata = nomsu.action_metadata[action]
-    if metadata and metadata.compile_time then
+    local macro = nomsu.environment.MACROS[stub]
+    if macro then
       local args
       do
         local _accum_0 = { }
@@ -174,26 +202,23 @@ Tree("Action", {
         end
         args = _accum_0
       end
-      if metadata.arg_orders then
-        local new_args
-        do
-          local _accum_0 = { }
-          local _len_0 = 1
-          local _list_0 = metadata.arg_orders[stub]
-          for _index_0 = 1, #_list_0 do
-            local p = _list_0[_index_0]
-            _accum_0[_len_0] = args[p - 1]
-            _len_0 = _len_0 + 1
-          end
-          new_args = _accum_0
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        local _list_0 = nomsu.environment.ARG_ORDERS[macro][stub]
+        for _index_0 = 1, #_list_0 do
+          local p = _list_0[_index_0]
+          _accum_0[_len_0] = args[p - 1]
+          _len_0 = _len_0 + 1
         end
-        args = new_args
+        args = _accum_0
       end
-      local ret = action(self, unpack(args))
+      local ret = macro(self, unpack(args))
       return ret
     end
+    local action = rawget(nomsu.environment.ACTIONS, stub)
     local lua = Lua.Value(self.source)
-    if not metadata and math_expression:match(stub) then
+    if not action and math_expression:match(stub) then
       for i, tok in ipairs(self.value) do
         if tok.type == "Word" then
           lua:append(tok.value)
@@ -234,11 +259,11 @@ Tree("Action", {
         break
       end
     end
-    if metadata and metadata.arg_orders then
+    if action then
       do
         local _accum_0 = { }
         local _len_0 = 1
-        local _list_0 = metadata.arg_orders[stub]
+        local _list_0 = nomsu.environment.ARG_ORDERS[action][stub]
         for _index_0 = 1, #_list_0 do
           local p = _list_0[_index_0]
           _accum_0[_len_0] = args[p]
@@ -375,6 +400,19 @@ Tree("Action", {
       end
       return nomsu
     end
+  end,
+  map = function(self, fn)
+    return fn(self) or self:with_value(Tuple(unpack((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local v = _list_0[_index_0]
+        _accum_0[_len_0] = v:map(fn)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)())))
   end
 })
 Tree("Text", {
@@ -482,6 +520,19 @@ Tree("Text", {
       end
       return nomsu
     end
+  end,
+  map = function(self, fn)
+    return fn(self) or self:with_value(Tuple(unpack((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local v = _list_0[_index_0]
+        _accum_0[_len_0] = type(v) == 'string' and v or v:map(fn)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)())))
   end
 })
 Tree("List", {
@@ -568,6 +619,19 @@ Tree("List", {
       end
       return nomsu
     end
+  end,
+  map = function(self, fn)
+    return fn(self) or self:with_value(Tuple(unpack((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local v = _list_0[_index_0]
+        _accum_0[_len_0] = v:map(fn)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)())))
   end
 })
 Tree("Dict", {
@@ -685,6 +749,20 @@ Tree("Dict", {
       end
       return nomsu
     end
+  end,
+  map = function(self, fn)
+    local DictEntry = Types.DictEntry
+    return fn(self) or self:with_value(Tuple(unpack((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local e = _list_0[_index_0]
+        _accum_0[_len_0] = DictEntry(e.key:map(fn), e.value:map(fn))
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)())))
   end
 })
 Tree("IndexChain", {
@@ -741,6 +819,19 @@ Tree("IndexChain", {
       nomsu:append(bit_nomsu)
     end
     return nomsu
+  end,
+  map = function(self, fn)
+    return fn(self) or self:with_value(Tuple(unpack((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local v = _list_0[_index_0]
+        _accum_0[_len_0] = v:map(fn)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)())))
   end
 })
 Tree("Number", {
@@ -752,6 +843,9 @@ Tree("Number", {
       inline = false
     end
     return Nomsu(self.source, tostring(self.value))
+  end,
+  map = function(self, fn)
+    return fn(self) or self
   end
 })
 Tree("Var", {
@@ -770,6 +864,9 @@ Tree("Var", {
       inline = false
     end
     return Nomsu(self.source, "%", self.value)
+  end,
+  map = function(self, fn)
+    return fn(self) or self
   end
 })
 Tree("Word", {
@@ -781,6 +878,9 @@ Tree("Word", {
       inline = false
     end
     return Nomsu(self.source, self.value)
+  end,
+  map = function(self, fn)
+    return fn(self) or self
   end
 })
 Tree("Comment", {
@@ -799,6 +899,9 @@ Tree("Comment", {
     else
       return Nomsu(self.source, "#", self.value)
     end
+  end,
+  map = function(self, fn)
+    return fn(self) or self
   end
 })
 return Types
