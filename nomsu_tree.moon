@@ -63,6 +63,9 @@ Tree "File",
                 nomsu\append "\n"
         return nomsu
 
+    map: (fn)=>
+        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
+
 Tree "Nomsu",
     as_lua: (nomsu)=>
         Lua.Value(@source, "nomsu:parse(Nomsu(",repr(@value.source),", ",repr(tostring(@value.source\get_text!)),")).value[1]")
@@ -73,6 +76,9 @@ Tree "Nomsu",
             nomsu = @value\as_nomsu!
             return nomsu and Nomsu(@source, "\\:\n    ", nomsu)
         return nomsu and Nomsu(@source, "\\(", nomsu, ")")
+
+    map: (fn)=>
+        fn(self) or @with_value(@value\map(fn))
 
 Tree "Block",
     as_lua: (nomsu)=>
@@ -103,24 +109,24 @@ Tree "Block",
                 nomsu\append "\n"
         return nomsu
 
+    map: (fn)=>
+        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
+
 math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
 Tree "Action",
     as_lua: (nomsu)=>
         stub = @get_stub!
-        action = rawget(nomsu.environment.ACTIONS, stub)
-        metadata = nomsu.action_metadata[action]
-        if metadata and metadata.compile_time
+        macro = nomsu.environment.MACROS[stub]
+        if macro
             args = [arg for arg in *@value when arg.type != "Word"]
             -- Force all compile-time actions to take a tree location
-            if metadata.arg_orders
-                new_args = [args[p-1] for p in *metadata.arg_orders[stub]]
-                args = new_args
+            args = [args[p-1] for p in *nomsu.environment.ARG_ORDERS[macro][stub]]
             -- Force Lua to avoid tail call optimization for debugging purposes
-            ret = action(self, unpack(args))
+            ret = macro(self, unpack(args))
             return ret
-
+        action = rawget(nomsu.environment.ACTIONS, stub)
         lua = Lua.Value(@source)
-        if not metadata and math_expression\match(stub)
+        if not action and math_expression\match(stub)
             -- This is a bit of a hack, but this code handles arbitrarily complex
             -- math expressions like 2*x + 3^2 without having to define a single
             -- action for every possibility.
@@ -148,8 +154,8 @@ Tree "Action",
                 error "#{line}: Cannot use:\n#{colored.yellow src}\nas an argument to #{stub}, since it's not an expression, it produces: #{repr arg_lua}", 0
             insert args, arg_lua
 
-        if metadata and metadata.arg_orders
-            args = [args[p] for p in *metadata.arg_orders[stub]]
+        if action
+            args = [args[p] for p in *nomsu.environment.ARG_ORDERS[action][stub]]
 
         -- Not really worth bothering with ACTIONS.foo(...) style since almost every action
         -- has arguments, so it won't work
@@ -227,7 +233,9 @@ Tree "Action",
                     if next_space == " " and #(tostring(nomsu)\match("[^\n]*$")) > MAX_LINE
                         next_space = "\n.."
             return nomsu
-    
+
+    map: (fn)=>
+        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
 
 Tree "Text",
     as_lua: (nomsu)=>
@@ -296,6 +304,9 @@ Tree "Text",
                             nomsu\append "\n    .."
             return nomsu
 
+    map: (fn)=>
+        fn(self) or @with_value(Tuple(unpack([type(v) == 'string' and v or v\map(fn) for v in *@value])))
+
 Tree "List",
     as_lua: (nomsu)=>
         lua = Lua.Value @source, "{"
@@ -356,6 +367,9 @@ Tree "List",
             if #line.bits > 1
                 nomsu\append line
             return nomsu
+
+    map: (fn)=>
+        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
 
 Tree "Dict",
     as_lua: (nomsu)=>
@@ -441,6 +455,10 @@ Tree "Dict",
                 nomsu\append line
             return nomsu
 
+    map: (fn)=>
+        DictEntry = Types.DictEntry
+        fn(self) or @with_value(Tuple(unpack([DictEntry(e.key\map(fn), e.value\map(fn)) for e in *@value])))
+
 Tree "IndexChain",
     as_lua: (nomsu)=>
         lua = @value[1]\as_lua(nomsu)
@@ -479,12 +497,17 @@ Tree "IndexChain",
             nomsu\append bit_nomsu
         return nomsu
 
+    map: (fn)=>
+        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
+
 Tree "Number",
     as_lua: (nomsu)=>
         Lua.Value(@source, tostring(@value))
     
     as_nomsu: (inline=false)=>
         return Nomsu(@source, tostring(@value))
+
+    map: (fn)=> fn(self) or self
 
 Tree "Var",
     as_lua: (nomsu)=>
@@ -495,12 +518,16 @@ Tree "Var",
     as_nomsu: (inline=false)=>
         return Nomsu(@source, "%", @value)
 
+    map: (fn)=> fn(self) or self
+
 Tree "Word",
     as_lua: (nomsu)=>
         error("Attempt to convert Word to lua")
 
     as_nomsu: (inline=false)=>
         return Nomsu(@source, @value)
+
+    map: (fn)=> fn(self) or self
 
 Tree "Comment",
     as_lua: (nomsu)=>
@@ -512,5 +539,7 @@ Tree "Comment",
             return Nomsu(@source, "#..", @value\gsub("\n", "\n    "))
         else
             return Nomsu(@source, "#", @value)
+
+    map: (fn)=> fn(self) or self
 
 return Types

@@ -5,7 +5,7 @@
 # Compile-time action to make compile-time actions:
 immediately
     lua> ".."
-        nomsu:define_compile_action("compile %actions to %lua", \(!! code location !!), function(tree, \%actions, \%lua)
+        nomsu:define_compile_action("compile %actions to %lua", function(tree, \%actions, \%lua)
             local lua = Lua(tree.source, "nomsu:define_compile_action(");
             local stubs = {};
             for i, action in ipairs(\%actions.value) do
@@ -17,7 +17,7 @@ immediately
             else
                 lua:append(stubs,", ");
             end
-            lua:append(repr(tree.source:get_line()), ", function(tree");
+            lua:append("function(tree");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
@@ -49,7 +49,7 @@ immediately
             else
                 lua:append(stubs,", ");
             end
-            lua:append(repr(tree.source:get_line()), ", function(");
+            lua:append("function(");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
@@ -80,7 +80,7 @@ immediately
             else
                 lua:append(stubs,", ");
             end
-            lua:append(repr(tree.source:get_line()), ", function(tree");
+            lua:append("function(tree");
             local args = {};
             for i,tok in ipairs(\%shorthand.value[1].value) do
                 if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
@@ -103,12 +103,11 @@ immediately
 action [remove action %stub]
     lua> ".."
         local fn = ACTIONS[\%stub];
-        local metadata = nomsu.action_metadata[fn];
-        for i=#metadata.aliases,1,-1 do
-            metadata.arg_orders[metadata.aliases[i]] = nil;
-            table.remove(metadata.aliases, i);
+        local stubs = ARG_ORDERS[fn];
+        for stub in pairs(stubs) do
+            ACTIONS[stub] = nil;
         end
-        ACTIONS[\%stub] = nil;
+        ARG_ORDERS[fn] = nil;
 
 immediately
     action [%tree as lua]
@@ -142,7 +141,7 @@ immediately
 
     
     action [%tree's stub]
-        =lua "nomsu:tree_to_stub(\%tree)"
+        =lua "\%tree:get_stub()"
     
 immediately
     parse [%var <-write %code] as: lua> "\%var:append(\%code);"

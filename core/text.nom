@@ -18,11 +18,6 @@ compile [capitalized %text, %text capitalized] to
 compile [%text with %sub instead of %patt, %text s/%patt/%sub] to
     Lua value "((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))"
 
-# TODO: figure out whether indent/dedent should affect first line
-compile [indented %text, %text indented] to: Lua value "((\%text):gsub('\\n','\\n'..('    ')))"
-compile [dedented %obj, %obj dedented] to: Lua value "nomsu:dedent(\(%obj as lua expr))"
-compile [%text indented %n times] to: Lua value "((\%text):gsub('\\n','\\n'..('    '):rep(\%n)))"
-
 # Text literals
 lua> ".."
     do
@@ -32,7 +27,7 @@ lua> ".."
         };
         for name, e in pairs(escapes) do
             local lua = "'"..e.."'";
-            nomsu:define_compile_action(name, \(!! code location !!), function(tree) return Lua.Value(tree.source, lua); end);
+            nomsu:define_compile_action(name, function(tree) return Lua.Value(tree.source, lua); end);
         end
         local colors = {
             ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
@@ -47,8 +42,8 @@ lua> ".."
         for name, c in pairs(colors) do
             local color = "'"..c.."'";
             local reset = "'"..colors["reset color"].."'";
-            nomsu:define_compile_action(name, \(!! code location !!), function(tree) return Lua.Value(tree.source, color); end);
-            nomsu:define_compile_action(name.." %", \(!! code location !!), function(\%)
+            nomsu:define_compile_action(name, function(tree) return Lua.Value(tree.source, color); end);
+            nomsu:define_compile_action(name.." %", function(\%)
                 return Lua.Value(tree.source, color, "..", \%:as_lua(nomsu), "..", reset);
             end);
         end

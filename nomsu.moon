@@ -223,7 +223,6 @@ class NomsuCompiler
         })
         @use_stack = {}
         @file_metadata = setmetatable({}, {__mode:"k"})
-        @action_metadata = setmetatable({}, {__mode:"k"})
 
         @environment = {
             -- Discretionary/convenience stuff
@@ -241,69 +240,47 @@ class NomsuCompiler
         @environment.Nomsu = Nomsu
         @environment.Source = Source
         @environment.ACTIONS = setmetatable({}, {__index:(key)=>
-            error("Attempt to run undefined action: #{key}", 0)
+            (...)->
+                error("Attempt to run undefined action: #{key}", 0)
         })
+        @environment.MACROS = {}
+        @environment.ARG_ORDERS = setmetatable({}, {__mode:"k"})
         @environment.LOADED = {}
         @environment.Types = Types
         @initialize_core!
     
-    define_action: (signature, source, fn)=>
-        if type(fn) != 'function'
-            error 'function', "Bad fn: #{repr fn}"
+    stub_defs = {
+        space:(P(' ') + P('\n..'))^0
+        word:(NOMSU_DEFS.ident_char^1 + NOMSU_DEFS.operator^1)
+        varname:(R('az','AZ','09') + P('_') + NOMSU_DEFS.utf8_char)^0
+    }
+    stub_pattern = re.compile [=[
+        {~ (%space->'') (('%' (%varname->'')) / %word)? ((%space->' ') (('%' (%varname->'')) / %word))* (%space->'') ~}
+    ]=], stub_defs
+    var_pattern = re.compile "{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs
+    define_action: (signature, fn, is_macro=false)=>
+        assert(type(fn) == 'function', "Bad fn: #{repr fn}")
         if type(signature) == 'string'
             signature = {signature}
-        elseif type(signature) != 'table' or signature.type != nil
+        elseif type(signature) != 'table'
             error("Invalid signature, expected list of strings, but got: #{repr signature}", 0)
-        stubs = @get_stubs_from_signature signature
-        stub_args = @get_args_from_signature signature
+
+        stubs = [assert(stub_pattern\match(alias)) for alias in *signature]
+        stub_args = [assert(var_pattern\match(alias)) for alias in *signature]
 
         fn_info = debug_getinfo(fn, "u")
-        local fn_arg_positions, arg_orders
-        unless fn_info.isvararg
-            fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
-            arg_orders = {} -- Map from stub -> index where each arg in the stub goes in the function call
-        for sig_i=1,#stubs
-            stub, args = stubs[sig_i], stub_args[sig_i]
-            @environment.ACTIONS[stub] = fn
-            unless fn_info.isvararg
-                arg_positions = [fn_arg_positions[a] for a in *args]
-                -- TODO: better error checking?
-                --if #arg_positions != #args
-                --    error("Mismatch in args between lua function's #{repr fn_arg_positions} and stub's #{repr args} for #{repr stub}", 0)
-                arg_orders[stub] = arg_positions
-        
-        @action_metadata[fn] = {
-            :fn, :source, aliases:stubs, :arg_orders,
-            arg_positions:fn_arg_positions, def_number:@@def_number,
-        }
+        assert(not fn_info.isvararg, "Vararg functions aren't supported. Sorry, use a list instead.")
+        fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
+        arg_orders = {}
+        for alias in *signature
+            stub = assert(stub_pattern\match(alias))
+            stub_args = assert(var_pattern\match(alias))
+            (is_macro and @environment.MACROS or @environment.ACTIONS)[stub] = fn
+            arg_orders[stub] = [fn_arg_positions[@var_to_lua_identifier(a)] for a in *stub_args]
+        @environment.ARG_ORDERS[fn] = arg_orders
 
-    define_compile_action: (signature, source, fn, src)=>
-        @define_action(signature, source, fn)
-        @action_metadata[fn].compile_time = true
-
-    serialize_defs: (scope=nil, after=nil)=>
-        -- TODO: repair
-        error("Not currently functional.", 0)
-
-    dedent: (code)=>
-        unless code\find("\n")
-            return code
-        spaces, indent_spaces = math.huge, math.huge
-        for line in code\gmatch("\n([^\n]*)")
-            if line\match("^%s*#.*") or line\match("^%s*$")
-                continue -- skip comments and blank lines
-            elseif s = line\match("^(%s*)%.%..*")
-                spaces = math.min(spaces, #s)
-            elseif s = line\match("^(%s*)%S.*")
-                indent_spaces = math.min(indent_spaces, #s)
-        if spaces != math.huge and spaces < indent_spaces
-            return (code\gsub("\n"..(" ")\rep(spaces), "\n"))
-        elseif indent_spaces != math.huge
-            return (code\gsub("\n"..(" ")\rep(indent_spaces), "\n    "))
-        else return code
-
-    indent: (code, levels=1)=>
-        return code\gsub("\n","\n"..("    ")\rep(levels))
+    define_compile_action: (signature, fn)=>
+        return @define_action(signature, fn, true)
 
     parse: (nomsu_code)=>
         if type(nomsu_code) == 'string'
@@ -409,31 +386,6 @@ class NomsuCompiler
         lua = Lua(tree.source, "return ",tree\as_lua(@),";")
         return @run_lua(lua)
 
-    value_to_nomsu: (value)=>
-        switch type(value)
-            when "nil"
-                return "(nil)"
-            when "bool"
-                return value and "(yes)" or "(no)"
-            when "number"
-                -- TODO: support NaN, inf, etc.?
-                return repr(value)
-            when "table"
-                if is_list(value)
-                    return "[#{concat [@value_to_nomsu(v) for v in *value], ", "}]"
-                else
-                    return "{#{concat ["#{@value_to_nomsu(k)}:#{@value_to_nomsu(v)}" for k,v in pairs(value)], ", "}}"
-            when "string"
-                if value == "\n"
-                    return "'\\n'"
-                elseif not value\find[["]] and not value\find"\n" and not value\find"\\"
-                    return "\""..value.."\""
-                else
-                    -- TODO: This might fail if it's being put inside a list or something
-                    return '".."\n    '..(@indent value)
-            else
-                error("Unsupported value_to_nomsu type: #{type(value)}", 0)
-
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
         return unless Types.is_node(tree)
@@ -466,106 +418,18 @@ class NomsuCompiler
                 insert bits, (("    ")\rep(depth)..repr(node))
         return concat(bits, "\n")
 
-    @unescape_string: (str)=>
-        Cs(((P("\\\\")/"\\") + (P("\\\"")/'"') + NOMSU_DEFS.escaped_char + P(1))^0)\match(str)
-
-    @comma_separated_items: (open, items, close)=>
-        bits = {open}
-        so_far = 0
-        for i,item in ipairs(items)
-            if i < #items then item ..= ", "
-            insert bits, item
-            so_far += #item
-            if so_far >= 80
-                insert bits, "\n"
-                so_far = 0
-        insert bits, close
-        return concat(bits)
-
     tree_map: (tree, fn)=>
         -- Return a new tree with fn mapped to each node. If fn provides a replacement,
         -- use that and stop recursing, otherwise recurse.
         unless Types.is_node(tree) then return tree
-        replacement = fn(tree)
-        if replacement != nil
-            return replacement
-        switch tree.type
-            when "File", "Nomsu", "Block", "List", "Action", "Text", "IndexChain"
-                new_values, is_changed = {}, false
-                for i,old_value in ipairs(tree.value)
-                    new_value = type(old_value) != "string" and @tree_map(old_value, fn) or nil
-                    if new_value != nil and new_value != old_value
-                        is_changed = true
-                        new_values[i] = new_value
-                    else
-                        new_values[i] = old_value
-                if is_changed
-                    return tree\with_value Tuple(table.unpack(new_values))
-                
-            when "Dict"
-                new_values, is_changed = {}, false
-                for i,e in ipairs tree.value
-                    new_key = @tree_map(e.key, fn)
-                    new_value = @tree_map(e.value, fn)
-                    if (new_key != nil and new_key != e.key) or (new_value != nil and new_value != e.value)
-                        is_changed = true
-                        new_values[i] = DictEntry(new_key, new_value)
-                    else
-                        new_values[i] = e
-                if is_changed
-                    return tree\with_value Tuple(table.unpack(new_values))
-            when nil -- Raw table, probably from one of the .value of a multi-value tree (e.g. List)
-                error("Invalid tree: #{repr tree}")
-
-        return tree
+        return tree\map(fn)
 
     tree_with_replaced_vars: (tree, replacements)=>
-        return @tree_map tree, (t)->
+        tree\map (t)->
             if t.type == "Var"
                 id = tostring(t\as_lua(self))
                 if replacements[id] != nil
                     return replacements[id]
-
-    tree_to_stub: (tree)=>
-        if tree.type != "Action" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
-        return concat([(t.type == "Word" and t.value or "%") for t in *tree.value], " ")
-
-    tree_to_named_stub: (tree)=>
-        if tree.type != "Action" then error "Tried to get stub from non-functioncall tree: #{tree.type}", 0
-        return concat([(t.type == "Word" and t.value or "%#{t.value}") for t in *tree.value], " ")
-
-    stub_defs = {
-        space:(P(' ') + P('\n..'))^0
-        word:(NOMSU_DEFS.ident_char^1 + NOMSU_DEFS.operator^1)
-        varname:(R('az','AZ','09') + P('_') + NOMSU_DEFS.utf8_char)^0
-    }
-    stub_pattern = re.compile("{~ (%space->'') (('%' (%varname->'')) / %word)? ((%space->' ') (('%' (%varname->'')) / %word))* (%space->'') ~}", stub_defs)
-    get_stubs_from_signature: (signature)=>
-        if type(signature) != 'table' or signature.type
-            error("Invalid signature: #{repr signature}", 0)
-        stubs = {}
-        for i,alias in ipairs(signature)
-            if type(alias) != 'string'
-                error("Expected entries in signature to be strings, not #{type(alias)}s like: #{repr alias}\nsignature: #{repr signature}", 0)
-            stubs[i] = stub_pattern\match(alias)
-            unless stubs[i]
-                error("Failed to match stub pattern on alias: #{repr alias}")
-        return stubs
-
-    var_pattern = re.compile("{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs)
-    get_args_from_signature: (signature)=>
-        if type(signature) != 'table' or signature.type
-            error("Invalid signature: #{repr signature}", 0)
-        stub_args = {}
-        for i,alias in ipairs(signature)
-            if type(alias) != 'string'
-                error("Invalid type for signature: #{type(alias)} for:\n#{repr alias}", 0)
-            args = var_pattern\match(alias)
-            unless args
-                error("Failed to match arg pattern on alias: #{repr alias}", 0)
-            for j=1,#args do args[j] = @var_to_lua_identifier(args[j])
-            stub_args[i] = args
-        return stub_args
 
     var_to_lua_identifier: (var)=>
         -- Converts arbitrary nomsu vars to valid lua identifiers by replacing illegal
@@ -577,9 +441,8 @@ class NomsuCompiler
     
     initialize_core: =>
         -- Sets up some core functionality
-        get_line_no = -> "nomsu.moon:#{debug_getinfo(2).currentline}"
         nomsu = self
-        @define_compile_action "immediately %block", get_line_no!, (_block)=>
+        @define_compile_action "immediately %block", (_block)=>
             lua = _block\as_lua(nomsu)
             lua\convert_to_statements!
             lua\declare_locals!
@@ -601,31 +464,31 @@ class NomsuCompiler
                         error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression."
                     lua\append bit_lua
 
-        @define_compile_action "Lua %code", get_line_no!, (_code)=>
+        @define_compile_action "Lua %code", (_code)=>
             lua = Lua.Value(@source, "Lua(", tostring(_code.source))
             add_lua_bits(lua, _code)
             lua\append ")"
             return lua
 
-        @define_compile_action "Lua %source %code", get_line_no!, (_source, _code)=>
+        @define_compile_action "Lua %source %code", (_source, _code)=>
             lua = Lua.Value(@source, "Lua(", _source\as_lua(nomsu))
             add_lua_bits(lua, _code)
             lua\append ")"
             return lua
 
-        @define_compile_action "Lua value %code", get_line_no!, (_code)=>
+        @define_compile_action "Lua value %code", (_code)=>
             lua = Lua.Value(@source, "Lua.Value(", tostring(_code.source))
             add_lua_bits(lua, _code)
             lua\append ")"
             return lua
 
-        @define_compile_action "Lua value %source %code", get_line_no!, (_source, _code)=>
+        @define_compile_action "Lua value %source %code", (_source, _code)=>
             lua = Lua.Value(@source, "Lua.Value(", _source\as_lua(nomsu))
             add_lua_bits(lua, _code)
             lua\append ")"
             return lua
 
-        @define_compile_action "lua> %code", get_line_no!, (_code)=>
+        @define_compile_action "lua> %code", (_code)=>
             if _code.type != "Text"
                 return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
                     ", ",repr(tostring(_code\as_lua(nomsu))),"))"
@@ -642,7 +505,7 @@ class NomsuCompiler
                     lua\append bit_lua
             return lua
 
-        @define_compile_action "=lua %code", get_line_no!, (_code)=>
+        @define_compile_action "=lua %code", (_code)=>
             if _code.type != "Text"
                 return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
                     ", ",repr(tostring(_code\as_lua(nomsu))),"))"
@@ -659,13 +522,13 @@ class NomsuCompiler
                     lua\append bit_lua
             return lua
 
-        @define_compile_action "!! code location !!", get_line_no!, =>
+        @define_compile_action "!! code location !!", =>
             return Lua.Value(@source, repr(tostring(@source)))
 
-        @define_action "run file %filename", get_line_no!, (_filename)->
+        @define_action "run file %filename", (_filename)->
             return nomsu\run_file(_filename)
 
-        @define_compile_action "use %path", get_line_no!, (_path)=>
+        @define_compile_action "use %path", (_path)=>
             path = nomsu\tree_to_value(_path)
             nomsu\use_file(path)
             return Lua(@source, "nomsu:use_file(#{repr path});")
@@ -730,9 +593,13 @@ OPTIONS
         else debug_getinfo(thread,f,what)
         if not info or not info.func then return info
         if info.short_src or info.source or info.linedefine or info.currentline
+            for k,v in pairs(nomsu.environment.ACTIONS)
+                if v == info.func
+                    info.name = k
+                    break
+            [=[
             if metadata = nomsu.action_metadata[info.func]
                 info.name = metadata.aliases[1]
-                [=[
                 filename = if type(metadata.source) == 'string'
                     metadata.source\match("^[^[:]*")
                 else metadata.source.filename
@@ -815,7 +682,6 @@ OPTIONS
         else io.stdout
 
         nomsu.skip_precompiled = not args.optimized
-        compile_fn = nil
         if print_file == nil
             nomsu.environment.print = ->
         elseif print_file != io.stdout
@@ -828,10 +694,11 @@ OPTIONS
                 print_file\write('\n')
                 print_file\flush!
 
-        if output_file
-            compile_fn = (code)->
+        compile_fn = if output_file
+            (code)->
                 output_file\write("local IMMEDIATE = true;\n"..tostring(code))
                 output_file\flush!
+        else nil
 
         parse_errs = {}
         for input in *args.inputs
