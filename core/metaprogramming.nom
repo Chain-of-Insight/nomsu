@@ -28,7 +28,7 @@ immediately
             end
             local body_lua = \%lua:as_lua(nomsu);
             body_lua:convert_to_statements("return ");
-            body_lua:remove_free_vars(unpack(args));
+            body_lua:remove_free_vars(args);
             body_lua:declare_locals();
             lua:append(")\n    ", body_lua, "\nend);");
             return lua;
@@ -60,7 +60,7 @@ immediately
             end
             local body_lua = \%body:as_lua(nomsu);
             body_lua:convert_to_statements("return ");
-            body_lua:remove_free_vars(unpack(args));
+            body_lua:remove_free_vars(args);
             body_lua:declare_locals();
             lua:append(")\n    ", body_lua, "\nend);")
             return lua;
@@ -127,14 +127,14 @@ immediately
             lua:convert_to_statements();
             return lua;
     
-    compile [declare locals in %tree] to
-        Lua "\(%tree as lua expr):declare_locals();"
+    compile [declare locals in %code] to
+        Lua value "\(%code as lua expr):declare_locals()"
     
-    compile [declare locals %locals in %tree] to
-        Lua "\(%tree as lua expr):declare_locals(\(%locals as lua expr));"
+    compile [declare locals %locals in %code] to
+        Lua value "\(%code as lua expr):declare_locals(\(%locals as lua expr))"
     
-    compile [remove free vars %vars from %tree] to
-        Lua "\(%tree as lua expr):remove_free_vars(unpack(\(%vars as lua expr)));"
+    compile [remove free vars %vars from %code] to
+        Lua "\(%code as lua expr):remove_free_vars(\(%vars as lua expr));"
 
     action [%tree as value]
         =lua "nomsu:tree_to_value(\%tree)"

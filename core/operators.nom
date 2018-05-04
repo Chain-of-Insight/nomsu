@@ -54,7 +54,7 @@ immediately
         lua> ".."
             local lua = Lua(tree.source, \%var_lua, ' = ', \%value_lua, ';');
             if \%var.type == 'Var' then
-                lua:add_free_vars(\%var);
+                lua:add_free_vars({\%var});
             end
             return lua;
 
@@ -72,7 +72,7 @@ immediately
                 local value_lua = value:as_lua(nomsu);
                 if not value_lua.is_value then error("Invalid value for assignment: "..value:get_src()); end
                 if target.type == "Var" then
-                    lhs:add_free_vars(target);
+                    lhs:add_free_vars({target});
                 end
                 if i > 1 then
                     lhs:append(", ");
@@ -93,7 +93,7 @@ immediately
 
     compile [exporting %exported %body] to
         %body_lua <- (%body as lua statements)
-        lua> "\%body_lua:remove_free_vars(unpack(\(%exported.value)));"
+        lua> "\%body_lua:remove_free_vars(\(%exported.value));"
         return %body_lua
 
     compile [with %assignments %body] to
@@ -112,7 +112,7 @@ immediately
                     error("Invalid value for assignment: "..tostring(value.source:get_text()));
                 end
                 if target.type == "Var" then
-                    lhs:add_free_vars(target);
+                    lhs:add_free_vars({target});
                 end
                 if i > 1 then
                     lhs:append(", ");

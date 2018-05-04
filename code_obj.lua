@@ -201,7 +201,7 @@ do
   local _class_0
   local _parent_0 = Code
   local _base_0 = {
-    add_free_vars = function(self, ...)
+    add_free_vars = function(self, vars)
       local seen
       do
         local _tbl_0 = { }
@@ -215,13 +215,14 @@ do
         end
         seen = _tbl_0
       end
-      for i = 1, select("#", ...) do
-        local var = select(i, ...)
+      for _index_0 = 1, #vars do
+        local var = vars[_index_0]
         if type(var) == 'userdata' and var.type == "Var" then
           var = tostring(var:as_lua())
         elseif type(var) ~= 'string' then
           var = tostring(var)
         end
+        assert(var:match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
         if not (seen[var]) then
           self.free_vars[#self.free_vars + 1] = var
           seen[var] = true
@@ -229,15 +230,16 @@ do
       end
       self.__str = nil
     end,
-    remove_free_vars = function(self, ...)
+    remove_free_vars = function(self, vars)
       local removals = { }
-      for i = 1, select("#", ...) do
-        local var = select(i, ...)
+      for _index_0 = 1, #vars do
+        local var = vars[_index_0]
         if type(var) == 'userdata' and var.type == "Var" then
           var = tostring(var:as_lua())
         elseif type(var) ~= 'string' then
           var = tostring(var)
         end
+        assert(var:match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
         removals[var] = true
       end
       local stack = {
@@ -292,6 +294,7 @@ do
             local var = _list_0[_index_0]
             if not (seen[var]) then
               seen[var] = true
+              assert(var:match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
               to_declare[#to_declare + 1] = var
             end
           end
@@ -306,9 +309,10 @@ do
         gather_from(self)
       end
       if #to_declare > 0 then
-        self:remove_free_vars(unpack(to_declare))
-        return self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
+        self:remove_free_vars(to_declare)
+        self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
       end
+      return to_declare
     end,
     __tostring = function(self)
       if self.__str == nil then
