@@ -1,5 +1,35 @@
-local re = require('re')
-local lpeg = require('lpeg')
+if jit then
+  package.path = "LPegLJ/src/?.lua;" .. tostring(package.path)
+  lpeg = require('lpeglj')
+  re = require('re')
+  bit32 = require('bit')
+  local _pairs, _ipairs = pairs, ipairs
+  pairs = function(x)
+    do
+      local mt = getmetatable(x)
+      if mt then
+        if mt.__pairs then
+          return mt.__pairs(x)
+        end
+      end
+    end
+    return _pairs(x)
+  end
+  ipairs = function(x)
+    do
+      local mt = getmetatable(x)
+      if mt then
+        if mt.__ipairs then
+          return mt.__ipairs(x)
+        end
+      end
+    end
+    return _ipairs(x)
+  end
+else
+  re = require('re')
+  lpeg = require('lpeg')
+end
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt
 P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
@@ -41,7 +71,7 @@ FILE_CACHE = setmetatable({ }, {
     if not (file) then
       return nil
     end
-    local contents = file:read("a")
+    local contents = file:read("*a")
     file:close()
     self[filename] = contents
     return contents
@@ -118,7 +148,7 @@ local NOMSU_DEFS
 do
   local _with_0 = { }
   _with_0.Tuple = function(values)
-    return Tuple(table.unpack(values))
+    return Tuple(unpack(values))
   end
   _with_0.DictEntry = function(k, v)
     return Types.DictEntry(k, v)
@@ -343,7 +373,7 @@ do
       if compile_fn == nil then
         compile_fn = nil
       end
-      if #nomsu_code == 0 then
+      if #tostring(nomsu_code) == 0 then
         return nil
       end
       local tree = self:parse(nomsu_code)
@@ -884,46 +914,35 @@ OPTIONS
           break
         end
         local line = nil
-        do
-          local metadata = nomsu.action_metadata[calling_fn.func]
-          if metadata then
-            local filename, start, stop = metadata.source:match("([^:]*):([0-9]*),([0-9]*)")
-            if filename then
-              local file = FILE_CACHE[filename]
-              local line_no = 1
-              for _ in file:sub(1, tonumber(start)):gmatch("\n") do
-                line_no = line_no + 1
-              end
-              local offending_statement = file:sub(tonumber(start), tonumber(stop))
-              if #offending_statement > 50 then
-                offending_statement = offending_statement:sub(1, 50) .. "..."
-              end
-              offending_statement = colored.red(offending_statement)
-              line = colored.yellow(filename .. ":" .. tostring(line_no) .. "\n    " .. offending_statement)
+        _ = [=[            if metadata = nomsu.action_metadata[calling_fn.func]
+                filename, start, stop = metadata.source\match("([^:]*):([0-9]*),([0-9]*)")
+                if filename
+                    file = FILE_CACHE[filename]
+                    line_no = 1
+                    for _ in file\sub(1,tonumber(start))\gmatch("\n") do line_no += 1
+                    offending_statement = file\sub(tonumber(start),tonumber(stop))
+                    if #offending_statement > 50
+                        offending_statement = offending_statement\sub(1,50).."..."
+                    offending_statement = colored.red(offending_statement)
+                    line = colored.yellow(filename..":"..tostring(line_no).."\n    "..offending_statement)
+                else
+                    line = colored.yellow(metadata.source)
+                name = colored.bright(colored.yellow(metadata.aliases[1]))
             else
-              line = colored.yellow(metadata.source)
-            end
-            name = colored.bright(colored.yellow(metadata.aliases[1]))
-          else
-            if calling_fn.istailcall and not name then
-              name = "<tail call>"
-            end
-            if calling_fn.short_src == "./nomsu.moon" and line_table then
-              local char = line_table[calling_fn.currentline]
-              local line_num = 1
-              for _ in nomsu_source:sub(1, char):gmatch("\n") do
-                line_num = line_num + 1
-              end
-              line = colored.cyan(tostring(calling_fn.short_src) .. ":" .. tostring(line_num))
-              name = colored.bright(colored.cyan(name or "???"))
-            else
-              line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline))
-              name = colored.bright(colored.blue(name or "???"))
-            end
-          end
-        end
-        local _from = colored.dim(colored.white("|"))
-        io.stderr:write(("%32s %s %s\n"):format(name, _from, line))
+                if calling_fn.istailcall and not name
+                    name = "<tail call>"
+                if calling_fn.short_src == "./nomsu.moon" and line_table
+                    char = line_table[calling_fn.currentline]
+                    line_num = 1
+                    for _ in nomsu_source\sub(1,char)\gmatch("\n") do line_num += 1
+                    line = colored.cyan("#{calling_fn.short_src}:#{line_num}")
+                    name = colored.bright(colored.cyan(name or "???"))
+                else
+                    line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline}")
+                    name = colored.bright(colored.blue(name or "???"))
+            _from = colored.dim colored.white "|"
+            io.stderr\write(("%32s %s %s\n")\format(name, _from, line))
+            ]=]
         _continue_0 = true
       until true
       if not _continue_0 then
@@ -1064,13 +1083,12 @@ OPTIONS
     print_err_msg(error_message)
     return os.exit(false, true)
   end
-  do
-    local ldt = require('ldt')
-    if ldt then
-      ldt.guard(run)
-    else
-      xpcall(run, err_hand)
-    end
+  local ldt
+  ok, ldt = pcall(require, 'ldt')
+  if ok then
+    ldt.guard(run)
+  else
+    xpcall(run, err_hand)
   end
 end
 return NomsuCompiler

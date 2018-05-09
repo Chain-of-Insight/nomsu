@@ -163,7 +163,14 @@ immediately
     # Unary operators
     compile [- %] to: Lua value "(- \(% as lua expr))"
     compile [not %] to: Lua value "(not \(% as lua expr))"
-    compile [length of %list] to: Lua value "(#\(%list as lua expr))"
+    compile [length of %list] to
+        # A bit of a hack so that luajit works properly.
+        Lua value ".."
+            (function(l)
+                local mt = getmetatable(l);
+                if mt and mt.__len then return mt.__len(l) end
+                return #l
+            end)(\(%list as lua expr))
 
 # Update operators
 immediately

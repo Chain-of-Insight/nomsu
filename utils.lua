@@ -1,8 +1,5 @@
---
 -- A collection of helper utility functions
 --
-local lpeg, re = require("lpeg"), require("re")
-
 local function is_list(t)
     if type(t) ~= 'table' then
         return false

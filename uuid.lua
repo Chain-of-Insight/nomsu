@@ -13,10 +13,10 @@ local function uuid()
     -- Set the four most significant bits (bits 12 through 15) of the
     -- time_hi_and_version field to the 4-bit version number from
     -- Section 4.1.3.
-    bytes[3] = bit32.bor(bytes[3], 0x4000)
+    bytes[3] = bytes[3] + 0x4000
     -- Set the two most significant bits (bits 6 and 7) of the
     -- clock_seq_hi_and_reserved to zero and one, respectively.
-    bytes[4] = bit32.bor(bytes[4], 0xC0)
+    bytes[4] = bytes[4] + 0xC0
     return ("%08x-%04x-%04x-%02x%02x-%6x%6x"):format(unpack(bytes))
 end
 

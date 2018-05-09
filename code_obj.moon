@@ -71,7 +71,7 @@ class Code
             if start or stop
                 @source = Source(filename, tonumber(start), tonumber(stop))
             else
-                @source = Source(@source, 1, #self+1)
+                @source = Source(@source, 1, #tostring(self)+1)
         assert(@source == nil or Source\is_instance(@source))
         indent = 0
         for i,b in ipairs @bits
@@ -219,7 +219,7 @@ class Lua extends Code
                         nomsu_to_lua[lua.source.start] = pos
                 else
                     walk b, pos
-                pos += #b
+                pos += #tostring(b)
         walk self, 1
         return {
             nomsu_filename:@source.filename

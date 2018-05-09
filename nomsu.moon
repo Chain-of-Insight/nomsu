@@ -10,8 +10,30 @@
 --        nomsu:run(your_nomsu_code)
 --    Or from the command line:
 --        lua nomsu.lua [input_file [output_file or -]]
-re = require 're'
-lpeg = require 'lpeg'
+export lpeg, re
+if jit
+    package.path = "LPegLJ/src/?.lua;#{package.path}"
+    lpeg = require 'lpeglj'
+    re = require 're'
+    
+    export bit32
+    bit32 = require('bit')
+
+    _pairs, _ipairs = pairs, ipairs
+    export pairs, ipairs
+    pairs = (x)->
+        if mt = getmetatable(x)
+            if mt.__pairs
+                return mt.__pairs(x)
+        return _pairs(x)
+    ipairs = (x)->
+        if mt = getmetatable(x)
+            if mt.__ipairs
+                return mt.__ipairs(x)
+        return _ipairs(x)
+else
+    re = require 're'
+    lpeg = require 'lpeg'
 lpeg.setmaxstack 10000
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 utils = require 'utils'
@@ -44,7 +66,7 @@ FILE_CACHE = setmetatable {}, {
     __index: (filename)=>
         file = io.open(filename)
         return nil unless file
-        contents = file\read("a")
+        contents = file\read("*a")
         file\close!
         self[filename] = contents
         return contents
@@ -111,7 +133,7 @@ Types = require "nomsu_tree"
 NOMSU_DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
     .Tuple = (values)->
-        return Tuple(table.unpack(values))
+        return Tuple(unpack(values))
     .DictEntry = (k,v) -> Types.DictEntry(k,v)
     .nl = P("\r")^-1 * P("\n")
     .ws = S(" \t")
@@ -308,7 +330,7 @@ class NomsuCompiler
 
     _nomsu_chunk_counter = 0
     run: (nomsu_code, compile_fn=nil)=>
-        if #nomsu_code == 0 then return nil
+        if #tostring(nomsu_code) == 0 then return nil
         tree = @parse(nomsu_code)
         assert tree, "Failed to parse: #{nomsu_code}"
         assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
@@ -629,6 +651,7 @@ OPTIONS
             name = calling_fn.name
             if name == "run_lua_fn" then continue
             line = nil
+            [=[
             if metadata = nomsu.action_metadata[calling_fn.func]
                 filename, start, stop = metadata.source\match("([^:]*):([0-9]*),([0-9]*)")
                 if filename
@@ -657,6 +680,7 @@ OPTIONS
                     name = colored.bright(colored.blue(name or "???"))
             _from = colored.dim colored.white "|"
             io.stderr\write(("%32s %s %s\n")\format(name, _from, line))
+            ]=]
         io.stderr\flush!
     
     run = ->
@@ -763,7 +787,8 @@ OPTIONS
 
     --ProFi = require 'ProFi'
     --ProFi\start()
-    if ldt = require('ldt')
+    ok, ldt = pcall(require,'ldt')
+    if ok
         ldt.guard run
     else xpcall(run, err_hand)
     --ProFi\stop()

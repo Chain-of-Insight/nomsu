@@ -163,7 +163,7 @@ do
         if start or stop then
           self.source = Source(filename, tonumber(start), tonumber(stop))
         else
-          self.source = Source(self.source, 1, #self + 1)
+          self.source = Source(self.source, 1, #tostring(self) + 1)
         end
       end
       assert(self.source == nil or Source:is_instance(self.source))
@@ -346,7 +346,7 @@ do
           else
             walk(b, pos)
           end
-          pos = pos + #b
+          pos = pos + #tostring(b)
         end
       end
       walk(self, 1)

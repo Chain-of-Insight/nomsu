@@ -1,8 +1,6 @@
 -- This file contains the datastructures used to represent parsed Nomsu syntax trees,
 -- as well as the logic for converting them to Lua code.
 utils = require 'utils'
-re = require 're'
-lpeg = require 'lpeg'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 immutable = require 'immutable'
 {:insert, :remove, :concat} = table

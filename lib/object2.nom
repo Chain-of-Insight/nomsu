@@ -83,34 +83,36 @@ compile [define object %classname %class_body] to
         %actions <- %line.value.2
         %body <- %line.value.3
         lua> ".."
-            local stubs = {};
-            for i, action in ipairs(\%actions.value) do
-                stubs[i] = nomsu:tree_to_named_stub(action);
-            end
-            local args = {};
-            for i,tok in ipairs(\%actions.value[1].value) do
-                if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
-            end
-            local arg_set = {};
-            for i, arg in ipairs(args) do arg_set[arg] = true; end
-            local body_lua = nomsu:tree_to_lua(\%body);
-            body_lua:convert_to_statements();
-            body_lua:declare_locals();
-            local lua_fn_args = table.concat({"self", unpack(args)}, ", ");
-            local def_tree = nomsu.compilestack[#nomsu.compilestack];
-
-            local compiled_args = {};
-            for i, arg in ipairs(args) do
-                compiled_args[i] = "nomsu:tree_to_lua("..arg..")";
-            end
-            compiled_args = table.concat(compiled_args, "..', '..");
-            table.insert(\%methods, ([==[
-                %s[ %s] = function(%s)
-                    %s
+            do
+                local stubs = {};
+                for i, action in ipairs(\%actions.value) do
+                    stubs[i] = nomsu:tree_to_named_stub(action);
                 end
-            ]==]):format(
-                \%class_identifier, repr(stubs[1]), lua_fn_args,
-                    body_lua));
+                local args = {};
+                for i,tok in ipairs(\%actions.value[1].value) do
+                    if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
+                end
+                local arg_set = {};
+                for i, arg in ipairs(args) do arg_set[arg] = true; end
+                local body_lua = nomsu:tree_to_lua(\%body);
+                body_lua:convert_to_statements();
+                body_lua:declare_locals();
+                local lua_fn_args = table.concat({"self", unpack(args)}, ", ");
+                local def_tree = nomsu.compilestack[#nomsu.compilestack];
+
+                local compiled_args = {};
+                for i, arg in ipairs(args) do
+                    compiled_args[i] = "nomsu:tree_to_lua("..arg..")";
+                end
+                compiled_args = table.concat(compiled_args, "..', '..");
+                table.insert(\%methods, ([==[
+                    %s[ %s] = function(%s)
+                        %s
+                    end
+                ]==]):format(
+                    \%class_identifier, repr(stubs[1]), lua_fn_args,
+                        body_lua));
+            end
 
     return
         Lua ".."

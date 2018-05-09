@@ -159,19 +159,6 @@ immediately
     compile [nomsu] to: Lua value "nomsu"
     compile [%var as lua identifier] to: Lua value "nomsu:var_to_lua_identifier(\(%var as lua expr))"
 
-action [action %names metadata]
-    =lua "nomsu.action_metadata[ACTIONS[\%names]]"
-
-# Get the source code for a function
-action [help %action]
-    lua> ".."
-        local metadata = \(action %action metadata);
-        if not metadata then
-            print("Action not found: "..repr(\%action));
-        else
-            print(metadata.src or "<unknown source code>");
-        end
-
 # Compiler tools
 immediately
     compile [run %code] to
