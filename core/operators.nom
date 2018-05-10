@@ -84,16 +84,16 @@ immediately
             return Lua(tree.source, lhs, " = ", rhs, ";");
 
 immediately
-    compile [export %var <- %value] to
+    compile [external %var <- %value] to
         %var_lua <- (%var as lua)
         assume %var_lua.is_value or barf "Invalid target for assignment: \(%var's source code)"
         %value_lua <- (%value as lua)
         assume %value_lua.is_value or barf "Invalid value for assignment: \(%value's source code)"
         return: Lua "\(%var_lua) = \(%value_lua);"
 
-    compile [exporting %exported %body] to
+    compile [with external %externs %body] to
         %body_lua <- (%body as lua statements)
-        lua> "\%body_lua:remove_free_vars(\(%exported.value));"
+        lua> "\%body_lua:remove_free_vars(\(%externs.value));"
         return %body_lua
 
     compile [with %assignments %body] to

@@ -19,18 +19,18 @@ assume (({}'s id) is not ({}'s id)) or barf "Identity check failed."
 
 <-{%foozle:"outer",%y:"outer"}
 action [set global x local y]
-    export %foozle <- "inner"
+    external %foozle <- "inner"
     %y <- "inner"
 set global x local y
-assume ((%foozle = "inner") and (%y = "outer")) or barf "export failed."
+assume ((%foozle = "inner") and (%y = "outer")) or barf "external failed."
 
 <-{%foozle:"outer",%y:"outer"}
 action [set global x local y]
-    exporting [%foozle]
+    with external [%foozle]
         %foozle <- "inner"
         %y <- "inner"
 set global x local y
-assume ((%foozle = "inner") and (%y = "outer")) or barf "exporting failed."
+assume ((%foozle = "inner") and (%y = "outer")) or barf "'with external' failed."
 
 <-{%x:1,%y:2}
 with {%z:nil, %x:999}
@@ -45,7 +45,7 @@ assume ((5 wrapped around 2) = 1) or barf "mod not working"
 assume (1 <= 2 < 3) or barf "chained operator fail."
 %value <- -999
 action [flipflop]
-    export %value <- (-%value)
+    external %value <- (-%value)
     return %value
 assume (not (1 < (flipflop) < 1)) or barf "3-way inequality evaluated middle term twice"
 assume (((yes) and (yes)) = (yes))
