@@ -1,7 +1,5 @@
 if jit then
-  package.path = "LPegLJ/src/?.lua;" .. tostring(package.path)
-  lpeg = require('lpeglj')
-  re = require('re')
+  package.cpath = "./luajit_lpeg/?.so;" .. package.cpath
   bit32 = require('bit')
   local _pairs, _ipairs = pairs, ipairs
   pairs = function(x)
@@ -26,10 +24,9 @@ if jit then
     end
     return _ipairs(x)
   end
-else
-  re = require('re')
-  lpeg = require('lpeg')
 end
+re = require('re')
+lpeg = require('lpeg')
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt
 P, R, V, S, Cg, C, Cp, B, Cmt = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt
@@ -91,7 +88,7 @@ all_files = function(path)
     return iterate_single, path
   end
   path = path:gsub("\\", "\\\\"):gsub("`", ""):gsub('"', '\\"'):gsub("$", "")
-  return io.popen("find \"" .. path .. "\" -type f -name \"*.nom\""):lines()
+  return io.popen("find -L \"" .. path .. "\" -type f -name \"*.nom\""):lines()
 end
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*

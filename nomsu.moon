@@ -12,9 +12,7 @@
 --        lua nomsu.lua [input_file [output_file or -]]
 export lpeg, re
 if jit
-    package.path = "LPegLJ/src/?.lua;#{package.path}"
-    lpeg = require 'lpeglj'
-    re = require 're'
+    package.cpath = "./luajit_lpeg/?.so;"..package.cpath
     
     export bit32
     bit32 = require('bit')
@@ -31,9 +29,9 @@ if jit
             if mt.__ipairs
                 return mt.__ipairs(x)
         return _ipairs(x)
-else
-    re = require 're'
-    lpeg = require 'lpeg'
+
+re = require 're'
+lpeg = require 'lpeg'
 lpeg.setmaxstack 10000
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
 utils = require 'utils'
@@ -79,7 +77,7 @@ all_files = (path)->
         return iterate_single, path
     -- TODO: improve sanitization
     path = path\gsub("\\","\\\\")\gsub("`","")\gsub('"','\\"')\gsub("$","")
-    return io.popen("find \""..path.."\" -type f -name \"*.nom\"")\lines!
+    return io.popen("find -L \""..path.."\" -type f -name \"*.nom\"")\lines!
 
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}
