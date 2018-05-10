@@ -7,8 +7,11 @@
       in an
     indented area.
 
-# How do I import files?
-use "lib/core.nom"
+# How do I import a file?
+use "core/control_flow.nom"
+
+# How do I import all the files in a directory?
+use "core"
 
 # Set a variable?
 %x <- 1
@@ -19,7 +22,7 @@ use "lib/core.nom"
 # Modify a variable?
 %foobar <- 100
 # As a shorthand, you can type:
-<- %foobar + 1
+%foobar +<- 1
 # which does the same thing as:
 %foobar <- (%foobar + 1)
 
@@ -54,13 +57,10 @@ say "Hello world!"
 # Use a list?
 %my_list <- ["first item", "second item", "third item"]
 # Lists are 1-indexed because they're implemented as Lua tables, so this prints "first item"
-say (1st in %my_list)
-# These do the same thing:
-say (%my_list's 1)
-say (1 in %my_list)
+say %my_list.1
 # List entries can be modified like this:
-(1st in %my_list) <- "ONE!!!"
-say (size of %my_list)
+%my_list.1 <- "ONE!!!"
+say (length of %my_list)
 
 # Define a dictionary/hash map?
 %my_dict <- {x: 99, y: 101}
@@ -71,8 +71,8 @@ say (size of %my_list)
 
 # Use a dict?
 # Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
-say (%my_dict's "x")
-(%my_dict's "x") <- 9999
+say %my_dict.x
+%my_dict.x <- 9999
 
 # Do conditional branching?
 if: 1 < 10
@@ -131,18 +131,18 @@ for %backwards from 3 to 1 by -1
 %x <- 1
 repeat while: %x <= 3
     say "repeat while loop #\%x"
-    <- %x + 1
+    %x +<- 1
 
 %x <- 1
 repeat until: %x > 3
     say "repeat until loop #\%x"
-    <- %x + 1
+    %x +<- 1
 
 # Infinite loop:
 %x <- 1
 repeat
     say "repeat loop #\%x"
-    <- %x + 1
+    %x +<- 1
     if: %x > 3
         stop repeating
 
@@ -151,7 +151,7 @@ do
     %x <- 1
     === %again ===
     say "GOTO loop #\%x"
-    <- %x + 1
+    %x +<- 1
     if: %x <= 3
         go to %again
     say "finished going to"
@@ -208,24 +208,28 @@ action [>> %foo_bar $$$^ --> % @& _~-^-~_~-^ %1 !]
 
 >> "wow" $$$^ --> "so flexible!" @& _~-^-~_~-^ "even numbers can be variables!" !
 
+# There's also full unicode support
+%こんにちは <- "こんにちは"
+action [% と言う]
+    "\(%)世界"
+say (%こんにちは と言う)
+
 # Math and logic operations are just treated the same as function calls in the syntax
 say (2 + 3)
-# So it's easy to define your own operators
+#.. So you can define your own operators, although they will need to be parenthesized to
+    play nicely with other operators
 action [%a ++ %b]
     2 * (%a + %b)
+say (1 ++ (2 * 3))
 
-#.. The following are characters won't "stick" to their neighbors, so the
-    compiler treats them as solitary single-character tokens: '~`!@$^&*-+=|<>?/
-    which means you can jam things together:
-assume ((5++2) is (   5   ++   2   )) or barf "ugh"
-
-
-# Do grouping?
+# How do I do grouping?
 # Expressions can be grouped by enclosing parentheses:
 say (2 + 3)
 # Or by an indented region
 say
     2 + 3
+# Or by ":" until the end of the line
+say: 2 + 3
 # If you need to keep going after an indented region, you can start the next line with ".."
 say both
     "Very long first argument that needs its own line"
@@ -244,7 +248,7 @@ say both
 # The "lua> %" and "=lua %" macros can be used to write raw lua code: 
 action [say the time]
     lua> ".."
-        nomsu:writeln("The OS time is: "..os.time());
+        io.write("The OS time is: "..os.time().."\n");
 say the time
 say "Math expression result is: \(=lua "(1 + 2*3 + 3*4)^2")"
 
@@ -253,6 +257,8 @@ action [square root of %n]
     =lua "math.sqrt(\%n)"
 say "The square root of 2 is \(square root of 2)"
 
+#.. The "immediately %" macro forces the indented code below it to run before the rest of
+    the file finishes compiling, so it's often useful for writing your own macros.
 immediately
     # Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
     parse [if %condition is untrue %body] as
@@ -260,19 +266,19 @@ immediately
 
     # Or to transform nomsu code into custom lua code using "compile % to %"
     compile [if %condition on opposite day %body] to
-        %body_lua <- (%body as lua)
-        return {..}
-            locals: %body_lua's "locals"
-            statements: ".."
-                if not \(%condition as lua expr) then
-                    \((%body_lua's "statements") or "\(%body_lua's "expr");")
-                end
+        Lua ".."
+            if not \(%condition as lua expr) then
+                \(%body as lua statements)
+            end
+    
+    # Constants can be defined as macros (but they need to be parenthesized when invoked)
+    parse [TWENTY] as: 20
 
-if (1 > 10) is untrue
+if (1 > (TWENTY)) is untrue
     say "Nomsu parsing macros work!"
     say "It looks like a keyword, but there's no magic here!"
 
-if (1 > 10) on opposite day
+if (1 > (TWENTY)) on opposite day
     say "Lua compiling macros work!"
     say "It looks like a keyword, but there's no magic here!"
 
