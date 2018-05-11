@@ -36,16 +36,14 @@ immediately
         return (yes)
 
 immediately
-    # Note: it's important to have the space after "[" to prevent confusion if %index is a string
-    compile [%list has key %index, %list has index %index] to
-        Lua value ".."
-            ((\(%list as lua expr))[ \(%index as lua expr)] ~= nil)
+    parse [%list has key %index, %list has index %index] as
+        %list.%index != (nil)
 
-    # Note: it's important to have the space after "[" to prevent confusion if %index is a string
-    compile [..]
+    parse [..]
         %list doesn't have key %index, %list does not have key %index
         %list doesn't have index %index, %list does not have index %index
-    ..to: Lua value "((\(%list as lua expr))[ \(%index as lua expr)] == nil)"
+    ..as
+        %list.%index = (nil)
 
     compile [number of keys in %list] to
         Lua value "utils.size(\(%list as lua expr))"
@@ -61,90 +59,65 @@ immediately
 
 # List Comprehension
 immediately
-    compile [%expression for %item in %iterable] to
-        assume (%item.type is "Var") or barf ".."
-            List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item.type)
-        return
-            Lua value ".."
-                (function()
-                    local comprehension = {};
-                    for i,\(%item as lua expr) in ipairs(\(%iterable as lua expr)) do
-                        comprehension[i] = \(%expression as lua expr);
-                    end
-                    return comprehension;
-                end)()
-    parse [%expression for all %iterable] as: %expression for % in %iterable
+    parse [%expression for %item in %iterable] as
+        result of
+            %comprehension <- []
+            for %i = %item in %iterable
+                %comprehension.%i <- %expression
+            return %comprehension
 
-    compile [..]
+    parse [%expression for all %iterable] as
+        %expression for % in %iterable
+
+    parse [..]
         %expression for %index from %start to %stop via %step
         %expression for %index from %start to %stop by %step
-    ..to
-        assume (%index.type is "Var") or barf ".."
-            List comprehension has the wrong type for the loop variable. Expected Var, but got: \(%index.type)
-        return
-            Lua value ".."
-                (function()
-                    local comprehension = {};
-                    for \(%index as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(%step as lua expr) do
-                        comprehension[#comprehension+1] = \(%expression as lua expr);
-                    end
-                    return comprehension;
-                end)()
-    parse [%expression for all ] as: %expression for % in %iterable
-    parse [%expression for %var from %start to %stop] as: %expression for %var from %start to %stop via 1
+    ..as
+        result of
+            %comprehension <- []
+            for %index from %start to %stop via %step
+                add %expression to %comprehension
+            return %comprehension
+
+    parse [%expression for all %iterable] as
+        %expression for % in %iterable
+
+    parse [%expression for %var from %start to %stop] as
+        %expression for %var from %start to %stop via 1
+
     parse [..]
         %expression for all %start to %stop by %step
         %expression for all %start to %stop via %step
-    ..as: %expression for % from %start to %stop via %step
-    parse [%expression for all %start to %stop] as: %expression for all %start to %stop via 1
+    ..as
+        %expression for % from %start to %stop via %step
 
-    compile [%expression for %key = %value in %iterable] to
-        assume (%key.type is "Var") or barf ".."
-            List comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%key.type)
-        assume (%value.type is "Var") or barf ".."
-            List comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%value.type)
-        return
-            Lua value ".."
-                (function()
-                    local comprehension = {};
-                    for \(%key as lua expr), \(%value as lua expr) in pairs(\(%iterable as lua expr)) do
-                        table.insert(comprehension, \(%expression as lua expr));
-                    end
-                    return comprehension;
-                end)()
+    parse [%expression for all %start to %stop] as
+        %expression for all %start to %stop via 1
 
-# Dict comprehensions
-immediately
-    compile [%key = %value for %item in %iterable] to
-        assume (%item.type is "Var") or barf ".."
-            Dict comprehension has the wrong type for the loop variable. Expected Var, but got: \(%item.type)
-        # Note: it's important to have the space after "[" to prevent confusion if %key is a string
-        return
-            Lua value ".."
-                (function()
-                    local comprehension = {};
-                    for i,\(%item as lua expr) in ipairs(\(%iterable as lua expr)) do
-                        comprehension[ \(%key as lua expr)] = \(%value as lua expr)
-                    end
-                    return comprehension;
-                end)()
-    parse [%key = %value for all %iterable] as: %key = %value for % in %iterable
+    parse [%expression for %key = %value in %iterable] as
+        result of
+            %comprehension <- []
+            for %key = %value in %iterable
+                add %expression to %comprehension
+            return %comprehension
 
-    compile [%key = %value for %src_key = %src_value in %iterable] to
-        assume (%src_key.type is "Var") or barf ".."
-            Dict comprehension has the wrong type for the key loop variable. Expected Var, but got: \(%src_key.type)
-        assume (%src_value.type is "Var") or barf ".."
-            Dict comprehension has the wrong type for the value loop variable. Expected Var, but got: \(%src_value.type)
-        # Note: it's important to have the space after "[" to prevent confusion if %key is a string
-        return
-            Lua value ".."
-                (function()
-                    local comprehension = {};
-                    for \(%src_key as lua expr), \(%src_value as lua expr) in pairs(\(%iterable as lua expr)) do
-                        comprehension[ \(%key as lua expr)] = \(%value as lua expr);
-                    end
-                    return comprehension;
-                end)()
+    # Dict comprehensions
+    parse [%key = %value for %item in %iterable] as
+        result of
+            %comprehension <- {}
+            for %item in %iterable
+                %comprehension.%key <- %value
+            return %comprehension
+
+    parse [%key = %value for all %iterable] as
+        %key = %value for % in %iterable
+
+    parse [%key = %value for %src_key = %src_value in %iterable] as
+        result of
+            %comprehension <- {}
+            for %src_key = %src_value in %iterable
+                %comprehension.%key <- %value
+            return %comprehension
 
 immediately
     action [%lists flattened]

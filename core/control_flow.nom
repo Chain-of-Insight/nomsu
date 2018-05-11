@@ -423,3 +423,11 @@ immediately
                 end
             end --do-then-always
 
+# Inline thunk:
+immediately
+    compile [result of %body] to
+        Lua value ".."
+            (function()
+                \(%body as lua statements)
+            end)()
+

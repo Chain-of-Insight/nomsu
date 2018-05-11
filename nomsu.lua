@@ -375,7 +375,6 @@ do
       end
       local tree = self:parse(nomsu_code)
       assert(tree, "Failed to parse: " .. tostring(nomsu_code))
-      assert(tree.type == "File", "Attempt to run non-file: " .. tostring(tree.type))
       local lua = tree:as_lua(self)
       lua:convert_to_statements()
       lua:declare_locals()
@@ -492,7 +491,7 @@ do
         return 
       end
       local _exp_0 = tree.type
-      if "List" == _exp_0 or "File" == _exp_0 or "Block" == _exp_0 or "Action" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
+      if "List" == _exp_0 or "Block" == _exp_0 or "Action" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local v = _list_0[_index_0]
@@ -543,6 +542,18 @@ do
       return tree:map(fn)
     end,
     tree_with_replaced_vars = function(self, tree, replacements)
+      if not (next(replacements)) then
+        return tree
+      end
+      if next(replacements).type == "Var" then
+        do
+          local _tbl_0 = { }
+          for k, v in pairs(replacements) do
+            _tbl_0[self:var_to_lua_identifier(k)] = v
+          end
+          replacements = _tbl_0
+        end
+      end
       return tree:map(function(t)
         if t.type == "Var" then
           local id = tostring(t:as_lua(self))
@@ -737,6 +748,23 @@ do
         load = load,
         ipairs = ipairs
       }
+      if jit then
+        self.environment.len = function(x)
+          do
+            local mt = getmetatable(x)
+            if mt then
+              if mt.__len then
+                return mt.__len(x)
+              end
+            end
+          end
+          return #x
+        end
+      else
+        self.environment.len = (function(x)
+          return #x
+        end)
+      end
       for k, v in pairs(Types) do
         self.environment[k] = v
       end

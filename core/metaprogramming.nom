@@ -127,6 +127,9 @@ immediately
             lua:convert_to_statements();
             return lua;
     
+    action [%tree with vars %vars]
+        =lua "nomsu:tree_with_replaced_vars(\%tree, \%vars)"
+    
     compile [declare locals in %code] to
         Lua value "\(%code as lua expr):declare_locals()"
     

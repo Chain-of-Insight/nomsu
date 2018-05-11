@@ -254,6 +254,13 @@ class NomsuCompiler
             :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :pairs,
             :load, :ipairs,
         }
+        @environment.len = if jit
+            (x)->
+                if mt = getmetatable(x)
+                    if mt.__len
+                        return mt.__len(x)
+                return #x
+        else ((x) -> #x)
         for k,v in pairs(Types) do @environment[k] = v
         @environment.Tuple = Tuple
         @environment.Lua = Lua
@@ -331,7 +338,6 @@ class NomsuCompiler
         if #tostring(nomsu_code) == 0 then return nil
         tree = @parse(nomsu_code)
         assert tree, "Failed to parse: #{nomsu_code}"
-        assert tree.type == "File", "Attempt to run non-file: #{tree.type}"
         lua = tree\as_lua(@)
         lua\convert_to_statements!
         lua\declare_locals!
@@ -410,7 +416,7 @@ class NomsuCompiler
         coroutine.yield(tree, depth)
         return unless Types.is_node(tree)
         switch tree.type
-            when "List", "File", "Block", "Action", "Text", "IndexChain"
+            when "List", "Block", "Action", "Text", "IndexChain"
                 for v in *tree.value
                     @walk_tree(v, depth+1)
             when "Dict"
@@ -445,6 +451,9 @@ class NomsuCompiler
         return tree\map(fn)
 
     tree_with_replaced_vars: (tree, replacements)=>
+        return tree unless next(replacements)
+        if next(replacements).type == "Var"
+            replacements = {@var_to_lua_identifier(k),v for k,v in pairs(replacements)}
         tree\map (t)->
             if t.type == "Var"
                 id = tostring(t\as_lua(self))

@@ -192,3 +192,11 @@ try
 assume (%x = 1) or barf "do/then always failed"
 
 say "Control flow test passed."
+
+assume
+    (..)
+        result of
+            %n <- 0
+            for all [1,2,3]: %n +<- %
+            return %n
+    ..= 6

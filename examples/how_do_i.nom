@@ -13,29 +13,27 @@ use "core/control_flow.nom"
 # How do I import all the files in a directory?
 use "core"
 
-# Set a variable?
+# How do I print stuff?
+say "Hello world!"
+
+# How do I set a variable?
 %x <- 1
 %str <- "Hello world"
 # Expressions that are more than just literal values require parentheses:
 %x <- (2 + 3)
 
-# Modify a variable?
-%foobar <- 100
-# As a shorthand, you can type:
-%foobar +<- 1
-# which does the same thing as:
-%foobar <- (%foobar + 1)
+# How do I modify a variable?
+%x <- (%x + 1)
+# Or, as a shorthand, you can do this to increment a variable:
+%x +<- 1
 
-# Print stuff?
-say "Hello world!"
-
-# Define a mutli-line string?
+# How do I define a mutli-line string?
 %mutli_str <- ".."
     Start with "..", then put lines below it
     that are indented one level.
     The string will continue until the indentation ends.
 
-# Format a string?
+# How do I put values inside a string?
 %format_str <- ".."
     Strings can contain a backslash followed by a variable, list, dict, or parenthesized
     expression. This escaped value will be converted to a readable string, like so:
@@ -44,7 +42,7 @@ say "Hello world!"
     If you need to use a plain ol' backslash, you can do \\ <-- that
 %format_str2 <- "Single-line strings can contain escape sequences like \", \\, \n, \065, and \x0A"
 
-# Define a list?
+# How do I define a list?
 %my_list <- [1,2,"hello"]
 #.. Really long lists can use [..] followed by a bunch of indented values delimited
     by commas and/or newlines
@@ -54,7 +52,7 @@ say "Hello world!"
     7
     8,9,10
 
-# Use a list?
+# How do I use a list?
 %my_list <- ["first item", "second item", "third item"]
 # Lists are 1-indexed because they're implemented as Lua tables, so this prints "first item"
 say %my_list.1
@@ -62,19 +60,19 @@ say %my_list.1
 %my_list.1 <- "ONE!!!"
 say (length of %my_list)
 
-# Define a dictionary/hash map?
+# How do I define a dictionary/hash map?
 %my_dict <- {x: 99, y: 101}
 %my_dict <- {..}
     x: 101, y: 2
     "99 bottles": 99
     653: 292
 
-# Use a dict?
+# How do I use a dict?
 # Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
 say %my_dict.x
 %my_dict.x <- 9999
 
-# Do conditional branching?
+# How do I do conditional branching?
 if: 1 < 10
     say "1 is indeed < 10"
 
@@ -96,7 +94,7 @@ when
     * else
         say "this is the default case"
 
-# Do a switch statement?
+# How do I do a switch statement?
 when 3 = ?
     * 0
     * 1
@@ -107,7 +105,7 @@ when 3 = ?
     * else
         say "this won't print"
 
-# Loop over a list (a foreach loop)?
+# How do I loop over a list (a foreach loop)?
 %list <- [1,2,3]
 for %x in %list
     say "For %x loop #\%x"
@@ -115,7 +113,7 @@ for %x in %list
 for all %list
     say "For all loop #\%"
 
-# Loop over a number range?
+# How do I loop over a number range?
 # This is inclusive, so it will loop over 1,2, and 3
 for %i from 1 to 3
     say "For %i from 1 to 3 loop #\%i"
@@ -127,7 +125,7 @@ for %even from 0 to 5 by 2
 for %backwards from 3 to 1 by -1
     say "Backwards #\%backwards"
 
-# While loops:
+# How do I do a 'while' loop?
 %x <- 1
 repeat while: %x <= 3
     say "repeat while loop #\%x"
@@ -138,7 +136,7 @@ repeat until: %x > 3
     say "repeat until loop #\%x"
     %x +<- 1
 
-# Infinite loop:
+# How do I do an infinite loop?
 %x <- 1
 repeat
     say "repeat loop #\%x"
@@ -146,7 +144,7 @@ repeat
     if: %x > 3
         stop repeating
 
-# GOTOs:
+# How do I do a 'goto'?
 do
     %x <- 1
     === %again ===
@@ -157,13 +155,14 @@ do
     say "finished going to"
 
 
-# Function definition:
+# How do I define a function/method/procedure?
+# In nomsu, they're called "action"s, and they can be declared like this:
 action [say both %first and also %second]
     say %first
     # Function arguments are accessed just like variables
     say %second
 
-# Functions can use "return" to return a value early
+# Actions can use "return" to return a value early
 action [first fibonacci above %n]
     %f1 <- 0
     %f2 <- 1
@@ -176,7 +175,7 @@ action [first fibonacci above %n]
 
 say (first fibonacci above 10)
 
-# Functions can have aliases, which may or may not have the arguments in different order
+# Actions can have aliases, which may or may not have the arguments in different order
 action [..]
     I hate %worse_things more than %better_things
     I think %worse_things are worse than %better_things
@@ -188,18 +187,18 @@ I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"
 
 
-#.. Function calls can have parts of the function's name spread throughout.
-    Everything that's not a literal value is treated as part of the function's name
+#.. Actions can have parts of the action's name spread throughout.
+    Everything that's not a literal value is treated as part of the action's name
 say both "Hello" and also "again!"
 
-# Functions can even have their name at the end:
+# Actions can even start with a parameter
 action [%what_she_said is what she said]
     say %what_she_said
     say "-- she said"
 
 "Howdy pardner" is what she said
 
-#.. The language only reserves []{}().,:;% as special characters, so functions
+#.. The language only reserves []{}().,:;% as special characters, so actions
     can have really funky names!
 action [>> %foo_bar $$$^ --> % @& _~-^-~_~-^ %1 !]
     say %foo_bar
@@ -214,13 +213,14 @@ action [% と言う]
     "\(%)世界"
 say (%こんにちは と言う)
 
-# Math and logic operations are just treated the same as function calls in the syntax
+# Math and logic operations are just treated the same as actions in the syntax
 say (2 + 3)
 #.. So you can define your own operators, although they will need to be parenthesized to
     play nicely with other operators
 action [%a ++ %b]
     2 * (%a + %b)
 say (1 ++ (2 * 3))
+
 
 # How do I do grouping?
 # Expressions can be grouped by enclosing parentheses:
@@ -282,3 +282,60 @@ if (1 > (TWENTY)) on opposite day
     say "Lua compiling macros work!"
     say "It looks like a keyword, but there's no magic here!"
 
+
+# How do I use an action as a value?
+#.. Well... it's always *possible* to fall back to Lua behavior for something like this:
+action [best of %items according to %key_fn]
+    <- {%best:nil, %best_key:nil}
+    for all %items
+        %key <- (=lua "\%key_fn(\%)")
+        if: (%best is (nil)) or (%key > %best_key)
+            <- {%best:%, %best_key:%key}
+    return %best
+
+immediately
+    compile [function %var %body] to
+        Lua value ".."
+            (function(\(%var as lua expr))
+                return \(%body as lua expr)
+            end)
+
+say: best of [2,-3,4,-8] according to (function %: % * %)
+
+#.. But nomsu was mostly designed so that you don't *need* to. Instead of creating a
+    one-off function to pass to another function and get called a bunch of times, you
+    could use a macro to generate a single block of code that inlines the expression you
+    want to use:
+immediately
+    parse [best of %items according to %key_expr] as
+        result of
+            <- {%best:nil, %best_key:nil}
+            for all %items
+                %key <- %key_expr
+                if: (%best is (nil)) or (%key > %best_key)
+                    <- {%best:%, %best_key:%key}
+            return %best
+#.. This results in generated code that is more efficient (no function calls in the
+    inner loop)
+say: best of [2,-3,4,-8] according to (% * %)
+
+#.. In a functional programming language, you might do something like:
+        doubled = map(list, function(x) return 2 * x end)
+    to get a new list with every entry multiplied by 2, but it's *much* more readable to
+    do something like:
+%nums <- [1,2,3,4,5]
+%double_nums <- ((2 * %num) for %num in %nums)
+
+#.. Nomsu comes with built-in list comprehensions, but the flexible macro system makes it
+    incredibly easy to make similar constructs.
+immediately
+    parse [%expr for %key in %list BACKWARDS!] as
+        result of
+            %result <- []
+            %N <- (length of %list)
+            for %i = %key in %list
+                %result.(%N - %i + 1) <- %expr
+            return %result
+
+%double_nums <- ((2 * %num) for %num in %nums BACKWARDS!)
+say %double_nums

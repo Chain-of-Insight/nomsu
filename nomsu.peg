@@ -1,10 +1,8 @@
-file (File):
-    {| shebang?
-        (ignored_line %nl)*
-        statement ((nodent (statement / (({} ([^%nl]* -> "Error while parsing line")) => error)))
-            / (({} ((%nl %dedent) ->"Indentation error")) => error))*
-        (%nl ignored_line)*
-    |} -> Tuple
+file:
+    shebang?
+    (ignored_line %nl)*
+    (block / action / expression)?
+    (%nl ignored_line)*
     (!. / (({} (.* -> "Parse error")) => error))
 
 shebang: "#!" [^%nl]* (!. / %nl)
@@ -15,23 +13,26 @@ inline_statement: inline_action / inline_expression
 inline_block (Block):
     {| inline_statement (%ws* ";" %ws*  inline_statement)+ |} -> Tuple
 block (Block):
-    {| statement (nodent statement)+ |} -> Tuple
+    {| statement (nodent (statement / (({} ([^%nl]* -> "Error while parsing block line")) => error)))+ |} -> Tuple
 
 inline_nomsu (Nomsu): "\" noindex_inline_expression
 indented_nomsu (Nomsu):
     "\" (noindex_inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression)
 
 index_chain (IndexChain):
-    {| noindex_inline_expression ("." ((({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / noindex_inline_expression))+ |} -> Tuple
+    {|
+        noindex_inline_expression ("." (text_word / noindex_inline_expression))+
+    |} -> Tuple
 
 noindex_inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
-    / (
-        "(" %ws* (inline_block / inline_action / inline_expression) %ws*
+    / ( "("
+            %ws* (inline_block / inline_action / inline_expression) %ws*
         (")"
             / (({} ((!. / &%nl) -> 'Expected to find a ) before the end of the line')) => error)
-            / (({} ([^%nl]* -> 'Error while parsing subexpression')) => error))
+            / (({} ([^%nl]* -> 'Error while parsing subexpression')) => error)
         )
+      )
 
 inline_expression:
     index_chain / noindex_inline_expression 
@@ -49,9 +50,11 @@ inline_action (Action):
     {| (inline_expression %ws*)* word (%ws* (inline_expression / word))*
         (%ws* ":" %ws* (inline_block / inline_action / inline_expression))?|} -> Tuple
 action (Action):
-    {| (expression (dotdot / %ws*))* word ((dotdot / %ws*) (expression / word))* |} -> Tuple
+    {| (expression (dotdot? %ws*))* word ((dotdot? %ws*) (expression / word))* |} -> Tuple
 
 word (Word): { %operator / (!number plain_word) }
+
+text_word (Text): {| {%operator / (!number plain_word)} |} -> Tuple
 
 inline_text (Text):
     !('".."' eol)
@@ -119,7 +122,7 @@ dict_line:
 inline_dict_item:
     ((dict_key %ws* (":" %ws* (inline_block / inline_action / inline_expression)?)?)-> DictEntry)
 dict_key:
-    (({} ({|{%operator / (!number plain_word)}|} -> Tuple) {}) -> Text) / inline_expression
+    text_word / inline_expression
 
 block_comment: "#.." [^%nl]* (%nl+ %indent [^%nl]* (%nl+ %nodent [^%nl]*)* %dedent)?
 line_comment: "#" [^%nl]*
@@ -131,5 +134,5 @@ nodent: eol (%nl ignored_line)* %nl %nodent
 dedent: eol (%nl ignored_line)* (((!.) &%dedent) / (&(%nl %dedent)))
 non_dedent_error: (!dedent .)* eol (%nl ignored_line)* (!. / &%nl)
 comma: %ws* "," %ws*
-dotdot: nodent ".." %ws*
+dotdot: nodent ".."
 plain_word: ([a-zA-Z0-9_] / %utf8_char)+

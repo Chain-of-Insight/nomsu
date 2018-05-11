@@ -33,40 +33,9 @@ Tree = (name, methods)->
     Types[name] = immutable {"value","source"}, methods
 
 
-Tree "File",
-    as_lua: (nomsu)=>
-        if #@value == 1
-            return @value[1]\as_lua(nomsu)
-        lua = Lua(@source)
-        for i, line in ipairs @value
-            line_lua = line\as_lua(nomsu)
-            if not line_lua
-                error("No lua produced by #{repr line}", 0)
-            if i > 1
-                lua\append "\n"
-            lua\convert_to_statements!
-            lua\append line_lua
-        lua\declare_locals!
-        return lua
-
-    as_nomsu: (inline=false)=>
-        return nil if inline
-        nomsu = Nomsu(@source)
-        for i, line in ipairs @value
-            line = assert(line\as_nomsu(nil,true), "Could not convert line to nomsu")
-            nomsu\append line
-            if i < #@value
-                if tostring(line)\match("\n")
-                    nomsu\append "\n"
-                nomsu\append "\n"
-        return nomsu
-
-    map: (fn)=>
-        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
-
 Tree "Nomsu",
     as_lua: (nomsu)=>
-        Lua.Value(@source, "nomsu:parse(Nomsu(",repr(@value.source),", ",repr(tostring(@value.source\get_text!)),")).value[1]")
+        Lua.Value(@source, "nomsu:parse(Nomsu(",repr(@value.source),", ",repr(tostring(@value\as_nomsu!)),"))")
 
     as_nomsu: (inline=false)=>
         nomsu = @value\as_nomsu(true)
@@ -105,6 +74,8 @@ Tree "Block",
             nomsu\append line
             if i < #@value
                 nomsu\append "\n"
+                if tostring(line)\match("\n")
+                    nomsu\append "\n"
         return nomsu
 
     map: (fn)=>
@@ -121,6 +92,7 @@ Tree "Action",
             args = [args[p-1] for p in *nomsu.environment.ARG_ORDERS[compile_action][stub]]
             -- Force Lua to avoid tail call optimization for debugging purposes
             ret = compile_action(self, unpack(args))
+            if not ret then error("Failed to produce any Lua")
             return ret
         action = rawget(nomsu.environment.ACTIONS, stub)
         lua = Lua.Value(@source)
@@ -492,6 +464,8 @@ Tree "IndexChain",
                 nomsu\append "."
             bit_nomsu = bit\as_nomsu(true)
             return nil unless bit_nomsu
+            if bit.type == "Action" or bit.type == "Block"
+                bit_nomsu\parenthesize!
             nomsu\append bit_nomsu
         return nomsu
 

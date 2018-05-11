@@ -52,63 +52,9 @@ Tree = function(name, methods)
     "source"
   }, methods)
 end
-Tree("File", {
-  as_lua = function(self, nomsu)
-    if #self.value == 1 then
-      return self.value[1]:as_lua(nomsu)
-    end
-    local lua = Lua(self.source)
-    for i, line in ipairs(self.value) do
-      local line_lua = line:as_lua(nomsu)
-      if not line_lua then
-        error("No lua produced by " .. tostring(repr(line)), 0)
-      end
-      if i > 1 then
-        lua:append("\n")
-      end
-      lua:convert_to_statements()
-      lua:append(line_lua)
-    end
-    lua:declare_locals()
-    return lua
-  end,
-  as_nomsu = function(self, inline)
-    if inline == nil then
-      inline = false
-    end
-    if inline then
-      return nil
-    end
-    local nomsu = Nomsu(self.source)
-    for i, line in ipairs(self.value) do
-      line = assert(line:as_nomsu(nil, true), "Could not convert line to nomsu")
-      nomsu:append(line)
-      if i < #self.value then
-        if tostring(line):match("\n") then
-          nomsu:append("\n")
-        end
-        nomsu:append("\n")
-      end
-    end
-    return nomsu
-  end,
-  map = function(self, fn)
-    return fn(self) or self:with_value(Tuple(unpack((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local v = _list_0[_index_0]
-        _accum_0[_len_0] = v:map(fn)
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)())))
-  end
-})
 Tree("Nomsu", {
   as_lua = function(self, nomsu)
-    return Lua.Value(self.source, "nomsu:parse(Nomsu(", repr(self.value.source), ", ", repr(tostring(self.value.source:get_text())), ")).value[1]")
+    return Lua.Value(self.source, "nomsu:parse(Nomsu(", repr(self.value.source), ", ", repr(tostring(self.value:as_nomsu())), "))")
   end,
   as_nomsu = function(self, inline)
     if inline == nil then
@@ -162,6 +108,9 @@ Tree("Block", {
       nomsu:append(line)
       if i < #self.value then
         nomsu:append("\n")
+        if tostring(line):match("\n") then
+          nomsu:append("\n")
+        end
       end
     end
     return nomsu
@@ -212,6 +161,9 @@ Tree("Action", {
         args = _accum_0
       end
       local ret = compile_action(self, unpack(args))
+      if not ret then
+        error("Failed to produce any Lua")
+      end
       return ret
     end
     local action = rawget(nomsu.environment.ACTIONS, stub)
@@ -813,6 +765,9 @@ Tree("IndexChain", {
       local bit_nomsu = bit:as_nomsu(true)
       if not (bit_nomsu) then
         return nil
+      end
+      if bit.type == "Action" or bit.type == "Block" then
+        bit_nomsu:parenthesize()
       end
       nomsu:append(bit_nomsu)
     end
