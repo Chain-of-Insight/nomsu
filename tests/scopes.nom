@@ -1,0 +1,25 @@
+use "core"
+
+using
+    %x <- 99
+..do
+    assume: %x = 99
+
+using
+    action [foo]
+        return 99
+    
+..do
+    assume: (foo) = 99
+
+action [baz]
+    return "outer"
+
+using
+    action [baz]
+        return "inner"
+..do
+    assume: (baz) = "inner"
+assume: (baz) = "outer"
+
+say "Scopes test passed."
