@@ -1,0 +1,53 @@
+use "core/metaprogramming.nom"
+use "core/text.nom"
+use "core/operators.nom"
+use "core/collections.nom"
+use "core/control_flow.nom"
+
+compile [using %definitions %body, using %definitions do %body] to
+    %setup_lua <-
+        Lua ".."
+            local fell_through = false;
+            local ok, ret = pcall(function()
+                \(%definitions as lua statements)
+                fell_through = true;
+            end);
+    %body_lua <-
+        Lua ".."
+            local fell_through = false;
+            local ok, ret = pcall(function()
+                \(%body as lua statements)
+                fell_through = true;
+            end);
+    remove free vars (declare locals in %setup_lua) from %body_lua
+    %lua <-
+        Lua ".."
+            do
+                local old_actions, old_compile_actions, old_arg_orders = ACTIONS, COMPILE_ACTIONS, ARG_ORDERS;
+                ACTIONS = setmetatable({}, {__index=old_actions});
+                COMPILE_ACTIONS = setmetatable({}, {__index=old_compile_actions});
+                ARG_ORDERS = setmetatable({}, {__index=old_arg_orders});
+                \%setup_lua
+                if not ok then
+                    ACTIONS, COMPILE_ACTIONS, ARG_ORDERS = old_actions, old_compile_actions, old_arg_orders;
+                    error(ret);
+                end
+                if not fell_through then
+                    ACTIONS, COMPILE_ACTIONS, ARG_ORDERS = old_actions, old_compile_actions, old_arg_orders;
+                    return ret;
+                end
+                getmetatable(ACTIONS).__newindex = old_actions;
+                getmetatable(COMPILE_ACTIONS).__newindex = old_compile_actions;
+                getmetatable(ARG_ORDERS).__newindex = old_arg_orders;
+                \%body_lua
+                ACTIONS, COMPILE_ACTIONS, ARG_ORDERS = old_actions, old_compile_actions, old_arg_orders;
+                if not ok then
+                    error(ret);
+                end
+                if not fell_through then
+                    return ret;
+                end
+            end
+    declare locals in %lua
+    return %lua
+
