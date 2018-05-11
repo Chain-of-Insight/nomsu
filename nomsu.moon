@@ -567,7 +567,6 @@ if arg and debug_getinfo(2).func != require
         args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} {:nomsu_args: {| ("--;" ({[^;]*} ";")*)? |} :} ";"? |} !.
         flag <-
             {:interactive: ("-i" -> true) :}
-          / {:verbose: ("-v" -> true) :}
           / {:optimized: ("-O" -> true) :}
           / {:format: ("-f" -> true) :}
           / {:syntax: ("-s" -> true) :}
@@ -589,7 +588,6 @@ OPTIONS
     -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available)
     -f Auto-format the given Nomsu file and print the result.
     -s Check the program for syntax errors.
-    -v Verbose mode.
     -h/--help Print this message.
     -o <file> Output the compiled Lua file to the given file (use "-" to output to stdout; if outputting to stdout and -p is not specified, -p will default to /dev/null)
     -p <file> Print to the specified file instead of stdout.
@@ -691,8 +689,6 @@ OPTIONS
         io.stderr\flush!
     
     run = ->
-        if args.verbose
-            nomsu.debug = true
     
         for i,input in ipairs args.inputs
             if input == "-" then args.inputs[i] = STDIN

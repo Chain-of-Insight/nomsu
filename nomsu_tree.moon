@@ -35,7 +35,7 @@ Tree = (name, methods)->
 
 Tree "Nomsu",
     as_lua: (nomsu)=>
-        Lua.Value(@source, "nomsu:parse(Nomsu(",repr(@value.source),", ",repr(tostring(@value\as_nomsu!)),"))")
+        Lua.Value(@source, "nomsu:parse(Nomsu(",repr(@value.source),", ",repr(tostring(@value\as_nomsu(true))),"))")
 
     as_nomsu: (inline=false)=>
         nomsu = @value\as_nomsu(true)

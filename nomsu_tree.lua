@@ -54,7 +54,7 @@ Tree = function(name, methods)
 end
 Tree("Nomsu", {
   as_lua = function(self, nomsu)
-    return Lua.Value(self.source, "nomsu:parse(Nomsu(", repr(self.value.source), ", ", repr(tostring(self.value:as_nomsu())), "))")
+    return Lua.Value(self.source, "nomsu:parse(Nomsu(", repr(self.value.source), ", ", repr(tostring(self.value:as_nomsu(true))), "))")
   end,
   as_nomsu = function(self, inline)
     if inline == nil then

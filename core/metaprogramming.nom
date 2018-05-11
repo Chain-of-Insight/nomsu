@@ -89,7 +89,7 @@ immediately
                 lua:append(", ");
                 lua:append(arg);
             end
-            local template = repr(tostring(\%longhand:as_nomsu()));
+            local template = repr(tostring(\%longhand:as_nomsu(true)));
             local replacements = {};
             for i, a in ipairs(args) do replacements[i] = a.."="..a; end
             replacements = "{"..table.concat(replacements, ", ").."}";
@@ -166,8 +166,6 @@ immediately
 immediately
     compile [run %code] to
         Lua value "nomsu:run(Nomsu(\(=lua "tostring(tree.source)"), \(%code as lua expr)))"
-    parse [enable debugging] as: lua> "nomsu.debug = true;"
-    parse [disable debugging] as: lua> "nomsu.debug = false;"
 
 immediately
     compile [show lua %block] to
