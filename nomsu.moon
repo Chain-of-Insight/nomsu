@@ -240,7 +240,6 @@ class NomsuCompiler
                 @[key] = id
                 return id
         })
-        @use_stack = {}
         @file_metadata = setmetatable({}, {__mode:"k"})
 
         @environment = {
@@ -345,9 +344,24 @@ class NomsuCompiler
             compile_fn(lua)
         return @run_lua(lua)
 
+    _running_files = {}
     run_file: (filename, compile_fn=nil)=>
+        loaded = @environment.LOADED
+        if loaded[filename]
+            return loaded[filename]
         ret = nil
         for filename in all_files(filename)
+            if loaded[filename]
+                ret = loaded[filename]
+                continue
+
+            for i,running in ipairs _running_files
+                if running == filename
+                    loop = [_running_files[j] for j=i,#_running_files]
+                    insert loop, filename
+                    error("Circular import, this loops forever: #{concat loop, " -> "}")
+
+            insert _running_files, filename
             if filename\match("%.lua$")
                 file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
                 ret = @run_lua(Lua(Source(filename), file))
@@ -364,25 +378,11 @@ class NomsuCompiler
                 ret = @run(Nomsu(Source(filename), file), compile_fn)
             else
                 error("Invalid filetype for #{filename}", 0)
+            loaded[filename] = ret or true
+            remove _running_files
+
+        loaded[filename] = ret or true
         return ret
-    
-    use_file: (filename)=>
-        loaded = @environment.LOADED
-        if not loaded[filename]
-            ret = nil
-            for filename in all_files(filename)
-                if not loaded[filename]
-                    for i,f in ipairs @use_stack
-                        if f == filename
-                            loop = [@use_stack[j] for j=i,#@use_stack]
-                            insert loop, filename
-                            error("Circular import, this loops forever: #{concat loop, " -> "}")
-                    insert @use_stack, filename
-                    loaded[filename] = @run_file(filename) or true
-                    ret = loaded[filename]
-                    remove @use_stack
-            loaded[filename] = ret
-        return loaded[filename]
 
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
@@ -550,13 +550,10 @@ class NomsuCompiler
                     lua\append bit_lua
             return lua
 
-        @define_action "run file %filename", (_filename)->
-            return nomsu\run_file(_filename)
-
         @define_compile_action "use %path", (_path)=>
             path = nomsu\tree_to_value(_path)
-            nomsu\use_file(path)
-            return Lua(@source, "nomsu:use_file(#{repr path});")
+            nomsu\run_file(path)
+            return Lua(@source, "nomsu:run_file(#{repr path});")
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug_getinfo(2).func != require

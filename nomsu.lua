@@ -263,7 +263,7 @@ end
 local NomsuCompiler
 do
   local _class_0
-  local stub_defs, stub_pattern, var_pattern, _nomsu_chunk_counter
+  local stub_defs, stub_pattern, var_pattern, _nomsu_chunk_counter, _running_files
   local _base_0 = {
     define_action = function(self, signature, fn, is_compile_action)
       if is_compile_action == nil then
@@ -390,10 +390,36 @@ do
       if compile_fn == nil then
         compile_fn = nil
       end
+      local loaded = self.environment.LOADED
+      if loaded[filename] then
+        return loaded[filename]
+      end
       local ret = nil
       for filename in all_files(filename) do
         local _continue_0 = false
         repeat
+          if loaded[filename] then
+            ret = loaded[filename]
+            _continue_0 = true
+            break
+          end
+          for i, running in ipairs(_running_files) do
+            if running == filename then
+              local loop
+              do
+                local _accum_0 = { }
+                local _len_0 = 1
+                for j = i, #_running_files do
+                  _accum_0[_len_0] = _running_files[j]
+                  _len_0 = _len_0 + 1
+                end
+                loop = _accum_0
+              end
+              insert(loop, filename)
+              error("Circular import, this loops forever: " .. tostring(concat(loop, " -> ")))
+            end
+          end
+          insert(_running_files, filename)
           if filename:match("%.lua$") then
             local file = assert(FILE_CACHE[filename], "Could not find file: " .. tostring(filename))
             ret = self:run_lua(Lua(Source(filename), file))
@@ -415,45 +441,16 @@ do
           else
             error("Invalid filetype for " .. tostring(filename), 0)
           end
+          loaded[filename] = ret or true
+          remove(_running_files)
           _continue_0 = true
         until true
         if not _continue_0 then
           break
         end
       end
+      loaded[filename] = ret or true
       return ret
-    end,
-    use_file = function(self, filename)
-      local loaded = self.environment.LOADED
-      if not loaded[filename] then
-        local ret = nil
-        for filename in all_files(filename) do
-          if not loaded[filename] then
-            for i, f in ipairs(self.use_stack) do
-              if f == filename then
-                local loop
-                do
-                  local _accum_0 = { }
-                  local _len_0 = 1
-                  for j = i, #self.use_stack do
-                    _accum_0[_len_0] = self.use_stack[j]
-                    _len_0 = _len_0 + 1
-                  end
-                  loop = _accum_0
-                end
-                insert(loop, filename)
-                error("Circular import, this loops forever: " .. tostring(concat(loop, " -> ")))
-              end
-            end
-            insert(self.use_stack, filename)
-            loaded[filename] = self:run_file(filename) or true
-            ret = loaded[filename]
-            remove(self.use_stack)
-          end
-        end
-        loaded[filename] = ret
-      end
-      return loaded[filename]
     end,
     run_lua = function(self, lua)
       assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
@@ -674,13 +671,10 @@ do
         end
         return lua
       end)
-      self:define_action("run file %filename", function(_filename)
-        return nomsu:run_file(_filename)
-      end)
       return self:define_compile_action("use %path", function(self, _path)
         local path = nomsu:tree_to_value(_path)
-        nomsu:use_file(path)
-        return Lua(self.source, "nomsu:use_file(" .. tostring(repr(path)) .. ");")
+        nomsu:run_file(path)
+        return Lua(self.source, "nomsu:run_file(" .. tostring(repr(path)) .. ");")
       end)
     end
   }
@@ -702,7 +696,6 @@ do
           return id
         end
       })
-      self.use_stack = { }
       self.file_metadata = setmetatable({ }, {
         __mode = "k"
       })
@@ -810,6 +803,7 @@ do
     ]=], stub_defs)
   var_pattern = re.compile("{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs)
   _nomsu_chunk_counter = 0
+  _running_files = { }
   NomsuCompiler = _class_0
 end
 if arg and debug_getinfo(2).func ~= require then
