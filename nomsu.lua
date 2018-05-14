@@ -131,12 +131,14 @@ do
     return self .. stringify(other)
   end
   STRING_METATABLE.__index = function(self, i)
+    local ret = string[i]
+    if ret ~= nil then
+      return ret
+    end
     if type(i) == 'number' then
       return string.sub(self, i, i)
     elseif type(i) == 'table' then
       return string.sub(self, i[1], i[2])
-    else
-      return string[i]
     end
   end
 end
@@ -1103,12 +1105,14 @@ OPTIONS
     print_err_msg(error_message)
     return os.exit(false, true)
   end
-  local ldt
-  ok, ldt = pcall(require, 'ldt')
-  if ok then
-    ldt.guard(run)
-  else
-    xpcall(run, err_hand)
+  do
+    local ldt
+    ok, ldt = pcall(require, 'ldt')
+    if ok then
+      ldt.guard(run)
+    else
+      xpcall(run, err_hand)
+    end
   end
 end
 return NomsuCompiler

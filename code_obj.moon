@@ -62,8 +62,18 @@ Source = immutable {"filename","start","stop"}, {
 
 class Code
     new: (@source, ...)=>
-        @indents = {}
         @bits = {...}
+        indent, indents = 0, {}
+        match = string.match
+        for i,b in ipairs @bits
+            if type(b) == 'string'
+                if spaces = match(b, "\n([ ]*)[^\n]*$")
+                    indent = #spaces
+            elseif indent != 0
+                indents[i] = indent
+        @current_indent = indent
+        @indents = indents
+        @__str = nil
         if type(@source) == 'string'
             filename,start,stop = @source\match("^(.-)%[(%d+):(%d+)%]$")
             unless filename
@@ -72,17 +82,6 @@ class Code
                 @source = Source(filename, tonumber(start), tonumber(stop))
             else
                 @source = Source(@source, 1, #tostring(self)+1)
-        assert(@source == nil or Source\is_instance(@source))
-        indent = 0
-        for i,b in ipairs @bits
-            assert(not Source\is_instance(b))
-            if type(b) == 'string'
-                if spaces = b\match("\n([ ]*)[^\n]*$")
-                    indent = #spaces
-            elseif indent != 0
-                @indents[i] = indent
-        @current_indent = indent
-        @__str = nil
             
     sub: (start,stop)=>
         -- TODO: implement this better

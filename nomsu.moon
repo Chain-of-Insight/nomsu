@@ -120,11 +120,10 @@ do
     STRING_METATABLE = getmetatable("")
     STRING_METATABLE.__add = (other)=> @ .. stringify(other)
     STRING_METATABLE.__index = (i)=>
+        ret = string[i]
+        if ret != nil then return ret
         if type(i) == 'number' then return string.sub(@, i, i)
         elseif type(i) == 'table' then return string.sub(@, i[1], i[2])
-        else return string[i]
-    -- Can't use this because it breaks some LPEG stuff
-    --STRING_METATABLE.__mul = (other)=> string.rep(@, other)
 
 Types = require "nomsu_tree"
 
@@ -309,6 +308,7 @@ class NomsuCompiler
     define_compile_action: (signature, fn)=>
         return @define_action(signature, fn, true)
 
+    _nomsu_chunk_counter = 0
     parse: (nomsu_code)=>
         if type(nomsu_code) == 'string'
             _nomsu_chunk_counter += 1
@@ -333,7 +333,6 @@ class NomsuCompiler
             
         return tree
 
-    _nomsu_chunk_counter = 0
     run: (nomsu_code, compile_fn=nil)=>
         if #tostring(nomsu_code) == 0 then return nil
         tree = @parse(nomsu_code)
@@ -788,13 +787,11 @@ OPTIONS
     -- for both APIs
     -- TODO: revert back to old error handler
 
-    --ProFi = require 'ProFi'
-    --ProFi\start()
-    ok, ldt = pcall(require,'ldt')
-    if ok
-        ldt.guard run
-    else xpcall(run, err_hand)
-    --ProFi\stop()
-    --ProFi\writeReport( 'MyProfilingReport.txt' )
+    --require('ProFi')\profile "scratch/profile.txt", (profi)->
+    do
+        ok, ldt = pcall(require,'ldt')
+        if ok
+            ldt.guard run
+        else xpcall(run, err_hand)
 
 return NomsuCompiler
