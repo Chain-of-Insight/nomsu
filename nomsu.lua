@@ -508,38 +508,6 @@ do
       end
       return nil
     end,
-    print_tree = function(self, tree)
-      io.write(colors.bright .. colors.green)
-      for node, depth in coroutine.wrap(function()
-        return self:walk_tree(tree)
-      end) do
-        if Types.is_node(node) then
-          print(tostring(("    "):rep(depth)) .. tostring(node.type) .. ":")
-        else
-          print(("    "):rep(depth) .. repr(node))
-        end
-      end
-      return io.write(colors.reset)
-    end,
-    tree_to_str = function(self, tree)
-      local bits = { }
-      for node, depth in coroutine.wrap(function()
-        return self:walk_tree(tree)
-      end) do
-        if Types.is_node(node) then
-          insert(bits, (tostring(("    "):rep(depth)) .. tostring(node.type) .. ":"))
-        else
-          insert(bits, (("    "):rep(depth) .. repr(node)))
-        end
-      end
-      return concat(bits, "\n")
-    end,
-    tree_map = function(self, tree, fn)
-      if not (Types.is_node(tree)) then
-        return tree
-      end
-      return tree:map(fn)
-    end,
     tree_with_replaced_vars = function(self, tree, replacements)
       if not (next(replacements)) then
         return tree

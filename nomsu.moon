@@ -425,30 +425,6 @@ class NomsuCompiler
             else @walk_tree(tree.value, depth+1)
         return nil
 
-    print_tree: (tree)=>
-        io.write(colors.bright..colors.green)
-        for node,depth in coroutine.wrap(-> @walk_tree tree)
-            if Types.is_node(node)
-                print("#{("    ")\rep(depth)}#{node.type}:")
-            else
-                print(("    ")\rep(depth)..repr(node))
-        io.write(colors.reset)
-    
-    tree_to_str: (tree)=>
-        bits = {}
-        for node,depth in coroutine.wrap(-> @walk_tree tree)
-            if Types.is_node(node)
-                insert bits, ("#{("    ")\rep(depth)}#{node.type}:")
-            else
-                insert bits, (("    ")\rep(depth)..repr(node))
-        return concat(bits, "\n")
-
-    tree_map: (tree, fn)=>
-        -- Return a new tree with fn mapped to each node. If fn provides a replacement,
-        -- use that and stop recursing, otherwise recurse.
-        unless Types.is_node(tree) then return tree
-        return tree\map(fn)
-
     tree_with_replaced_vars: (tree, replacements)=>
         return tree unless next(replacements)
         if next(replacements).type == "Var"
