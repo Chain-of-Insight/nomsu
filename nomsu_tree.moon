@@ -481,10 +481,11 @@ Tree "Number",
     map: (fn)=> fn(self) or self
 
 Tree "Var",
+    as_lua_id: (v)->
+        "_"..(v\gsub("%W", (c)-> if c == "_" then "__" else ("_%x")\format(c\byte!)))
+
     as_lua: (nomsu)=>
-        lua_id = "_"..(@value\gsub "%W", (verboten)->
-            if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
-        Lua.Value(@source, lua_id)
+        Lua.Value(@source, self.as_lua_id(@value))
 
     as_nomsu: (inline=false)=>
         return Nomsu(@source, "%", @value)

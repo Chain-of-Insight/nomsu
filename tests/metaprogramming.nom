@@ -50,7 +50,7 @@ assume ((type of {}) = "table") or barf "type of failed."
 
 assume ((nomsu) = (=lua "nomsu")) or barf "nomsu failed"
 
-assume (("x" as lua identifier) = (\%x as lua identifier)) or barf "converting to identifier failed."
+assume (((\%x as lua identifier) as text) = "_x") or barf "converting to identifier failed."
 
 assume ((run "return 99") = 99) or barf "run % failed."
 

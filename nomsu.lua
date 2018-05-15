@@ -277,28 +277,6 @@ do
       elseif type(signature) ~= 'table' then
         error("Invalid signature, expected list of strings, but got: " .. tostring(repr(signature)), 0)
       end
-      local stubs
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #signature do
-          local alias = signature[_index_0]
-          _accum_0[_len_0] = assert(stub_pattern:match(alias))
-          _len_0 = _len_0 + 1
-        end
-        stubs = _accum_0
-      end
-      local stub_args
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #signature do
-          local alias = signature[_index_0]
-          _accum_0[_len_0] = assert(var_pattern:match(alias))
-          _len_0 = _len_0 + 1
-        end
-        stub_args = _accum_0
-      end
       local fn_info = debug_getinfo(fn, "u")
       assert(not fn_info.isvararg, "Vararg functions aren't supported. Sorry, use a list instead.")
       local fn_arg_positions
@@ -313,14 +291,14 @@ do
       for _index_0 = 1, #signature do
         local alias = signature[_index_0]
         local stub = assert(stub_pattern:match(alias))
-        stub_args = assert(var_pattern:match(alias));
+        local stub_args = assert(var_pattern:match(alias));
         (is_compile_action and self.environment.COMPILE_ACTIONS or self.environment.ACTIONS)[stub] = fn
         do
           local _accum_0 = { }
           local _len_0 = 1
           for _index_1 = 1, #stub_args do
             local a = stub_args[_index_1]
-            _accum_0[_len_0] = fn_arg_positions[self:var_to_lua_identifier(a)]
+            _accum_0[_len_0] = fn_arg_positions[Types.Var.as_lua_id(a)]
             _len_0 = _len_0 + 1
           end
           arg_orders[stub] = _accum_0
@@ -428,6 +406,7 @@ do
               local file = FILE_CACHE[lua_filename]
               if file then
                 ret = self:run_lua(Lua(Source(filename), file))
+                remove(_running_files)
                 _continue_0 = true
                 break
               end
@@ -515,7 +494,7 @@ do
         do
           local _tbl_0 = { }
           for k, v in pairs(replacements) do
-            _tbl_0[self:var_to_lua_identifier(k)] = v
+            _tbl_0[tostring(k:as_lua(self))] = v
           end
           replacements = _tbl_0
         end
@@ -528,18 +507,6 @@ do
           end
         end
       end)
-    end,
-    var_to_lua_identifier = function(self, var)
-      if Types.Var:is_instance(var) then
-        var = var.value
-      end
-      return "_" .. (var:gsub("%W", function(verboten)
-        if verboten == "_" then
-          return "__"
-        else
-          return ("_%x"):format(verboten:byte())
-        end
-      end))
     end,
     initialize_core = function(self)
       local nomsu = self

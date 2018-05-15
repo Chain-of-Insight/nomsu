@@ -290,9 +290,6 @@ class NomsuCompiler
         elseif type(signature) != 'table'
             error("Invalid signature, expected list of strings, but got: #{repr signature}", 0)
 
-        stubs = [assert(stub_pattern\match(alias)) for alias in *signature]
-        stub_args = [assert(var_pattern\match(alias)) for alias in *signature]
-
         fn_info = debug_getinfo(fn, "u")
         assert(not fn_info.isvararg, "Vararg functions aren't supported. Sorry, use a list instead.")
         fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
@@ -301,7 +298,7 @@ class NomsuCompiler
             stub = assert(stub_pattern\match(alias))
             stub_args = assert(var_pattern\match(alias))
             (is_compile_action and @environment.COMPILE_ACTIONS or @environment.ACTIONS)[stub] = fn
-            arg_orders[stub] = [fn_arg_positions[@var_to_lua_identifier(a)] for a in *stub_args]
+            arg_orders[stub] = [fn_arg_positions[Types.Var.as_lua_id(a)] for a in *stub_args]
         @environment.ARG_ORDERS[fn] = arg_orders
 
     define_compile_action: (signature, fn)=>
@@ -370,6 +367,7 @@ class NomsuCompiler
                     file = FILE_CACHE[lua_filename]
                     if file
                         ret = @run_lua(Lua(Source(filename), file))
+                        remove _running_files
                         continue
                 file = file or FILE_CACHE[filename]
                 if not file
@@ -427,21 +425,13 @@ class NomsuCompiler
     tree_with_replaced_vars: (tree, replacements)=>
         return tree unless next(replacements)
         if next(replacements).type == "Var"
-            replacements = {@var_to_lua_identifier(k),v for k,v in pairs(replacements)}
+            replacements = {tostring(k\as_lua(@)),v for k,v in pairs(replacements)}
         tree\map (t)->
             if t.type == "Var"
                 id = tostring(t\as_lua(self))
                 if replacements[id] != nil
                     return replacements[id]
 
-    var_to_lua_identifier: (var)=>
-        -- Converts arbitrary nomsu vars to valid lua identifiers by replacing illegal
-        -- characters with escape sequences
-        if Types.Var\is_instance(var)
-            var = var.value
-        "_"..(var\gsub "%W", (verboten)->
-            if verboten == "_" then "__" else ("_%x")\format(verboten\byte!))
-    
     initialize_core: =>
         -- Sets up some core functionality
         nomsu = self

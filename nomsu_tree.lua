@@ -801,15 +801,17 @@ Tree("Number", {
   end
 })
 Tree("Var", {
-  as_lua = function(self, nomsu)
-    local lua_id = "_" .. (self.value:gsub("%W", function(verboten)
-      if verboten == "_" then
+  as_lua_id = function(v)
+    return "_" .. (v:gsub("%W", function(c)
+      if c == "_" then
         return "__"
       else
-        return ("_%x"):format(verboten:byte())
+        return ("_%x"):format(c:byte())
       end
     end))
-    return Lua.Value(self.source, lua_id)
+  end,
+  as_lua = function(self, nomsu)
+    return Lua.Value(self.source, self.as_lua_id(self.value))
   end,
   as_nomsu = function(self, inline)
     if inline == nil then

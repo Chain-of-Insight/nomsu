@@ -20,7 +20,7 @@ immediately
             lua:append("function(tree");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
-                if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
+                if tok.type == "Var" then args[#args+1] = tok:as_lua(nomsu); end
             end
             for i, arg in ipairs(args) do
                 lua:append(", ");
@@ -52,7 +52,7 @@ immediately
             lua:append("function(");
             local args = {};
             for i,tok in ipairs(\%actions.value[1].value) do
-                if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
+                if tok.type == "Var" then args[#args+1] = tok:as_lua(nomsu); end
             end
             for i, arg in ipairs(args) do
                 lua:append(arg);
@@ -83,7 +83,7 @@ immediately
             lua:append("function(tree");
             local args = {};
             for i,tok in ipairs(\%shorthand.value[1].value) do
-                if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
+                if tok.type == "Var" then args[#args+1] = tostring(tok:as_lua(nomsu)); end
             end
             for i, arg in ipairs(args) do
                 lua:append(", ");
@@ -157,7 +157,7 @@ immediately
 
 immediately
     compile [nomsu] to: Lua value "nomsu"
-    compile [%var as lua identifier] to: Lua value "nomsu:var_to_lua_identifier(\(%var as lua expr))"
+    compile [%var as lua identifier] to: Lua value "\(%var as lua expr):as_lua(nomsu)"
 
 # Compiler tools
 immediately
