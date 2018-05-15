@@ -167,13 +167,16 @@ class Lua extends Code
                     stack[#stack+1] = b
         @__str = nil
 
-    convert_to_statements: (prefix="", suffix=";")=>
+    as_statements: (prefix="", suffix=";")=>
         unless @is_value
-            return
+            return self
+        statements = Lua(@source)
         if prefix != ""
-            @prepend prefix
+            statements\append prefix
+        statements\append self
         if suffix != ""
-            @append suffix
+            statements\append suffix
+        return statements
 
     declare_locals: (to_declare=nil)=>
         if to_declare == nil

@@ -54,8 +54,7 @@ Tree "Block",
             line_lua = line\as_lua(nomsu)
             if i > 1
                 lua\append "\n"
-            line_lua\convert_to_statements!
-            lua\append line_lua
+            lua\append line_lua\as_statements!
         return lua
 
     as_nomsu: (inline=false)=>

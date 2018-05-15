@@ -262,7 +262,7 @@ do
       end
       self.__str = nil
     end,
-    convert_to_statements = function(self, prefix, suffix)
+    as_statements = function(self, prefix, suffix)
       if prefix == nil then
         prefix = ""
       end
@@ -270,14 +270,17 @@ do
         suffix = ";"
       end
       if not (self.is_value) then
-        return 
+        return self
       end
+      local statements = Lua(self.source)
       if prefix ~= "" then
-        self:prepend(prefix)
+        statements:append(prefix)
       end
+      statements:append(self)
       if suffix ~= "" then
-        return self:append(suffix)
+        statements:append(suffix)
       end
+      return statements
     end,
     declare_locals = function(self, to_declare)
       if to_declare == nil then

@@ -377,8 +377,7 @@ do
       end
       local tree = self:parse(nomsu_code)
       assert(tree, "Failed to parse: " .. tostring(nomsu_code))
-      local lua = tree:as_lua(self)
-      lua:convert_to_statements()
+      local lua = tree:as_lua(self):as_statements()
       lua:declare_locals()
       lua:prepend("-- File: " .. tostring(nomsu_code.source or "") .. "\n")
       if compile_fn then
@@ -545,14 +544,13 @@ do
     initialize_core = function(self)
       local nomsu = self
       self:define_compile_action("immediately %block", function(self, _block)
-        local lua = _block:as_lua(nomsu)
-        lua:convert_to_statements()
+        local lua = _block:as_lua(nomsu):as_statements()
         lua:declare_locals()
         nomsu:run_lua(lua)
         return Lua(self.source, "if IMMEDIATE then\n    ", lua, "\nend")
       end)
-      local add_lua_bits
-      add_lua_bits = function(lua, code)
+      local add_lua_string_bits
+      add_lua_string_bits = function(lua, code)
         if code.type ~= "Text" then
           lua:append(", ", code:as_lua(nomsu))
           return 
@@ -575,34 +573,19 @@ do
       end
       self:define_compile_action("Lua %code", function(self, _code)
         local lua = Lua.Value(self.source, "Lua(", tostring(_code.source))
-        add_lua_bits(lua, _code)
-        lua:append(")")
-        return lua
-      end)
-      self:define_compile_action("Lua %source %code", function(self, _source, _code)
-        local lua = Lua.Value(self.source, "Lua(", _source:as_lua(nomsu))
-        add_lua_bits(lua, _code)
+        add_lua_string_bits(lua, _code)
         lua:append(")")
         return lua
       end)
       self:define_compile_action("Lua value %code", function(self, _code)
         local lua = Lua.Value(self.source, "Lua.Value(", tostring(_code.source))
-        add_lua_bits(lua, _code)
+        add_lua_string_bits(lua, _code)
         lua:append(")")
         return lua
       end)
-      self:define_compile_action("Lua value %source %code", function(self, _source, _code)
-        local lua = Lua.Value(self.source, "Lua.Value(", _source:as_lua(nomsu))
-        add_lua_bits(lua, _code)
-        lua:append(")")
-        return lua
-      end)
-      self:define_compile_action("lua> %code", function(self, _code)
-        if _code.type ~= "Text" then
-          return Lua.Value(self.source, "nomsu:run_lua(Lua(", repr(_code.source), ", ", repr(tostring(_code:as_lua(nomsu))), "))")
-        end
-        local lua = Lua(_code.source)
-        local _list_0 = _code.value
+      local add_lua_bits
+      add_lua_bits = function(lua, code)
+        local _list_0 = code.value
         for _index_0 = 1, #_list_0 do
           local bit = _list_0[_index_0]
           if type(bit) == "string" then
@@ -617,27 +600,18 @@ do
           end
         end
         return lua
+      end
+      self:define_compile_action("lua> %code", function(self, _code)
+        if _code.type ~= "Text" then
+          return Lua(self.source, "nomsu:run_lua(", _code:as_lua(nomsu), ");")
+        end
+        return add_lua_bits(Lua(_code.source), _code)
       end)
       self:define_compile_action("=lua %code", function(self, _code)
         if _code.type ~= "Text" then
-          return Lua.Value(self.source, "nomsu:run_lua(Lua(", repr(_code.source), ", ", repr(tostring(_code:as_lua(nomsu))), "))")
+          return Lua.Value(self.source, "nomsu:run_lua(", _code:as_lua(nomsu), ":as_statements('return '))")
         end
-        local lua = Lua.Value(self.source)
-        local _list_0 = _code.value
-        for _index_0 = 1, #_list_0 do
-          local bit = _list_0[_index_0]
-          if type(bit) == "string" then
-            lua:append(bit)
-          else
-            local bit_lua = bit:as_lua(nomsu)
-            if not (lua.is_value) then
-              local line, src = bit.source:get_line(), bit.source:get_text()
-              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.", 0)
-            end
-            lua:append(bit_lua)
-          end
-        end
-        return lua
+        return add_lua_bits(Lua.Value(_code.source), _code)
       end)
       return self:define_compile_action("use %path", function(self, _path)
         local path = nomsu:tree_to_value(_path)

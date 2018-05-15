@@ -27,7 +27,7 @@ immediately
                 lua:append(arg);
             end
             local body_lua = \%lua:as_lua(nomsu);
-            body_lua:convert_to_statements("return ");
+            body_lua = body_lua:as_statements("return ");
             body_lua:remove_free_vars(args);
             body_lua:declare_locals();
             lua:append(")\n    ", body_lua, "\nend);");
@@ -59,7 +59,7 @@ immediately
                 if i < #args then lua:append(", ") end
             end
             local body_lua = \%body:as_lua(nomsu);
-            body_lua:convert_to_statements("return ");
+            body_lua = body_lua:as_statements("return ");
             body_lua:remove_free_vars(args);
             body_lua:declare_locals();
             lua:append(")\n    ", body_lua, "\nend);")
@@ -122,10 +122,7 @@ immediately
             return lua;
 
     action [%tree as lua statements]
-        lua> ".."
-            local lua = \%tree:as_lua(nomsu);
-            lua:convert_to_statements();
-            return lua;
+        =lua "\%tree:as_lua(nomsu):as_statements()"
     
     action [%tree with vars %vars]
         =lua "nomsu:tree_with_replaced_vars(\%tree, \%vars)"
@@ -183,7 +180,7 @@ immediately
             end
 
 immediately
-    compile [source] to: Lua value (=lua "tree.source") "tree.source"
+    compile [source] to: Lua value "tree.source"
 
 #..
     immediately

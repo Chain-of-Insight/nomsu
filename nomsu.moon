@@ -336,8 +336,7 @@ class NomsuCompiler
         if #tostring(nomsu_code) == 0 then return nil
         tree = @parse(nomsu_code)
         assert tree, "Failed to parse: #{nomsu_code}"
-        lua = tree\as_lua(@)
-        lua\convert_to_statements!
+        lua = tree\as_lua(@)\as_statements!
         lua\declare_locals!
         lua\prepend "-- File: #{nomsu_code.source or ""}\n"
         if compile_fn
@@ -447,13 +446,12 @@ class NomsuCompiler
         -- Sets up some core functionality
         nomsu = self
         @define_compile_action "immediately %block", (_block)=>
-            lua = _block\as_lua(nomsu)
-            lua\convert_to_statements!
+            lua = _block\as_lua(nomsu)\as_statements!
             lua\declare_locals!
             nomsu\run_lua(lua)
             return Lua(@source, "if IMMEDIATE then\n    ", lua, "\nend")
 
-        add_lua_bits = (lua, code)->
+        add_lua_string_bits = (lua, code)->
             if code.type != "Text"
                 lua\append ", ", code\as_lua(nomsu)
                 return
@@ -470,35 +468,18 @@ class NomsuCompiler
 
         @define_compile_action "Lua %code", (_code)=>
             lua = Lua.Value(@source, "Lua(", tostring(_code.source))
-            add_lua_bits(lua, _code)
-            lua\append ")"
-            return lua
-
-        @define_compile_action "Lua %source %code", (_source, _code)=>
-            lua = Lua.Value(@source, "Lua(", _source\as_lua(nomsu))
-            add_lua_bits(lua, _code)
+            add_lua_string_bits(lua, _code)
             lua\append ")"
             return lua
 
         @define_compile_action "Lua value %code", (_code)=>
             lua = Lua.Value(@source, "Lua.Value(", tostring(_code.source))
-            add_lua_bits(lua, _code)
+            add_lua_string_bits(lua, _code)
             lua\append ")"
             return lua
 
-        @define_compile_action "Lua value %source %code", (_source, _code)=>
-            lua = Lua.Value(@source, "Lua.Value(", _source\as_lua(nomsu))
-            add_lua_bits(lua, _code)
-            lua\append ")"
-            return lua
-
-        @define_compile_action "lua> %code", (_code)=>
-            if _code.type != "Text"
-                return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
-                    ", ",repr(tostring(_code\as_lua(nomsu))),"))"
-
-            lua = Lua(_code.source)
-            for bit in *_code.value
+        add_lua_bits = (lua, code)->
+            for bit in *code.value
                 if type(bit) == "string"
                     lua\append bit
                 else
@@ -509,22 +490,15 @@ class NomsuCompiler
                     lua\append bit_lua
             return lua
 
+        @define_compile_action "lua> %code", (_code)=>
+            if _code.type != "Text"
+                return Lua @source, "nomsu:run_lua(", _code\as_lua(nomsu), ");"
+            return add_lua_bits(Lua(_code.source), _code)
+
         @define_compile_action "=lua %code", (_code)=>
             if _code.type != "Text"
-                return Lua.Value @source, "nomsu:run_lua(Lua(",repr(_code.source),
-                    ", ",repr(tostring(_code\as_lua(nomsu))),"))"
-
-            lua = Lua.Value(@source)
-            for bit in *_code.value
-                if type(bit) == "string"
-                    lua\append bit
-                else
-                    bit_lua = bit\as_lua(nomsu)
-                    unless lua.is_value
-                        line, src = bit.source\get_line!, bit.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
-                    lua\append bit_lua
-            return lua
+                return Lua.Value @source, "nomsu:run_lua(", _code\as_lua(nomsu), ":as_statements('return '))"
+            return add_lua_bits(Lua.Value(_code.source), _code)
 
         @define_compile_action "use %path", (_path)=>
             path = nomsu\tree_to_value(_path)

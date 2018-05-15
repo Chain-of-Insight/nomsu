@@ -79,8 +79,7 @@ Tree("Block", {
       if i > 1 then
         lua:append("\n")
       end
-      line_lua:convert_to_statements()
-      lua:append(line_lua)
+      lua:append(line_lua:as_statements())
     end
     return lua
   end,

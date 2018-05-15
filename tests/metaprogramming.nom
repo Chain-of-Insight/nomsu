@@ -55,3 +55,9 @@ assume (("x" as lua identifier) = (\%x as lua identifier)) or barf "converting t
 assume ((run "return 99") = 99) or barf "run % failed."
 
 say "Metaprogramming test passed."
+
+%code <-: Lua "global_x = true;"
+lua> %code
+assume (=lua "global_x") or barf "Running lua from a variable failed."
+%code <-: Lua value "global_x"
+assume (=lua %code) or barf "Running lua from a variable failed."
