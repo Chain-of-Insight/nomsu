@@ -1,7 +1,7 @@
+local _pairs, _ipairs = pairs, ipairs
 if jit then
   package.cpath = "./luajit_lpeg/?.so;" .. package.cpath
   bit32 = require('bit')
-  local _pairs, _ipairs = pairs, ipairs
   pairs = function(x)
     do
       local mt = getmetatable(x)
@@ -486,7 +486,7 @@ do
       end
       return nil
     end,
-    tree_with_replaced_vars = function(self, tree, replacements)
+    tree_with_replacements = function(self, tree, replacements)
       if not (next(replacements)) then
         return tree
       end
@@ -668,6 +668,42 @@ do
         self.environment.len = (function(x)
           return #x
         end)
+      end
+      self.environment.ipairs = function(x)
+        if type(x) == 'function' then
+          return coroutine.wrap(x)
+        elseif type(x) == 'thread' then
+          return coroutine.resume, x, nil
+        else
+          do
+            local mt = getmetatable(x)
+            if mt then
+              if mt.__ipairs then
+                return mt.__ipairs(x)
+              end
+            else
+              return _ipairs(x)
+            end
+          end
+        end
+      end
+      self.environment.pairs = function(x)
+        if type(x) == 'function' then
+          return coroutine.wrap(x)
+        elseif type(x) == 'thread' then
+          return coroutine.resume, x, nil
+        else
+          do
+            local mt = getmetatable(x)
+            if mt then
+              if mt.__pairs then
+                return mt.__pairs(x)
+              end
+            else
+              return _pairs(x)
+            end
+          end
+        end
       end
       for k, v in pairs(Types) do
         self.environment[k] = v

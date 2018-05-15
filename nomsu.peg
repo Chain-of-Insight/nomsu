@@ -124,12 +124,12 @@ inline_dict_item:
 dict_key:
     text_word / inline_expression
 
-block_comment: "#.." [^%nl]* (%nl+ %indent [^%nl]* (%nl+ %nodent [^%nl]*)* %dedent)?
-line_comment: "#" [^%nl]*
+comment: "#" [^%nl]* (%nl+ %indent [^%nl]* (%nl+ %nodent [^%nl]*)* %dedent)?
+eol_comment: "#" [^%nl]*
 
-eol: %ws* line_comment? (!. / &%nl)
-ignored_line: (%nodent (block_comment / line_comment)) / (%ws* (!. / &%nl))
-indent: eol (%nl ignored_line)* %nl %indent ((block_comment/line_comment) (%nl ignored_line)* nodent)?
+eol: %ws* eol_comment? (!. / &%nl)
+ignored_line: (%nodent comment) / (%ws* (!. / &%nl))
+indent: eol (%nl ignored_line)* %nl %indent (comment (%nl ignored_line)* nodent)?
 nodent: eol (%nl ignored_line)* %nl %nodent
 dedent: eol (%nl ignored_line)* (((!.) &%dedent) / (&(%nl %dedent)))
 non_dedent_error: (!dedent .)* eol (%nl ignored_line)* (!. / &%nl)

@@ -271,8 +271,10 @@ immediately
                 \(%body as lua statements)
             end
     
-    # Constants can be defined as macros (but they need to be parenthesized when invoked)
+    # Constants can be defined as macros
     parse [TWENTY] as: 20
+    # When they're invoked, they'll need parentheses just like a function call
+    parse [TWENTY ONE] as: 21
 
 if (1 > (TWENTY)) is untrue
     say "Nomsu parsing macros work!"

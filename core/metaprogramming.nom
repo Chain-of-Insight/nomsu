@@ -95,7 +95,7 @@ immediately
             replacements = "{"..table.concat(replacements, ", ").."}";
             lua:append([[)
                 local template = nomsu:parse(Nomsu(]]..repr(tree.source)..[[, ]]..template..[[));
-                local replacement = nomsu:tree_with_replaced_vars(template, ]]..replacements..[[);
+                local replacement = nomsu:tree_with_replacements(template, ]]..replacements..[[);
                 return replacement:as_lua(nomsu);
             end);]]);
             return lua;
@@ -125,7 +125,7 @@ immediately
         =lua "\%tree:as_lua(nomsu):as_statements()"
     
     action [%tree with vars %vars]
-        =lua "nomsu:tree_with_replaced_vars(\%tree, \%vars)"
+        =lua "nomsu:tree_with_replacements(\%tree, \%vars)"
     
     compile [declare locals in %code] to
         Lua value "\(%code as lua expr):declare_locals()"

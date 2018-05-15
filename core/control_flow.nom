@@ -74,11 +74,9 @@ immediately
     compile [%tree has subtree %subtree where %condition] to
         Lua value ".."
             (function()
-                for \(%subtree as lua expr) in coroutine.wrap(function() nomsu:walk_tree(\(%tree as lua expr)) end) do
-                    if Types.is_node(\(%subtree as lua expr)) then
-                        if \(%condition as lua expr) then
-                            return true;
-                        end
+                for \(%subtree as lua expr) in coroutine.wrap(function() \(%tree as lua expr):map(coroutine.yield) end) do
+                    if \(%condition as lua expr) then
+                        return true;
                     end
                 end
                 return false;
@@ -431,3 +429,13 @@ immediately
                 \(%body as lua statements)
             end)()
 
+# Coroutines:
+immediately
+    compile [values %body, coroutine %body, generator %body] to
+        Lua value ".."
+            (function()
+                \(%body as lua statements)
+            end)
+    compile [->] to: Lua "coroutine.yield(true);"
+    compile [-> %] to: Lua "coroutine.yield(true, \(% as lua expr));"
+    compile [-> %k = %v] to: Lua "coroutine.yield(\(%k as lua expr), \(%v as lua expr));"

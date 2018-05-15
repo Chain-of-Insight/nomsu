@@ -11,13 +11,13 @@
 --    Or from the command line:
 --        lua nomsu.lua [input_file [output_file or -]]
 export lpeg, re
+_pairs, _ipairs = pairs, ipairs
 if jit
     package.cpath = "./luajit_lpeg/?.so;"..package.cpath
     
     export bit32
     bit32 = require('bit')
 
-    _pairs, _ipairs = pairs, ipairs
     export pairs, ipairs
     pairs = (x)->
         if mt = getmetatable(x)
@@ -259,6 +259,24 @@ class NomsuCompiler
                         return mt.__len(x)
                 return #x
         else ((x) -> #x)
+        @environment.ipairs = (x)->
+            if type(x) == 'function'
+                return coroutine.wrap(x)
+            elseif type(x) == 'thread'
+                return coroutine.resume, x, nil
+            elseif mt = getmetatable(x)
+                if mt.__ipairs
+                    return mt.__ipairs(x)
+            else return _ipairs(x)
+        @environment.pairs = (x)->
+            if type(x) == 'function'
+                return coroutine.wrap(x)
+            elseif type(x) == 'thread'
+                return coroutine.resume, x, nil
+            elseif mt = getmetatable(x)
+                if mt.__pairs
+                    return mt.__pairs(x)
+            else return _pairs(x)
         for k,v in pairs(Types) do @environment[k] = v
         @environment.Tuple = Tuple
         @environment.Lua = Lua
@@ -422,7 +440,7 @@ class NomsuCompiler
             else @walk_tree(tree.value, depth+1)
         return nil
 
-    tree_with_replaced_vars: (tree, replacements)=>
+    tree_with_replacements: (tree, replacements)=>
         return tree unless next(replacements)
         if next(replacements).type == "Var"
             replacements = {tostring(k\as_lua(@)),v for k,v in pairs(replacements)}
