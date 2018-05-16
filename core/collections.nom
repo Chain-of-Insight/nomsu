@@ -66,33 +66,18 @@ immediately
                 %comprehension.%i <- %expression
             return %comprehension
 
-    parse [%expression for all %iterable] as
-        %expression for % in %iterable
-
     parse [..]
-        %expression for %index from %start to %stop via %step
-        %expression for %index from %start to %stop by %step
+        %expression for %index in %start to %stop via %step
+        %expression for %index in %start to %stop by %step
     ..as
         result of
             %comprehension <- []
-            for %index from %start to %stop via %step
+            for %index in %start to %stop via %step
                 add %expression to %comprehension
             return %comprehension
 
-    parse [%expression for all %iterable] as
-        %expression for % in %iterable
-
-    parse [%expression for %var from %start to %stop] as
-        %expression for %var from %start to %stop via 1
-
-    parse [..]
-        %expression for all %start to %stop by %step
-        %expression for all %start to %stop via %step
-    ..as
-        %expression for % from %start to %stop via %step
-
-    parse [%expression for all %start to %stop] as
-        %expression for all %start to %stop via 1
+    parse [%expression for %var in %start to %stop] as
+        %expression for %var in %start to %stop via 1
 
     parse [%expression for %key = %value in %iterable] as
         result of
@@ -108,9 +93,6 @@ immediately
             for %item in %iterable
                 %comprehension.%key <- %value
             return %comprehension
-
-    parse [%key = %value for all %iterable] as
-        %key = %value for % in %iterable
 
     parse [%key = %value for %src_key = %src_value in %iterable] as
         result of
@@ -142,18 +124,18 @@ immediately
 
 immediately
     action [%items sorted, sorted %items]
-        %copy <- (% for all %items)
+        %copy <- (% for % in %items)
         sort %copy
         return %copy
     action [%items sorted by %key]
-        %copy <- (% for all %items)
+        %copy <- (% for % in %items)
         sort %copy by %key
         return %copy
 
     action [unique %items]
         %unique <- []
         %seen <- {}
-        for all %items
+        for % in %items
             unless: % in %seen
                 add % to %unique
                 (% in %seen) <- (yes)

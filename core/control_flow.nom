@@ -140,8 +140,8 @@ immediately
 # Numeric range for loops
 immediately
     compile [..]
-        for %var from %start to %stop by %step %body
-        for %var from %start to %stop via %step %body
+        for %var in %start to %stop by %step %body
+        for %var in %start to %stop via %step %body
     ..to
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
         assume (%var.type is "Var") or barf "Loop expected variable, not: \(%var's source code)"
@@ -173,12 +173,7 @@ immediately
         return %lua
 
 immediately
-    parse [for %var from %start to %stop %body] as: for %var from %start to %stop via 1 %body
-    parse [..]
-        for all %start to %stop by %step %body
-        for all %start to %stop via %step %body
-    ..as: for % from %start to %stop via %step %body
-    parse [for all %start to %stop %body] as: for all %start to %stop via 1 %body
+    parse [for %var in %start to %stop %body] as: for %var in %start to %stop via 1 %body
 
 # For-each loop (lua's "ipairs()")
 immediately
@@ -209,8 +204,6 @@ immediately
                         ::stop_\(%var as lua identifier)::;
                     end -- end of scope for stopping for-loop
         return %lua
-
-    parse [for all %iterable %body] as: for % in %iterable %body
 
 # Dict iteration (lua's "pairs()")
 immediately

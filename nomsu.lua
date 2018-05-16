@@ -741,7 +741,7 @@ do
   local self = _class_0
   stub_defs = {
     space = (P(' ') + P('\n..')) ^ 0,
-    word = (NOMSU_DEFS.ident_char ^ 1 + NOMSU_DEFS.operator ^ 1),
+    word = (NOMSU_DEFS.ident_char ^ 1 + NOMSU_DEFS.operator),
     varname = (R('az', 'AZ', '09') + P('_') + NOMSU_DEFS.utf8_char) ^ 0
   }
   stub_pattern = re.compile([=[        {~ (%space->'') (('%' (%varname->'')) / %word)? ((%space->' ') (('%' (%varname->'')) / %word))* (%space->'') ~}
