@@ -6,108 +6,116 @@
 immediately
     lua> ".."
         nomsu:define_compile_action("compile %actions to %lua", function(tree, \%actions, \%lua)
-            local lua = Lua(tree.source, "nomsu:define_compile_action(");
-            local stubs = {};
+            local lua = Lua(tree.source, "nomsu:define_compile_action(")
+            local stubs = {}
             for i, action in ipairs(\%actions.value) do
-                stubs[i] = action:get_stub(true);
+                stubs[i] = action:get_stub(true)
             end
-            stubs = repr(stubs);
+            stubs = repr(stubs)
             if #stubs > 80 then
-                lua:append("\n    ",stubs,",\n    ");
+                lua:append("\n    ",stubs,",\n    ")
             else
-                lua:append(stubs,", ");
+                lua:append(stubs,", ")
             end
-            lua:append("function(tree");
-            local args = {};
+            lua:append("function(tree")
+            local args = {}
             for i,tok in ipairs(\%actions.value[1].value) do
-                if tok.type == "Var" then args[#args+1] = tok:as_lua(nomsu); end
+                if tok.type == "Var" then args[#args+1] = tok:as_lua(nomsu) end
             end
             for i, arg in ipairs(args) do
-                lua:append(", ");
-                lua:append(arg);
+                lua:append(", ", arg)
             end
-            local body_lua = \%lua:as_lua(nomsu);
-            body_lua = body_lua:as_statements("return ");
-            body_lua:remove_free_vars(args);
-            body_lua:declare_locals();
-            lua:append(")\n    ", body_lua, "\nend);");
-            return lua;
+            local body_lua = \%lua:as_lua(nomsu):as_statements("return ")
+            body_lua:remove_free_vars(args)
+            body_lua:declare_locals()
+            lua:append(")\n    ", body_lua, "\nend);")
+            return lua
         end);
 
 # Compile-time action to make actions
 immediately
     compile [action %actions %body] to
         lua> ".."
-            local lua = Lua(tree.source, "nomsu:define_action(");
-            local stubs = {};
+            local lua = Lua(tree.source, "nomsu:define_action(")
+            local stubs = {}
             for i, action in ipairs(\%actions.value) do
-                stubs[i] = action:get_stub(true);
+                stubs[i] = action:get_stub(true)
             end
-            stubs = repr(stubs);
+            stubs = repr(stubs)
             if #stubs > 80 then
-                lua:append("\n    ",stubs,",\n    ");
+                lua:append("\n    ",stubs,",\n    ")
             else
-                lua:append(stubs,", ");
+                lua:append(stubs,", ")
             end
-            lua:append("function(");
-            local args = {};
+            lua:append("function(")
+            local args = {}
             for i,tok in ipairs(\%actions.value[1].value) do
-                if tok.type == "Var" then args[#args+1] = tok:as_lua(nomsu); end
+                if tok.type == "Var" then args[#args+1] = tok:as_lua(nomsu) end
             end
             for i, arg in ipairs(args) do
-                lua:append(arg);
+                lua:append(arg)
                 if i < #args then lua:append(", ") end
             end
-            local body_lua = \%body:as_lua(nomsu);
-            body_lua = body_lua:as_statements("return ");
-            body_lua:remove_free_vars(args);
-            body_lua:declare_locals();
+            local body_lua = \%body:as_lua(nomsu):as_statements("return ")
+            body_lua:remove_free_vars(args)
+            body_lua:declare_locals()
             lua:append(")\n    ", body_lua, "\nend);")
-            return lua;
+            return lua
 
 # Macro to make nomsu macros
 immediately
     compile [parse %shorthand as %longhand] to
         lua> ".."
-            local lua = Lua(tree.source, "nomsu:define_compile_action(");
-            local stubs = {};
+            local lua = Lua(tree.source, "nomsu:define_compile_action(")
+            local stubs = {}
             for i, action in ipairs(\%shorthand.value) do
-                stubs[i] = action:get_stub(true);
+                stubs[i] = action:get_stub(true)
             end
-            stubs = repr(stubs);
+            stubs = repr(stubs)
             if #stubs > 80 then
-                lua:append("\n    ",stubs,",\n    ");
+                lua:append("\n    ",stubs,",\n    ")
             else
-                lua:append(stubs,", ");
+                lua:append(stubs,", ")
             end
-            lua:append("function(tree");
-            local args = {};
+            lua:append("function(tree")
+            local replacements = {}
             for i,tok in ipairs(\%shorthand.value[1].value) do
-                if tok.type == "Var" then args[#args+1] = tostring(tok:as_lua(nomsu)); end
+                if tok.type == "Var" then
+                    local lua_var = tostring(tok:as_lua(nomsu))
+                    replacements[tok.value] = lua_var
+                    lua:append(", ", lua_var)
+                end
             end
-            for i, arg in ipairs(args) do
-                lua:append(", ");
-                lua:append(arg);
+            local function make_tree(t)
+                if Tuple:is_instance(t) then
+                    local bits = {}
+                    for i, entry in ipairs(t) do
+                        bits[i] = make_tree(entry)
+                    end
+                    return "Tuple("..table.concat(bits, ", ")..")"
+                elseif type(t) ~= 'table' and type(t) ~= 'userdata' then
+                    return repr(t)
+                elseif t.type == "Var" and replacements[t.value] then
+                    return replacements[t.value]
+                else
+                    return t.type.."("..make_tree(t.value)..")"
+                end
             end
-            local template = repr(tostring(\%longhand:as_nomsu(true)));
-            local replacements = {};
-            for i, a in ipairs(args) do replacements[i] = a.."="..a; end
-            replacements = "{"..table.concat(replacements, ", ").."}";
             lua:append([[)
-                local template = nomsu:parse(Nomsu(]]..repr(tree.source)..[[, ]]..template..[[));
-                local replacement = nomsu:tree_with_replacements(template, ]]..replacements..[[);
-                return replacement:as_lua(nomsu);
-            end);]]);
-            return lua;
+                local tree = ]], make_tree(\%longhand), [[
+
+                return tree:as_lua(nomsu)
+            end);]])
+            return lua
 
 action [remove action %stub]
     lua> ".."
-        local fn = ACTIONS[\%stub];
-        local stubs = ARG_ORDERS[fn];
+        local fn = ACTIONS[\%stub]
+        local stubs = ARG_ORDERS[fn]
         for stub in pairs(stubs) do
-            ACTIONS[stub] = nil;
+            ACTIONS[stub] = nil
         end
-        ARG_ORDERS[fn] = nil;
+        ARG_ORDERS[fn] = nil
 
 immediately
     action [%tree as lua]
@@ -115,11 +123,11 @@ immediately
 
     action [%tree as lua expr]
         lua> ".."
-            local lua = \%tree:as_lua(nomsu);
+            local lua = \%tree:as_lua(nomsu)
             if not lua.is_value then
-                error("Invalid thing to convert to lua expr: "..\%tree.source:get_text());
+                error("Invalid thing to convert to lua expr: "..\%tree.source:get_text())
             end
-            return lua;
+            return lua
 
     action [%tree as lua statements]
         =lua "\%tree:as_lua(nomsu):as_statements()"

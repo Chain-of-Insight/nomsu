@@ -149,9 +149,6 @@ do
   _with_0.Tuple = function(values)
     return Tuple(unpack(values))
   end
-  _with_0.DictEntry = function(k, v)
-    return Types.DictEntry(k, v)
-  end
   _with_0.nl = P("\r") ^ -1 * P("\n")
   _with_0.ws = S(" \t")
   _with_0.tonumber = tonumber
@@ -467,24 +464,15 @@ do
       if not (Types.is_node(tree)) then
         return 
       end
-      local _exp_0 = tree.type
-      if "List" == _exp_0 or "Block" == _exp_0 or "Action" == _exp_0 or "Text" == _exp_0 or "IndexChain" == _exp_0 then
+      if Tuple:is_instance(tree.value) then
         local _list_0 = tree.value
         for _index_0 = 1, #_list_0 do
           local v = _list_0[_index_0]
           self:walk_tree(v, depth + 1)
         end
-      elseif "Dict" == _exp_0 then
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local e = _list_0[_index_0]
-          self:walk_tree(e.key, depth + 1)
-          self:walk_tree(e.value, depth + 1)
-        end
       else
-        self:walk_tree(tree.value, depth + 1)
+        return self:walk_tree(v, depth + 1)
       end
-      return nil
     end,
     tree_with_replacements = function(self, tree, replacements)
       if not (next(replacements)) then

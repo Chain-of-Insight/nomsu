@@ -66,7 +66,7 @@ immediately
         lua> ".."
             local lhs, rhs = Lua(tree.source), Lua(\%assignments.source);
             for i, item in ipairs(\%assignments.value) do
-                local target, value = item.key, item.value;
+                local target, value = item.value[1], item.value[2];
                 local target_lua = target:as_lua(nomsu);
                 if not target_lua.is_value then error("Invalid target for assignment: "..target:get_src()); end
                 local value_lua = value:as_lua(nomsu);
@@ -102,7 +102,7 @@ immediately
             local lhs, rhs = Lua(tree.source), Lua(\%assignments.source);
             local vars = {};
             for i, item in ipairs(\%assignments.value) do
-                local target, value = item.key, item.value;
+                local target, value = item.value[1], item.value[2];
                 if not target.type == "Var" then
                     error("Invalid target for 'with' assignment: "..tostring(target.source:get_text()));
                 end

@@ -14,12 +14,6 @@ do
 end
 local MAX_LINE = 80
 local Types = { }
-Types.DictEntry = immutable({
-  "key",
-  "value"
-}, {
-  name = "DictEntry"
-})
 Types.is_node = function(n)
   return type(n) == 'userdata' and getmetatable(n) and Types[n.type] == getmetatable(n)
 end
@@ -46,6 +40,28 @@ Tree = function(name, methods)
       local ret = tostring(self.source:get_text()):gsub("\n" .. ((" "):rep(leading_space)), "\n")
       return ret
     end
+    methods.map = function(self, fn)
+      do
+        local mapped = fn(self)
+        if mapped then
+          return mapped
+        end
+      end
+      if Tuple:is_instance(self.value) then
+        return self:with_value(Tuple(unpack((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = self.value
+          for _index_0 = 1, #_list_0 do
+            local v = _list_0[_index_0]
+            _accum_0[_len_0] = v.map and v:map(fn) or v
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)())))
+      end
+      return self
+    end
   end
   Types[name] = immutable({
     "value",
@@ -66,9 +82,6 @@ Tree("Nomsu", {
       return nomsu and Nomsu(self.source, "\\:\n    ", nomsu)
     end
     return nomsu and Nomsu(self.source, "\\(", nomsu, ")")
-  end,
-  map = function(self, fn)
-    return fn(self) or self:with_value(self.value:map(fn))
   end
 })
 Tree("Block", {
@@ -113,19 +126,6 @@ Tree("Block", {
       end
     end
     return nomsu
-  end,
-  map = function(self, fn)
-    return fn(self) or self:with_value(Tuple(unpack((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local v = _list_0[_index_0]
-        _accum_0[_len_0] = v:map(fn)
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)())))
   end
 })
 local math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])
@@ -349,19 +349,6 @@ Tree("Action", {
       end
       return nomsu
     end
-  end,
-  map = function(self, fn)
-    return fn(self) or self:with_value(Tuple(unpack((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local v = _list_0[_index_0]
-        _accum_0[_len_0] = v:map(fn)
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)())))
   end
 })
 Tree("Text", {
@@ -469,19 +456,6 @@ Tree("Text", {
       end
       return nomsu
     end
-  end,
-  map = function(self, fn)
-    return fn(self) or self:with_value(Tuple(unpack((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local v = _list_0[_index_0]
-        _accum_0[_len_0] = type(v) == 'string' and v or v:map(fn)
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)())))
   end
 })
 Tree("List", {
@@ -568,19 +542,6 @@ Tree("List", {
       end
       return nomsu
     end
-  end,
-  map = function(self, fn)
-    return fn(self) or self:with_value(Tuple(unpack((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local v = _list_0[_index_0]
-        _accum_0[_len_0] = v:map(fn)
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)())))
   end
 })
 Tree("Dict", {
@@ -588,29 +549,14 @@ Tree("Dict", {
     local lua = Lua.Value(self.source, "{")
     local line_length = 0
     for i, entry in ipairs(self.value) do
-      local key_lua = entry.key:as_lua(nomsu)
-      if not (key_lua.is_value) then
-        local line, src = key.source:get_line(), key.source:get_text()
-        error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict key, since it's not an expression.", 0)
-      end
-      local value_lua = entry.value and entry.value:as_lua(nomsu) or Lua.Value(entry.key.source, "true")
-      if not (value_lua.is_value) then
-        local line, src = value.source:get_line(), value.source:get_text()
-        error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict value, since it's not an expression.", 0)
-      end
-      local key_str = tostring(key_lua):match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
-      if key_str then
-        lua:append(key_str, "=", value_lua)
-      elseif tostring(key_lua):sub(1, 1) == "[" then
-        lua:append("[ ", key_lua, "]=", value_lua)
-      else
-        lua:append("[", key_lua, "]=", value_lua)
-      end
-      local newlines, last_line = ("[" .. tostring(key_lua) .. "=" .. tostring(value_lua)):match("^(.-)([^\n]*)$")
-      if #newlines > 0 then
+      local entry_lua = entry:as_lua(nomsu)
+      lua:append(entry_lua)
+      local entry_lua_str = tostring(entry_lua)
+      local last_line = entry_lua_str:match("\n([^\n]*)$")
+      if last_line then
         line_length = #last_line
       else
-        line_length = line_length + #last_line
+        line_length = line_length + #entry_lua_str
       end
       if i < #self.value then
         if line_length >= MAX_LINE then
@@ -632,21 +578,14 @@ Tree("Dict", {
     if inline then
       local nomsu = Nomsu(self.source, "{")
       for i, entry in ipairs(self.value) do
-        local key_nomsu = entry.key:as_nomsu(true)
-        if not (key_nomsu) then
-          return nil
-        end
-        if entry.key.type == "Action" or entry.key.type == "Block" then
-          key_nomsu:parenthesize()
-        end
-        local value_nomsu = entry.value and entry.value:as_nomsu(true) or Nomsu(entry.key.source, "")
-        if not (value_nomsu) then
+        local entry_nomsu = entry:as_nomsu(true)
+        if not (entry_nomsu) then
           return nil
         end
         if i > 1 then
           nomsu:append(", ")
         end
-        nomsu:append(key_nomsu, ":", value_nomsu)
+        nomsu:append(entry_nomsu)
       end
       nomsu:append("}")
       return nomsu
@@ -660,37 +599,21 @@ Tree("Dict", {
       local _list_0 = self.value
       for _index_0 = 1, #_list_0 do
         local entry = _list_0[_index_0]
-        local key_nomsu = entry.key:as_nomsu(true)
-        if not (key_nomsu) then
+        local entry_nomsu = entry:as_nomsu()
+        if not (entry_nomsu) then
           return nil
         end
-        if entry.key.type == "Action" or entry.key.type == "Block" then
-          key_nomsu:parenthesize()
-        end
-        local value_nomsu = entry.value and entry.value:as_nomsu(true) or Nomsu(entry.key.source, "")
-        if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= MAX_LINE then
+        if #line + #tostring(entry_nomsu) <= MAX_LINE then
           if #line.bits > 1 then
             line:append(", ")
           end
-          line:append(key_nomsu)
-          if entry.value then
-            line:append(":", value_nomsu)
-          end
+          line:append(entry_nomsu)
         else
-          if not (value_nomsu) then
-            value_nomsu = entry.value:as_nomsu()
-            if not (value_nomsu) then
-              return nil
-            end
-          end
           if #line.bits > 1 then
             nomsu:append(line)
             line = Nomsu(bit.source, "\n    ")
           end
-          line:append(key_nomsu)
-          if entry.value then
-            line:append(":", value_nomsu)
-          end
+          line:append(entry_nomsu)
         end
       end
       if #line.bits > 1 then
@@ -698,20 +621,61 @@ Tree("Dict", {
       end
       return nomsu
     end
+  end
+})
+Tree("DictEntry", {
+  as_lua = function(self, nomsu)
+    local key, value = self.value[1], self.value[2]
+    local key_lua = key:as_lua(nomsu)
+    if not (key_lua.is_value) then
+      local line, src = key.source:get_line(), key.source:get_text()
+      error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict key, since it's not an expression.", 0)
+    end
+    local value_lua = value and value:as_lua(nomsu) or Lua.Value(key.source, "true")
+    if not (value_lua.is_value) then
+      local line, src = value.source:get_line(), value.source:get_text()
+      error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a dict value, since it's not an expression.", 0)
+    end
+    local key_str = tostring(key_lua):match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
+    if key_str then
+      return Lua(key.source, key_str, "=", value_lua)
+    elseif tostring(key_lua):sub(1, 1) == "[" then
+      return Lua(key.source, "[ ", key_lua, "]=", value_lua)
+    else
+      return Lua(key.source, "[", key_lua, "]=", value_lua)
+    end
   end,
-  map = function(self, fn)
-    local DictEntry = Types.DictEntry
-    return fn(self) or self:with_value(Tuple(unpack((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local e = _list_0[_index_0]
-        _accum_0[_len_0] = DictEntry(e.key:map(fn), e.value:map(fn))
-        _len_0 = _len_0 + 1
+  as_nomsu = function(self, inline)
+    if inline == nil then
+      inline = true
+    end
+    local key, value = self.value[1], self.value[2]
+    local key_nomsu = key:as_nomsu(true)
+    if not (key_nomsu) then
+      return nil
+    end
+    if key.type == "Action" or key.type == "Block" then
+      key_nomsu:parenthesize()
+    end
+    local value_nomsu
+    if value then
+      value_nomsu = value:as_nomsu(true)
+    else
+      value_nomsu = Nomsu(key.source, "")
+    end
+    if inline and not value_nomsu then
+      return nil
+    end
+    if not value_nomsu then
+      if inline then
+        return nil
       end
-      return _accum_0
-    end)())))
+      value_nomsu = value:as_nomsu()
+      if not (value_nomsu) then
+        return nil
+      end
+    end
+    return Nomsu(key.source, key_nomsu, ":", value_nomsu)
   end
 })
 Tree("IndexChain", {
@@ -771,19 +735,6 @@ Tree("IndexChain", {
       nomsu:append(bit_nomsu)
     end
     return nomsu
-  end,
-  map = function(self, fn)
-    return fn(self) or self:with_value(Tuple(unpack((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local v = _list_0[_index_0]
-        _accum_0[_len_0] = v:map(fn)
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)())))
   end
 })
 Tree("Number", {
@@ -795,9 +746,6 @@ Tree("Number", {
       inline = false
     end
     return Nomsu(self.source, tostring(self.value))
-  end,
-  map = function(self, fn)
-    return fn(self) or self
   end
 })
 Tree("Var", {
@@ -818,9 +766,6 @@ Tree("Var", {
       inline = false
     end
     return Nomsu(self.source, "%", self.value)
-  end,
-  map = function(self, fn)
-    return fn(self) or self
   end
 })
 Tree("Word", {
@@ -832,9 +777,6 @@ Tree("Word", {
       inline = false
     end
     return Nomsu(self.source, self.value)
-  end,
-  map = function(self, fn)
-    return fn(self) or self
   end
 })
 Tree("Comment", {
@@ -853,9 +795,6 @@ Tree("Comment", {
     else
       return Nomsu(self.source, "#", self.value)
     end
-  end,
-  map = function(self, fn)
-    return fn(self) or self
   end
 })
 return Types

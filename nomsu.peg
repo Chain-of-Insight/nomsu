@@ -107,7 +107,7 @@ inline_list_item: inline_block / inline_action / inline_expression
 
 inline_dict (Dict):
     !('{..}')
-    "{" %ws* ({| (inline_dict_item (comma inline_dict_item)*)? |} -> Tuple) %ws*
+    "{" %ws* ({| (inline_dict_entry (comma inline_dict_entry)*)? |} -> Tuple) %ws*
     ("}"
       / (({} (%ws* comma? (!. / &%nl)->"Failed to find a closing } on the same line")) => error)
       / (({} ([^%nl]*->"Error while parsing dictionary")) => error))
@@ -117,10 +117,11 @@ indented_dict (Dict):
     |} -> Tuple)
     (dedent / (({} (non_dedent_error -> "Error while parsing dict")) => error))
 dict_line:
-    ((dict_key %ws* ":" %ws* (action / expression)) -> DictEntry !comma)
-    / (inline_dict_item (comma dict_line?)?)
-inline_dict_item:
-    ((dict_key %ws* (":" %ws* (inline_block / inline_action / inline_expression)?)?)-> DictEntry)
+    (dict_entry !comma) / (inline_dict_entry (comma dict_line?)?)
+dict_entry(DictEntry):
+    {| dict_key %ws* ":" %ws* (action / expression) |} -> Tuple
+inline_dict_entry(DictEntry):
+    {| dict_key %ws* (":" %ws* (inline_block / inline_action / inline_expression)?) |} -> Tuple
 dict_key:
     text_word / inline_expression
 

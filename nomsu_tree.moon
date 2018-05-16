@@ -9,7 +9,6 @@ immutable = require 'immutable'
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 
 Types = {}
-Types.DictEntry = immutable({"key","value"}, {name:"DictEntry"})
 Types.is_node = (n)->
     type(n) == 'userdata' and getmetatable(n) and Types[n.type] == getmetatable(n)
 
@@ -29,6 +28,12 @@ Tree = (name, methods)->
                 leading_space = 0
             ret = tostring(@source\get_text!)\gsub("\n"..((" ")\rep(leading_space)), "\n")
             return ret
+        .map = (fn)=>
+            if mapped = fn(self)
+                return mapped
+            if Tuple\is_instance(@value)
+                return @with_value(Tuple(unpack([v.map and v\map(fn) or v for v in *@value])))
+            return self
 
     Types[name] = immutable {"value","source"}, methods
 
@@ -43,9 +48,6 @@ Tree "Nomsu",
             nomsu = @value\as_nomsu!
             return nomsu and Nomsu(@source, "\\:\n    ", nomsu)
         return nomsu and Nomsu(@source, "\\(", nomsu, ")")
-
-    map: (fn)=>
-        fn(self) or @with_value(@value\map(fn))
 
 Tree "Block",
     as_lua: (nomsu)=>
@@ -76,9 +78,6 @@ Tree "Block",
                 if tostring(line)\match("\n")
                     nomsu\append "\n"
         return nomsu
-
-    map: (fn)=>
-        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
 
 math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
 Tree "Action",
@@ -203,9 +202,6 @@ Tree "Action",
                         next_space = "\n.."
             return nomsu
 
-    map: (fn)=>
-        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
-
 Tree "Text",
     as_lua: (nomsu)=>
         lua = Lua.Value(@source)
@@ -273,9 +269,6 @@ Tree "Text",
                             nomsu\append "\n    .."
             return nomsu
 
-    map: (fn)=>
-        fn(self) or @with_value(Tuple(unpack([type(v) == 'string' and v or v\map(fn) for v in *@value])))
-
 Tree "List",
     as_lua: (nomsu)=>
         lua = Lua.Value @source, "{"
@@ -337,39 +330,20 @@ Tree "List",
                 nomsu\append line
             return nomsu
 
-    map: (fn)=>
-        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
-
 Tree "Dict",
     as_lua: (nomsu)=>
         lua = Lua.Value @source, "{"
         line_length = 0
         for i, entry in ipairs @value
-            key_lua = entry.key\as_lua(nomsu)
-            unless key_lua.is_value
-                line, src = key.source\get_line!, key.source\get_text!
-                error "#{line}: Cannot use #{colored.yellow src} as a dict key, since it's not an expression.", 0
-            value_lua = entry.value and entry.value\as_lua(nomsu) or Lua.Value(entry.key.source, "true")
-            unless value_lua.is_value
-                line, src = value.source\get_line!, value.source\get_text!
-                error "#{line}: Cannot use #{colored.yellow src} as a dict value, since it's not an expression.", 0
-            key_str = tostring(key_lua)\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
-            if key_str
-                lua\append key_str,"=",value_lua
-            elseif tostring(key_lua)\sub(1,1) == "["
-                -- NOTE: this *must* use a space after the [ to avoid freaking out
-                -- Lua's parser if the inner expression is a long string. Lua
-                -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                lua\append "[ ",key_lua,"]=",value_lua
-            else
-                lua\append "[",key_lua,"]=",value_lua
-
+            entry_lua = entry\as_lua(nomsu)
+            lua\append entry_lua
+            entry_lua_str = tostring(entry_lua)
             -- TODO: maybe make this more accurate? It's only a heuristic, so eh...
-            newlines, last_line = ("[#{key_lua}=#{value_lua}")\match("^(.-)([^\n]*)$")
-            if #newlines > 0
+            last_line = entry_lua_str\match("\n([^\n]*)$")
+            if last_line
                 line_length = #last_line
             else
-                line_length += #last_line
+                line_length += #entry_lua_str
             if i < #@value
                 if line_length >= MAX_LINE
                     lua\append ",\n  "
@@ -384,15 +358,11 @@ Tree "Dict",
         if inline
             nomsu = Nomsu(@source, "{")
             for i, entry in ipairs @value
-                key_nomsu = entry.key\as_nomsu(true)
-                return nil unless key_nomsu
-                if entry.key.type == "Action" or entry.key.type == "Block"
-                    key_nomsu\parenthesize!
-                value_nomsu = entry.value and entry.value\as_nomsu(true) or Nomsu(entry.key.source, "")
-                return nil unless value_nomsu
+                entry_nomsu = entry\as_nomsu(true)
+                return nil unless entry_nomsu
                 if i > 1
                     nomsu\append ", "
-                nomsu\append key_nomsu,":",value_nomsu
+                nomsu\append entry_nomsu
             nomsu\append "}"
             return nomsu
         else
@@ -401,32 +371,59 @@ Tree "Dict",
             nomsu = Nomsu(@source, "{..}")
             line = Nomsu(@source, "\n    ")
             for entry in *@value
-                key_nomsu = entry.key\as_nomsu(true)
-                return nil unless key_nomsu
-                if entry.key.type == "Action" or entry.key.type == "Block"
-                    key_nomsu\parenthesize!
-                value_nomsu = entry.value and entry.value\as_nomsu(true) or Nomsu(entry.key.source, "")
-                if value_nomsu and #line + #", " + #key_nomsu + #":" + #value_nomsu <= MAX_LINE
+                entry_nomsu = entry\as_nomsu!
+                return nil unless entry_nomsu
+                if #line + #tostring(entry_nomsu) <= MAX_LINE
                     if #line.bits > 1
                         line\append ", "
-                    line\append key_nomsu
-                    if entry.value then line\append ":",value_nomsu
+                    line\append entry_nomsu
                 else
-                    unless value_nomsu
-                        value_nomsu = entry.value\as_nomsu!
-                        return nil unless value_nomsu
                     if #line.bits > 1
                         nomsu\append line
                         line = Nomsu(bit.source, "\n    ")
-                    line\append key_nomsu
-                    if entry.value then line\append ":",value_nomsu
+                    line\append entry_nomsu
             if #line.bits > 1
                 nomsu\append line
             return nomsu
 
-    map: (fn)=>
-        DictEntry = Types.DictEntry
-        fn(self) or @with_value(Tuple(unpack([DictEntry(e.key\map(fn), e.value\map(fn)) for e in *@value])))
+Tree "DictEntry",
+    as_lua: (nomsu)=>
+        key, value = @value[1], @value[2]
+        key_lua = key\as_lua(nomsu)
+        unless key_lua.is_value
+            line, src = key.source\get_line!, key.source\get_text!
+            error "#{line}: Cannot use #{colored.yellow src} as a dict key, since it's not an expression.", 0
+        value_lua = value and value\as_lua(nomsu) or Lua.Value(key.source, "true")
+        unless value_lua.is_value
+            line, src = value.source\get_line!, value.source\get_text!
+            error "#{line}: Cannot use #{colored.yellow src} as a dict value, since it's not an expression.", 0
+        key_str = tostring(key_lua)\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
+        return if key_str
+            Lua key.source, key_str,"=",value_lua
+        elseif tostring(key_lua)\sub(1,1) == "["
+            -- NOTE: this *must* use a space after the [ to avoid freaking out
+            -- Lua's parser if the inner expression is a long string. Lua
+            -- parses x[[[y]]] as x("[y]"), not as x["y"]
+            Lua key.source, "[ ",key_lua,"]=",value_lua
+        else
+            Lua key.source, "[",key_lua,"]=",value_lua
+
+    as_nomsu: (inline=true)=>
+        key, value = @value[1], @value[2]
+        key_nomsu = key\as_nomsu(true)
+        return nil unless key_nomsu
+        if key.type == "Action" or key.type == "Block"
+            key_nomsu\parenthesize!
+        value_nomsu = if value
+            value\as_nomsu(true)
+        else Nomsu(key.source, "")
+        if inline and not value_nomsu then return nil
+        if not value_nomsu
+            return nil if inline
+            value_nomsu = value\as_nomsu!
+            return nil unless value_nomsu
+        return Nomsu key.source, key_nomsu, ":", value_nomsu
+
 
 Tree "IndexChain",
     as_lua: (nomsu)=>
@@ -468,17 +465,12 @@ Tree "IndexChain",
             nomsu\append bit_nomsu
         return nomsu
 
-    map: (fn)=>
-        fn(self) or @with_value(Tuple(unpack([v\map(fn) for v in *@value])))
-
 Tree "Number",
     as_lua: (nomsu)=>
         Lua.Value(@source, tostring(@value))
     
     as_nomsu: (inline=false)=>
         return Nomsu(@source, tostring(@value))
-
-    map: (fn)=> fn(self) or self
 
 Tree "Var",
     as_lua_id: (v)->
@@ -490,16 +482,12 @@ Tree "Var",
     as_nomsu: (inline=false)=>
         return Nomsu(@source, "%", @value)
 
-    map: (fn)=> fn(self) or self
-
 Tree "Word",
     as_lua: (nomsu)=>
         error("Attempt to convert Word to lua")
 
     as_nomsu: (inline=false)=>
         return Nomsu(@source, @value)
-
-    map: (fn)=> fn(self) or self
 
 Tree "Comment",
     as_lua: (nomsu)=>
@@ -511,7 +499,5 @@ Tree "Comment",
             return Nomsu(@source, "#..", @value\gsub("\n", "\n    "))
         else
             return Nomsu(@source, "#", @value)
-
-    map: (fn)=> fn(self) or self
 
 return Types

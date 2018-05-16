@@ -131,7 +131,6 @@ NOMSU_DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
     .Tuple = (values)->
         return Tuple(unpack(values))
-    .DictEntry = (k,v) -> Types.DictEntry(k,v)
     .nl = P("\r")^-1 * P("\n")
     .ws = S(" \t")
     .tonumber = tonumber
@@ -429,16 +428,11 @@ class NomsuCompiler
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
         return unless Types.is_node(tree)
-        switch tree.type
-            when "List", "Block", "Action", "Text", "IndexChain"
-                for v in *tree.value
-                    @walk_tree(v, depth+1)
-            when "Dict"
-                for e in *tree.value
-                    @walk_tree(e.key, depth+1)
-                    @walk_tree(e.value, depth+1)
-            else @walk_tree(tree.value, depth+1)
-        return nil
+        if Tuple\is_instance(tree.value)
+            for v in *tree.value
+                @walk_tree(v, depth+1)
+        else
+            @walk_tree(v, depth+1)
 
     tree_with_replacements: (tree, replacements)=>
         return tree unless next(replacements)
