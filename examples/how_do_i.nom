@@ -1,11 +1,11 @@
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 
-#.. How do I write a multi-line comment?
-    Put a #.. on its own line and
-        write whatever you want
-      in an
-    indented area.
+# How do I write a multi-line comment?
+    After a comment line, any indented text
+    is considered part of the comment
+        (including any deeper-level indented text)
+    The comment ends when the indentation ends
 
 # How do I import a file?
 use "core/control_flow.nom"
@@ -44,7 +44,7 @@ say "Hello world!"
 
 # How do I define a list?
 %my_list <- [1,2,"hello"]
-#.. Really long lists can use [..] followed by a bunch of indented values delimited
+# Really long lists can use [..] followed by a bunch of indented values delimited
     by commas and/or newlines
 %my_really_long_list <- [..]
     1,2,3,4
@@ -187,7 +187,7 @@ I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"
 
 
-#.. Actions can have parts of the action's name spread throughout.
+# Actions can have parts of the action's name spread throughout.
     Everything that's not a literal value is treated as part of the action's name
 say both "Hello" and also "again!"
 
@@ -198,7 +198,7 @@ action [%what_she_said is what she said]
 
 "Howdy pardner" is what she said
 
-#.. The language only reserves []{}().,:;% as special characters, so actions
+# The language only reserves []{}().,:;% as special characters, so actions
     can have really funky names!
 action [>> %foo_bar $$$^ --> % @& _~-^-~_~-^ %1 !]
     say %foo_bar
@@ -215,7 +215,7 @@ say (%こんにちは と言う)
 
 # Math and logic operations are just treated the same as actions in the syntax
 say (2 + 3)
-#.. So you can define your own operators, although they will need to be parenthesized to
+# So you can define your own operators, although they will need to be parenthesized to
     play nicely with other operators
 action [%a ++ %b]
     2 * (%a + %b)
@@ -257,7 +257,7 @@ action [square root of %n]
     =lua "math.sqrt(\%n)"
 say "The square root of 2 is \(square root of 2)"
 
-#.. The "immediately %" macro forces the indented code below it to run before the rest of
+# The "immediately %" macro forces the indented code below it to run before the rest of
     the file finishes compiling, so it's often useful for writing your own macros.
 immediately
     # Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
@@ -286,7 +286,7 @@ if (1 > (TWENTY)) on opposite day
 
 
 # How do I use an action as a value?
-#.. Well... it's always *possible* to fall back to Lua behavior for something like this:
+# Well... it's always *possible* to fall back to Lua behavior for something like this:
 action [best of %items according to %key_fn]
     <- {%best:nil, %best_key:nil}
     for all %items
@@ -304,7 +304,7 @@ immediately
 
 say: best of [2,-3,4,-8] according to (function %: % * %)
 
-#.. But nomsu was mostly designed so that you don't *need* to. Instead of creating a
+# But nomsu was mostly designed so that you don't *need* to. Instead of creating a
     one-off function to pass to another function and get called a bunch of times, you
     could use a macro to generate a single block of code that inlines the expression you
     want to use:
@@ -317,18 +317,18 @@ immediately
                 if: (%best is (nil)) or (%key > %best_key)
                     <- {%best:%, %best_key:%key}
             return %best
-#.. This results in generated code that is more efficient (no function calls in the
+# This results in generated code that is more efficient (no function calls in the
     inner loop)
 say: best of [2,-3,4,-8] according to (% * %)
 
-#.. In a functional programming language, you might do something like:
+# In a functional programming language, you might do something like:
         doubled = map(list, function(x) return 2 * x end)
     to get a new list with every entry multiplied by 2, but it's *much* more readable to
     do something like:
 %nums <- [1,2,3,4,5]
 %double_nums <- ((2 * %num) for %num in %nums)
 
-#.. Nomsu comes with built-in list comprehensions, but the flexible macro system makes it
+# Nomsu comes with built-in list comprehensions, but the flexible macro system makes it
     incredibly easy to make similar constructs.
 immediately
     parse [%expr for %key in %list BACKWARDS!] as

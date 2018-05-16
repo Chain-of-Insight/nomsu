@@ -1,11 +1,11 @@
-#..
+#
     This file contains definitions of operators like "+" and "and".
 
 use "core/metaprogramming.nom"
 
 # Indexing
 immediately
-    #.. NOTE!!! It's critical that there are spaces around %key if it's a string,
+    #   NOTE!!! It's critical that there are spaces around %key if it's a string,
         otherwise, Lua will get confused and interpret %obj[[[foo]]] as %obj("[foo]")
         instead of %obj[ "foo" ].
         It's also critical to have parens around %obj, otherwise Lua is too dumb to

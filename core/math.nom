@@ -1,4 +1,4 @@
-#..
+#
     This file defines some common math literals and functions
 
 use "core/metaprogramming.nom"

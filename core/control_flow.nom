@@ -1,4 +1,4 @@
-#..
+#
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
 
@@ -28,7 +28,7 @@ immediately
             end
 
 # Conditional expression (ternary operator)
-#.. Note: this uses a function instead of "(condition and if_expr or else_expr)"
+#   Note: this uses a function instead of "(condition and if_expr or else_expr)"
     because that breaks if %if_expr is falsey, e.g. "x < 5 and false or 99"
 immediately
     compile [..]
@@ -37,14 +37,14 @@ immediately
         %when_false_expr unless %condition else %when_true_expr
         %when_false_expr unless %condition then %when_true_expr
     ..to
-        #.. If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
+        #   If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
             equivalent of a conditional expression: (cond and if_true or if_false)
         if: %when_true_expr.type in {Text:yes, List:yes, Dict:yes, Number:yes}
             return
                 Lua value ".."
                     (\(%condition as lua expr) and \(%when_true_expr as lua expr) or \(%when_false_expr as lua expr))
         ..else
-            #.. Otherwise, need to do an anonymous inline function (yuck, too bad lua 
+            #   Otherwise, need to do an anonymous inline function (yuck, too bad lua 
                 doesn't have a proper ternary operator!)
                 To see why this is necessary consider: (random()<.5 and false or 99)
             return

@@ -1,4 +1,4 @@
-#..
+#
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
 
@@ -182,14 +182,14 @@ immediately
 immediately
     compile [source] to: Lua value "tree.source"
 
-#..
+#
     immediately
         action [Lua %]: Lua (=lua "tree.source") %
         action [Lua value %]: Lua value (=lua "tree.source") %
 
 # Return
 immediately
-    #.. Return statement is wrapped in a do..end block because Lua is unhappy if you
+    # Return statement is wrapped in a do..end block because Lua is unhappy if you
         put code after a return statement, unless you wrap it in a block.
     compile [return] to: Lua "do return; end"
     compile [return %return_value] to: Lua "do return \(%return_value as lua expr); end"
