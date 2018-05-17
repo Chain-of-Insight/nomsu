@@ -134,26 +134,20 @@ class Lua extends Code
         return lua
 
     add_free_vars: (vars)=>
+        return unless #vars > 0
         seen = {[v]:true for v in *@free_vars}
         for var in *vars
-            if type(var) == 'userdata' and var.type == "Var"
-                var = tostring(var\as_lua!)
-            elseif type(var) != 'string'
-                var = tostring(var)
-            assert(var\match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
+            assert(type(var) == 'userdata' and var.type == "Var")
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
         @__str = nil
     
     remove_free_vars: (vars)=>
+        return unless #vars > 0
         removals = {}
         for var in *vars
-            if type(var) == 'userdata' and var.type == "Var"
-                var = tostring(var\as_lua!)
-            elseif type(var) != 'string'
-                var = tostring(var)
-            assert(var\match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
+            assert(type(var) == 'userdata' and var.type == "Var")
             removals[var] = true
         
         stack = {self}
@@ -185,7 +179,6 @@ class Lua extends Code
                 for var in *@free_vars
                     unless seen[var]
                         seen[var] = true
-                        assert(var\match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
                         to_declare[#to_declare+1] = var
                 for bit in *@bits
                     if bit.__class == Lua
@@ -193,7 +186,7 @@ class Lua extends Code
             gather_from self
         if #to_declare > 0
             @remove_free_vars to_declare
-            @prepend "local #{concat to_declare, ", "};\n"
+            @prepend "local #{concat [v\as_lua_id! for v in *to_declare], ", "};\n"
         return to_declare
 
     __tostring: =>

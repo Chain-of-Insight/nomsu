@@ -201,6 +201,9 @@ do
   local _parent_0 = Code
   local _base_0 = {
     add_free_vars = function(self, vars)
+      if not (#vars > 0) then
+        return 
+      end
       local seen
       do
         local _tbl_0 = { }
@@ -216,12 +219,7 @@ do
       end
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
-        if type(var) == 'userdata' and var.type == "Var" then
-          var = tostring(var:as_lua())
-        elseif type(var) ~= 'string' then
-          var = tostring(var)
-        end
-        assert(var:match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
+        assert(type(var) == 'userdata' and var.type == "Var")
         if not (seen[var]) then
           self.free_vars[#self.free_vars + 1] = var
           seen[var] = true
@@ -230,15 +228,13 @@ do
       self.__str = nil
     end,
     remove_free_vars = function(self, vars)
+      if not (#vars > 0) then
+        return 
+      end
       local removals = { }
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
-        if type(var) == 'userdata' and var.type == "Var" then
-          var = tostring(var:as_lua())
-        elseif type(var) ~= 'string' then
-          var = tostring(var)
-        end
-        assert(var:match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
+        assert(type(var) == 'userdata' and var.type == "Var")
         removals[var] = true
       end
       local stack = {
@@ -296,7 +292,6 @@ do
             local var = _list_0[_index_0]
             if not (seen[var]) then
               seen[var] = true
-              assert(var:match("^[_a-zA-Z][_a-zA-Z0-9]*$"))
               to_declare[#to_declare + 1] = var
             end
           end
@@ -312,7 +307,16 @@ do
       end
       if #to_declare > 0 then
         self:remove_free_vars(to_declare)
-        self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
+        self:prepend("local " .. tostring(concat((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          for _index_0 = 1, #to_declare do
+            local v = to_declare[_index_0]
+            _accum_0[_len_0] = v:as_lua_id()
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)(), ", ")) .. ";\n")
       end
       return to_declare
     end,

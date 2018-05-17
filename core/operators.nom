@@ -25,21 +25,21 @@ immediately
     # TODO: optimize case of [%x,%y] = [1,2]
     compile [%a is %b, %a = %b, %a == %b] to
         lua> ".."
-            local safe = {Text=true, Number=true};
-            local a_lua, b_lua = \%a:as_lua(nomsu), \%b:as_lua(nomsu);
+            local safe = {Text=true, Number=true}
+            local a_lua, b_lua = \(%a as lua), \(%b as lua)
             if safe[\%a.type] or safe[\%b.type] then
-                return Lua.Value(nil, "(", a_lua, " == ", b_lua, ")");
+                return Lua.Value(nil, "(", a_lua, " == ", b_lua, ")")
             else
-                return Lua.Value(nil, "utils.equivalent(", a_lua, ", ", b_lua, ")");
+                return Lua.Value(nil, "utils.equivalent(", a_lua, ", ", b_lua, ")")
             end
     compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
         lua> ".."
-            local safe = {Text=true, Number=true};
-            local a_lua, b_lua = \%a:as_lua(nomsu), \%b:as_lua(nomsu);
+            local safe = {Text=true, Number=true}
+            local a_lua, b_lua = \(%a as lua), \(%b as lua)
             if safe[\%a.type] or safe[\%b.type] then
-                return Lua.Value(nil, "(", a_lua, " ~= ", b_lua, ")");
+                return Lua.Value(nil, "(", a_lua, " ~= ", b_lua, ")")
             else
-                return Lua.Value(nil, "(not utils.equivalent(", a_lua, ", ", b_lua, "))");
+                return Lua.Value(nil, "(not utils.equivalent(", a_lua, ", ", b_lua, "))")
             end
     # For strict identity checking, use (%x's id) is (%y's id)
     compile [%'s id, id of %] to: Lua value "nomsu.ids[\(% as lua expr)]"
@@ -47,14 +47,14 @@ immediately
 # Variable assignment operator
 immediately
     compile [%var <- %value] to
-        lua> "local \%var_lua = \%var:as_lua(nomsu);"
+        lua> "local \%var_lua = \(%var as lua);"
         assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-        lua> "local \%value_lua = \%value:as_lua(nomsu);"
+        lua> "local \%value_lua = \(%value as lua);"
         assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
         lua> ".."
-            local lua = Lua(nil, \%var_lua, ' = ', \%value_lua, ';');
+            local lua = Lua(nil, \%var_lua, ' = ', \%value_lua, ';')
             if \%var.type == 'Var' then
-                lua:add_free_vars({\%var});
+                lua:add_free_vars({\%var})
             end
             return lua;
 
@@ -64,24 +64,24 @@ immediately
         assume ((%assignments' "type") is "Dict") or barf ".."
             Expected a Dict for the assignments part of '<- %' statement, not \%assignments
         lua> ".."
-            local lhs, rhs = Lua(), Lua();
+            local lhs, rhs = Lua(), Lua()
             for i, item in ipairs(\%assignments) do
-                local target, value = item[1], item[2];
-                local target_lua = target:as_lua(nomsu);
-                if not target_lua.is_value then error("Invalid target for assignment: "..target:get_src()); end
-                local value_lua = value:as_lua(nomsu);
-                if not value_lua.is_value then error("Invalid value for assignment: "..value:get_src()); end
-                if target.type == "Var" then
-                    lhs:add_free_vars({target});
+                local \%target, \%value = item[1], item[2]
+                local target_lua = \(%target as lua)
+                if not target_lua.is_value then error("Invalid target for assignment: "..\(%target as text)) end
+                local value_lua = \(%value as lua)
+                if not value_lua.is_value then error("Invalid value for assignment: "..\(%value as text)) end
+                if \%target.type == "Var" then
+                    lhs:add_free_vars({\%target})
                 end
                 if i > 1 then
-                    lhs:append(", ");
-                    rhs:append(", ");
+                    lhs:append(", ")
+                    rhs:append(", ")
                 end
-                lhs:append(target_lua);
-                rhs:append(value_lua);
+                lhs:append(target_lua)
+                rhs:append(value_lua)
             end
-            return Lua(nil, lhs, " = ", rhs, ";");
+            return Lua(nil, lhs, " = ", rhs, ";")
 
 immediately
     compile [external %var <- %value] to
@@ -99,31 +99,31 @@ immediately
     compile [with %assignments %body] to
         %lua <- (%body as lua statements)
         lua> ".."
-            local lhs, rhs = Lua(), Lua();
-            local vars = {};
+            local lhs, rhs = Lua(), Lua()
+            local vars = {}
             for i, item in ipairs(\%assignments) do
-                local target, value = item[1], item[2];
-                if not target.type == "Var" then
-                    error("Invalid target for 'with' assignment: "..tostring(target));
+                local \%target, \%value = item[1], item[2]
+                if not \%target.type == "Var" then
+                    error("Invalid target for 'with' assignment: "..tostring(\%target))
                 end
-                local target_lua = target:as_lua(nomsu);
-                local value_lua = value:as_lua(nomsu);
+                local target_lua = \(%target as lua)
+                local value_lua = \(%value as lua)
                 if not value_lua.is_value then
-                    error("Invalid value for assignment: "..tostring(value));
+                    error("Invalid value for assignment: "..tostring(\%value))
                 end
-                if target.type == "Var" then
-                    lhs:add_free_vars({target});
+                if \%target.type == "Var" then
+                    lhs:add_free_vars({\%target})
                 end
                 if i > 1 then
-                    lhs:append(", ");
-                    rhs:append(", ");
+                    lhs:append(", ")
+                    rhs:append(", ")
                 end
-                lhs:append(target_lua);
-                rhs:append(value_lua);
-                vars[i] = tostring(target_lua);
+                lhs:append(target_lua)
+                rhs:append(value_lua)
+                vars[i] = \%target
             end
-            \%lua:remove_free_vars(vars);
-            \%lua:prepend("local ", lhs, " = ", rhs, ";\n");
+            \%lua:remove_free_vars(vars)
+            \%lua:prepend("local ", lhs, " = ", rhs, ";\n")
         return
             Lua ".."
                 do
