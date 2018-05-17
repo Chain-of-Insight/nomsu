@@ -146,9 +146,6 @@ local Types = require("nomsu_tree")
 local NOMSU_DEFS
 do
   local _with_0 = { }
-  _with_0.Tuple = function(values)
-    return Tuple(unpack(values))
-  end
   _with_0.nl = P("\r") ^ -1 * P("\n")
   _with_0.ws = S(" \t")
   _with_0.tonumber = tonumber
@@ -228,16 +225,8 @@ end
 setmetatable(NOMSU_DEFS, {
   __index = function(self, key)
     local make_node
-    make_node = function(start, value, stop)
-      if type(value) == 'table' then
-        error("Not a tuple: " .. tostring(repr(value)))
-      end
-      local source = lpeg.userdata.source_code.source
-      start = start + (source.start - 1)
-      stop = stop + (source.start - 1)
-      source = Source(source.filename, start, stop - 1)
-      local node = Types[key](value, source)
-      return node
+    make_node = function(src, ...)
+      return Types[key](...)
     end
     self[key] = make_node
     return make_node
@@ -250,7 +239,7 @@ do
     anon_def <- ({ident} (" "*) ":"
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
     captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- ({} %3 {}) -> %2"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3) -> %2)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]])
@@ -430,12 +419,6 @@ do
     run_lua = function(self, lua)
       assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
       local lua_string = tostring(lua)
-      if rawget(FILE_CACHE, lua.source.filename) == nil then
-        FILE_CACHE[lua.source.filename] = lua_string
-      end
-      if rawget(FILE_CACHE, lua.source) == nil then
-        FILE_CACHE[lua.source] = lua_string
-      end
       local run_lua_fn, err = load(lua_string, filename, "t", self.environment)
       if not run_lua_fn then
         local n = 1
@@ -450,10 +433,10 @@ do
       return run_lua_fn()
     end,
     tree_to_value = function(self, tree)
-      if tree.type == 'Text' and #tree.value == 1 and type(tree.value[1]) == 'string' then
-        return tree.value[1]
+      if tree.type == 'Text' and #tree == 1 and type(tree[1]) == 'string' then
+        return tree[1]
       end
-      local lua = Lua(tree.source, "return ", tree:as_lua(self), ";")
+      local lua = Lua(nil, "return ", tree:as_lua(self), ";")
       return self:run_lua(lua)
     end,
     walk_tree = function(self, tree, depth)
@@ -464,10 +447,9 @@ do
       if not (Types.is_node(tree)) then
         return 
       end
-      if Tuple:is_instance(tree.value) then
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local v = _list_0[_index_0]
+      if tree.is_multi then
+        for _index_0 = 1, #tree do
+          local v = tree[_index_0]
           self:walk_tree(v, depth + 1)
         end
       else
@@ -502,7 +484,7 @@ do
         local lua = _block:as_lua(nomsu):as_statements()
         lua:declare_locals()
         nomsu:run_lua(lua)
-        return Lua(self.source, "if IMMEDIATE then\n    ", lua, "\nend")
+        return Lua(nil, "if IMMEDIATE then\n    ", lua, "\nend")
       end)
       local add_lua_string_bits
       add_lua_string_bits = function(lua, code)
@@ -510,46 +492,42 @@ do
           lua:append(", ", code:as_lua(nomsu))
           return 
         end
-        local _list_0 = code.value
-        for _index_0 = 1, #_list_0 do
-          local bit = _list_0[_index_0]
+        for _index_0 = 1, #code do
+          local bit = code[_index_0]
           lua:append(", ")
           if type(bit) == "string" then
             lua:append(repr(bit))
           else
             local bit_lua = bit:as_lua(nomsu)
             if not (bit_lua.is_value) then
-              local line, src = bit.source:get_line(), bit.source:get_text()
-              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.")
+              error("Cannot use " .. tostring(colored.yellow(repr(bit))) .. " as a string interpolation value, since it's not an expression.")
             end
             lua:append(bit_lua)
           end
         end
       end
       self:define_compile_action("Lua %code", function(self, _code)
-        local lua = Lua.Value(self.source, "Lua(", tostring(_code.source))
+        local lua = Lua.Value(nil, "Lua(nil")
         add_lua_string_bits(lua, _code)
         lua:append(")")
         return lua
       end)
       self:define_compile_action("Lua value %code", function(self, _code)
-        local lua = Lua.Value(self.source, "Lua.Value(", tostring(_code.source))
+        local lua = Lua.Value(nil, "Lua.Value(nil")
         add_lua_string_bits(lua, _code)
         lua:append(")")
         return lua
       end)
       local add_lua_bits
       add_lua_bits = function(lua, code)
-        local _list_0 = code.value
-        for _index_0 = 1, #_list_0 do
-          local bit = _list_0[_index_0]
+        for _index_0 = 1, #code do
+          local bit = code[_index_0]
           if type(bit) == "string" then
             lua:append(bit)
           else
             local bit_lua = bit:as_lua(nomsu)
             if not (bit_lua.is_value) then
-              local line, src = bit.source:get_line(), bit.source:get_text()
-              error(tostring(line) .. ": Cannot use " .. tostring(colored.yellow(src)) .. " as a string interpolation value, since it's not an expression.", 0)
+              error("Cannot use " .. tostring(colored.yellow(repr(bit))) .. " as a string interpolation value, since it's not an expression.", 0)
             end
             lua:append(bit_lua)
           end
@@ -558,20 +536,20 @@ do
       end
       self:define_compile_action("lua> %code", function(self, _code)
         if _code.type ~= "Text" then
-          return Lua(self.source, "nomsu:run_lua(", _code:as_lua(nomsu), ");")
+          return Lua(nil, "nomsu:run_lua(", _code:as_lua(nomsu), ");")
         end
-        return add_lua_bits(Lua(_code.source), _code)
+        return add_lua_bits(Lua(), _code)
       end)
       self:define_compile_action("=lua %code", function(self, _code)
         if _code.type ~= "Text" then
-          return Lua.Value(self.source, "nomsu:run_lua(", _code:as_lua(nomsu), ":as_statements('return '))")
+          return Lua.Value(nil, "nomsu:run_lua(", _code:as_lua(nomsu), ":as_statements('return '))")
         end
-        return add_lua_bits(Lua.Value(_code.source), _code)
+        return add_lua_bits(Lua.Value(), _code)
       end)
       return self:define_compile_action("use %path", function(self, _path)
         local path = nomsu:tree_to_value(_path)
         nomsu:run_file(path)
-        return Lua(self.source, "nomsu:run_file(" .. tostring(repr(path)) .. ");")
+        return Lua(nil, "nomsu:run_file(" .. tostring(repr(path)) .. ");")
       end)
     end
   }

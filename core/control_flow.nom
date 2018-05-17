@@ -144,7 +144,7 @@ immediately
         for %var in %start to %stop via %step %body
     ..to
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
-        assume (%var.type is "Var") or barf "Loop expected variable, not: \(%var's source code)"
+        assume (%var.type is "Var") or barf "Loop expected variable, not: \%var"
         %lua <-
             Lua ".."
                 for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(%step as lua expr) do
@@ -153,7 +153,7 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "do next %") and 
-                        %.value.3.value is %var.value
+                        %.3 = %var
         ..: to %lua write "\n    ::continue_\(%var as lua identifier)::;"
         to %lua write "\nend --numeric for-loop"
 
@@ -161,7 +161,7 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "stop %") and
-                        %.value.2.value is %var.value
+                        %.2 = %var
         ..
             %lua <-
                 Lua ".."
@@ -179,7 +179,7 @@ immediately
 immediately
     compile [for %var in %iterable %body] to
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
-        assume (%var.type is "Var") or barf "Loop expected variable, not: \(%var's source code)"
+        assume (%var.type is "Var") or barf "Loop expected variable, not: \%var"
         %lua <-
             Lua ".."
                 for i,\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
@@ -188,14 +188,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "do next %") and
-                        %.value.3.value is %var.value
+                        %.3 = %var
         ..: to %lua write (Lua "\n    ::continue_\(%var as lua identifier)::;")
         to %lua write "\nend --foreach-loop"
         if
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "stop %") and
-                        %.value.2.value is %var.value
+                        %.2 = %var
         ..
             %lua <-
                 Lua ".."
@@ -209,8 +209,8 @@ immediately
 immediately
     compile [for %key = %value in %iterable %body] to
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
-        assume (%key.type is "Var") or barf "Loop expected variable, not: \(%key's source code)"
-        assume (%value.type is "Var") or barf "Loop expected variable, not: \(%value's source code)"
+        assume (%key.type is "Var") or barf "Loop expected variable, not: \%key"
+        assume (%value.type is "Var") or barf "Loop expected variable, not: \%value"
         %lua <-
             Lua ".."
                 for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(%iterable as lua expr)) do
@@ -219,14 +219,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "do next %") and
-                        %.value.3.value is %key.value
+                        %.3 = %key
         ..: to %lua write (Lua "\n    ::continue_\(%key as lua identifier)::;")
 
         if
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "do next %") and
-                        %.value.3.value is %value.value
+                        %.3 = %value
         ..: to %lua write (Lua "\n    ::continue_\(%value as lua identifier)::;")
         to %lua write "\nend --foreach-loop"
         
@@ -235,14 +235,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "stop %") and
-                        %.value.2.value is %key.value
+                        %.2 = %key
         ..: to %stop_labels write "\n::stop_\(%key as lua identifier)::;"
 
         if
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "stop %") and
-                        %.value.2.value is %value.value
+                        %.2 = %value
         ..: to %stop_labels write "\n::stop_\(%value as lua identifier)::;"
 
         if: (length of %stop_labels) > 0
@@ -262,15 +262,14 @@ immediately
         %is_first <- (yes)
         %seen_else <- (no)
         %branches <-
-            %body.value if (%body.type = "Block") else [%body]
+            %body if (%body.type = "Block") else [%body]
         for %func_call in %branches
             assume (%func_call.type is "Action") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
-            %tokens <- %func_call.value
             with {..}
-                %star: %tokens.1
-                %condition: %tokens.2
-                %action: %tokens.3
+                %star: %func_call.1
+                %condition: %func_call.2
+                %action: %func_call.3
             ..
                 assume ((%star and (%star.type is "Word")) and (%star.value is "*")) or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*'
@@ -311,12 +310,11 @@ immediately
         %is_first <- (yes)
         %seen_else <- (no)
         %branches <-
-            %body.value if (%body.type = "Block") else [%body]
+            %body if (%body.type = "Block") else [%body]
         for %func_call in %branches
             assume (%func_call.type is "Action") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
-            %tokens <- %func_call.value
-            with {%star:%tokens.1, %condition:%tokens.2, %action:%tokens.3}
+            with {%star:%func_call.1, %condition:%func_call.2, %action:%func_call.3}
                 assume ((%star and (%star.type is "Word")) and (%star.value is "*")) or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*'
                 assume %condition or barf ".."

@@ -129,8 +129,6 @@ Types = require "nomsu_tree"
 
 NOMSU_DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
-    .Tuple = (values)->
-        return Tuple(unpack(values))
     .nl = P("\r")^-1 * P("\n")
     .ws = S(" \t")
     .tonumber = tonumber
@@ -196,15 +194,8 @@ NOMSU_DEFS = with {}
         return true
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
-    make_node = (start, value, stop)->
-        if type(value) == 'table' then error("Not a tuple: #{repr value}")-- = Tuple(value)
-        --source = lpeg.userdata.source_code.source\sub(start,stop-1)
-        source = lpeg.userdata.source_code.source
-        start += source.start-1
-        stop += source.start-1
-        source = Source(source.filename, start, stop-1)
-        node = Types[key](value, source)
-        return node
+    make_node = (src, ...)->
+        Types[key](...)
     self[key] = make_node
     return make_node
 })
@@ -218,7 +209,7 @@ NOMSU_PATTERN = do
     anon_def <- ({ident} (" "*) ":"
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
     captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- ({} %3 {}) -> %2"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3) -> %2)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]]
@@ -401,13 +392,6 @@ class NomsuCompiler
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
         lua_string = tostring(lua)
-        --metadata = lua\make_offset_table!
-        --LUA_METADATA[metadata.lua_filename] = metadata
-        if rawget(FILE_CACHE, lua.source.filename) == nil
-            FILE_CACHE[lua.source.filename] = lua_string
-        if rawget(FILE_CACHE, lua.source) == nil
-            FILE_CACHE[lua.source] = lua_string
-            
         run_lua_fn, err = load(lua_string, filename, "t", @environment)
         if not run_lua_fn
             n = 1
@@ -420,16 +404,16 @@ class NomsuCompiler
     
     tree_to_value: (tree)=>
         -- Special case for text literals
-        if tree.type == 'Text' and #tree.value == 1 and type(tree.value[1]) == 'string'
-            return tree.value[1]
-        lua = Lua(tree.source, "return ",tree\as_lua(@),";")
+        if tree.type == 'Text' and #tree == 1 and type(tree[1]) == 'string'
+            return tree[1]
+        lua = Lua(nil, "return ",tree\as_lua(@),";")
         return @run_lua(lua)
 
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
         return unless Types.is_node(tree)
-        if Tuple\is_instance(tree.value)
-            for v in *tree.value
+        if tree.is_multi
+            for v in *tree
                 @walk_tree(v, depth+1)
         else
             @walk_tree(v, depth+1)
@@ -451,61 +435,59 @@ class NomsuCompiler
             lua = _block\as_lua(nomsu)\as_statements!
             lua\declare_locals!
             nomsu\run_lua(lua)
-            return Lua(@source, "if IMMEDIATE then\n    ", lua, "\nend")
+            return Lua(nil, "if IMMEDIATE then\n    ", lua, "\nend")
 
         add_lua_string_bits = (lua, code)->
             if code.type != "Text"
                 lua\append ", ", code\as_lua(nomsu)
                 return
-            for bit in *code.value
+            for bit in *code
                 lua\append ", "
                 if type(bit) == "string"
                     lua\append repr(bit)
                 else
                     bit_lua = bit\as_lua(nomsu)
                     unless bit_lua.is_value
-                        line, src = bit.source\get_line!, bit.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression."
+                        error "Cannot use #{colored.yellow repr(bit)} as a string interpolation value, since it's not an expression."
                     lua\append bit_lua
 
         @define_compile_action "Lua %code", (_code)=>
-            lua = Lua.Value(@source, "Lua(", tostring(_code.source))
+            lua = Lua.Value(nil, "Lua(nil")
             add_lua_string_bits(lua, _code)
             lua\append ")"
             return lua
 
         @define_compile_action "Lua value %code", (_code)=>
-            lua = Lua.Value(@source, "Lua.Value(", tostring(_code.source))
+            lua = Lua.Value(nil, "Lua.Value(nil")
             add_lua_string_bits(lua, _code)
             lua\append ")"
             return lua
 
         add_lua_bits = (lua, code)->
-            for bit in *code.value
+            for bit in *code
                 if type(bit) == "string"
                     lua\append bit
                 else
                     bit_lua = bit\as_lua(nomsu)
                     unless bit_lua.is_value
-                        line, src = bit.source\get_line!, bit.source\get_text!
-                        error "#{line}: Cannot use #{colored.yellow src} as a string interpolation value, since it's not an expression.", 0
+                        error "Cannot use #{colored.yellow repr(bit)} as a string interpolation value, since it's not an expression.", 0
                     lua\append bit_lua
             return lua
 
         @define_compile_action "lua> %code", (_code)=>
             if _code.type != "Text"
-                return Lua @source, "nomsu:run_lua(", _code\as_lua(nomsu), ");"
-            return add_lua_bits(Lua(_code.source), _code)
+                return Lua nil, "nomsu:run_lua(", _code\as_lua(nomsu), ");"
+            return add_lua_bits(Lua!, _code)
 
         @define_compile_action "=lua %code", (_code)=>
             if _code.type != "Text"
-                return Lua.Value @source, "nomsu:run_lua(", _code\as_lua(nomsu), ":as_statements('return '))"
-            return add_lua_bits(Lua.Value(_code.source), _code)
+                return Lua.Value nil, "nomsu:run_lua(", _code\as_lua(nomsu), ":as_statements('return '))"
+            return add_lua_bits(Lua.Value!, _code)
 
         @define_compile_action "use %path", (_path)=>
             path = nomsu\tree_to_value(_path)
             nomsu\run_file(path)
-            return Lua(@source, "nomsu:run_file(#{repr path});")
+            return Lua(nil, "nomsu:run_file(#{repr path});")
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug_getinfo(2).func != require

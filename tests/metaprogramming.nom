@@ -42,7 +42,7 @@ try: foo 99
 
 assume ((\(5 + 5) as value) = 10) or barf "%tree as value failed."
 
-assume (((\(foo %x)'s source code) as text) = "foo %x") or barf "source code failed."
+assume (((\(foo %x) as nomsu) as text) = "foo %x") or barf "source code failed."
 
 assume ((repr [1,2]) = "{1, 2}") or barf "repr failed."
 

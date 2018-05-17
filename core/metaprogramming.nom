@@ -6,9 +6,9 @@
 immediately
     lua> ".."
         nomsu:define_compile_action("compile %actions to %lua", function(tree, \%actions, \%lua)
-            local lua = Lua(tree.source, "nomsu:define_compile_action(")
+            local lua = Lua(nil, "nomsu:define_compile_action(")
             local stubs = {}
-            for i, action in ipairs(\%actions.value) do
+            for i, action in ipairs(\%actions) do
                 stubs[i] = action:get_stub(true)
             end
             stubs = repr(stubs)
@@ -19,7 +19,7 @@ immediately
             end
             lua:append("function(tree")
             local args = {}
-            for i,tok in ipairs(\%actions.value[1].value) do
+            for i,tok in ipairs(\%actions[1]) do
                 if tok.type == "Var" then args[#args+1] = tok:as_lua(nomsu) end
             end
             for i, arg in ipairs(args) do
@@ -36,9 +36,9 @@ immediately
 immediately
     compile [action %actions %body] to
         lua> ".."
-            local lua = Lua(tree.source, "nomsu:define_action(")
+            local lua = Lua(nil, "nomsu:define_action(")
             local stubs = {}
-            for i, action in ipairs(\%actions.value) do
+            for i, action in ipairs(\%actions) do
                 stubs[i] = action:get_stub(true)
             end
             stubs = repr(stubs)
@@ -49,7 +49,7 @@ immediately
             end
             lua:append("function(")
             local args = {}
-            for i,tok in ipairs(\%actions.value[1].value) do
+            for i,tok in ipairs(\%actions[1]) do
                 if tok.type == "Var" then args[#args+1] = tok:as_lua(nomsu) end
             end
             for i, arg in ipairs(args) do
@@ -66,9 +66,9 @@ immediately
 immediately
     compile [parse %shorthand as %longhand] to
         lua> ".."
-            local lua = Lua(tree.source, "nomsu:define_compile_action(")
+            local lua = Lua(nil, "nomsu:define_compile_action(")
             local stubs = {}
-            for i, action in ipairs(\%shorthand.value) do
+            for i, action in ipairs(\%shorthand) do
                 stubs[i] = action:get_stub(true)
             end
             stubs = repr(stubs)
@@ -79,24 +79,24 @@ immediately
             end
             lua:append("function(tree")
             local replacements = {}
-            for i,tok in ipairs(\%shorthand.value[1].value) do
+            for i,tok in ipairs(\%shorthand[1]) do
                 if tok.type == "Var" then
                     local lua_var = tostring(tok:as_lua(nomsu))
-                    replacements[tok.value] = lua_var
+                    replacements[tok] = lua_var
                     lua:append(", ", lua_var)
                 end
             end
             local function make_tree(t)
-                if Tuple:is_instance(t) then
+                if replacements[t] then
+                    return replacements[t]
+                elseif type(t) ~= 'table' and type(t) ~= 'userdata' then
+                    return repr(t)
+                elseif t.is_multi then
                     local bits = {}
                     for i, entry in ipairs(t) do
                         bits[i] = make_tree(entry)
                     end
-                    return "Tuple("..table.concat(bits, ", ")..")"
-                elseif type(t) ~= 'table' and type(t) ~= 'userdata' then
-                    return repr(t)
-                elseif t.type == "Var" and replacements[t.value] then
-                    return replacements[t.value]
+                    return t.type.."("..table.concat(bits, ", ")..")"
                 else
                     return t.type.."("..make_tree(t.value)..")"
                 end
@@ -118,6 +118,12 @@ action [remove action %stub]
         ARG_ORDERS[fn] = nil
 
 immediately
+    action [%tree as nomsu]
+        =lua "\%tree:as_nomsu()"
+
+    action [%tree as inline nomsu]
+        =lua "\%tree:as_nomsu(true)"
+
     action [%tree as lua]
         =lua "\%tree:as_lua(nomsu)"
 
@@ -125,7 +131,7 @@ immediately
         lua> ".."
             local lua = \%tree:as_lua(nomsu)
             if not lua.is_value then
-                error("Invalid thing to convert to lua expr: "..\%tree.source:get_text())
+                error("Invalid thing to convert to lua expr: "..\%tree)
             end
             return lua
 
@@ -156,9 +162,6 @@ immediately
     parse [to %var write %code] as: lua> "\%var:append(\%code);"
 
 immediately
-    action [%tree's source code, %tree' source code]
-        =lua "\%tree.source:get_text()"
-
     compile [repr %obj] to: Lua value "repr(\(%obj as lua expr))"
     compile [%obj as text] to: Lua value "tostring(\(%obj as lua expr))"
     compile [type of %obj] to: Lua value "type(\(%obj as lua expr))"
@@ -170,30 +173,22 @@ immediately
 # Compiler tools
 immediately
     compile [run %code] to
-        Lua value "nomsu:run(Nomsu(\(=lua "tostring(tree.source)"), \(%code as lua expr)))"
+        Lua value "nomsu:run(Nomsu(nil, \(%code as lua expr)))"
 
 immediately
     compile [show lua %block] to
         lua> ".."
             local \%lua = \%block:as_lua(nomsu);
-            return Lua(\%block.source, "print(", repr(tostring(\%lua)), ");");
+            return Lua(nil, "print(", repr(tostring(\%lua)), ");");
 
 immediately
     compile [say %message] to
         lua> ".."
             if \%message.type == "Text" then
-                return Lua(tree.source, "print(", \(%message as lua expr), ");");
+                return Lua(nil, "print(", \(%message as lua expr), ");");
             else
-                return Lua(tree.source, "print(stringify(", \(%message as lua expr), "));");
+                return Lua(nil, "print(stringify(", \(%message as lua expr), "));");
             end
-
-immediately
-    compile [source] to: Lua value "tree.source"
-
-#
-    immediately
-        action [Lua %]: Lua (=lua "tree.source") %
-        action [Lua value %]: Lua value (=lua "tree.source") %
 
 # Return
 immediately
@@ -207,7 +202,7 @@ immediately
     compile [barf] to: Lua "error(nil, 0);"
     compile [barf %msg] to: Lua "error(\(%msg as lua expr), 0);"
     compile [assume %condition] to
-        lua> "local \%assumption = 'Assumption failed: '..tostring(\%condition.source:get_text());"
+        lua> "local \%assumption = 'Assumption failed: '..tostring(\%condition:as_nomsu());"
         return
             Lua ".."
                 if not \(%condition as lua expr) then
