@@ -87,7 +87,7 @@ number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonum
 
 -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
 -- which is a hack to allow %'s to parse as "%" and "' s" separately
-variable (Var): "%" { plain_word? }
+variable (Var): "%" { ((!"'" %operator) / plain_word)* }
 
 inline_list (List):
     !('[..]')
@@ -132,4 +132,4 @@ dedent: eol (%nl ignored_line)* (((!.) &%dedent) / (&(%nl %dedent)))
 non_dedent_error: (!dedent .)* eol (%nl ignored_line)* (!. / &%nl)
 comma: %ws* "," %ws*
 dotdot: nodent ".."
-plain_word: ([a-zA-Z0-9_] / %utf8_char)+
+plain_word: ([a-zA-Z0-9_-] / %utf8_char)+

@@ -1,100 +1,91 @@
 use "core"
 
-compile [@%var] to
-    lua> ".."
-        local key_lua = repr(\%var.value);
-        local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
-                       or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
-        if key_attr then
-            return {expr="_me."..key_attr};
-        elseif key_lua:sub(1,1) == "[" then
-            key_lua = " "..key_lua.." ";
-        end
-        return {expr="_me["..key_lua.."]"};
+compile [@, me] to: Lua value "self"
 
-compile [@%var <- %val] to
-    lua> ".."
-        local val_lua = \(%val as lua expr);
-        local key_lua = repr(\%var.value);
-        local key_attr = (key_lua:match("'([a-zA-Z][a-zA-Z0-9]*)'")
-                       or key_lua:match('"([a-zA-Z][a-zA-Z0-9]*)"'));
-        if key_attr then
-            return {statements="_me."..key_attr.." = "..val_lua..";"};
-        elseif key_lua:sub(1,1) == "[" then
-            key_lua = " "..key_lua.." ";
+compile [as %instance %body] to
+    Lua ".."
+        do
+            local self = \(%instance as lua expr);
+            local global_actions = ACTIONS;
+            local ACTIONS = setmetatable({}, {__index=function(_,key)
+                local method = self[key];
+                if method then return (function(...) return method(self, ...); end); end
+                return global_actions[key];
+            end});
+            \(%body as lua statements)
         end
-        return {statements="_me["..key_lua.."] = "..val_lua..";"};
 
-compile [define object %classname %class_body] to
-    %class_identifier <- (=lua "nomsu:var_to_lua_identifier(\(%classname as value)):sub(2,-1)")
-    if: %class_identifier is ""
-        %class_identifier <- "class"
-    %methods <- []
-    for %line in (%class_body's "value")
-        if: (%line's "type") is "Comment"
+compile [object %classname %class_body] to
+    %class_id <- (=lua "Var(\(%classname as value)):as_lua_id():sub(2,-1)")
+    if: %class_id is ""
+        %class_id <- "class"
+    %methods <-: Lua ""
+    %__index <- %class_id
+    %__newindex <- "nil"
+    for %line in %class_body
+        if: %line.type is "Comment"
             do next %line
-        assume (((%line's "type") == "FunctionCall") and ((%line's stub) == "action % %"))
-        ..or barf "Only action definitions are supported inside 'define object % %', not \(%line's "src")"
-        %actions <- (2nd in (%line's "value"))
-        %body <- (3rd in (%line's "value"))
+        if: (%line.type is "Action") and ((%line's stub) is "slots %")
+            %slot_index_clauses <- []
+            %slot_newindex_clauses <- []
+            %slots <- %line.2
+            for %slot_index = %slot_var in %slots
+                to %slot_index_clauses add ".."
+                    if key == \(repr %slot_var.value) or key == \(repr (%slot_var as lua expr)) then
+                        return rawget(self, \%slot_index);
+                    end
+                to %slot_newindex_clauses add ".."
+                    if key == \(repr %slot_var.value) or key == \(repr (%slot_var as lua expr)) or key == \%slot_index then
+                        rawset(self, \%slot_index, value);
+                    end
+
+            %__index <- ".."
+                function(self, key)
+                    \(%slot_index_clauses joined with "\n")
+                    return \%class_id[key];
+                end
+            %__newindex <- ".."
+                function(self, key, value)
+                    \(%slot_newindex_clauses joined with "\n")
+                    error("Attempt to store data in "..repr(key)..", which is not a valid slot on "..tostring(self.class));
+                end
+            do next %line
+        assume ((%line.type is "Action") and ((%line's stub) is "action % %"))
+        ..or barf "Only action definitions are supported inside 'object % %'"
+        %actions <- %line.2
+        %body <- %line.3
         lua> ".."
-            local stubs = {};
-            for i, action in ipairs(\%actions.value) do
-                stubs[i] = nomsu:tree_to_named_stub(action);
-            end
-            local args = {};
-            for i,tok in ipairs(\%actions.value[1].value) do
-                if tok.type == "Var" then args[#args+1] = nomsu:var_to_lua_identifier(tok.value); end
-            end
-            local arg_set = {};
-            for i, arg in ipairs(args) do arg_set[arg] = true; end
-            local body_lua = nomsu:tree_to_lua(\%body);
-            local body_code = body_lua.statements or ("return "..body_lua.expr..";");
-            local undeclared_locals = {};
-            for i, body_local in ipairs(body_lua.locals or {}) do
-                if not arg_set[body_local] then
-                    table.insert(undeclared_locals, body_local);
+            do
+                local stubs = {}
+                for i, action in ipairs(\%actions) do
+                    stubs[i] = action:get_stub(true)
                 end
-            end
-            if #undeclared_locals > 0 then
-                body_code = "local "..table.concat(undeclared_locals, ", ")..";\\n"..body_code;
-            end
-            local lua_fn_args = table.concat(args, ", ");
-            local def_tree = nomsu.compilestack[#nomsu.compilestack];
-            local code_location = ("%s:%s,%s"):format(def_tree.filename, def_tree.start, def_tree.stop);
-
-            local compiled_args = {};
-            for i, arg in ipairs(args) do
-                compiled_args[i] = "nomsu:tree_to_lua("..arg..").expr";
-            end
-            compiled_args = table.concat(compiled_args, "..', '..");
-            table.insert(\%methods, ([==[
-                %s[ %s] = function(%s)
-                    %s
+                local lua = Lua(nil, \%class_id, "[ ", repr(stubs[1]), "] = function(self")
+                local args = {}
+                for i,tok in ipairs(\%actions[1]) do
+                    if tok.type == "Var" then args[#args+1] = tok end
                 end
-                nomsu:define_compile_action(%s, %s, function(%s)
-                    return {expr="("..nomsu:tree_to_lua(_me).expr..")[ "..%s.."]("..%s..")"};
-                end);
-                ACTION_METADATA[%s[ %s]] = ACTION_METADATA[ACTION[ %s]];
-            ]==]):format(
-                \%class_identifier, repr(stubs[1]), lua_fn_args,
-                    body_code,
-                repr(stubs), repr(code_location), lua_fn_args,
-                    repr(repr(stubs[1])), compiled_args,
-                \%class_identifier, repr(stubs[1]), repr(stubs[1])));
+                for i, arg in ipairs(args) do
+                    lua:append(", ", nomsu:tree_to_lua(arg))
+                end
+                local body_lua = nomsu:tree_to_lua(\%body):as_statements("return ")
+                body_lua:remove_free_vars(args)
+                body_lua:declare_locals()
+                lua:append(")\n    ", body_lua, "\nend;\n")
+                \%methods:append(lua)
+            end
 
-    return {..}
-        statements:".."
-            do -- \%class_identifier
+    return
+        Lua ".."
+            do -- \%class_id
                 -- Create the class object
-                local \%class_identifier = setmetatable({
+                local \%class_id = setmetatable({
                     name=\(%classname as lua expr), instances=setmetatable({}, {__mode="k"}),
                 }, {
                     __tostring=function(c) return c.name; end,
-                    __call=function(cls, inst)
-                        inst = inst or {};
-                        inst.id = tostring(inst):match('table: (.*)');
-                        setmetatable(inst, cls.instance_metatable);
+                    __call=function(cls, initial_values)
+                        local inst = setmetatable({}, cls.instance_metatable);
+                        for k,v in pairs(initial_values) do inst[k] = v; end
                         cls.instances[inst] = true;
                         if inst['set % up'] then
                             inst['set % up'](inst);
@@ -102,27 +93,44 @@ compile [define object %classname %class_body] to
                         return inst;
                     end,
                 });
-                \%class_identifier.class = \%class_identifier;
+                \%class_id.class = \%class_id;
 
                 -- Define the methods
-            \(%methods joined with "\n")
+                \%methods
 
                 -- Define class methods for instantiating and accessing instances
-                \%class_identifier.instance_metatable = {
-                    __index=\%class_identifier,
-                    __tostring=\%class_identifier['% as text'] or function(inst)
-                        return "<"..inst.class.name..": "..inst.id..">";
+                \%class_id.instance_metatable = {
+                    __index=\%__index,
+                    __newindex=\%__newindex,
+                    __tostring=\%class_id['as text'] or function(inst)
+                        return "<"..inst.class.name..": "..nomsu.ids[inst]..">";
                     end,
+                    __len=\%class_id['size of'],
+                    __unm=\%class_id['-'],
+                    __add=\%class_id['+ %'],
+                    __sub=\%class_id['- %'],
+                    __mul=\%class_id['* %'],
+                    __div=\%class_id['/ %'],
+                    __mod=\%class_id['wrapped around %'],
+                    __pow=\%class_id['^ %'],
+                    __band=\%class_id['AND %'],
+                    __bor=\%class_id['OR %'],
+                    __bxor=\%class_id['XOR %'],
+                    __bshl=\%class_id['<< %'],
+                    __bshr=\%class_id['>> %'],
+                    __eq=\%class_id['= %'],
+                    __lt=\%class_id['< %'],
+                    __le=\%class_id['<= %'],
                 };
-                nomsu:define_action("instances of "..\%class_identifier.name, "lib/class.nom", function()
-                    return utils.keys(\%class_identifier.instances);
-                end, "");
-                nomsu:define_action("new "..\%class_identifier.name.." %instance", "lib/class.nom", function(_instance)
-                    return \%class_identifier(_instance);
-                end, "");
-                nomsu:define_action("new "..\%class_identifier.name, "lib/class.nom", function()
-                    return \%class_identifier({});
-                end, "");
-            end -- End of definition of \%class_identifier
+                nomsu:define_action("instances of "..\%class_id.name, function()
+                    return utils.keys(\%class_id.instances);
+                end);
+                nomsu:define_action("new "..\%class_id.name.." %instance", function(_instance)
+                    return \%class_id(_instance);
+                end);
+                nomsu:define_action("new "..\%class_id.name, function()
+                    return \%class_id({});
+                end);
+            end -- End of definition of \%class_id
             \("\n\n")
         

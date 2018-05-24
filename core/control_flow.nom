@@ -288,7 +288,7 @@ immediately
                     assume (not %seen_else) or barf "'else' clause needs to be last in 'when' block"
                     lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
                     to %code write "\("if" if %is_first else "\nelseif") "
-                    for %i=%condition in %fallthroughs
+                    for %i = %condition in %fallthroughs
                         if (%i > 1): to %code write " or "
                         to %code write %condition
                     to %code write " then\n    "

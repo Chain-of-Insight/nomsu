@@ -33,7 +33,7 @@ if jit
 re = require 're'
 lpeg = require 'lpeg'
 lpeg.setmaxstack 10000
-{:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt} = lpeg
+{:P,:R,:V,:S,:Cg,:C,:Cp,:B} = lpeg
 utils = require 'utils'
 new_uuid = require 'uuid'
 immutable = require 'immutable'
@@ -285,7 +285,7 @@ class NomsuCompiler
     stub_defs = {
         space:(P(' ') + P('\n..'))^0
         word:(NOMSU_DEFS.ident_char^1 + NOMSU_DEFS.operator)
-        varname:(R('az','AZ','09') + P('_') + NOMSU_DEFS.utf8_char)^0
+        varname:(R('az','AZ','09') + P('_') + NOMSU_DEFS.utf8_char + (-P("'") * NOMSU_DEFS.operator))^0
     }
     stub_pattern = re.compile [=[
         {~ (%space->'') (('%' (%varname->'')) / %word)? ((%space->' ') (('%' (%varname->'')) / %word))* (%space->'') ~}
