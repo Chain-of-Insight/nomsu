@@ -77,7 +77,13 @@ all_files = (path)->
         return iterate_single, path
     -- TODO: improve sanitization
     path = path\gsub("\\","\\\\")\gsub("`","")\gsub('"','\\"')\gsub("$","")
-    return io.popen('find -L "'..path..'" -type f -name "*.nom"')\lines!
+    return coroutine.wrap ->
+        f = io.popen('find -L "'..path..'" -type f -name "*.nom"')
+        for line in f\lines!
+            coroutine.yield(line)
+        success = f\close!
+        unless success
+            error("Invalid file path: "..tostring(path))
 
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}

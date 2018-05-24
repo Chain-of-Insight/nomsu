@@ -88,7 +88,16 @@ all_files = function(path)
     return iterate_single, path
   end
   path = path:gsub("\\", "\\\\"):gsub("`", ""):gsub('"', '\\"'):gsub("$", "")
-  return io.popen('find -L "' .. path .. '" -type f -name "*.nom"'):lines()
+  return coroutine.wrap(function()
+    local f = io.popen('find -L "' .. path .. '" -type f -name "*.nom"')
+    for line in f:lines() do
+      coroutine.yield(line)
+    end
+    local success = f:close()
+    if not (success) then
+      return error("Invalid file path: " .. tostring(path))
+    end
+  end)
 end
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*
