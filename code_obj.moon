@@ -62,18 +62,8 @@ Source = immutable {"filename","start","stop"}, {
 
 class Code
     new: (@source, ...)=>
-        @bits = {...}
-        indent, indents = 0, {}
-        match = string.match
-        for i,b in ipairs @bits
-            if type(b) == 'string'
-                if spaces = match(b, "\n([ ]*)[^\n]*$")
-                    indent = #spaces
-            elseif indent != 0
-                indents[i] = indent
-        @current_indent = indent
-        @indents = indents
-        @__str = nil
+        @bits, @indents, @current_indent = {}, {}, 0
+        @append(...)
         if type(@source) == 'string'
             filename,start,stop = @source\match("^(.-)%[(%d+):(%d+)%]$")
             unless filename
@@ -91,16 +81,17 @@ class Code
 
     append: (...)=>
         n = select("#",...)
-        bits = @bits
+        bits, indents = @bits, @indents
+        match = string.match
         for i=1,n
             b = select(i, ...)
             assert(b != self, "No recursion please.")
             bits[#bits+1] = b
             if type(b) == 'string'
-                if spaces = b\match("\n([ ]*)[^\n]*$")
+                if spaces = match(b, "\n([ ]*)[^\n]*$")
                     @current_indent = #spaces
             elseif @current_indent != 0
-                @indents[#bits] = @current_indent
+                indents[#bits] = @current_indent
         @__str = nil
     
     prepend: (...)=>

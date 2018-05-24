@@ -101,20 +101,21 @@ do
     end,
     append = function(self, ...)
       local n = select("#", ...)
-      local bits = self.bits
+      local bits, indents = self.bits, self.indents
+      local match = string.match
       for i = 1, n do
         local b = select(i, ...)
         assert(b ~= self, "No recursion please.")
         bits[#bits + 1] = b
         if type(b) == 'string' then
           do
-            local spaces = b:match("\n([ ]*)[^\n]*$")
+            local spaces = match(b, "\n([ ]*)[^\n]*$")
             if spaces then
               self.current_indent = #spaces
             end
           end
         elseif self.current_indent ~= 0 then
-          self.indents[#bits] = self.current_indent
+          indents[#bits] = self.current_indent
         end
       end
       self.__str = nil
@@ -151,26 +152,8 @@ do
   _class_0 = setmetatable({
     __init = function(self, source, ...)
       self.source = source
-      self.bits = {
-        ...
-      }
-      local indent, indents = 0, { }
-      local match = string.match
-      for i, b in ipairs(self.bits) do
-        if type(b) == 'string' then
-          do
-            local spaces = match(b, "\n([ ]*)[^\n]*$")
-            if spaces then
-              indent = #spaces
-            end
-          end
-        elseif indent ~= 0 then
-          indents[i] = indent
-        end
-      end
-      self.current_indent = indent
-      self.indents = indents
-      self.__str = nil
+      self.bits, self.indents, self.current_indent = { }, { }, 0
+      self:append(...)
       if type(self.source) == 'string' then
         local filename, start, stop = self.source:match("^(.-)%[(%d+):(%d+)%]$")
         if not (filename) then

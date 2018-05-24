@@ -101,11 +101,7 @@ immediately
                     return t.type.."("..make_tree(t.value)..")"
                 end
             end
-            lua:append([[)
-                local tree = ]], make_tree(\%longhand), [[
-
-                return nomsu:tree_to_lua(tree)
-            end);]])
+            lua:append(")\n    local tree = ", make_tree(\%longhand), "\n    return nomsu:tree_to_lua(tree)\nend);")
             return lua
 
 action [remove action %stub]

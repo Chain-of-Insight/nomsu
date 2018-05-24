@@ -78,7 +78,7 @@ all_files = (path)->
     -- TODO: improve sanitization
     path = path\gsub("\\","\\\\")\gsub("`","")\gsub('"','\\"')\gsub("$","")
     return coroutine.wrap ->
-        f = io.popen('find -L "'..path..'" -type f -name "*.nom"')
+        f = io.popen('find -L "'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
         for line in f\lines!
             coroutine.yield(line)
         success = f\close!

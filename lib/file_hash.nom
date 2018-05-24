@@ -3,7 +3,7 @@ use "core"
 action [file with hash %hash]
     lua> ".."
         local Hash = require("openssl.digest")
-        for filename in io.popen('find -L . -type f -name "*.nom"'):lines() do
+        for filename in io.popen('find -L . -not -path "*/\\\\.*" -type f -name "*.nom"'):lines() do
             local file = io.open(filename)
             local contents = file:read("*a")
             file:close()

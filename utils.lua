@@ -49,9 +49,6 @@ local function repr(x, depth)
             return "{"..table.concat(ret, ", ").."}"
         end
     elseif x_type == 'string' then
-        if x == "\n" then
-            return "'\\n'"
-        end
         local escaped = x:gsub("\\", "\\\\"):gsub("\n","\\n"):gsub('"', '\\"')
         return '"'..escaped..'"'
     else
