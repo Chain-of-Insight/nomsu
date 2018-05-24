@@ -77,7 +77,7 @@ all_files = (path)->
         return iterate_single, path
     -- TODO: improve sanitization
     path = path\gsub("\\","\\\\")\gsub("`","")\gsub('"','\\"')\gsub("$","")
-    return io.popen("find -L \""..path.."\" -type f -name \"*.nom\"")\lines!
+    return io.popen('find -L "'..path..'" -type f -name "*.nom"')\lines!
 
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}

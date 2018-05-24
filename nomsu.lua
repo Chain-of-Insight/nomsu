@@ -88,7 +88,7 @@ all_files = function(path)
     return iterate_single, path
   end
   path = path:gsub("\\", "\\\\"):gsub("`", ""):gsub('"', '\\"'):gsub("$", "")
-  return io.popen("find -L \"" .. path .. "\" -type f -name \"*.nom\""):lines()
+  return io.popen('find -L "' .. path .. '" -type f -name "*.nom"'):lines()
 end
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*
