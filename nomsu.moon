@@ -201,7 +201,9 @@ NOMSU_DEFS = with {}
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (src, ...)->
-        Types[key](...)
+        tree = Types[key](...)
+        insert lpeg.userdata.depth_first_sources, {src, tree}
+        return tree
     self[key] = make_node
     return make_node
 })
@@ -327,6 +329,7 @@ class NomsuCompiler
             nomsu_code = Nomsu(filename, nomsu_code)
         userdata = {
             source_code:nomsu_code, indent_stack: {""}, errors: {},
+            depth_first_sources: {},
         }
 
         old_userdata, lpeg.userdata = lpeg.userdata, userdata
@@ -340,8 +343,22 @@ class NomsuCompiler
             table.sort(keys)
             errors = [userdata.errors[k] for k in *keys]
             error(concat(errors, "\n\n"), 0)
-            
-        return tree
+        
+        src_map = {}
+        src_i = 1
+        walk_tree = (tree, path)->
+            if tree.is_multi
+                for i, v in ipairs tree
+                    if Types.is_node(v)
+                        walk_tree(v, Tuple(i, path))
+            src, t2 = unpack(userdata.depth_first_sources[src_i])
+            src_i += 1
+            assert t2 == tree
+            src_map[path] = src
+        walk_tree tree, Tuple!
+        assert src_i == #userdata.depth_first_sources + 1
+
+        return tree, src_map
 
     run: (nomsu_code, compile_fn=nil)=>
         if #tostring(nomsu_code) == 0 then return nil
@@ -410,7 +427,7 @@ class NomsuCompiler
 
     MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
     math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
-    tree_to_lua: (tree)=>
+    tree_to_lua: (tree, path=Tuple!)=>
         switch tree.type
             when "Action"
                 stub = tree\get_stub!
@@ -420,6 +437,7 @@ class NomsuCompiler
                     -- Force all compile-time actions to take a tree location
                     args = [args[p-1] for p in *@environment.ARG_ORDERS[compile_action][stub]]
                     -- Force Lua to avoid tail call optimization for debugging purposes
+                    -- TODO: use tail call
                     ret = compile_action(tree, unpack(args))
                     if not ret then error("Failed to produce any Lua")
                     return ret
@@ -433,7 +451,7 @@ class NomsuCompiler
                         if tok.type == "Word"
                             lua\append tok.value
                         else
-                            tok_lua = @tree_to_lua(tok)
+                            tok_lua = @tree_to_lua(tok, Tuple(i, path))
                             unless tok_lua.is_value
                                 error("non-expression value inside math expression: #{colored.yellow repr(tok)}")
                             if tok.type == "Action"
@@ -446,7 +464,7 @@ class NomsuCompiler
                 args = {}
                 for i, tok in ipairs tree
                     if tok.type == "Word" then continue
-                    arg_lua = @tree_to_lua(tok)
+                    arg_lua = @tree_to_lua(tok, Tuple(i, path))
                     unless arg_lua.is_value
                         error "Cannot use:\n#{colored.yellow repr(tok)}\nas an argument to #{stub}, since it's not an expression, it produces: #{repr arg_lua}", 0
                     insert args, arg_lua
@@ -471,13 +489,13 @@ class NomsuCompiler
                         bits = [make_tree(bit) for bit in *t]
                         return t.type.."("..table.concat(bits, ", ")..")"
                     else
-                        return t.type.."("..make_tree(t.value)..")"
-                Lua.Value nil, make_tree(tree.value)
+                        return t.type.."("..make_tree(t[1])..")"
+                Lua.Value nil, make_tree(tree[1])
             
             when "Block"
                 lua = Lua!
                 for i,line in ipairs tree
-                    line_lua = @tree_to_lua(line)
+                    line_lua = @tree_to_lua(line, Tuple(i, path))
                     if i > 1
                         lua\append "\n"
                     lua\append line_lua\as_statements!
@@ -486,7 +504,7 @@ class NomsuCompiler
             when "Text"
                 lua = Lua.Value!
                 string_buffer = ""
-                for bit in *tree
+                for i, bit in ipairs tree
                     if type(bit) == "string"
                         string_buffer ..= bit
                         continue
@@ -494,7 +512,7 @@ class NomsuCompiler
                         if #lua.bits > 0 then lua\append ".."
                         lua\append repr(string_buffer)
                         string_buffer = ""
-                    bit_lua = @tree_to_lua(bit)
+                    bit_lua = @tree_to_lua(bit, Tuple(i, path))
                     unless bit_lua.is_value
                         error "Cannot use #{colored.yellow repr(bit)} as a string interpolation value, since it's not an expression.", 0
                     if #lua.bits > 0 then lua\append ".."
@@ -514,7 +532,7 @@ class NomsuCompiler
                 lua = Lua.Value nil, "{"
                 line_length = 0
                 for i, item in ipairs tree
-                    item_lua = @tree_to_lua(item)
+                    item_lua = @tree_to_lua(item, Tuple(i, path))
                     unless item_lua.is_value
                         error "Cannot use #{colored.yellow repr(item)} as a list item, since it's not an expression.", 0
                     lua\append item_lua
@@ -538,7 +556,7 @@ class NomsuCompiler
                 lua = Lua.Value nil, "{"
                 line_length = 0
                 for i, entry in ipairs tree
-                    entry_lua = @tree_to_lua(entry)
+                    entry_lua = @tree_to_lua(entry, Tuple(i, path))
                     lua\append entry_lua
                     entry_lua_str = tostring(entry_lua)
                     -- TODO: maybe make this more accurate? It's only a heuristic, so eh...
@@ -559,10 +577,10 @@ class NomsuCompiler
 
             when "DictEntry"
                 key, value = tree[1], tree[2]
-                key_lua = @tree_to_lua(key)
+                key_lua = @tree_to_lua(key, Tuple(1, path))
                 unless key_lua.is_value
                     error "Cannot use #{colored.yellow repr(key)} as a dict key, since it's not an expression.", 0
-                value_lua = value and @tree_to_lua(value) or Lua.Value(nil, "true")
+                value_lua = value and @tree_to_lua(value, Tuple(2, path)) or Lua.Value(nil, "true")
                 unless value_lua.is_value
                     error "Cannot use #{colored.yellow repr(value)} as a dict value, since it's not an expression.", 0
                 key_str = tostring(key_lua)\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
@@ -577,7 +595,7 @@ class NomsuCompiler
                     Lua nil, "[",key_lua,"]=",value_lua
             
             when "IndexChain"
-                lua = @tree_to_lua(tree[1])
+                lua = @tree_to_lua(tree[1], Tuple(1, path))
                 unless lua.is_value
                     error "Cannot index #{colored.yellow repr(tree[1])}, since it's not an expression.", 0
                 first_char = tostring(lua)\sub(1,1)
@@ -586,7 +604,7 @@ class NomsuCompiler
 
                 for i=2,#tree
                     key = tree[i]
-                    key_lua = @tree_to_lua(key)
+                    key_lua = @tree_to_lua(key, Tuple(i, path))
                     unless key_lua.is_value
                         error "Cannot use #{colored.yellow repr(key)} as an index, since it's not an expression.", 0
                     key_lua_str = tostring(key_lua)
@@ -684,7 +702,7 @@ class NomsuCompiler
             when "EscapedNomsu"
                 nomsu = @tree_to_nomsu(tree.value, true)
                 if nomsu == nil and not inline
-                    nomsu = @tree_to_nomsu(tree.value)
+                    nomsu = @tree_to_nomsu(tree[1])
                     return nomsu and Nomsu nil, "\\:\n    ", nomsu
                 return nomsu and Nomsu nil, "\\(", nomsu, ")"
 
@@ -866,12 +884,10 @@ class NomsuCompiler
 
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
-        return unless Types.is_node(tree)
         if tree.is_multi
             for v in *tree
-                @walk_tree(v, depth+1)
-        else
-            @walk_tree(v, depth+1)
+                if Types.is_node(v)
+                    @walk_tree(v, depth+1)
 
     initialize_core: =>
         -- Sets up some core functionality

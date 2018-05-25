@@ -32,15 +32,15 @@ Tree = (name, kind, methods)->
             return @_map(fn)
         if is_multi
             .__tostring = => "#{@name}(#{table.concat [repr(v) for v in *@], ', '})"
-            .map = (fn)=>
+            ._map = (fn)=>
                 if ret = fn(@)
                     return ret
-                new_vals = [v.map and v\map(fn) or v for v in *@]
+                new_vals = [v._map and v\_map(fn) or v for v in *@]
                 ret = getmetatable(self)(unpack(new_vals))
                 return ret
         else
             .__tostring = => "#{@name}(#{repr(@value)})"
-            .map = (fn)=>
+            ._map = (fn)=>
                 fn(@) or @
 
     if is_multi
@@ -49,6 +49,7 @@ Tree = (name, kind, methods)->
         Types[name] = immutable {"value"}, methods
 
 Tree "Block", 'multi'
+Tree "EscapedNomsu", 'multi'
 Tree "Text", 'multi'
 Tree "List", 'multi'
 Tree "Dict", 'multi'
@@ -57,9 +58,6 @@ Tree "IndexChain", 'multi'
 Tree "Number", 'single'
 Tree "Word", 'single'
 Tree "Comment", 'single'
-
-Tree "EscapedNomsu", 'single',
-    map: (fn)=> fn(@) or @\map(fn)
 
 Tree "Var", 'single',
     as_lua_id: =>

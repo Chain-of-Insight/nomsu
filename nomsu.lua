@@ -235,7 +235,12 @@ setmetatable(NOMSU_DEFS, {
   __index = function(self, key)
     local make_node
     make_node = function(src, ...)
-      return Types[key](...)
+      local tree = Types[key](...)
+      insert(lpeg.userdata.depth_first_sources, {
+        src,
+        tree
+      })
+      return tree
     end
     self[key] = make_node
     return make_node
@@ -316,7 +321,8 @@ do
         indent_stack = {
           ""
         },
-        errors = { }
+        errors = { },
+        depth_first_sources = { }
       }
       local old_userdata
       old_userdata, lpeg.userdata = lpeg.userdata, userdata
@@ -339,7 +345,25 @@ do
         end
         error(concat(errors, "\n\n"), 0)
       end
-      return tree
+      local src_map = { }
+      local src_i = 1
+      local walk_tree
+      walk_tree = function(tree, path)
+        if tree.is_multi then
+          for i, v in ipairs(tree) do
+            if Types.is_node(v) then
+              walk_tree(v, Tuple(i, path))
+            end
+          end
+        end
+        local src, t2 = unpack(userdata.depth_first_sources[src_i])
+        src_i = src_i + 1
+        assert(t2 == tree)
+        src_map[path] = src
+      end
+      walk_tree(tree, Tuple())
+      assert(src_i == #userdata.depth_first_sources + 1)
+      return tree, src_map
     end,
     run = function(self, nomsu_code, compile_fn)
       if compile_fn == nil then
@@ -441,7 +465,10 @@ do
       end
       return run_lua_fn()
     end,
-    tree_to_lua = function(self, tree)
+    tree_to_lua = function(self, tree, path)
+      if path == nil then
+        path = Tuple()
+      end
       local _exp_0 = tree.type
       if "Action" == _exp_0 then
         local stub = tree:get_stub()
@@ -484,7 +511,7 @@ do
             if tok.type == "Word" then
               lua:append(tok.value)
             else
-              local tok_lua = self:tree_to_lua(tok)
+              local tok_lua = self:tree_to_lua(tok, Tuple(i, path))
               if not (tok_lua.is_value) then
                 error("non-expression value inside math expression: " .. tostring(colored.yellow(repr(tok))))
               end
@@ -507,7 +534,7 @@ do
               _continue_0 = true
               break
             end
-            local arg_lua = self:tree_to_lua(tok)
+            local arg_lua = self:tree_to_lua(tok, Tuple(i, path))
             if not (arg_lua.is_value) then
               error("Cannot use:\n" .. tostring(colored.yellow(repr(tok))) .. "\nas an argument to " .. tostring(stub) .. ", since it's not an expression, it produces: " .. tostring(repr(arg_lua)), 0)
             end
@@ -560,14 +587,14 @@ do
             end
             return t.type .. "(" .. table.concat(bits, ", ") .. ")"
           else
-            return t.type .. "(" .. make_tree(t.value) .. ")"
+            return t.type .. "(" .. make_tree(t[1]) .. ")"
           end
         end
-        return Lua.Value(nil, make_tree(tree.value))
+        return Lua.Value(nil, make_tree(tree[1]))
       elseif "Block" == _exp_0 then
         local lua = Lua()
         for i, line in ipairs(tree) do
-          local line_lua = self:tree_to_lua(line)
+          local line_lua = self:tree_to_lua(line, Tuple(i, path))
           if i > 1 then
             lua:append("\n")
           end
@@ -577,10 +604,9 @@ do
       elseif "Text" == _exp_0 then
         local lua = Lua.Value()
         local string_buffer = ""
-        for _index_0 = 1, #tree do
+        for i, bit in ipairs(tree) do
           local _continue_0 = false
           repeat
-            local bit = tree[_index_0]
             if type(bit) == "string" then
               string_buffer = string_buffer .. bit
               _continue_0 = true
@@ -593,7 +619,7 @@ do
               lua:append(repr(string_buffer))
               string_buffer = ""
             end
-            local bit_lua = self:tree_to_lua(bit)
+            local bit_lua = self:tree_to_lua(bit, Tuple(i, path))
             if not (bit_lua.is_value) then
               error("Cannot use " .. tostring(colored.yellow(repr(bit))) .. " as a string interpolation value, since it's not an expression.", 0)
             end
@@ -624,7 +650,7 @@ do
         local lua = Lua.Value(nil, "{")
         local line_length = 0
         for i, item in ipairs(tree) do
-          local item_lua = self:tree_to_lua(item)
+          local item_lua = self:tree_to_lua(item, Tuple(i, path))
           if not (item_lua.is_value) then
             error("Cannot use " .. tostring(colored.yellow(repr(item))) .. " as a list item, since it's not an expression.", 0)
           end
@@ -652,7 +678,7 @@ do
         local lua = Lua.Value(nil, "{")
         local line_length = 0
         for i, entry in ipairs(tree) do
-          local entry_lua = self:tree_to_lua(entry)
+          local entry_lua = self:tree_to_lua(entry, Tuple(i, path))
           lua:append(entry_lua)
           local entry_lua_str = tostring(entry_lua)
           local last_line = entry_lua_str:match("\n([^\n]*)$")
@@ -675,11 +701,11 @@ do
         return lua
       elseif "DictEntry" == _exp_0 then
         local key, value = tree[1], tree[2]
-        local key_lua = self:tree_to_lua(key)
+        local key_lua = self:tree_to_lua(key, Tuple(1, path))
         if not (key_lua.is_value) then
           error("Cannot use " .. tostring(colored.yellow(repr(key))) .. " as a dict key, since it's not an expression.", 0)
         end
-        local value_lua = value and self:tree_to_lua(value) or Lua.Value(nil, "true")
+        local value_lua = value and self:tree_to_lua(value, Tuple(2, path)) or Lua.Value(nil, "true")
         if not (value_lua.is_value) then
           error("Cannot use " .. tostring(colored.yellow(repr(value))) .. " as a dict value, since it's not an expression.", 0)
         end
@@ -692,7 +718,7 @@ do
           return Lua(nil, "[", key_lua, "]=", value_lua)
         end
       elseif "IndexChain" == _exp_0 then
-        local lua = self:tree_to_lua(tree[1])
+        local lua = self:tree_to_lua(tree[1], Tuple(1, path))
         if not (lua.is_value) then
           error("Cannot index " .. tostring(colored.yellow(repr(tree[1]))) .. ", since it's not an expression.", 0)
         end
@@ -702,7 +728,7 @@ do
         end
         for i = 2, #tree do
           local key = tree[i]
-          local key_lua = self:tree_to_lua(key)
+          local key_lua = self:tree_to_lua(key, Tuple(i, path))
           if not (key_lua.is_value) then
             error("Cannot use " .. tostring(colored.yellow(repr(key))) .. " as an index, since it's not an expression.", 0)
           end
@@ -822,7 +848,7 @@ do
       elseif "EscapedNomsu" == _exp_0 then
         local nomsu = self:tree_to_nomsu(tree.value, true)
         if nomsu == nil and not inline then
-          nomsu = self:tree_to_nomsu(tree.value)
+          nomsu = self:tree_to_nomsu(tree[1])
           return nomsu and Nomsu(nil, "\\:\n    ", nomsu)
         end
         return nomsu and Nomsu(nil, "\\(", nomsu, ")")
@@ -1070,16 +1096,13 @@ do
         depth = 0
       end
       coroutine.yield(tree, depth)
-      if not (Types.is_node(tree)) then
-        return 
-      end
       if tree.is_multi then
         for _index_0 = 1, #tree do
           local v = tree[_index_0]
-          self:walk_tree(v, depth + 1)
+          if Types.is_node(v) then
+            self:walk_tree(v, depth + 1)
+          end
         end
-      else
-        return self:walk_tree(v, depth + 1)
       end
     end,
     initialize_core = function(self)

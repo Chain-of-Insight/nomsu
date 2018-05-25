@@ -57,7 +57,7 @@ Tree = function(name, kind, methods)
           return _accum_0
         end)(), ', ')) .. ")"
       end
-      methods.map = function(self, fn)
+      methods._map = function(self, fn)
         do
           local ret = fn(self)
           if ret then
@@ -70,7 +70,7 @@ Tree = function(name, kind, methods)
           local _len_0 = 1
           for _index_0 = 1, #self do
             local v = self[_index_0]
-            _accum_0[_len_0] = v.map and v:map(fn) or v
+            _accum_0[_len_0] = v._map and v:_map(fn) or v
             _len_0 = _len_0 + 1
           end
           new_vals = _accum_0
@@ -82,7 +82,7 @@ Tree = function(name, kind, methods)
       methods.__tostring = function(self)
         return tostring(self.name) .. "(" .. tostring(repr(self.value)) .. ")"
       end
-      methods.map = function(self, fn)
+      methods._map = function(self, fn)
         return fn(self) or self
       end
     end
@@ -96,6 +96,7 @@ Tree = function(name, kind, methods)
   end
 end
 Tree("Block", 'multi')
+Tree("EscapedNomsu", 'multi')
 Tree("Text", 'multi')
 Tree("List", 'multi')
 Tree("Dict", 'multi')
@@ -104,11 +105,6 @@ Tree("IndexChain", 'multi')
 Tree("Number", 'single')
 Tree("Word", 'single')
 Tree("Comment", 'single')
-Tree("EscapedNomsu", 'single', {
-  map = function(self, fn)
-    return fn(self) or self:map(fn)
-  end
-})
 Tree("Var", 'single', {
   as_lua_id = function(self)
     return "_" .. (self.value:gsub("%W", function(c)
