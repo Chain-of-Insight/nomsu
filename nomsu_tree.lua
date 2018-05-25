@@ -103,7 +103,6 @@ Tree("Dict", 'multi')
 Tree("DictEntry", 'multi')
 Tree("IndexChain", 'multi')
 Tree("Number", 'single')
-Tree("Word", 'single')
 Tree("Comment", 'single')
 Tree("Var", 'single', {
   as_lua_id = function(self)
@@ -121,31 +120,29 @@ Tree("Action", 'multi', {
     if include_names == nil then
       include_names = false
     end
-    local bits
     if include_names then
-      do
+      return concat((function()
         local _accum_0 = { }
         local _len_0 = 1
         for _index_0 = 1, #self do
-          local t = self[_index_0]
-          _accum_0[_len_0] = (t.type == "Word" and t.value or "%" .. tostring(t.value))
+          local a = self[_index_0]
+          _accum_0[_len_0] = type(a) == "string" and a or "%" .. tostring(a.value)
           _len_0 = _len_0 + 1
         end
-        bits = _accum_0
-      end
+        return _accum_0
+      end)(), " ")
     else
-      do
+      return concat((function()
         local _accum_0 = { }
         local _len_0 = 1
         for _index_0 = 1, #self do
-          local t = self[_index_0]
-          _accum_0[_len_0] = (t.type == "Word" and t.value or "%")
+          local a = self[_index_0]
+          _accum_0[_len_0] = type(a) == "string" and a or "%"
           _len_0 = _len_0 + 1
         end
-        bits = _accum_0
-      end
+        return _accum_0
+      end)(), " ")
     end
-    return concat(bits, " ")
   end
 })
 return Types

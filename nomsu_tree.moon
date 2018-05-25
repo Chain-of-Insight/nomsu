@@ -56,7 +56,6 @@ Tree "Dict", 'multi'
 Tree "DictEntry", 'multi'
 Tree "IndexChain", 'multi'
 Tree "Number", 'single'
-Tree "Word", 'single'
 Tree "Comment", 'single'
 
 Tree "Var", 'single',
@@ -65,9 +64,9 @@ Tree "Var", 'single',
 
 Tree "Action", 'multi',
     get_stub: (include_names=false)=>
-        bits = if include_names
-            [(t.type == "Word" and t.value or "%#{t.value}") for t in *@]
-        else [(t.type == "Word" and t.value or "%") for t in *@]
-        return concat(bits, " ")
+        if include_names
+            concat [type(a) == "string" and a or "%#{a.value}" for a in *@], " "
+        else
+            concat [type(a) == "string" and a or "%" for a in *@], " "
 
 return Types

@@ -271,7 +271,7 @@ immediately
                 %condition: %func_call.2
                 %action: %func_call.3
             ..
-                assume ((%star and (%star.type is "Word")) and (%star.value is "*")) or barf ".."
+                assume (%star = "*") or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*'
                 assume %condition or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
@@ -279,7 +279,7 @@ immediately
                     lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
                     do next %func_call
 
-                if: (%condition.type is "Word") and (%condition.value is "else")
+                if: %condition = "else"
                     assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
                     to %code write "\nelse\n    "
                     to %code write: %action as lua statements
@@ -315,7 +315,7 @@ immediately
             assume (%func_call.type is "Action") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             with {%star:%func_call.1, %condition:%func_call.2, %action:%func_call.3}
-                assume ((%star and (%star.type is "Word")) and (%star.value is "*")) or barf ".."
+                assume (%star = "*") or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*'
                 assume %condition or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
@@ -323,7 +323,7 @@ immediately
                     lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
                     do next %func_call
 
-                if: (%condition.type is "Word") and (%condition.value is "else")
+                if: %condition = "else"
                     assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
                     to %code write "\nelse\n    "
                     to %code write: %action as lua statements

@@ -433,7 +433,7 @@ class NomsuCompiler
                 stub = tree\get_stub!
                 compile_action = @environment.COMPILE_ACTIONS[stub]
                 if compile_action
-                    args = [arg for arg in *tree when arg.type != "Word"]
+                    args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force all compile-time actions to take a tree location
                     args = [args[p-1] for p in *@environment.ARG_ORDERS[compile_action][stub]]
                     -- Force Lua to avoid tail call optimization for debugging purposes
@@ -448,8 +448,8 @@ class NomsuCompiler
                     -- math expressions like 2*x + 3^2 without having to define a single
                     -- action for every possibility.
                     for i,tok in ipairs tree
-                        if tok.type == "Word"
-                            lua\append tok.value
+                        if type(tok) == 'string'
+                            lua\append tok
                         else
                             tok_lua = @tree_to_lua(tok, Tuple(i, path))
                             unless tok_lua.is_value
@@ -463,7 +463,7 @@ class NomsuCompiler
 
                 args = {}
                 for i, tok in ipairs tree
-                    if tok.type == "Word" then continue
+                    if type(tok) == "string" then continue
                     arg_lua = @tree_to_lua(tok, Tuple(i, path))
                     unless arg_lua.is_value
                         error "Cannot use:\n#{colored.yellow repr(tok)}\nas an argument to #{stub}, since it's not an expression, it produces: #{repr arg_lua}", 0
@@ -625,9 +625,6 @@ class NomsuCompiler
             when "Var"
                 Lua.Value(nil, tree\as_lua_id!)
             
-            when "Word"
-                error("Cannot convert a Word to lua")
-            
             when "Comment"
                 Lua(nil, "--"..tree.value\gsub("\n","\n--").."\n")
             
@@ -641,10 +638,10 @@ class NomsuCompiler
                 if inline
                     nomsu = Nomsu!
                     for i,bit in ipairs tree
-                        if bit.type == "Word"
+                        if type(bit) == "string"
                             if i > 1
                                 nomsu\append " "
-                            nomsu\append bit.value
+                            nomsu\append bit
                         else
                             arg_nomsu = @tree_to_nomsu(bit,true)
                             return nil unless arg_nomsu
@@ -660,8 +657,8 @@ class NomsuCompiler
                     -- TODO: track line length as we go and use 80-that instead of 80 for wrapping
                     last_colon = nil
                     for i,bit in ipairs tree
-                        if bit.type == "Word"
-                            nomsu\append next_space, bit.value
+                        if type(bit) == "string"
+                            nomsu\append next_space, bit
                             next_space = " "
                         else
                             arg_nomsu = if last_colon == i-1 and bit.type == "Action" then nil
@@ -736,7 +733,7 @@ class NomsuCompiler
                         else
                             interp_nomsu = @tree_to_nomsu(bit, true)
                             if interp_nomsu
-                                if bit.type != "Word" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
+                                if bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
                                     interp_nomsu\parenthesize!
                                 nomsu\append "\\", interp_nomsu
                             else return nil
@@ -753,7 +750,7 @@ class NomsuCompiler
                         else
                             interp_nomsu = @tree_to_nomsu(bit, true)
                             if interp_nomsu
-                                if bit.type != "Word" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
+                                if bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
                                     interp_nomsu\parenthesize!
                                 nomsu\append "\\", interp_nomsu
                             else
@@ -864,9 +861,6 @@ class NomsuCompiler
 
             when "Var"
                 return Nomsu(nil, "%", tree.value)
-
-            when "Word"
-                return Nomsu(nil, tree.value)
 
             when "Comment"
                 return nil if inline

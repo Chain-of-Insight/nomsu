@@ -480,7 +480,7 @@ do
             local _len_0 = 1
             for _index_0 = 1, #tree do
               local arg = tree[_index_0]
-              if arg.type ~= "Word" then
+              if type(arg) ~= "string" then
                 _accum_0[_len_0] = arg
                 _len_0 = _len_0 + 1
               end
@@ -508,8 +508,8 @@ do
         local lua = Lua.Value()
         if not action and math_expression:match(stub) then
           for i, tok in ipairs(tree) do
-            if tok.type == "Word" then
-              lua:append(tok.value)
+            if type(tok) == 'string' then
+              lua:append(tok)
             else
               local tok_lua = self:tree_to_lua(tok, Tuple(i, path))
               if not (tok_lua.is_value) then
@@ -530,7 +530,7 @@ do
         for i, tok in ipairs(tree) do
           local _continue_0 = false
           repeat
-            if tok.type == "Word" then
+            if type(tok) == "string" then
               _continue_0 = true
               break
             end
@@ -749,8 +749,6 @@ do
         return Lua.Value(nil, tostring(tree.value))
       elseif "Var" == _exp_0 then
         return Lua.Value(nil, tree:as_lua_id())
-      elseif "Word" == _exp_0 then
-        return error("Cannot convert a Word to lua")
       elseif "Comment" == _exp_0 then
         return Lua(nil, "--" .. tree.value:gsub("\n", "\n--") .. "\n")
       else
@@ -769,11 +767,11 @@ do
         if inline then
           local nomsu = Nomsu()
           for i, bit in ipairs(tree) do
-            if bit.type == "Word" then
+            if type(bit) == "string" then
               if i > 1 then
                 nomsu:append(" ")
               end
-              nomsu:append(bit.value)
+              nomsu:append(bit)
             else
               local arg_nomsu = self:tree_to_nomsu(bit, true)
               if not (arg_nomsu) then
@@ -794,8 +792,8 @@ do
           local next_space = ""
           local last_colon = nil
           for i, bit in ipairs(tree) do
-            if bit.type == "Word" then
-              nomsu:append(next_space, bit.value)
+            if type(bit) == "string" then
+              nomsu:append(next_space, bit)
               next_space = " "
             else
               local arg_nomsu
@@ -889,7 +887,7 @@ do
             else
               local interp_nomsu = self:tree_to_nomsu(bit, true)
               if interp_nomsu then
-                if bit.type ~= "Word" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
+                if bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
                   interp_nomsu:parenthesize()
                 end
                 nomsu:append("\\", interp_nomsu)
@@ -912,7 +910,7 @@ do
             else
               local interp_nomsu = self:tree_to_nomsu(bit, true)
               if interp_nomsu then
-                if bit.type ~= "Word" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
+                if bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
                   interp_nomsu:parenthesize()
                 end
                 nomsu:append("\\", interp_nomsu)
@@ -1073,8 +1071,6 @@ do
         return Nomsu(nil, tostring(tree.value))
       elseif "Var" == _exp_0 then
         return Nomsu(nil, "%", tree.value)
-      elseif "Word" == _exp_0 then
-        return Nomsu(nil, tree.value)
       elseif "Comment" == _exp_0 then
         if inline then
           return nil
