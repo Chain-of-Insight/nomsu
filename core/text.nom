@@ -27,7 +27,7 @@ lua> ".."
         };
         for name, e in pairs(escapes) do
             local lua = "'"..e.."'";
-            nomsu:define_compile_action(name, function(tree) return Lua.Value(nil, lua); end);
+            nomsu:define_compile_action(name, function(tree) return Lua.Value(tree.value, lua); end);
         end
         local colors = {
             ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
@@ -42,9 +42,9 @@ lua> ".."
         for name, c in pairs(colors) do
             local color = "'"..c.."'";
             local reset = "'"..colors["reset color"].."'";
-            nomsu:define_compile_action(name, function(tree) return Lua.Value(nil, color); end);
+            nomsu:define_compile_action(name, function(tree) return Lua.Value(tree.value, color); end);
             nomsu:define_compile_action(name.." %", function(\%)
-                return Lua.Value(nil, color, "..", \(% as lua), "..", reset);
+                return Lua.Value(tree.value, color, "..", \(% as lua), "..", reset);
             end);
         end
     end

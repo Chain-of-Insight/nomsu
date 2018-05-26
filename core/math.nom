@@ -42,7 +42,7 @@ compile [all of %items, all %items] to
     unless: (%items' "type") is "List"
         return: Lua value "utils.all(\(%items as lua expr))"
     %clauses <- []
-    for % in %items
+    for % in %items.value
         lua> "table.insert(\%clauses, \(% as lua expr));"
     return: Lua value "(\(%clauses joined with " and "))"
 parse [not all of %items, not all %items] as: not (all of %items)
@@ -50,7 +50,7 @@ compile [any of %items, any %items] to
     unless: (%items' "type") is "List"
         return: Lua value "utils.any(\(%items as lua expr))"
     %clauses <- []
-    for % in %items
+    for % in %items.value
         lua> "table.insert(\%clauses, \(% as lua expr));"
     return: Lua value "(\(%clauses joined with " or "))"
 parse [none of %items, none %items] as: not (any of %items)
@@ -58,14 +58,14 @@ compile [sum of %items, sum %items] to
     unless: (%items' "type") is "List"
         return: Lua value "utils.sum(\(%items as lua expr))"
     %clauses <- []
-    for % in %items
+    for % in %items.value
         lua> "table.insert(\%clauses, \(% as lua expr));"
     return: Lua value "(\(%clauses joined with " + "))"
 compile [product of %items, product %items] to
     unless: (%items' "type") is "List"
         return: Lua value "utils.product(\(%items as lua expr))"
     %clauses <- []
-    for % in %items
+    for % in %items.value
         lua> "table.insert(\%clauses, \(% as lua expr));"
     return: Lua value "(\(%clauses joined with " * "))"
 action [avg of %items, average of %items]

@@ -28,18 +28,18 @@ immediately
             local safe = {Text=true, Number=true}
             local a_lua, b_lua = \(%a as lua), \(%b as lua)
             if safe[\%a.type] or safe[\%b.type] then
-                return Lua.Value(nil, "(", a_lua, " == ", b_lua, ")")
+                return Lua.Value(tree.source, "(", a_lua, " == ", b_lua, ")")
             else
-                return Lua.Value(nil, "utils.equivalent(", a_lua, ", ", b_lua, ")")
+                return Lua.Value(tree.source, "utils.equivalent(", a_lua, ", ", b_lua, ")")
             end
     compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
         lua> ".."
             local safe = {Text=true, Number=true}
             local a_lua, b_lua = \(%a as lua), \(%b as lua)
             if safe[\%a.type] or safe[\%b.type] then
-                return Lua.Value(nil, "(", a_lua, " ~= ", b_lua, ")")
+                return Lua.Value(tree.source, "(", a_lua, " ~= ", b_lua, ")")
             else
-                return Lua.Value(nil, "(not utils.equivalent(", a_lua, ", ", b_lua, "))")
+                return Lua.Value(tree.source, "(not utils.equivalent(", a_lua, ", ", b_lua, "))")
             end
     # For strict identity checking, use (%x's id) is (%y's id)
     compile [%'s id, id of %] to: Lua value "nomsu.ids[\(% as lua expr)]"
@@ -52,7 +52,7 @@ immediately
         lua> "local \%value_lua = \(%value as lua);"
         assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
         lua> ".."
-            local lua = Lua(nil, \%var_lua, ' = ', \%value_lua, ';')
+            local lua = Lua(tree.source, \%var_lua, ' = ', \%value_lua, ';')
             if \%var.type == 'Var' then
                 lua:add_free_vars({\%var})
             end
@@ -64,9 +64,9 @@ immediately
         assume ((%assignments' "type") is "Dict") or barf ".."
             Expected a Dict for the assignments part of '<- %' statement, not \%assignments
         lua> ".."
-            local lhs, rhs = Lua(), Lua()
-            for i, item in ipairs(\%assignments) do
-                local \%target, \%value = item[1], item[2]
+            local lhs, rhs = Lua(tree.source), Lua(tree.source)
+            for i, item in ipairs(\%assignments.value) do
+                local \%target, \%value = item.value[1], item.value[2]
                 local target_lua = \(%target as lua)
                 if not target_lua.is_value then error("Invalid target for assignment: "..\(%target as text)) end
                 local value_lua = \(%value as lua)
@@ -81,7 +81,7 @@ immediately
                 lhs:append(target_lua)
                 rhs:append(value_lua)
             end
-            return Lua(nil, lhs, " = ", rhs, ";")
+            return Lua(tree.source, lhs, " = ", rhs, ";")
 
 immediately
     compile [external %var <- %value] to
@@ -89,20 +89,20 @@ immediately
         assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
         %value_lua <- (%value as lua)
         assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
-        return: Lua "\(%var_lua) = \(%value_lua);"
+        return: Lua "\%var_lua = \%value_lua;"
 
     compile [with external %externs %body] to
         %body_lua <- (%body as lua statements)
-        lua> "\%body_lua:remove_free_vars(\(%externs));"
+        lua> "\%body_lua:remove_free_vars(\%externs.value);"
         return %body_lua
 
     compile [with %assignments %body] to
         %lua <- (%body as lua statements)
         lua> ".."
-            local lhs, rhs = Lua(), Lua()
+            local lhs, rhs = Lua(tree.source), Lua(tree.source)
             local vars = {}
-            for i, item in ipairs(\%assignments) do
-                local \%target, \%value = item[1], item[2]
+            for i, item in ipairs(\%assignments.value) do
+                local \%target, \%value = item.value[1], item.value[2]
                 if not \%target.type == "Var" then
                     error("Invalid target for 'with' assignment: "..tostring(\%target))
                 end

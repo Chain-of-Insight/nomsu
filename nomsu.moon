@@ -200,9 +200,14 @@ NOMSU_DEFS = with {}
         return true
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
-    make_node = (src, ...)->
-        tree = Types[key](...)
-        insert lpeg.userdata.depth_first_sources, {src, tree}
+    make_node = (start, ...)->
+        args = {...}
+        stop = args[#args]
+        source = lpeg.userdata.source\sub(start, stop)
+        args[#args] = nil
+        tree = if Types[key].is_multi
+            Types[key](Tuple(unpack(args)), source)
+        else Types[key](args[1], source)
         return tree
     self[key] = make_node
     return make_node
@@ -217,7 +222,7 @@ NOMSU_PATTERN = do
     anon_def <- ({ident} (" "*) ":"
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
     captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3) -> %2)"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {}) -> %2)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]]
@@ -314,7 +319,7 @@ class NomsuCompiler
             stub = assert(stub_pattern\match(alias))
             stub_args = assert(var_pattern\match(alias))
             (is_compile_action and @environment.COMPILE_ACTIONS or @environment.ACTIONS)[stub] = fn
-            arg_orders[stub] = [fn_arg_positions[Types.Var(a)\as_lua_id!] for a in *stub_args]
+            arg_orders[stub] = [fn_arg_positions[Types.Var.as_lua_id {value:a}] for a in *stub_args]
         @environment.ARG_ORDERS[fn] = arg_orders
 
     define_compile_action: (signature, fn)=>
@@ -329,7 +334,7 @@ class NomsuCompiler
             nomsu_code = Nomsu(filename, nomsu_code)
         userdata = {
             source_code:nomsu_code, indent_stack: {""}, errors: {},
-            depth_first_sources: {},
+            source: nomsu_code.source,
         }
 
         old_userdata, lpeg.userdata = lpeg.userdata, userdata
@@ -344,21 +349,7 @@ class NomsuCompiler
             errors = [userdata.errors[k] for k in *keys]
             error(concat(errors, "\n\n"), 0)
         
-        src_map = {}
-        src_i = 1
-        walk_tree = (tree, path)->
-            if tree.is_multi
-                for i, v in ipairs tree
-                    if Types.is_node(v)
-                        walk_tree(v, Tuple(i, path))
-            src, t2 = unpack(userdata.depth_first_sources[src_i])
-            src_i += 1
-            assert t2 == tree
-            src_map[path] = src
-        walk_tree tree, Tuple!
-        assert src_i == #userdata.depth_first_sources + 1
-
-        return tree, src_map
+        return tree
 
     run: (nomsu_code, compile_fn=nil)=>
         if #tostring(nomsu_code) == 0 then return nil
@@ -427,13 +418,13 @@ class NomsuCompiler
 
     MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
     math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
-    tree_to_lua: (tree, path=Tuple!)=>
+    tree_to_lua: (tree)=>
         switch tree.type
             when "Action"
                 stub = tree\get_stub!
                 compile_action = @environment.COMPILE_ACTIONS[stub]
                 if compile_action
-                    args = [arg for arg in *tree when type(arg) != "string"]
+                    args = [arg for arg in *tree.value when type(arg) != "string"]
                     -- Force all compile-time actions to take a tree location
                     args = [args[p-1] for p in *@environment.ARG_ORDERS[compile_action][stub]]
                     -- Force Lua to avoid tail call optimization for debugging purposes
@@ -442,29 +433,29 @@ class NomsuCompiler
                     if not ret then error("Failed to produce any Lua")
                     return ret
                 action = rawget(@environment.ACTIONS, stub)
-                lua = Lua.Value!
+                lua = Lua.Value(tree.source)
                 if not action and math_expression\match(stub)
                     -- This is a bit of a hack, but this code handles arbitrarily complex
                     -- math expressions like 2*x + 3^2 without having to define a single
                     -- action for every possibility.
-                    for i,tok in ipairs tree
+                    for i,tok in ipairs tree.value
                         if type(tok) == 'string'
                             lua\append tok
                         else
-                            tok_lua = @tree_to_lua(tok, Tuple(i, path))
+                            tok_lua = @tree_to_lua(tok)
                             unless tok_lua.is_value
                                 error("non-expression value inside math expression: #{colored.yellow repr(tok)}")
                             if tok.type == "Action"
                                 tok_lua\parenthesize!
                             lua\append tok_lua
-                        if i < #tree
+                        if i < #tree.value
                             lua\append " "
                     return lua
 
                 args = {}
-                for i, tok in ipairs tree
+                for i, tok in ipairs tree.value
                     if type(tok) == "string" then continue
-                    arg_lua = @tree_to_lua(tok, Tuple(i, path))
+                    arg_lua = @tree_to_lua(tok)
                     unless arg_lua.is_value
                         error "Cannot use:\n#{colored.yellow repr(tok)}\nas an argument to #{stub}, since it's not an expression, it produces: #{repr arg_lua}", 0
                     insert args, arg_lua
@@ -486,25 +477,25 @@ class NomsuCompiler
                     if type(t) != 'userdata'
                         return repr(t)
                     if t.is_multi
-                        bits = [make_tree(bit) for bit in *t]
-                        return t.type.."("..table.concat(bits, ", ")..")"
+                        bits = [make_tree(bit) for bit in *t.value]
+                        return t.type.."(Tuple("..table.concat(bits, ", ").."), "..repr(t.source)..")"
                     else
-                        return t.type.."("..make_tree(t[1])..")"
-                Lua.Value nil, make_tree(tree[1])
+                        return t.type.."("..repr(t.value)..", "..repr(t.source)..")"
+                Lua.Value tree.source, make_tree(tree.value[1])
             
             when "Block"
-                lua = Lua!
-                for i,line in ipairs tree
-                    line_lua = @tree_to_lua(line, Tuple(i, path))
+                lua = Lua(tree.source)
+                for i,line in ipairs tree.value
+                    line_lua = @tree_to_lua(line)
                     if i > 1
                         lua\append "\n"
                     lua\append line_lua\as_statements!
                 return lua
 
             when "Text"
-                lua = Lua.Value!
+                lua = Lua.Value(tree.source)
                 string_buffer = ""
-                for i, bit in ipairs tree
+                for i, bit in ipairs tree.value
                     if type(bit) == "string"
                         string_buffer ..= bit
                         continue
@@ -512,12 +503,12 @@ class NomsuCompiler
                         if #lua.bits > 0 then lua\append ".."
                         lua\append repr(string_buffer)
                         string_buffer = ""
-                    bit_lua = @tree_to_lua(bit, Tuple(i, path))
+                    bit_lua = @tree_to_lua(bit)
                     unless bit_lua.is_value
                         error "Cannot use #{colored.yellow repr(bit)} as a string interpolation value, since it's not an expression.", 0
                     if #lua.bits > 0 then lua\append ".."
                     if bit.type != "Text"
-                        bit_lua = Lua.Value(nil, "stringify(",bit_lua,")")
+                        bit_lua = Lua.Value(bit.source, "stringify(",bit_lua,")")
                     lua\append bit_lua
 
                 if string_buffer ~= "" or #lua.bits == 0
@@ -529,10 +520,10 @@ class NomsuCompiler
                 return lua
 
             when "List"
-                lua = Lua.Value nil, "{"
+                lua = Lua.Value tree.source, "{"
                 line_length = 0
-                for i, item in ipairs tree
-                    item_lua = @tree_to_lua(item, Tuple(i, path))
+                for i, item in ipairs tree.value
+                    item_lua = @tree_to_lua(item)
                     unless item_lua.is_value
                         error "Cannot use #{colored.yellow repr(item)} as a list item, since it's not an expression.", 0
                     lua\append item_lua
@@ -542,7 +533,7 @@ class NomsuCompiler
                         line_length = #last_line
                     else
                         line_length += #last_line
-                    if i < #tree
+                    if i < #tree.value
                         if line_length >= MAX_LINE
                             lua\append ",\n  "
                             line_length = 0
@@ -553,10 +544,10 @@ class NomsuCompiler
                 return lua
 
             when "Dict"
-                lua = Lua.Value nil, "{"
+                lua = Lua.Value tree.source, "{"
                 line_length = 0
-                for i, entry in ipairs tree
-                    entry_lua = @tree_to_lua(entry, Tuple(i, path))
+                for i, entry in ipairs tree.value
+                    entry_lua = @tree_to_lua(entry)
                     lua\append entry_lua
                     entry_lua_str = tostring(entry_lua)
                     -- TODO: maybe make this more accurate? It's only a heuristic, so eh...
@@ -565,7 +556,7 @@ class NomsuCompiler
                         line_length = #last_line
                     else
                         line_length += #entry_lua_str
-                    if i < #tree
+                    if i < #tree.value
                         if line_length >= MAX_LINE
                             lua\append ",\n  "
                             line_length = 0
@@ -576,35 +567,35 @@ class NomsuCompiler
                 return lua
 
             when "DictEntry"
-                key, value = tree[1], tree[2]
-                key_lua = @tree_to_lua(key, Tuple(1, path))
+                key, value = tree.value[1], tree.value[2]
+                key_lua = @tree_to_lua(key)
                 unless key_lua.is_value
                     error "Cannot use #{colored.yellow repr(key)} as a dict key, since it's not an expression.", 0
-                value_lua = value and @tree_to_lua(value, Tuple(2, path)) or Lua.Value(nil, "true")
+                value_lua = value and @tree_to_lua(value) or Lua.Value(key.source, "true")
                 unless value_lua.is_value
                     error "Cannot use #{colored.yellow repr(value)} as a dict value, since it's not an expression.", 0
                 key_str = tostring(key_lua)\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                 return if key_str
-                    Lua nil, key_str,"=",value_lua
+                    Lua tree.source, key_str,"=",value_lua
                 elseif tostring(key_lua)\sub(1,1) == "["
                     -- NOTE: this *must* use a space after the [ to avoid freaking out
                     -- Lua's parser if the inner expression is a long string. Lua
                     -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                    Lua nil, "[ ",key_lua,"]=",value_lua
+                    Lua tree.source, "[ ",key_lua,"]=",value_lua
                 else
-                    Lua nil, "[",key_lua,"]=",value_lua
+                    Lua tree.source, "[",key_lua,"]=",value_lua
             
             when "IndexChain"
-                lua = @tree_to_lua(tree[1], Tuple(1, path))
+                lua = @tree_to_lua(tree.value[1])
                 unless lua.is_value
-                    error "Cannot index #{colored.yellow repr(tree[1])}, since it's not an expression.", 0
+                    error "Cannot index #{colored.yellow repr(tree.value[1])}, since it's not an expression.", 0
                 first_char = tostring(lua)\sub(1,1)
                 if first_char == "{" or first_char == '"' or first_char == "["
                     lua\parenthesize!
 
-                for i=2,#tree
-                    key = tree[i]
-                    key_lua = @tree_to_lua(key, Tuple(i, path))
+                for i=2,#tree.value
+                    key = tree.value[i]
+                    key_lua = @tree_to_lua(key)
                     unless key_lua.is_value
                         error "Cannot use #{colored.yellow repr(key)} as an index, since it's not an expression.", 0
                     key_lua_str = tostring(key_lua)
@@ -620,13 +611,10 @@ class NomsuCompiler
                 return lua
 
             when "Number"
-                Lua.Value(nil, tostring(tree.value))
+                Lua.Value(tree.source, tostring(tree.value))
 
             when "Var"
-                Lua.Value(nil, tree\as_lua_id!)
-            
-            when "Comment"
-                Lua(nil, "--"..tree.value\gsub("\n","\n--").."\n")
+                Lua.Value(tree.source, tree\as_lua_id!)
             
             else
                 error("Unknown type: #{tree.type}")
@@ -636,8 +624,8 @@ class NomsuCompiler
         switch tree.type
             when "Action"
                 if inline
-                    nomsu = Nomsu!
-                    for i,bit in ipairs tree
+                    nomsu = Nomsu(tree.source)
+                    for i,bit in ipairs tree.value
                         if type(bit) == "string"
                             if i > 1
                                 nomsu\append " "
@@ -652,11 +640,11 @@ class NomsuCompiler
                             nomsu\append arg_nomsu
                     return nomsu
                 else
-                    nomsu = Nomsu!
+                    nomsu = Nomsu(tree.source)
                     next_space = ""
                     -- TODO: track line length as we go and use 80-that instead of 80 for wrapping
                     last_colon = nil
-                    for i,bit in ipairs tree
+                    for i,bit in ipairs tree.value
                         if type(bit) == "string"
                             nomsu\append next_space, bit
                             next_space = " "
@@ -683,9 +671,9 @@ class NomsuCompiler
                                 -- These types carry their own indentation
                                 if bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
                                     if i == 1
-                                        arg_nomsu = Nomsu(nil, "(..)\n    ", arg_nomsu)
+                                        arg_nomsu = Nomsu(bit.source, "(..)\n    ", arg_nomsu)
                                     else
-                                        arg_nomsu = Nomsu(nil, "\n    ", arg_nomsu)
+                                        arg_nomsu = Nomsu(bit.source, "\n    ", arg_nomsu)
                                 
                                 if last_colon == i-1 and (bit.type == "Action" or bit.type == "Block")
                                     next_space = ""
@@ -699,21 +687,21 @@ class NomsuCompiler
             when "EscapedNomsu"
                 nomsu = @tree_to_nomsu(tree.value, true)
                 if nomsu == nil and not inline
-                    nomsu = @tree_to_nomsu(tree[1])
-                    return nomsu and Nomsu nil, "\\:\n    ", nomsu
-                return nomsu and Nomsu nil, "\\(", nomsu, ")"
+                    nomsu = @tree_to_nomsu(tree.value[1])
+                    return nomsu and Nomsu tree.source, "\\:\n    ", nomsu
+                return nomsu and Nomsu tree.source, "\\(", nomsu, ")"
 
             when "Block"
                 if inline
-                    nomsu = Nomsu!
-                    for i,line in ipairs @
+                    nomsu = Nomsu(tree.source)
+                    for i,line in ipairs tree.value
                         if i > 1
                             nomsu\append "; "
                         line_nomsu = @tree_to_nomsu(line,true)
                         return nil unless line_nomsu
                         nomsu\append line_nomsu
                     return nomsu
-                nomsu = Nomsu!
+                nomsu = Nomsu(tree.source)
                 for i, line in ipairs @
                     line = assert(@tree_to_nomsu(line, nil, true), "Could not convert line to nomsu")
                     nomsu\append line
@@ -725,8 +713,8 @@ class NomsuCompiler
 
             when "Text"
                 if inline
-                    nomsu = Nomsu(nil, '"')
-                    for bit in *tree
+                    nomsu = Nomsu(tree.source, '"')
+                    for bit in *tree.value
                         if type(bit) == 'string'
                             -- TODO: unescape better?
                             nomsu\append (bit\gsub("\\","\\\\")\gsub("\n","\\n"))
@@ -743,7 +731,7 @@ class NomsuCompiler
                     inline_version = @tree_to_nomsu(tree, true)
                     if inline_version and #inline_version <= MAX_LINE
                         return inline_version
-                    nomsu = Nomsu(nil, '".."\n    ')
+                    nomsu = Nomsu(tree.source, '".."\n    ')
                     for i, bit in ipairs @
                         if type(bit) == 'string'
                             nomsu\append (bit\gsub("\\","\\\\")\gsub("\n","\n    "))
@@ -763,8 +751,8 @@ class NomsuCompiler
 
             when "List"
                 if inline
-                    nomsu = Nomsu(nil, "[")
-                    for i, item in ipairs tree
+                    nomsu = Nomsu(tree.source, "[")
+                    for i, item in ipairs tree.value
                         item_nomsu = @tree_to_nomsu(item, true)
                         return nil unless item_nomsu
                         if i > 1
@@ -776,9 +764,9 @@ class NomsuCompiler
                     inline_version = @tree_to_nomsu(tree, true)
                     if inline_version and #inline_version <= MAX_LINE
                         return inline_version
-                    nomsu = Nomsu(nil, "[..]")
-                    line = Nomsu(nil, "\n    ")
-                    for item in *tree
+                    nomsu = Nomsu(tree.source, "[..]")
+                    line = Nomsu(tree.source, "\n    ")
+                    for item in *tree.value
                         item_nomsu = @tree_to_nomsu(item, true)
                         if item_nomsu and #line + #", " + #item_nomsu <= MAX_LINE
                             if #line.bits > 1
@@ -790,7 +778,7 @@ class NomsuCompiler
                                 return nil unless item_nomsu
                             if #line.bits > 1
                                 nomsu\append line
-                                line = Nomsu(nil, "\n    ")
+                                line = Nomsu(line.source, "\n    ")
                             line\append item_nomsu
                     if #line.bits > 1
                         nomsu\append line
@@ -798,8 +786,8 @@ class NomsuCompiler
             
             when "Dict"
                 if inline
-                    nomsu = Nomsu(nil, "{")
-                    for i, entry in ipairs tree
+                    nomsu = Nomsu(tree.source, "{")
+                    for i, entry in ipairs tree.value
                         entry_nomsu = @tree_to_nomsu(entry, true)
                         return nil unless entry_nomsu
                         if i > 1
@@ -810,9 +798,9 @@ class NomsuCompiler
                 else
                     inline_version = @tree_to_nomsu(tree, true)
                     if inline_version then return inline_version
-                    nomsu = Nomsu(nil, "{..}")
-                    line = Nomsu(nil, "\n    ")
-                    for entry in *tree
+                    nomsu = Nomsu(tree.source, "{..}")
+                    line = Nomsu(tree.source, "\n    ")
+                    for entry in *tree.value
                         entry_nomsu = @tree_to_nomsu(entry)
                         return nil unless entry_nomsu
                         if #line + #tostring(entry_nomsu) <= MAX_LINE
@@ -822,31 +810,31 @@ class NomsuCompiler
                         else
                             if #line.bits > 1
                                 nomsu\append line
-                                line = Nomsu(nil, "\n    ")
+                                line = Nomsu(line.source, "\n    ")
                             line\append entry_nomsu
                     if #line.bits > 1
                         nomsu\append line
                     return nomsu
             
             when "DictEntry"
-                key, value = tree[1], tree[2]
+                key, value = tree.value[1], tree.value[2]
                 key_nomsu = @tree_to_nomsu(key, true)
                 return nil unless key_nomsu
                 if key.type == "Action" or key.type == "Block"
                     key_nomsu\parenthesize!
                 value_nomsu = if value
                     @tree_to_nomsu(value, true)
-                else Nomsu(nil, "")
+                else Nomsu(tree.source, "")
                 if inline and not value_nomsu then return nil
                 if not value_nomsu
                     return nil if inline
                     value_nomsu = @tree_to_nomsu(value)
                     return nil unless value_nomsu
-                return Nomsu nil, key_nomsu, ":", value_nomsu
+                return Nomsu tree.source, key_nomsu, ":", value_nomsu
             
             when "IndexChain"
-                nomsu = Nomsu!
-                for i, bit in ipairs tree
+                nomsu = Nomsu(tree.source)
+                for i, bit in ipairs tree.value
                     if i > 1
                         nomsu\append "."
                     bit_nomsu = @tree_to_nomsu(bit, true)
@@ -857,14 +845,14 @@ class NomsuCompiler
                 return nomsu
             
             when "Number"
-                return Nomsu(nil, tostring(tree.value))
+                return Nomsu(tree.source, tostring(tree.value))
 
             when "Var"
-                return Nomsu(nil, "%", tree.value)
+                return Nomsu(tree.source, "%", tree.value)
 
             when "Comment"
                 return nil if inline
-                return Nomsu(nil, "#", tree.value\gsub("\n", "\n    "))
+                return Nomsu(tree.source, "#", tree.value\gsub("\n", "\n    "))
             
             else
                 error("Unknown type: #{tree.type}")
@@ -873,13 +861,13 @@ class NomsuCompiler
         -- Special case for text literals
         if tree.type == 'Text' and #tree == 1 and type(tree[1]) == 'string'
             return tree[1]
-        lua = Lua(nil, "return ",@tree_to_lua(tree),";")
+        lua = Lua(tree.source, "return ",@tree_to_lua(tree),";")
         return @run_lua(lua)
 
     walk_tree: (tree, depth=0)=>
         coroutine.yield(tree, depth)
         if tree.is_multi
-            for v in *tree
+            for v in *tree.value
                 if Types.is_node(v)
                     @walk_tree(v, depth+1)
 
@@ -890,13 +878,13 @@ class NomsuCompiler
             lua = nomsu\tree_to_lua(_block)\as_statements!
             lua\declare_locals!
             nomsu\run_lua(lua)
-            return Lua(nil, "if IMMEDIATE then\n    ", lua, "\nend")
+            return Lua(_block.source, "if IMMEDIATE then\n    ", lua, "\nend")
 
         add_lua_string_bits = (lua, code)->
             if code.type != "Text"
                 lua\append ", ", nomsu\tree_to_lua(code)
                 return
-            for bit in *code
+            for bit in *code.value
                 lua\append ", "
                 if type(bit) == "string"
                     lua\append repr(bit)
@@ -907,19 +895,19 @@ class NomsuCompiler
                     lua\append bit_lua
 
         @define_compile_action "Lua %code", (_code)=>
-            lua = Lua.Value(nil, "Lua(nil")
+            lua = Lua.Value(_code.source, "Lua(", repr(_code.source))
             add_lua_string_bits(lua, _code)
             lua\append ")"
             return lua
 
         @define_compile_action "Lua value %code", (_code)=>
-            lua = Lua.Value(nil, "Lua.Value(nil")
+            lua = Lua.Value(_code.source, "Lua.Value(", repr(_code.source))
             add_lua_string_bits(lua, _code)
             lua\append ")"
             return lua
 
         add_lua_bits = (lua, code)->
-            for bit in *code
+            for bit in *code.value
                 if type(bit) == "string"
                     lua\append bit
                 else
@@ -931,18 +919,18 @@ class NomsuCompiler
 
         @define_compile_action "lua> %code", (_code)=>
             if _code.type != "Text"
-                return Lua nil, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ");"
-            return add_lua_bits(Lua!, _code)
+                return Lua @source, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ");"
+            return add_lua_bits(Lua(@source), _code)
 
         @define_compile_action "=lua %code", (_code)=>
             if _code.type != "Text"
-                return Lua.Value nil, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ":as_statements('return '))"
-            return add_lua_bits(Lua.Value!, _code)
+                return Lua.Value @source, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ":as_statements('return '))"
+            return add_lua_bits(Lua.Value(@source), _code)
 
         @define_compile_action "use %path", (_path)=>
             path = nomsu\tree_to_value(_path)
             nomsu\run_file(path)
-            return Lua(nil, "nomsu:run_file(#{repr path});")
+            return Lua(_path.source, "nomsu:run_file(#{repr path});")
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug_getinfo(2).func != require

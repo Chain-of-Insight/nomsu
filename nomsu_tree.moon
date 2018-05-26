@@ -18,9 +18,11 @@ Tree = (name, kind, methods)->
     assert((kind == 'single') or (kind == 'multi'))
     is_multi = (kind == 'multi')
     with methods
-        .with_value = (value)=> getmetatable(self)(value)
         .type = name
         .name = name
+        .__new = (value, source)=>
+            assert source
+            return value, source
         .is_multi = is_multi
         .map = (fn)=>
             if type(fn) == 'table'
@@ -31,22 +33,20 @@ Tree = (name, kind, methods)->
                 fn = (k)-> _replacements[k]
             return @_map(fn)
         if is_multi
-            .__tostring = => "#{@name}(#{table.concat [repr(v) for v in *@], ', '})"
+            .__tostring = => "#{@name}(#{table.concat [repr(v) for v in *@value], ', '})"
             ._map = (fn)=>
                 if ret = fn(@)
                     return ret
-                new_vals = [v._map and v\_map(fn) or v for v in *@]
-                ret = getmetatable(self)(unpack(new_vals))
+                new_vals = [v._map and v\_map(fn) or v for v in *@value]
+                ret = getmetatable(self)(Tuple(unpack(new_vals)), @source)
                 return ret
+            .__ipairs = => error!
         else
             .__tostring = => "#{@name}(#{repr(@value)})"
             ._map = (fn)=>
                 fn(@) or @
 
-    if is_multi
-        Types[name] = immutable nil, methods
-    else
-        Types[name] = immutable {"value"}, methods
+    Types[name] = immutable {"value", "source"}, methods
 
 Tree "Block", 'multi'
 Tree "EscapedNomsu", 'multi'
@@ -65,8 +65,8 @@ Tree "Var", 'single',
 Tree "Action", 'multi',
     get_stub: (include_names=false)=>
         if include_names
-            concat [type(a) == "string" and a or "%#{a.value}" for a in *@], " "
+            concat [type(a) == "string" and a or "%#{a.value}" for a in *@value], " "
         else
-            concat [type(a) == "string" and a or "%" for a in *@], " "
+            concat [type(a) == "string" and a or "%" for a in *@value], " "
 
 return Types

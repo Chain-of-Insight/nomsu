@@ -23,11 +23,12 @@ Tree = function(name, kind, methods)
   assert((kind == 'single') or (kind == 'multi'))
   local is_multi = (kind == 'multi')
   do
-    methods.with_value = function(self, value)
-      return getmetatable(self)(value)
-    end
     methods.type = name
     methods.name = name
+    methods.__new = function(self, value, source)
+      assert(source)
+      return value, source
+    end
     methods.is_multi = is_multi
     methods.map = function(self, fn)
       if type(fn) == 'table' then
@@ -49,8 +50,9 @@ Tree = function(name, kind, methods)
         return tostring(self.name) .. "(" .. tostring(table.concat((function()
           local _accum_0 = { }
           local _len_0 = 1
-          for _index_0 = 1, #self do
-            local v = self[_index_0]
+          local _list_0 = self.value
+          for _index_0 = 1, #_list_0 do
+            local v = _list_0[_index_0]
             _accum_0[_len_0] = repr(v)
             _len_0 = _len_0 + 1
           end
@@ -68,15 +70,19 @@ Tree = function(name, kind, methods)
         do
           local _accum_0 = { }
           local _len_0 = 1
-          for _index_0 = 1, #self do
-            local v = self[_index_0]
+          local _list_0 = self.value
+          for _index_0 = 1, #_list_0 do
+            local v = _list_0[_index_0]
             _accum_0[_len_0] = v._map and v:_map(fn) or v
             _len_0 = _len_0 + 1
           end
           new_vals = _accum_0
         end
-        local ret = getmetatable(self)(unpack(new_vals))
+        local ret = getmetatable(self)(Tuple(unpack(new_vals)), self.source)
         return ret
+      end
+      methods.__ipairs = function(self)
+        return error()
       end
     else
       methods.__tostring = function(self)
@@ -87,13 +93,10 @@ Tree = function(name, kind, methods)
       end
     end
   end
-  if is_multi then
-    Types[name] = immutable(nil, methods)
-  else
-    Types[name] = immutable({
-      "value"
-    }, methods)
-  end
+  Types[name] = immutable({
+    "value",
+    "source"
+  }, methods)
 end
 Tree("Block", 'multi')
 Tree("EscapedNomsu", 'multi')
@@ -124,8 +127,9 @@ Tree("Action", 'multi', {
       return concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        for _index_0 = 1, #self do
-          local a = self[_index_0]
+        local _list_0 = self.value
+        for _index_0 = 1, #_list_0 do
+          local a = _list_0[_index_0]
           _accum_0[_len_0] = type(a) == "string" and a or "%" .. tostring(a.value)
           _len_0 = _len_0 + 1
         end
@@ -135,8 +139,9 @@ Tree("Action", 'multi', {
       return concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        for _index_0 = 1, #self do
-          local a = self[_index_0]
+        local _list_0 = self.value
+        for _index_0 = 1, #_list_0 do
+          local a = _list_0[_index_0]
           _accum_0[_len_0] = type(a) == "string" and a or "%"
           _len_0 = _len_0 + 1
         end

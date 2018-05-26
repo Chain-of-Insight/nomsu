@@ -106,6 +106,7 @@ do
       for i = 1, n do
         local b = select(i, ...)
         assert(b ~= self, "No recursion please.")
+        assert(not Source:is_instance(b))
         bits[#bits + 1] = b
         if type(b) == 'string' then
           do
@@ -165,6 +166,7 @@ do
           self.source = Source(self.source, 1, #tostring(self) + 1)
         end
       end
+      return assert(self.source)
     end,
     __base = _base_0,
     __name = "Code"
@@ -218,7 +220,7 @@ do
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
         assert(type(var) == 'userdata' and var.type == "Var")
-        removals[var] = true
+        removals[var.value] = true
       end
       local stack = {
         self
@@ -227,7 +229,7 @@ do
         local lua
         lua, stack[#stack] = stack[#stack], nil
         for i = #lua.free_vars, 1, -1 do
-          if removals[lua.free_vars[i]] then
+          if removals[lua.free_vars[i].value] then
             remove(lua.free_vars, i)
           end
         end

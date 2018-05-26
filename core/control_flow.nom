@@ -188,14 +188,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "do next %") and
-                        %.3 = %var
+                        %.value.3.value = %var.value
         ..: to %lua write (Lua "\n    ::continue_\(%var as lua identifier)::;")
         to %lua write "\nend --foreach-loop"
         if
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "stop %") and
-                        %.2 = %var
+                        %.value.2.value = %var.value
         ..
             %lua <-
                 Lua ".."
@@ -219,14 +219,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "do next %") and
-                        %.3 = %key
+                        %.value.3.value = %key.value
         ..: to %lua write (Lua "\n    ::continue_\(%key as lua identifier)::;")
 
         if
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "do next %") and
-                        %.3 = %value
+                        %.value.3.value = %value.value
         ..: to %lua write (Lua "\n    ::continue_\(%value as lua identifier)::;")
         to %lua write "\nend --foreach-loop"
         
@@ -235,14 +235,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "stop %") and
-                        %.2 = %key
+                        %.value.2.value = %key.value
         ..: to %stop_labels write "\n::stop_\(%key as lua identifier)::;"
 
         if
             %body has subtree % where
                 (%.type = "Action") and
                     ((%'s stub) is "stop %") and
-                        %.2 = %value
+                        %.value.2.value = %value.value
         ..: to %stop_labels write "\n::stop_\(%value as lua identifier)::;"
 
         if: (length of %stop_labels) > 0
@@ -262,14 +262,14 @@ immediately
         %is_first <- (yes)
         %seen_else <- (no)
         %branches <-
-            %body if (%body.type = "Block") else [%body]
+            %body.value if (%body.type = "Block") else [%body]
         for %func_call in %branches
             assume (%func_call.type is "Action") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
             with {..}
-                %star: %func_call.1
-                %condition: %func_call.2
-                %action: %func_call.3
+                %star: %func_call.value.1
+                %condition: %func_call.value.2
+                %action: %func_call.value.3
             ..
                 assume (%star = "*") or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*'
@@ -310,11 +310,11 @@ immediately
         %is_first <- (yes)
         %seen_else <- (no)
         %branches <-
-            %body if (%body.type = "Block") else [%body]
+            %body.value if (%body.type = "Block") else [%body]
         for %func_call in %branches
             assume (%func_call.type is "Action") or barf ".."
                 Invalid format for 'when' statement. Only '*' blocks are allowed.
-            with {%star:%func_call.1, %condition:%func_call.2, %action:%func_call.3}
+            with {%star:%func_call.value.1, %condition:%func_call.value.2, %action:%func_call.value.3}
                 assume (%star = "*") or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*'
                 assume %condition or barf ".."

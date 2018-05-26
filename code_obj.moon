@@ -72,6 +72,7 @@ class Code
                 @source = Source(filename, tonumber(start), tonumber(stop))
             else
                 @source = Source(@source, 1, #tostring(self)+1)
+        assert(@source)
             
     sub: (start,stop)=>
         -- TODO: implement this better
@@ -86,6 +87,7 @@ class Code
         for i=1,n
             b = select(i, ...)
             assert(b != self, "No recursion please.")
+            assert(not Source\is_instance(b))
             bits[#bits+1] = b
             if type(b) == 'string'
                 if spaces = match(b, "\n([ ]*)[^\n]*$")
@@ -139,13 +141,13 @@ class Lua extends Code
         removals = {}
         for var in *vars
             assert(type(var) == 'userdata' and var.type == "Var")
-            removals[var] = true
+            removals[var.value] = true
         
         stack = {self}
         while #stack > 0
             lua, stack[#stack] = stack[#stack], nil
             for i=#lua.free_vars,1,-1
-                if removals[lua.free_vars[i]]
+                if removals[lua.free_vars[i].value]
                     remove lua.free_vars, i
             for b in *lua.bits
                 if type(b) != 'string'

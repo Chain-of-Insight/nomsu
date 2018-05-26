@@ -16,20 +16,20 @@ compile [as %instance %body] to
         end
 
 compile [object %classname %class_body] to
-    %class_id <- (=lua "Var(\(%classname as value)):as_lua_id():sub(2,-1)")
+    %class_id <- (=lua "Var.as_lua_id({value=\(%classname as value)}):sub(2,-1)")
     if: %class_id is ""
         %class_id <- "class"
     %methods <-: Lua ""
     %__index <- %class_id
     %__newindex <- "nil"
-    for %line in %class_body
+    for %line in %class_body.value
         if: %line.type is "Comment"
             do next %line
         if: (%line.type is "Action") and ((%line's stub) is "slots %")
             %slot_index_clauses <- []
             %slot_newindex_clauses <- []
-            %slots <- %line.2
-            for %slot_index = %slot_var in %slots
+            %slots <- %line.value.2
+            for %slot_index = %slot_var in %slots.value
                 to %slot_index_clauses add ".."
                     if key == \(repr %slot_var.value) or key == \(repr (%slot_var as lua expr)) then
                         return rawget(self, \%slot_index);
@@ -52,15 +52,15 @@ compile [object %classname %class_body] to
             do next %line
         assume ((%line.type is "Action") and ((%line's stub) is "action % %"))
         ..or barf "Only action definitions are supported inside 'object % %'"
-        %actions <- %line.2
-        %body <- %line.3
+        %actions <- %line.value.2
+        %body <- %line.value.3
         lua> ".."
             do
                 local stubs = {}
-                for i, action in ipairs(\%actions) do
+                for i, action in ipairs(\%actions.value) do
                     stubs[i] = action:get_stub(true)
                 end
-                local lua = Lua(nil, \%class_id, "[ ", repr(stubs[1]), "] = function(self")
+                local lua = Lua(\(%line.source), \%class_id, "[ ", repr(stubs[1]), "] = function(self")
                 local args = {}
                 for i,tok in ipairs(\%actions[1]) do
                     if tok.type == "Var" then args[#args+1] = tok end
