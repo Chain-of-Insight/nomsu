@@ -211,14 +211,14 @@ do
       return true
     end
     local err_pos = start_pos
-    local text_loc = lpeg.userdata.source_code.source:sub(err_pos, err_pos)
+    local text_loc = lpeg.userdata.source:sub(err_pos, err_pos)
     local line_no = text_loc:get_line_number()
     src = FILE_CACHE[text_loc.filename]
     local prev_line = line_no == 1 and "" or src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 2)
     local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 2)
     local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 2)
     local pointer = ("-"):rep(err_pos - LINE_STARTS[src][line_no]) .. "^"
-    err_msg = (err_msg or "Parse error") .. " at " .. tostring(lpeg.userdata.source_code.source.filename) .. ":" .. tostring(line_no) .. ":\n"
+    err_msg = (err_msg or "Parse error") .. " at " .. tostring(lpeg.userdata.source.filename) .. ":" .. tostring(line_no) .. ":\n"
     if #prev_line > 0 then
       err_msg = err_msg .. ("\n" .. prev_line)
     end
@@ -234,18 +234,13 @@ end
 setmetatable(NOMSU_DEFS, {
   __index = function(self, key)
     local make_node
-    make_node = function(start, ...)
-      local args = {
-        ...
-      }
-      local stop = args[#args]
+    make_node = function(start, value, stop)
       local source = lpeg.userdata.source:sub(start, stop)
-      args[#args] = nil
       local tree
       if Types[key].is_multi then
-        tree = Types[key](Tuple(unpack(args)), source)
+        tree = Types[key](Tuple(unpack(value)), source)
       else
-        tree = Types[key](args[1], source)
+        tree = Types[key](value, source)
       end
       return tree
     end

@@ -4,7 +4,7 @@ utils = require 'utils'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 immutable = require 'immutable'
 {:insert, :remove, :concat} = table
-{:Lua, :Nomsu, :Location} = require "code_obj"
+{:Lua, :Nomsu, :Source} = require "code_obj"
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 
@@ -22,6 +22,8 @@ Tree = (name, kind, methods)->
         .name = name
         .__new = (value, source)=>
             assert source
+            if type(source) == 'string'
+                source = Source\from_string(source)
             return value, source
         .is_multi = is_multi
         .map = (fn)=>

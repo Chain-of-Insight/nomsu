@@ -184,14 +184,14 @@ NOMSU_DEFS = with {}
         err_pos = start_pos
         --if src\sub(err_pos,err_pos)\match("[\r\n]")
         --    err_pos += #src\match("[ \t\n\r]*", err_pos)
-        text_loc = lpeg.userdata.source_code.source\sub(err_pos,err_pos)
+        text_loc = lpeg.userdata.source\sub(err_pos,err_pos)
         line_no = text_loc\get_line_number!
         src = FILE_CACHE[text_loc.filename]
         prev_line = line_no == 1 and "" or src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-2)
         err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-2)
         next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-2)
         pointer = ("-")\rep(err_pos-LINE_STARTS[src][line_no]) .. "^"
-        err_msg = (err_msg or "Parse error").." at #{lpeg.userdata.source_code.source.filename}:#{line_no}:\n"
+        err_msg = (err_msg or "Parse error").." at #{lpeg.userdata.source.filename}:#{line_no}:\n"
         if #prev_line > 0 then err_msg ..= "\n"..prev_line
         err_msg ..= "\n#{err_line}\n#{pointer}"
         if #next_line > 0 then err_msg ..= "\n"..next_line
@@ -200,14 +200,11 @@ NOMSU_DEFS = with {}
         return true
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
-    make_node = (start, ...)->
-        args = {...}
-        stop = args[#args]
+    make_node = (start, value, stop)->
         source = lpeg.userdata.source\sub(start, stop)
-        args[#args] = nil
         tree = if Types[key].is_multi
-            Types[key](Tuple(unpack(args)), source)
-        else Types[key](args[1], source)
+            Types[key](Tuple(unpack(value)), source)
+        else Types[key](value, source)
         return tree
     self[key] = make_node
     return make_node

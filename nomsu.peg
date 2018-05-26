@@ -8,9 +8,9 @@ file:
 shebang: "#!" [^%nl]* (!. / %nl)
 
 inline_block (Block):
-    inline_statement (%ws* ";" %ws*  inline_statement)+
+    {| inline_statement (%ws* ";" %ws*  inline_statement)+ |}
 block (Block):
-    statement (nodent (statement / (({} ([^%nl]* -> "Error while parsing block line")) => error)))+
+    {| statement (nodent (statement / (({} ([^%nl]* -> "Error while parsing block line")) => error)))+ |}
 
 statement: (action / expression) (eol / (({} ([^%nl]* -> "Error while parsing line")) => error))
 inline_statement: inline_action / inline_expression
@@ -35,19 +35,21 @@ indented_expression:
 expression:
     inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression
 
-inline_nomsu (EscapedNomsu): "\" inline_expression
+inline_nomsu (EscapedNomsu): "\" {| inline_expression |}
 indented_nomsu (EscapedNomsu):
-    "\" (noindex_inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression)
+    "\" {| (noindex_inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression) |}
 
 index_chain (IndexChain):
-    noindex_inline_expression ("." (text_word / noindex_inline_expression))+
+    {| noindex_inline_expression ("." (text_word / noindex_inline_expression))+ |}
 
 -- Actions need at least one word in them
 inline_action (Action):
+    {|
     (inline_expression %ws*)* word (%ws* (inline_expression / word))*
     (%ws* ":" %ws* (inline_block / inline_action / inline_expression))?
+    |}
 action (Action):
-    (expression (dotdot? %ws*))* word ((dotdot? %ws*) (expression / word))*
+    {| (expression (dotdot? %ws*))* word ((dotdot? %ws*) (expression / word))* |}
 
 word: { %operator / (!number plain_word) }
 
@@ -55,19 +57,19 @@ text_word (Text): {%operator / (!number plain_word)}
 
 inline_text (Text):
     !('".."' eol)
-    '"' (
+    '"' {|
         ({~ (('\"' -> '"') / ('\\' -> '\') / %escaped_char / [^%nl\"])+ ~}
         / inline_text_interpolation)*
-    ) ('"' / (({} ([^%nl]*->'Failed to find a closing " mark on the same line')) => error))
+    |} ('"' / (({} ([^%nl]*->'Failed to find a closing " mark on the same line')) => error))
 
 -- Have to use "%indent" instead of "indent" etc. to avoid messing up text lines that start with "#"
 indented_text (Text):
-    '".."' eol %nl (
+    '".."' eol %nl {|
         {~ (%nl*) (%indent -> "") ~}
         ({~
             (("\\" -> "\") / (("\" nodent "..") -> "")/ (%nl+ {~ %nodent -> "" ~}) / [^%nl\] / (!text_interpolation "\"))+
         ~} / text_interpolation)*
-    ) (((!.) &%dedent) / (&(%nl %dedent)) / (({} (non_dedent_error -> "Error while parsing Text")) => error))
+    |} (((!.) &%dedent) / (&(%nl %dedent)) / (({} (non_dedent_error -> "Error while parsing Text")) => error))
 inline_text_interpolation:
     "\" (
         variable / inline_list / inline_dict / inline_text
@@ -90,11 +92,11 @@ variable (Var): "%" { ((!"'" %operator) / plain_word)* }
 
 inline_list (List):
     !('[..]')
-    "[" %ws* (inline_list_item (comma inline_list_item)* comma?)? %ws*
+    "[" %ws* {| (inline_list_item (comma inline_list_item)* comma?)? |} %ws*
     ("]" / (({} ([^%nl]*->"Failed to find a closing ] on the same line")) => error))
 indented_list (List):
     "[..]" indent
-        list_line (nodent list_line)*
+        {| list_line (nodent list_line)* |}
     (dedent / (({} (non_dedent_error -> "Error while parsing list")) => error))
 list_line:
      ((action / expression) !comma)
@@ -103,20 +105,20 @@ inline_list_item: inline_block / inline_action / inline_expression
 
 inline_dict (Dict):
     !('{..}')
-    "{" %ws* (inline_dict_entry (comma inline_dict_entry)*)? %ws*
+    "{" %ws* {| (inline_dict_entry (comma inline_dict_entry)*)? |} %ws*
     ("}"
       / (({} (%ws* comma? (!. / &%nl)->"Failed to find a closing } on the same line")) => error)
       / (({} ([^%nl]*->"Error while parsing dictionary")) => error))
 indented_dict (Dict):
     "{..}" indent
-        dict_line (nodent dict_line)*
+        {| dict_line (nodent dict_line)* |}
     (dedent / (({} (non_dedent_error -> "Error while parsing dict")) => error))
 dict_line:
     (dict_entry !comma) / (inline_dict_entry (comma dict_line?)?)
 dict_entry(DictEntry):
-    dict_key %ws* ":" %ws* (action / expression)
+    {| dict_key %ws* ":" %ws* (action / expression) |}
 inline_dict_entry(DictEntry):
-    dict_key %ws* (":" %ws* (inline_block / inline_action / inline_expression)?)
+    {| dict_key %ws* (":" %ws* (inline_block / inline_action / inline_expression)?) |}
 dict_key:
     text_word / inline_expression
 

@@ -20,6 +20,13 @@ Source = immutable({
     end
     return filename, start, stop
   end,
+  from_string = function(self, str)
+    local filename, start, stop = str:match("^(.-)%[(%d+):(%d+)%]$")
+    if not (filename) then
+      filename, start = str:match("^(.-)%[(%d+)%]$")
+    end
+    return Source(filename or str, tonumber(start or 1), tonumber(stop))
+  end,
   __tostring = function(self)
     if self.stop then
       return "\"" .. tostring(self.filename) .. "[" .. tostring(self.start) .. ":" .. tostring(self.stop) .. "]\""
@@ -94,11 +101,6 @@ local Code
 do
   local _class_0
   local _base_0 = {
-    sub = function(self, start, stop)
-      local str = tostring(self):sub(start, stop)
-      local cls = self.__class
-      return cls(self.source:sub(start, stop), str)
-    end,
     append = function(self, ...)
       local n = select("#", ...)
       local bits, indents = self.bits, self.indents
@@ -156,15 +158,7 @@ do
       self.bits, self.indents, self.current_indent = { }, { }, 0
       self:append(...)
       if type(self.source) == 'string' then
-        local filename, start, stop = self.source:match("^(.-)%[(%d+):(%d+)%]$")
-        if not (filename) then
-          filename, start = self.source:match("^(.-)%[(%d+)%]$")
-        end
-        if start or stop then
-          self.source = Source(filename, tonumber(start), tonumber(stop))
-        else
-          self.source = Source(self.source, 1, #tostring(self) + 1)
-        end
+        self.source = Source:from_string(self.source)
       end
       return assert(self.source)
     end,

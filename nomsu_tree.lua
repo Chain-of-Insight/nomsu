@@ -7,10 +7,10 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local Lua, Nomsu, Location
+local Lua, Nomsu, Source
 do
   local _obj_0 = require("code_obj")
-  Lua, Nomsu, Location = _obj_0.Lua, _obj_0.Nomsu, _obj_0.Location
+  Lua, Nomsu, Source = _obj_0.Lua, _obj_0.Nomsu, _obj_0.Source
 end
 local MAX_LINE = 80
 local Types = { }
@@ -27,6 +27,9 @@ Tree = function(name, kind, methods)
     methods.name = name
     methods.__new = function(self, value, source)
       assert(source)
+      if type(source) == 'string' then
+        source = Source:from_string(source)
+      end
       return value, source
     end
     methods.is_multi = is_multi

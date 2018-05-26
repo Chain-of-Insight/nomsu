@@ -10,6 +10,11 @@ Source = immutable {"filename","start","stop"}, {
             start, stop = 1, #FILE_CACHE[filename]
         if stop then assert(start <= stop+1, "Invalid range: #{start}, #{stop}")
         return filename, start, stop
+    from_string: (str)=>
+        filename,start,stop = str\match("^(.-)%[(%d+):(%d+)%]$")
+        unless filename
+            filename,start = str\match("^(.-)%[(%d+)%]$")
+        return Source(filename or str, tonumber(start or 1), tonumber(stop))
     __tostring: =>
         if @stop
             "\"#{@filename}[#{@start}:#{@stop}]\""
@@ -65,21 +70,9 @@ class Code
         @bits, @indents, @current_indent = {}, {}, 0
         @append(...)
         if type(@source) == 'string'
-            filename,start,stop = @source\match("^(.-)%[(%d+):(%d+)%]$")
-            unless filename
-                filename,start = @source\match("^(.-)%[(%d+)%]$")
-            if start or stop
-                @source = Source(filename, tonumber(start), tonumber(stop))
-            else
-                @source = Source(@source, 1, #tostring(self)+1)
+            @source = Source\from_string(@source)
         assert(@source)
             
-    sub: (start,stop)=>
-        -- TODO: implement this better
-        str = tostring(self)\sub(start,stop)
-        cls = @__class
-        return cls(@source\sub(start,stop), str)
-
     append: (...)=>
         n = select("#",...)
         bits, indents = @bits, @indents
