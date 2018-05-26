@@ -193,7 +193,7 @@ do
   end)
   _with_0.dedent = P(function(self, start)
     local nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-    local spaces = self:match("[ ]*", start)
+    local spaces = self:match("^[ ]*", start)
     if #spaces <= #nodent - 4 then
       remove(lpeg.userdata.indent_stack)
       return start

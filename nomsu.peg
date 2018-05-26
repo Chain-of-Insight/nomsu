@@ -7,20 +7,13 @@ file:
 
 shebang: "#!" [^%nl]* (!. / %nl)
 
-statement: (action / expression) (eol / (({} ([^%nl]* -> "Error while parsing line")) => error))
-inline_statement: inline_action / inline_expression
-
 inline_block (Block):
     inline_statement (%ws* ";" %ws*  inline_statement)+
 block (Block):
     statement (nodent (statement / (({} ([^%nl]* -> "Error while parsing block line")) => error)))+
 
-inline_nomsu (EscapedNomsu): "\" noindex_inline_expression
-indented_nomsu (EscapedNomsu):
-    "\" (noindex_inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression)
-
-index_chain (IndexChain):
-    noindex_inline_expression ("." (text_word / noindex_inline_expression))+
+statement: (action / expression) (eol / (({} ([^%nl]* -> "Error while parsing line")) => error))
+inline_statement: inline_action / inline_expression
 
 noindex_inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
@@ -31,7 +24,6 @@ noindex_inline_expression:
             / (({} ([^%nl]* -> 'Error while parsing subexpression')) => error)
         )
       )
-
 inline_expression:
     index_chain / noindex_inline_expression 
 indented_expression:
@@ -43,7 +35,14 @@ indented_expression:
 expression:
     inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression
 
--- Function calls need at least one word in them
+inline_nomsu (EscapedNomsu): "\" inline_expression
+indented_nomsu (EscapedNomsu):
+    "\" (noindex_inline_expression / (":" %ws* (inline_block / inline_action / inline_expression) eol) / indented_expression)
+
+index_chain (IndexChain):
+    noindex_inline_expression ("." (text_word / noindex_inline_expression))+
+
+-- Actions need at least one word in them
 inline_action (Action):
     (inline_expression %ws*)* word (%ws* (inline_expression / word))*
     (%ws* ":" %ws* (inline_block / inline_action / inline_expression))?

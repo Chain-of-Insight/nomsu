@@ -166,7 +166,7 @@ NOMSU_DEFS = with {}
     -- stack minus 4, this pattern matches and pops off the top of the stack exactly once.
     .dedent = P (start)=>
         nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-        spaces = @match("[ ]*", start)
+        spaces = @match("^[ ]*", start)
         if #spaces <= #nodent-4
             remove(lpeg.userdata.indent_stack)
             return start
