@@ -33,7 +33,7 @@ if jit
 re = require 're'
 lpeg = require 'lpeg'
 lpeg.setmaxstack 10000
-{:P,:R,:V,:S,:Cg,:C,:Cp,:B} = lpeg
+{:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt,:Carg} = lpeg
 utils = require 'utils'
 new_uuid = require 'uuid'
 immutable = require 'immutable'
@@ -156,42 +156,39 @@ NOMSU_DEFS = with {}
 
     -- If the line begins with #indent+4 spaces, the pattern matches *those* spaces
     -- and adds them to the stack (not any more).
-    .indent = P (start)=>
-        nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-        indented = nodent.."    "
-        if @sub(start, start+#indented-1) == indented
-            insert(lpeg.userdata.indent_stack, indented)
-            return start + #indented
+    .indent = Cmt Carg(1), (start, userdata)=>
+        if #@match("^[ ]*", start) == userdata.indent + 4
+            userdata.indent += 4
+            return start + userdata.indent
     -- If the number of leading space characters is <= the number of space on the top of the
     -- stack minus 4, this pattern matches and pops off the top of the stack exactly once.
-    .dedent = P (start)=>
-        nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-        spaces = @match("^[ ]*", start)
-        if #spaces <= #nodent-4
-            remove(lpeg.userdata.indent_stack)
+    .dedent = Cmt Carg(1), (start, userdata)=>
+        if #@match("^[ ]*", start) <= userdata.indent - 4
+            userdata.indent -= 4
             return start
     -- If the number of leading space characters is >= the number on the top of the
     -- stack, this pattern matches and does not modify the stack.
-    .nodent = P (start)=>
-        nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-        if @sub(start, start+#nodent-1) == nodent
-            return start + #nodent
+    .nodent = Cmt Carg(1), (start, userdata)=>
+        if #@match("^[ ]*", start) >= userdata.indent
+            return start + userdata.indent
 
-    .error = (src,end_pos,start_pos,err_msg)->
-        seen_errors = lpeg.userdata.errors
+    .userdata = Carg(1)
+
+    .error = (src,end_pos,start_pos,err_msg,userdata)->
+        seen_errors = userdata.errors
         if seen_errors[start_pos]
             return true
         err_pos = start_pos
         --if src\sub(err_pos,err_pos)\match("[\r\n]")
         --    err_pos += #src\match("[ \t\n\r]*", err_pos)
-        text_loc = lpeg.userdata.source\sub(err_pos,err_pos)
+        text_loc = userdata.source\sub(err_pos,err_pos)
         line_no = text_loc\get_line_number!
         src = FILE_CACHE[text_loc.filename]
         prev_line = line_no == 1 and "" or src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-2)
         err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-2)
         next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-2)
         pointer = ("-")\rep(err_pos-LINE_STARTS[src][line_no]) .. "^"
-        err_msg = (err_msg or "Parse error").." at #{lpeg.userdata.source.filename}:#{line_no}:\n"
+        err_msg = (err_msg or "Parse error").." at #{userdata.source.filename}:#{line_no}:\n"
         if #prev_line > 0 then err_msg ..= "\n"..prev_line
         err_msg ..= "\n#{err_line}\n#{pointer}"
         if #next_line > 0 then err_msg ..= "\n"..next_line
@@ -200,8 +197,8 @@ NOMSU_DEFS = with {}
         return true
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
-    make_node = (start, value, stop)->
-        source = lpeg.userdata.source\sub(start, stop)
+    make_node = (start, value, stop, userdata)->
+        source = userdata.source\sub(start, stop)
         tree = if Types[key].is_multi
             Types[key](Tuple(unpack(value)), source)
         else Types[key](value, source)
@@ -219,7 +216,7 @@ NOMSU_PATTERN = do
     anon_def <- ({ident} (" "*) ":"
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
     captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {}) -> %2)"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {} %%userdata) -> %2)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]]
@@ -329,16 +326,15 @@ class NomsuCompiler
             filename = "<nomsu chunk ##{_nomsu_chunk_counter}>.nom"
             FILE_CACHE[filename] = nomsu_code
             nomsu_code = Nomsu(filename, nomsu_code)
+
         userdata = {
-            source_code:nomsu_code, indent_stack: {""}, errors: {},
+            source_code:nomsu_code, indent: 0, errors: {},
             source: nomsu_code.source,
         }
-
-        old_userdata, lpeg.userdata = lpeg.userdata, userdata
-        tree = NOMSU_PATTERN\match(tostring(nomsu_code))
-        lpeg.userdata = old_userdata
+        tree = NOMSU_PATTERN\match(tostring(nomsu_code), nil, userdata)
         
-        assert tree, "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
+        unless tree
+            error "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
 
         if next(userdata.errors)
             keys = utils.keys(userdata.errors)

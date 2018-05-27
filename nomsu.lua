@@ -28,8 +28,8 @@ end
 re = require('re')
 lpeg = require('lpeg')
 lpeg.setmaxstack(10000)
-local P, R, V, S, Cg, C, Cp, B
-P, R, V, S, Cg, C, Cp, B = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B
+local P, R, V, S, Cg, C, Cp, B, Cmt, Carg
+P, R, V, S, Cg, C, Cp, B, Cmt, Carg = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt, lpeg.Carg
 local utils = require('utils')
 local new_uuid = require('uuid')
 local immutable = require('immutable')
@@ -183,42 +183,38 @@ do
   _with_0.operator = _with_0.operator_char ^ 1
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
-  _with_0.indent = P(function(self, start)
-    local nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-    local indented = nodent .. "    "
-    if self:sub(start, start + #indented - 1) == indented then
-      insert(lpeg.userdata.indent_stack, indented)
-      return start + #indented
+  _with_0.indent = Cmt(Carg(1), function(self, start, userdata)
+    if #self:match("^[ ]*", start) == userdata.indent + 4 then
+      userdata.indent = userdata.indent + 4
+      return start + userdata.indent
     end
   end)
-  _with_0.dedent = P(function(self, start)
-    local nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-    local spaces = self:match("^[ ]*", start)
-    if #spaces <= #nodent - 4 then
-      remove(lpeg.userdata.indent_stack)
+  _with_0.dedent = Cmt(Carg(1), function(self, start, userdata)
+    if #self:match("^[ ]*", start) <= userdata.indent - 4 then
+      userdata.indent = userdata.indent - 4
       return start
     end
   end)
-  _with_0.nodent = P(function(self, start)
-    local nodent = lpeg.userdata.indent_stack[#lpeg.userdata.indent_stack]
-    if self:sub(start, start + #nodent - 1) == nodent then
-      return start + #nodent
+  _with_0.nodent = Cmt(Carg(1), function(self, start, userdata)
+    if #self:match("^[ ]*", start) >= userdata.indent then
+      return start + userdata.indent
     end
   end)
-  _with_0.error = function(src, end_pos, start_pos, err_msg)
-    local seen_errors = lpeg.userdata.errors
+  _with_0.userdata = Carg(1)
+  _with_0.error = function(src, end_pos, start_pos, err_msg, userdata)
+    local seen_errors = userdata.errors
     if seen_errors[start_pos] then
       return true
     end
     local err_pos = start_pos
-    local text_loc = lpeg.userdata.source:sub(err_pos, err_pos)
+    local text_loc = userdata.source:sub(err_pos, err_pos)
     local line_no = text_loc:get_line_number()
     src = FILE_CACHE[text_loc.filename]
     local prev_line = line_no == 1 and "" or src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 2)
     local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 2)
     local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 2)
     local pointer = ("-"):rep(err_pos - LINE_STARTS[src][line_no]) .. "^"
-    err_msg = (err_msg or "Parse error") .. " at " .. tostring(lpeg.userdata.source.filename) .. ":" .. tostring(line_no) .. ":\n"
+    err_msg = (err_msg or "Parse error") .. " at " .. tostring(userdata.source.filename) .. ":" .. tostring(line_no) .. ":\n"
     if #prev_line > 0 then
       err_msg = err_msg .. ("\n" .. prev_line)
     end
@@ -234,8 +230,8 @@ end
 setmetatable(NOMSU_DEFS, {
   __index = function(self, key)
     local make_node
-    make_node = function(start, value, stop)
-      local source = lpeg.userdata.source:sub(start, stop)
+    make_node = function(start, value, stop, userdata)
+      local source = userdata.source:sub(start, stop)
       local tree
       if Types[key].is_multi then
         tree = Types[key](Tuple(unpack(value)), source)
@@ -255,7 +251,7 @@ do
     anon_def <- ({ident} (" "*) ":"
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
     captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {}) -> %2)"
+        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {} %%userdata) -> %2)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]])
@@ -322,17 +318,14 @@ do
       end
       local userdata = {
         source_code = nomsu_code,
-        indent_stack = {
-          ""
-        },
+        indent = 0,
         errors = { },
         source = nomsu_code.source
       }
-      local old_userdata
-      old_userdata, lpeg.userdata = lpeg.userdata, userdata
-      local tree = NOMSU_PATTERN:match(tostring(nomsu_code))
-      lpeg.userdata = old_userdata
-      assert(tree, "In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
+      local tree = NOMSU_PATTERN:match(tostring(nomsu_code), nil, userdata)
+      if not (tree) then
+        error("In file " .. tostring(colored.blue(filename)) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
+      end
       if next(userdata.errors) then
         local keys = utils.keys(userdata.errors)
         table.sort(keys)
