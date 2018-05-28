@@ -19,6 +19,7 @@ noindex_inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
     / ( "("
             %ws* (inline_block / inline_action / inline_expression) %ws*
+            (comma %ws* (inline_block / inline_action / inline_expression) %ws*)*
         (")"
             / (({} ((!. / &%nl) -> 'Expected to find a ) before the end of the line') %userdata) => error)
             / (({} ([^%nl]* -> 'Error while parsing subexpression') %userdata) => error)
@@ -75,6 +76,7 @@ inline_text_interpolation:
         variable / inline_list / inline_dict / inline_text
         / ("("
             %ws* (inline_block / inline_action / inline_expression) %ws*
+            (comma %ws* (inline_block / inline_action / inline_expression) %ws*)*
         (")"
             / (({} (&%nl -> 'Expected to find a ")" before the end of the line') %userdata) => error)
             / (({} ([^%nl]* -> 'Error while parsing text interpolation') %userdata) => error))
