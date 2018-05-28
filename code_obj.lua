@@ -17,6 +17,8 @@ Source = immutable({
     end
     if stop then
       assert(start <= stop + 1, "Invalid range: " .. tostring(start) .. ", " .. tostring(stop))
+    else
+      error("HUH?")
     end
     return filename, start, stop
   end,

@@ -9,6 +9,7 @@ Source = immutable {"filename","start","stop"}, {
         if not start
             start, stop = 1, #FILE_CACHE[filename]
         if stop then assert(start <= stop+1, "Invalid range: #{start}, #{stop}")
+        else error("HUH?")
         return filename, start, stop
     from_string: (str)=>
         filename,start,stop = str\match("^(.-)%[(%d+):(%d+)%]$")

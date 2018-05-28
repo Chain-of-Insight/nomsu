@@ -36,7 +36,20 @@ immediately
     parse [V] as: five
 assume ((V) = 5) or barf "Parse as compile action failed."
 
-remove action "foo %"
+immediately
+    parse [swap %x and %y] as
+        do
+            %tmp <- %x
+            %x <- %y
+            %y <- %tmp
+<- {%1:1, %2:2}
+swap %1 and %2
+assume ((%1 = 2) and (%2 = 1)) or barf "'parse % as %' failed on 'swap % and %'"
+<- {%tmp:1, %tmp2:2}
+swap %tmp and %tmp2
+assume ((%tmp = 2) and (%tmp2 = 1)) or barf "'parse % as %' variable mangling failed."
+
+remove action (foo %)
 try: foo 99
 ..and if it succeeds: barf "Failed to delete action"
 

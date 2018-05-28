@@ -17,17 +17,17 @@ use "core"
 say "Hello world!"
 
 # How do I set a variable?
-%x <- 1
+%foobar <- 1
 %str <- "Hello world"
 # Expressions that are more than just literal values require parentheses:
-%x <- (2 + 3)
+%foobar <- (2 + 3)
 %one-two <- 12
 say %one-two
 
 # How do I modify a variable?
-%x <- (%x + 1)
+%foobar <- (%foobar + 1)
 # Or, as a shorthand, you can do this to increment a variable:
-%x +<- 1
+%foobar +<- 1
 
 # How do I define a mutli-line string?
 %mutli-str <- ".."

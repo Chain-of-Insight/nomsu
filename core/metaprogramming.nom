@@ -86,11 +86,14 @@ immediately
                     lua:append(", ", lua_var)
                 end
             end
+            MANGLE_INDEX = (MANGLE_INDEX or 0) + 1
             local function make_tree(t)
                 if type(t) ~= 'table' and type(t) ~= 'userdata' then
                     return repr(t)
                 elseif t.type == 'Var' and replacements[t.value] then
                     return replacements[t.value]
+                elseif t.type == 'Var' then
+                    return t.type.."("..repr(t.value.."#"..tostring(MANGLE_INDEX))..", "..repr(t.source)..")"
                 elseif t.is_multi then
                     local bits = {}
                     for i, entry in ipairs(t.value) do
@@ -104,14 +107,16 @@ immediately
             lua:append(")\n    local tree = ", make_tree(\%longhand), "\n    return nomsu:tree_to_lua(tree)\nend);")
             return lua
 
-action [remove action %stub]
-    lua> ".."
-        local fn = ACTIONS[\%stub]
-        local stubs = ARG_ORDERS[fn]
-        for stub in pairs(stubs) do
-            ACTIONS[stub] = nil
+compile [remove action %action] to
+    Lua ".."
+        do
+            local fn = ACTIONS[\(=lua "repr(\%action:get_stub())")]
+            local stubs = ARG_ORDERS[fn]
+            for stub in pairs(stubs) do
+                ACTIONS[stub] = nil
+            end
+            ARG_ORDERS[fn] = nil
         end
-        ARG_ORDERS[fn] = nil
 
 immediately
     action [%tree as nomsu]

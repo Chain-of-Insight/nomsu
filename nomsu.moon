@@ -325,7 +325,7 @@ class NomsuCompiler
             _nomsu_chunk_counter += 1
             filename = "<nomsu chunk ##{_nomsu_chunk_counter}>.nom"
             FILE_CACHE[filename] = nomsu_code
-            nomsu_code = Nomsu(filename, nomsu_code)
+            nomsu_code = Nomsu(Source(filename,1,#nomsu_code), nomsu_code)
 
         userdata = {
             source_code:nomsu_code, indent: 0, errors: {},

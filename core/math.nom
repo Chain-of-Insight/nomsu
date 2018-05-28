@@ -74,16 +74,22 @@ compile [min of %items, smallest of %items, lowest of %items] to
     Lua value "utils.min(\(%items as lua expr))"
 compile [max of %items, biggest of %items, largest of %items, highest of %items] to
     Lua value "utils.max(\(%items as lua expr))"
-compile [min of %items by %value_expr] to
-    Lua value ".."
-        utils.min(\(%items as lua expr), function(_)
-            return \(%value_expr as lua expr)
-        end)
-compile [max of %items by %value_expr] to
-    Lua value ".."
-        utils.max(\(%items as lua expr), function(_)
-            return \(%value_expr as lua expr)
-        end)
+parse [min of %items by %item = %value_expr] as
+    result of
+        <- {%best:nil, %best_key:nil}
+        for %item in %items
+            %key <- %value_expr
+            if: (%best = (nil)) or (%key < %best_key)
+                <- {%best:%item, %best_key:%key}
+        return %best
+parse [max of %items by %item = %value_expr] as
+    result of
+        <- {%best:nil, %best_key:nil}
+        for %item in %items
+            %key <- %value_expr
+            if: (%best = (nil)) or (%key > %best_key)
+                <- {%best:%item, %best_key:%key}
+        return %best
 
 # Random functions
 action [seed random with %]

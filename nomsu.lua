@@ -314,7 +314,7 @@ do
         _nomsu_chunk_counter = _nomsu_chunk_counter + 1
         local filename = "<nomsu chunk #" .. tostring(_nomsu_chunk_counter) .. ">.nom"
         FILE_CACHE[filename] = nomsu_code
-        nomsu_code = Nomsu(filename, nomsu_code)
+        nomsu_code = Nomsu(Source(filename, 1, #nomsu_code), nomsu_code)
       end
       local userdata = {
         source_code = nomsu_code,

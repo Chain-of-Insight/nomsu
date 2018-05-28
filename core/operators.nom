@@ -47,9 +47,16 @@ immediately
 # Variable assignment operator
 immediately
     compile [%var <- %value] to
-        lua> "local \%var_lua = \(%var as lua);"
+        lua> "local \%var_lua = \(%var as lua)"
         assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-        lua> "local \%value_lua = \(%value as lua);"
+        lua> ".."
+            \%value = \%value:map(function(t)
+                if Action:is_instance(t) and t:get_stub() == "?" then
+                    return \%var
+                end
+            end)
+            local \%value_lua = \(%value as lua)
+
         assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
         lua> ".."
             local lua = Lua(tree.source, \%var_lua, ' = ', \%value_lua, ';')
@@ -67,6 +74,11 @@ immediately
             local lhs, rhs = Lua(tree.source), Lua(tree.source)
             for i, item in ipairs(\%assignments.value) do
                 local \%target, \%value = item.value[1], item.value[2]
+                \%value = \%value:map(function(t)
+                    if Action:is_instance(t) and t:get_stub() == "?" then
+                        return \%target
+                    end
+                end)
                 local target_lua = \(%target as lua)
                 if not target_lua.is_value then error("Invalid target for assignment: "..\(%target as text)) end
                 local value_lua = \(%value as lua)

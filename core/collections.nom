@@ -113,23 +113,39 @@ immediately
     parse [keys in %dict] as: %k for %k = %v in %dict
     parse [values in %dict] as: %v for %k = %v in %dict
 
+# Metatable stuff
+immediately
+    compile [set %dict's metatable to %metatable] to
+        Lua "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
+    
+    compile [%dict with fallback %key -> %value] to
+        Lua value ".."
+            setmetatable(\(%dict as lua expr), {__index=function(self, \(%key as lua expr))
+                local value = \(%value as lua expr)
+                self[\(%key as lua expr)] = value
+                return value
+            end})
+    
+immediately
+    parse [new counter] as: {} with fallback % -> 0
+    parse [new default dict] as: {} with fallback % -> {}
+
 # Sorting
 immediately
     compile [sort %items] to: Lua "table.sort(\(%items as lua expr));"
-    compile [sort %items by %key_expr] to
-        Lua ".."
-            utils.sort(\(%items as lua expr), function(_)
-                return \(%key_expr as lua expr);
-            end);
+    parse [sort %items by %item = %key_expr] as
+        do
+            %keys <- ({} with fallback %item -> %key_expr)
+            lua> "table.sort(\%items, function(x,y) return \%keys[x] < \%keys[y] end)"
 
 immediately
     action [%items sorted, sorted %items]
         %copy <- (% for % in %items)
         sort %copy
         return %copy
-    action [%items sorted by %key]
+    action [%items sorted by %item = %key]
         %copy <- (% for % in %items)
-        sort %copy by %key
+        sort %copy by %item = %key
         return %copy
 
     action [unique %items]
@@ -141,19 +157,5 @@ immediately
                 (% in %seen) <- (yes)
         return %unique
 
-immediately
-    # Metatable stuff
-    compile [set %dict's metatable to %metatable] to
-        Lua "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
-
-    compile [new counter] to: Lua value "setmetatable({}, {__index=function() return 0; end})"
-
-    compile [new default dict] to
-        Lua value ".."
-            setmetatable({}, {__index=function(self, key)
-                t = {};
-                self[key] = t;
-                return t;
-            end})
 
 # TODO: maybe make a generator/coroutine?
