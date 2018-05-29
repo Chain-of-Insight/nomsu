@@ -6,6 +6,7 @@ export LINE_STARTS
 Source = immutable {"filename","start","stop"}, {
     name:"Source"
     __new: (filename, start, stop)=>
+        assert(type(filename) == 'string')
         if not start
             start, stop = 1, #FILE_CACHE[filename]
         if stop and start > stop+1 then error("Invalid range: #{start}, #{stop}")
@@ -71,7 +72,7 @@ class Code
         @append(...)
         if type(@source) == 'string'
             @source = Source\from_string(@source)
-        assert(@source)
+        assert(@source and Source\is_instance(@source))
             
     append: (...)=>
         n = select("#",...)

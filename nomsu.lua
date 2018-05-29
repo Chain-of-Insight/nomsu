@@ -233,7 +233,7 @@ setmetatable(NOMSU_DEFS, {
   __index = function(self, key)
     local make_node
     make_node = function(start, value, stop, userdata)
-      local source = userdata.source:sub(start, stop)
+      local source = userdata.source:sub(start, stop - 1)
       local tree
       if Types[key].is_multi then
         tree = Types[key](Tuple(unpack(value)), source)
@@ -312,6 +312,24 @@ do
     end,
     define_compile_action = function(self, signature, fn)
       return self:define_action(signature, fn, true)
+    end,
+    lua_line_to_nomsu = function(self, source, line_no)
+      local pos = 0
+      local line = 0
+      local filename = source:match('"([^[]*)')
+      for line in FILE_CACHE[filename]:gmatch("[^\n]*\n") do
+        line = line + 1
+        pos = pos + #line
+        if line == line_no then
+          break
+        end
+      end
+      for i, entry in ipairs(self.source_map[source]) do
+        if entry[1] > pos then
+          return self.source_map[source][i - 1][2]
+        end
+      end
+      return self.source_map[source][#self.source_map[source]][2]
     end,
     parse = function(self, nomsu_code)
       if type(nomsu_code) == 'string' then
@@ -419,7 +437,7 @@ do
             if not file then
               error("File does not exist: " .. tostring(filename), 0)
             end
-            ret = self:run(Nomsu(Source(filename), file), compile_fn)
+            ret = self:run(Nomsu(Source(filename, 1, #file), file), compile_fn)
           else
             error("Invalid filetype for " .. tostring(filename), 0)
           end
@@ -437,7 +455,7 @@ do
     run_lua = function(self, lua)
       assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
       local lua_string = tostring(lua)
-      local run_lua_fn, err = load(lua_string, filename, "t", self.environment)
+      local run_lua_fn, err = load(lua_string, tostring(lua.source), "t", self.environment)
       if not run_lua_fn then
         local n = 1
         local fn
@@ -447,6 +465,69 @@ do
         end
         local line_numbered_lua = "1  |" .. lua_string:gsub("\n", fn)
         error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(line_numbered_lua)))) .. "\n\n" .. tostring(err), 0)
+      end
+      if not (self.source_map[tostring(lua.source)]) then
+        local map = { }
+        local offset = 1
+        local source = lua.source
+        local nomsu_raw = FILE_CACHE[source.filename]:sub(source.start, source.stop)
+        local get_line_starts
+        get_line_starts = function(s)
+          local starts = { }
+          local pos = 1
+          for line in s:gmatch("[^\n]*\n") do
+            insert(starts, pos)
+            pos = pos + #line
+          end
+          insert(starts, pos)
+          return starts
+        end
+        local nomsu_line_to_pos = get_line_starts(nomsu_raw)
+        local lua_line_to_pos = get_line_starts(tostring(lua))
+        local pos_to_line
+        pos_to_line = function(line_starts, pos)
+          local lo, hi = 1, #line_starts
+          while lo <= hi do
+            local mid = math.floor((lo + hi) / 2)
+            if line_starts[mid] > pos then
+              hi = mid - 1
+            else
+              lo = mid + 1
+            end
+          end
+          return hi
+        end
+        local lua_line = 1
+        local nomsu_line = pos_to_line(nomsu_line_to_pos, lua.source.start)
+        local fn
+        fn = function(s)
+          if type(s) == 'string' then
+            map[lua_line] = map[lua_line] or {
+              nomsu_line
+            }
+            for nl in s:gmatch("\n") do
+              lua_line = lua_line + 1
+              map[lua_line] = map[lua_line] or {
+                nomsu_line
+              }
+            end
+          else
+            local old_line = nomsu_line
+            if s.source then
+              nomsu_line = pos_to_line(nomsu_line_to_pos, s.source.start)
+              if nomsu_line ~= old_line then
+                insert(map[lua_line], nomsu_line)
+              end
+            end
+            local _list_0 = s.bits
+            for _index_0 = 1, #_list_0 do
+              local b = _list_0[_index_0]
+              fn(b)
+            end
+          end
+        end
+        fn(lua)
+        self.source_map[tostring(lua.source)] = map
       end
       return run_lua_fn()
     end,
@@ -1185,6 +1266,7 @@ do
       self.file_metadata = setmetatable({ }, {
         __mode = "k"
       })
+      self.source_map = { }
       self.environment = {
         nomsu = self,
         repr = repr,
@@ -1405,6 +1487,27 @@ OPTIONS
         if v == info.func then
           info.name = k
           break
+        end
+      end
+      do
+        local map = nomsu.source_map[info.source]
+        if map then
+          if info.currentline then
+            info.currentline = (map[info.currentline] or {
+              info.currentline
+            })[1]
+          end
+          if info.linedefined then
+            info.linedefined = (map[info.linedefined] or {
+              info.linedefined
+            })[1]
+          end
+          if info.lastlinedefined then
+            info.lastlinedefined = (map[info.lastlinedefined] or {
+              info.lastlinedefined
+            })[1]
+          end
+          info.short_src = info.source:match('"([^[]*)')
         end
       end
       local _ = [=[            if metadata = nomsu.action_metadata[info.func]

@@ -202,7 +202,7 @@ NOMSU_DEFS = with {}
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop, userdata)->
-        source = userdata.source\sub(start, stop)
+        source = userdata.source\sub(start, stop-1)
         tree = if Types[key].is_multi
             Types[key](Tuple(unpack(value)), source)
         else Types[key](value, source)
@@ -242,6 +242,7 @@ class NomsuCompiler
                 return id
         })
         @file_metadata = setmetatable({}, {__mode:"k"})
+        @source_map = {}
 
         @environment = {
             -- Discretionary/convenience stuff
@@ -324,6 +325,20 @@ class NomsuCompiler
     define_compile_action: (signature, fn)=>
         return @define_action(signature, fn, true)
 
+    lua_line_to_nomsu: (source, line_no)=>
+        pos = 0
+        line = 0
+        filename = source\match('"([^[]*)')
+        for line in FILE_CACHE[filename]\gmatch("[^\n]*\n")
+            line += 1
+            pos += #line
+            if line == line_no
+                break
+        for i, entry in ipairs @source_map[source]
+            if entry[1] > pos
+                return @source_map[source][i-1][2]
+        return @source_map[source][#@source_map[source]][2]
+
     _nomsu_chunk_counter = 0
     parse: (nomsu_code)=>
         if type(nomsu_code) == 'string'
@@ -393,7 +408,7 @@ class NomsuCompiler
                 file = file or FILE_CACHE[filename]
                 if not file
                     error("File does not exist: #{filename}", 0)
-                ret = @run(Nomsu(Source(filename), file), compile_fn)
+                ret = @run(Nomsu(Source(filename,1,#file), file), compile_fn)
             else
                 error("Invalid filetype for #{filename}", 0)
             loaded[filename] = ret or true
@@ -405,7 +420,7 @@ class NomsuCompiler
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, filename, "t", @environment)
+        run_lua_fn, err = load(lua_string, tostring(lua.source), "t", @environment)
         if not run_lua_fn
             n = 1
             fn = ->
@@ -413,6 +428,53 @@ class NomsuCompiler
                 ("\n%-3d|")\format(n)
             line_numbered_lua = "1  |"..lua_string\gsub("\n", fn)
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack line_numbered_lua}\n\n#{err}", 0)
+        unless @source_map[tostring(lua.source)]
+            map = {}
+            offset = 1
+            source = lua.source
+            nomsu_raw = FILE_CACHE[source.filename]\sub(source.start, source.stop)
+
+            get_line_starts = (s)->
+                starts = {}
+                pos = 1
+                for line in s\gmatch("[^\n]*\n")
+                    insert starts, pos
+                    pos += #line
+                insert starts, pos
+                return starts
+
+            nomsu_line_to_pos = get_line_starts(nomsu_raw)
+            lua_line_to_pos = get_line_starts(tostring(lua))
+
+            pos_to_line = (line_starts, pos)->
+                -- Binary search for line number of position
+                lo, hi = 1, #line_starts
+                while lo <= hi
+                    mid = math.floor((lo+hi)/2)
+                    if line_starts[mid] > pos
+                        hi = mid-1
+                    else lo = mid+1
+                return hi
+
+            lua_line = 1
+            nomsu_line = pos_to_line(nomsu_line_to_pos, lua.source.start)
+            fn = (s)->
+                if type(s) == 'string'
+                    map[lua_line] or= {nomsu_line}
+                    for nl in s\gmatch("\n")
+                        lua_line += 1
+                        map[lua_line] or= {nomsu_line}
+                else
+                    old_line = nomsu_line
+                    if s.source
+                        nomsu_line = pos_to_line(nomsu_line_to_pos, s.source.start)
+                        if nomsu_line != old_line
+                            insert map[lua_line], nomsu_line
+                    for b in *s.bits do fn(b)
+            fn(lua)
+            -- Mapping from lua line number to nomsu line numbers
+            @source_map[tostring(lua.source)] = map
+
         return run_lua_fn!
 
     MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
@@ -993,6 +1055,15 @@ OPTIONS
                 if v == info.func
                     info.name = k
                     break
+
+            if map = nomsu.source_map[info.source]
+                if info.currentline
+                    info.currentline = (map[info.currentline] or {info.currentline})[1]
+                if info.linedefined
+                    info.linedefined = (map[info.linedefined] or {info.linedefined})[1]
+                if info.lastlinedefined
+                    info.lastlinedefined = (map[info.lastlinedefined] or {info.lastlinedefined})[1]
+                info.short_src = info.source\match('"([^[]*)')
             [=[
             if metadata = nomsu.action_metadata[info.func]
                 info.name = metadata.aliases[1]

@@ -12,6 +12,7 @@ Source = immutable({
 }, {
   name = "Source",
   __new = function(self, filename, start, stop)
+    assert(type(filename) == 'string')
     if not start then
       start, stop = 1, #FILE_CACHE[filename]
     end
@@ -159,7 +160,7 @@ do
       if type(self.source) == 'string' then
         self.source = Source:from_string(self.source)
       end
-      return assert(self.source)
+      return assert(self.source and Source:is_instance(self.source))
     end,
     __base = _base_0,
     __name = "Code"
