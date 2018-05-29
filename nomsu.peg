@@ -54,7 +54,7 @@ action (Action):
 
 word: { %operator / (!number plain_word) }
 
-text_word (Text): {%operator / (!number plain_word)}
+text_word (Text): {| {%operator / (!number plain_word)} |}
 
 inline_text (Text):
     !('".."' eol)

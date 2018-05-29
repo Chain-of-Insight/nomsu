@@ -1,6 +1,7 @@
 local _pairs, _ipairs = pairs, ipairs
 if jit then
   package.cpath = "./luajit_lpeg/?.so;" .. package.cpath
+  lpeg = require("lpeglj")
   bit32 = require('bit')
   pairs = function(x)
     do
@@ -24,9 +25,10 @@ if jit then
     end
     return _ipairs(x)
   end
+else
+  lpeg = require('lpeg')
 end
 re = require('re')
-lpeg = require('lpeg')
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt, Carg
 P, R, V, S, Cg, C, Cp, B, Cmt, Carg = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt, lpeg.Carg

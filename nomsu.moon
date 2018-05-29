@@ -14,6 +14,8 @@ export lpeg, re
 _pairs, _ipairs = pairs, ipairs
 if jit
     package.cpath = "./luajit_lpeg/?.so;"..package.cpath
+    --package.path = "./LPegLJ/src/?.lua;"..package.path
+    lpeg = require "lpeglj"
     
     export bit32
     bit32 = require('bit')
@@ -29,9 +31,10 @@ if jit
             if mt.__ipairs
                 return mt.__ipairs(x)
         return _ipairs(x)
+else
+    lpeg = require 'lpeg'
 
 re = require 're'
-lpeg = require 'lpeg'
 lpeg.setmaxstack 10000
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt,:Carg} = lpeg
 utils = require 'utils'
