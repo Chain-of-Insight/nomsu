@@ -8,8 +8,7 @@ Source = immutable {"filename","start","stop"}, {
     __new: (filename, start, stop)=>
         if not start
             start, stop = 1, #FILE_CACHE[filename]
-        if stop then assert(start <= stop+1, "Invalid range: #{start}, #{stop}")
-        else error("HUH?")
+        if stop and start > stop+1 then error("Invalid range: #{start}, #{stop}")
         return filename, start, stop
     from_string: (str)=>
         filename,start,stop = str\match("^(.-)%[(%d+):(%d+)%]$")
@@ -34,7 +33,7 @@ Source = immutable {"filename","start","stop"}, {
     __add: (offset)=>
         if type(self) == 'number'
             offset, self = self, offset
-        else assert(type(offset) == 'number', "Cannot add Source and #{type(offset)}")
+        else if type(offset) != 'number' then error("Cannot add Source and #{type(offset)}")
         return Source(@filename, @start+offset, @stop)
     sub: (start, stop)=>
         start or= 1
@@ -80,8 +79,6 @@ class Code
         match = string.match
         for i=1,n
             b = select(i, ...)
-            assert(b != self, "No recursion please.")
-            assert(not Source\is_instance(b))
             bits[#bits+1] = b
             if type(b) == 'string'
                 if spaces = match(b, "\n([ ]*)[^\n]*$")
@@ -99,7 +96,6 @@ class Code
             bits[i] = select(i, ...)
         @current_indent = 0
         for i,b in ipairs(bits)
-            assert(b != self, "No recursion please.")
             if type(b) == 'string'
                 if spaces = b\match("\n([ ]*)[^\n]*$")
                     @current_indent = #spaces

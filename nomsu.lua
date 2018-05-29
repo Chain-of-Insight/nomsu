@@ -1,7 +1,7 @@
 local _pairs, _ipairs = pairs, ipairs
 if jit then
   package.cpath = "./luajit_lpeg/?.so;" .. package.cpath
-  lpeg = require("lpeglj")
+  lpeg = require('lpeg')
   bit32 = require('bit')
   pairs = function(x)
     do
@@ -269,7 +269,9 @@ do
       if is_compile_action == nil then
         is_compile_action = false
       end
-      assert(type(fn) == 'function', "Bad fn: " .. tostring(repr(fn)))
+      if type(fn) ~= 'function' then
+        error("Not a function: " .. tostring(repr(fn)))
+      end
       if type(signature) == 'string' then
         signature = {
           signature
@@ -354,7 +356,9 @@ do
         return nil
       end
       local tree = self:parse(nomsu_code)
-      assert(tree, "Failed to parse: " .. tostring(nomsu_code))
+      if not (tree) then
+        error("Failed to parse: " .. tostring(nomsu_code))
+      end
       local lua = self:tree_to_lua(tree):as_statements()
       lua:declare_locals()
       lua:prepend("-- File: " .. tostring(nomsu_code.source or "") .. "\n")

@@ -15,10 +15,8 @@ Source = immutable({
     if not start then
       start, stop = 1, #FILE_CACHE[filename]
     end
-    if stop then
-      assert(start <= stop + 1, "Invalid range: " .. tostring(start) .. ", " .. tostring(stop))
-    else
-      error("HUH?")
+    if stop and start > stop + 1 then
+      error("Invalid range: " .. tostring(start) .. ", " .. tostring(stop))
     end
     return filename, start, stop
   end,
@@ -56,7 +54,9 @@ Source = immutable({
     if type(self) == 'number' then
       offset, self = self, offset
     else
-      assert(type(offset) == 'number', "Cannot add Source and " .. tostring(type(offset)))
+      if type(offset) ~= 'number' then
+        error("Cannot add Source and " .. tostring(type(offset)))
+      end
     end
     return Source(self.filename, self.start + offset, self.stop)
   end,
@@ -109,8 +109,6 @@ do
       local match = string.match
       for i = 1, n do
         local b = select(i, ...)
-        assert(b ~= self, "No recursion please.")
-        assert(not Source:is_instance(b))
         bits[#bits + 1] = b
         if type(b) == 'string' then
           do
@@ -136,7 +134,6 @@ do
       end
       self.current_indent = 0
       for i, b in ipairs(bits) do
-        assert(b ~= self, "No recursion please.")
         if type(b) == 'string' then
           do
             local spaces = b:match("\n([ ]*)[^\n]*$")

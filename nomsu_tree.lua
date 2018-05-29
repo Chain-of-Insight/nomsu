@@ -38,9 +38,6 @@ Tree = function(name, kind, methods)
         if not (next(fn)) then
           return self
         end
-        if type(next(fn)) == 'string' then
-          error("SHIT")
-        end
         local _replacements = fn
         fn = function(k)
           return _replacements[k]

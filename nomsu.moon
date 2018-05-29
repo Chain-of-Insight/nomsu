@@ -15,7 +15,8 @@ _pairs, _ipairs = pairs, ipairs
 if jit
     package.cpath = "./luajit_lpeg/?.so;"..package.cpath
     --package.path = "./LPegLJ/src/?.lua;"..package.path
-    lpeg = require "lpeglj"
+    --lpeg = require "lpeglj"
+    lpeg = require 'lpeg'
     
     export bit32
     bit32 = require('bit')
@@ -302,7 +303,8 @@ class NomsuCompiler
     ]=], stub_defs
     var_pattern = re.compile "{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs
     define_action: (signature, fn, is_compile_action=false)=>
-        assert(type(fn) == 'function', "Bad fn: #{repr fn}")
+        if type(fn) != 'function'
+            error("Not a function: #{repr fn}")
         if type(signature) == 'string'
             signature = {signature}
         elseif type(signature) != 'table'
@@ -350,7 +352,8 @@ class NomsuCompiler
     run: (nomsu_code, compile_fn=nil)=>
         if #tostring(nomsu_code) == 0 then return nil
         tree = @parse(nomsu_code)
-        assert tree, "Failed to parse: #{nomsu_code}"
+        unless tree
+            error "Failed to parse: #{nomsu_code}"
         lua = @tree_to_lua(tree)\as_statements!
         lua\declare_locals!
         lua\prepend "-- File: #{nomsu_code.source or ""}\n"

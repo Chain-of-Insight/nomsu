@@ -29,8 +29,6 @@ Tree = (name, kind, methods)->
         .map = (fn)=>
             if type(fn) == 'table'
                 return @ unless next(fn)
-                if type(next(fn)) == 'string'
-                    error("SHIT")
                 _replacements = fn
                 fn = (k)-> _replacements[k]
             return @_map(fn)
