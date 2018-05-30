@@ -1229,7 +1229,7 @@ OPTIONS
     --require('ProFi')\profile "scratch/profile.txt", (profi)->
     do
         ok, ldt = pcall(require,'ldt')
-        if ok and false
+        if ok
             ldt.guard run
         else xpcall(run, err_hand)
 

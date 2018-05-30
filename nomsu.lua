@@ -1748,7 +1748,7 @@ OPTIONS
   do
     local ldt
     ok, ldt = pcall(require, 'ldt')
-    if ok and false then
+    if ok then
       ldt.guard(run)
     else
       xpcall(run, err_hand)
