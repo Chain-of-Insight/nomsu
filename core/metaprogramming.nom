@@ -152,8 +152,12 @@ immediately
         Lua "\(%code as lua expr):remove_free_vars(\(%vars as lua expr));"
 
     action [%tree as value]
-        =lua "nomsu:tree_to_value(\%tree)"
-
+        lua> ".."
+            if \%tree.type == 'Text' and #\%tree == 1 and type(\%tree[1]) == 'string' then
+                return \%tree[1]
+            end
+            local lua = Lua(\%tree.source, "return ",nomsu:tree_to_lua(\%tree))
+            return nomsu:run_lua(lua)
     
     action [%tree's stub]
         =lua "\%tree:get_stub()"

@@ -260,7 +260,7 @@ end
 local NomsuCompiler
 do
   local _class_0
-  local stub_pattern, var_pattern, _nomsu_chunk_counter, _running_files, MAX_LINE, math_expression
+  local stub_pattern, var_pattern, _running_files, MAX_LINE, math_expression
   local _base_0 = {
     define_action = function(self, signature, fn, is_compile_action)
       if is_compile_action == nil then
@@ -309,12 +309,7 @@ do
       return self:define_action(signature, fn, true)
     end,
     parse = function(self, nomsu_code)
-      if type(nomsu_code) == 'string' then
-        _nomsu_chunk_counter = _nomsu_chunk_counter + 1
-        local filename = "<nomsu chunk #" .. tostring(_nomsu_chunk_counter) .. ">.nom"
-        FILE_CACHE[filename] = nomsu_code
-        nomsu_code = Nomsu(Source(filename, 1, #nomsu_code), nomsu_code)
-      end
+      assert(type(nomsu_code) ~= 'string')
       local userdata = {
         source_code = nomsu_code,
         indent = 0,
@@ -348,12 +343,9 @@ do
       if compile_fn == nil then
         compile_fn = nil
       end
-      if #tostring(nomsu_code) == 0 then
+      local tree = assert(self:parse(nomsu_code))
+      if type(tree) == 'number' then
         return nil
-      end
-      local tree = self:parse(nomsu_code)
-      if not (tree) then
-        error("Failed to parse: " .. tostring(nomsu_code))
       end
       local lua = self:tree_to_lua(tree):as_statements()
       lua:declare_locals()
@@ -1107,28 +1099,6 @@ do
         return error("Unknown type: " .. tostring(tree.type))
       end
     end,
-    tree_to_value = function(self, tree)
-      if tree.type == 'Text' and #tree == 1 and type(tree[1]) == 'string' then
-        return tree[1]
-      end
-      local lua = Lua(tree.source, "return ", self:tree_to_lua(tree), ";")
-      return self:run_lua(lua)
-    end,
-    walk_tree = function(self, tree, depth)
-      if depth == nil then
-        depth = 0
-      end
-      coroutine.yield(tree, depth)
-      if tree.is_multi then
-        local _list_0 = tree.value
-        for _index_0 = 1, #_list_0 do
-          local v = _list_0[_index_0]
-          if Types.is_node(v) then
-            self:walk_tree(v, depth + 1)
-          end
-        end
-      end
-    end,
     initialize_core = function(self)
       local nomsu = self
       self:define_compile_action("immediately %block", function(self, _block)
@@ -1200,7 +1170,12 @@ do
         return add_lua_bits(Lua.Value(self.source), _code)
       end)
       return self:define_compile_action("use %path", function(self, _path)
-        local path = nomsu:tree_to_value(_path)
+        local path
+        if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string' then
+          path = _path[1]
+        else
+          path = nomsu:run_lua(Lua(_path.source, "return ", nomsu:tree_to_lua(_path)))
+        end
         nomsu:run_file(path)
         return Lua(_path.source, "nomsu:run_file(" .. tostring(repr(path)) .. ");")
       end)
@@ -1223,9 +1198,6 @@ do
           self[key] = id
           return id
         end
-      })
-      self.file_metadata = setmetatable({ }, {
-        __mode = "k"
       })
       self.source_map = { }
       self.environment = {
@@ -1370,7 +1342,6 @@ do
         tok <- ({'%'} %varname) / {%word}
     ]=], stub_defs)
   var_pattern = re.compile("{| ((('%' {%varname}) / %word) [ ]*)+ !. |}", stub_defs)
-  _nomsu_chunk_counter = 0
   _running_files = { }
   MAX_LINE = 80
   math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])

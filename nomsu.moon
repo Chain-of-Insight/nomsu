@@ -231,7 +231,6 @@ class NomsuCompiler
                 @[key] = id
                 return id
         })
-        @file_metadata = setmetatable({}, {__mode:"k"})
         @source_map = {}
 
         @environment = {
@@ -317,20 +316,13 @@ class NomsuCompiler
     define_compile_action: (signature, fn)=>
         return @define_action(signature, fn, true)
 
-    _nomsu_chunk_counter = 0
     parse: (nomsu_code)=>
-        if type(nomsu_code) == 'string'
-            _nomsu_chunk_counter += 1
-            filename = "<nomsu chunk ##{_nomsu_chunk_counter}>.nom"
-            FILE_CACHE[filename] = nomsu_code
-            nomsu_code = Nomsu(Source(filename,1,#nomsu_code), nomsu_code)
-
+        assert(type(nomsu_code) != 'string')
         userdata = {
             source_code:nomsu_code, indent: 0, errors: {},
             source: nomsu_code.source,
         }
         tree = NOMSU_PATTERN\match(tostring(nomsu_code), nil, userdata)
-        
         unless tree
             error "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
 
@@ -344,10 +336,9 @@ class NomsuCompiler
         return tree
 
     run: (nomsu_code, compile_fn=nil)=>
-        if #tostring(nomsu_code) == 0 then return nil
-        tree = @parse(nomsu_code)
-        unless tree
-            error "Failed to parse: #{nomsu_code}"
+        tree = assert(@parse(nomsu_code))
+        if type(tree) == 'number' -- Happens if pattern matches, but there are no captures, e.g. an empty string
+            return nil
         lua = @tree_to_lua(tree)\as_statements!
         lua\declare_locals!
         lua\prepend "-- File: #{nomsu_code.source or ""}\n"
@@ -355,7 +346,7 @@ class NomsuCompiler
             compile_fn(lua)
         return @run_lua(lua)
 
-    _running_files = {}
+    _running_files = {} -- For detecting circular imports
     run_file: (filename, compile_fn=nil)=>
         loaded = @environment.LOADED
         if loaded[filename]
@@ -886,20 +877,6 @@ class NomsuCompiler
             else
                 error("Unknown type: #{tree.type}")
     
-    tree_to_value: (tree)=>
-        -- Special case for text literals
-        if tree.type == 'Text' and #tree == 1 and type(tree[1]) == 'string'
-            return tree[1]
-        lua = Lua(tree.source, "return ",@tree_to_lua(tree),";")
-        return @run_lua(lua)
-
-    walk_tree: (tree, depth=0)=>
-        coroutine.yield(tree, depth)
-        if tree.is_multi
-            for v in *tree.value
-                if Types.is_node(v)
-                    @walk_tree(v, depth+1)
-
     initialize_core: =>
         -- Sets up some core functionality
         nomsu = self
@@ -957,7 +934,10 @@ class NomsuCompiler
             return add_lua_bits(Lua.Value(@source), _code)
 
         @define_compile_action "use %path", (_path)=>
-            path = nomsu\tree_to_value(_path)
+            path = if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
+                _path[1]
+            else
+                nomsu\run_lua Lua(_path.source, "return ",nomsu\tree_to_lua(_path))
             nomsu\run_file(path)
             return Lua(_path.source, "nomsu:run_file(#{repr path});")
 
