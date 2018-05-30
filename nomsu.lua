@@ -280,7 +280,7 @@ do
       local arg_orders = { }
       for _index_0 = 1, #signature do
         local alias = signature[_index_0]
-        local stub = assert(stub_pattern:match(alias))
+        local stub = concat(assert(stub_pattern:match(alias)), ' ')
         local stub_args = assert(var_pattern:match(alias));
         (is_compile_action and self.environment.COMPILE_ACTIONS or self.environment.ACTIONS)[stub] = fn
         do
@@ -1359,9 +1359,10 @@ do
       varname = (NOMSU_DEFS.ident_char ^ 1 * ((-P("'") * NOMSU_DEFS.operator_char ^ 1) + NOMSU_DEFS.ident_char ^ 1) ^ 0) ^ -1
     }
   end
-  stub_pattern = re.compile([=[        {~ ([ ]*->'') (('%' (%varname->'')) / %word)? (([ ]*->' ') (('%' (%varname->'')) / %word))* ([ ]*->'') ~}
+  stub_pattern = re.compile([=[        stub <- {| tok ([ ]* tok)* |} !.
+        tok <- ({'%'} %varname) / {%word}
     ]=], stub_defs)
-  var_pattern = re.compile("{| [ ]* ((('%' {%varname}) / %word) [ ]*)+ |}", stub_defs)
+  var_pattern = re.compile("{| ((('%' {%varname}) / %word) [ ]*)+ !. |}", stub_defs)
   _nomsu_chunk_counter = 0
   _running_files = { }
   MAX_LINE = 80

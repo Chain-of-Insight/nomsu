@@ -288,9 +288,10 @@ class NomsuCompiler
             varname: (.ident_char^1 * ((-P("'") * .operator_char^1) + .ident_char^1)^0)^-1
         }
     stub_pattern = re.compile [=[
-        {~ ([ ]*->'') (('%' (%varname->'')) / %word)? (([ ]*->' ') (('%' (%varname->'')) / %word))* ([ ]*->'') ~}
+        stub <- {| tok ([ ]* tok)* |} !.
+        tok <- ({'%'} %varname) / {%word}
     ]=], stub_defs
-    var_pattern = re.compile "{| [ ]* ((('%' {%varname}) / %word) [ ]*)+ |}", stub_defs
+    var_pattern = re.compile "{| ((('%' {%varname}) / %word) [ ]*)+ !. |}", stub_defs
     define_action: (signature, fn, is_compile_action=false)=>
         if type(fn) != 'function'
             error("Not a function: #{repr fn}")
@@ -304,7 +305,7 @@ class NomsuCompiler
         fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
         arg_orders = {}
         for alias in *signature
-            stub = assert(stub_pattern\match(alias))
+            stub = concat(assert(stub_pattern\match(alias)), ' ')
             stub_args = assert(var_pattern\match(alias))
             (is_compile_action and @environment.COMPILE_ACTIONS or @environment.ACTIONS)[stub] = fn
             arg_orders[stub] = [fn_arg_positions[Types.Var.as_lua_id {value:a}] for a in *stub_args]
