@@ -76,10 +76,10 @@ immediately
             (function()
                 for \(%subtree as lua expr) in coroutine.wrap(function() \(%tree as lua expr):map(coroutine.yield) end) do
                     if \(%condition as lua expr) then
-                        return true;
+                        return true
                     end
                 end
-                return false;
+                return false
             end)()
 
 # While loops
@@ -207,7 +207,10 @@ immediately
 
 # Dict iteration (lua's "pairs()")
 immediately
-    compile [for %key = %value in %iterable %body] to
+    compile [..]
+        for %key = %value in %iterable %body
+        for (%key,%value) in %iterable %body
+    ..to
         # This uses Lua's approach of only allowing loop-scoped variables in a loop
         assume (%key.type is "Var") or barf "Loop expected variable, not: \%key"
         assume (%value.type is "Var") or barf "Loop expected variable, not: \%value"

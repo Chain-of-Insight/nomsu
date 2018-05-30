@@ -55,7 +55,6 @@ STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 string.as_lua_id = (str)->
     "_"..(str\gsub("%W", (c)-> if c == "_" then "__" else ("_%x")\format(c\byte!)))
 
-
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- type checking?

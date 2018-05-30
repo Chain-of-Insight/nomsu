@@ -79,7 +79,10 @@ immediately
     parse [%expression for %var in %start to %stop] as
         %expression for %var in %start to %stop via 1
 
-    parse [%expression for %key = %value in %iterable] as
+    parse [..]
+        %expression for %key = %value in %iterable
+        %expression for (%key,%value) in %iterable
+    ..as
         result of
             %comprehension <- []
             for %key = %value in %iterable
@@ -87,14 +90,20 @@ immediately
             return %comprehension
 
     # Dict comprehensions
-    parse [%key = %value for %item in %iterable] as
+    parse [..]
+        %key = %value for %item in %iterable
+        (%key,%value) for %item in %iterable
+    ..as
         result of
             %comprehension <- {}
             for %item in %iterable
                 %comprehension.%key <- %value
             return %comprehension
 
-    parse [%key = %value for %src_key = %src_value in %iterable] as
+    parse [..]
+        %key = %value for %src_key = %src_value in %iterable
+        (%key,%value) for (%src_key,%src_value) in %iterable
+    ..as
         result of
             %comprehension <- {}
             for %src_key = %src_value in %iterable
@@ -133,7 +142,10 @@ immediately
 # Sorting
 immediately
     compile [sort %items] to: Lua "table.sort(\(%items as lua expr));"
-    parse [sort %items by %item = %key_expr] as
+    parse [..]
+        sort %items by %item = %key_expr
+        sort %items by %item -> %key_expr
+    ..as
         do
             %keys <- ({} with fallback %item -> %key_expr)
             lua> "table.sort(\%items, function(x,y) return \%keys[x] < \%keys[y] end)"
@@ -143,7 +155,10 @@ immediately
         %copy <- (% for % in %items)
         sort %copy
         return %copy
-    action [%items sorted by %item = %key]
+    action [..]
+        %items sorted by %item = %key
+        %items sorted by %item -> %key
+    ..
         %copy <- (% for % in %items)
         sort %copy by %item = %key
         return %copy
