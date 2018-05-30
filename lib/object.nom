@@ -16,7 +16,7 @@ compile [as %instance %body] to
         end
 
 compile [object %classname %class_body] to
-    %class_id <- (=lua "Var.as_lua_id({value=\(%classname as value)}):sub(2,-1)")
+    %class_id <- (=lua "string.as_lua_id(\(%classname as value)):sub(2,-1)")
     if: %class_id is ""
         %class_id <- "class"
     %methods <-: Lua ""

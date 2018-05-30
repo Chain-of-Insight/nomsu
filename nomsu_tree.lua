@@ -107,17 +107,7 @@ Tree("DictEntry", 'multi')
 Tree("IndexChain", 'multi')
 Tree("Number", 'single')
 Tree("Comment", 'single')
-Tree("Var", 'single', {
-  as_lua_id = function(self)
-    return "_" .. (self.value:gsub("%W", function(c)
-      if c == "_" then
-        return "__"
-      else
-        return ("_%x"):format(c:byte())
-      end
-    end))
-  end
-})
+Tree("Var", 'single')
 Tree("Action", 'multi', {
   get_stub = function(self, include_names)
     if include_names == nil then

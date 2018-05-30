@@ -64,6 +64,15 @@ do
   Nomsu, Lua, Source = _obj_0.Nomsu, _obj_0.Lua, _obj_0.Source
 end
 local STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
+string.as_lua_id = function(str)
+  return "_" .. (str:gsub("%W", function(c)
+    if c == "_" then
+      return "__"
+    else
+      return ("_%x"):format(c:byte())
+    end
+  end))
+end
 FILE_CACHE = setmetatable({ }, {
   __index = function(self, filename)
     local file = io.open(filename)
@@ -288,9 +297,7 @@ do
           local _len_0 = 1
           for _index_1 = 1, #stub_args do
             local a = stub_args[_index_1]
-            _accum_0[_len_0] = fn_arg_positions[Types.Var.as_lua_id({
-              value = a
-            })]
+            _accum_0[_len_0] = fn_arg_positions[string.as_lua_id(a)]
             _len_0 = _len_0 + 1
           end
           arg_orders[stub] = _accum_0
@@ -767,7 +774,7 @@ do
       elseif "Number" == _exp_0 then
         return Lua.Value(tree.source, tostring(tree.value))
       elseif "Var" == _exp_0 then
-        return Lua.Value(tree.source, tree:as_lua_id())
+        return Lua.Value(tree.source, string.as_lua_id(tree.value))
       else
         return error("Unknown type: " .. tostring(tree.type))
       end

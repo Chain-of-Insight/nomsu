@@ -52,6 +52,10 @@ debug_getinfo = debug.getinfo
 {:Nomsu, :Lua, :Source} = require "code_obj"
 STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 
+string.as_lua_id = (str)->
+    "_"..(str\gsub("%W", (c)-> if c == "_" then "__" else ("_%x")\format(c\byte!)))
+
+
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- type checking?
@@ -308,7 +312,7 @@ class NomsuCompiler
             stub = concat(assert(stub_pattern\match(alias)), ' ')
             stub_args = assert(var_pattern\match(alias))
             (is_compile_action and @environment.COMPILE_ACTIONS or @environment.ACTIONS)[stub] = fn
-            arg_orders[stub] = [fn_arg_positions[Types.Var.as_lua_id {value:a}] for a in *stub_args]
+            arg_orders[stub] = [fn_arg_positions[string.as_lua_id a] for a in *stub_args]
         @environment.ARG_ORDERS[fn] = arg_orders
 
     define_compile_action: (signature, fn)=>
@@ -641,11 +645,10 @@ class NomsuCompiler
                 Lua.Value(tree.source, tostring(tree.value))
 
             when "Var"
-                Lua.Value(tree.source, tree\as_lua_id!)
+                Lua.Value(tree.source, string.as_lua_id(tree.value))
             
             else
                 error("Unknown type: #{tree.type}")
-
 
     tree_to_nomsu: (tree, inline=false, can_use_colon=false)=>
         switch tree.type

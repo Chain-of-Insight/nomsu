@@ -57,10 +57,7 @@ Tree "DictEntry", 'multi'
 Tree "IndexChain", 'multi'
 Tree "Number", 'single'
 Tree "Comment", 'single'
-
-Tree "Var", 'single',
-    as_lua_id: =>
-        "_"..(@value\gsub("%W", (c)-> if c == "_" then "__" else ("_%x")\format(c\byte!)))
+Tree "Var", 'single'
 
 Tree "Action", 'multi',
     get_stub: (include_names=false)=>

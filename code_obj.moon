@@ -170,7 +170,7 @@ class Lua extends Code
             gather_from self
         if #to_declare > 0
             @remove_free_vars to_declare
-            @prepend "local #{concat [v\as_lua_id! for v in *to_declare], ", "};\n"
+            @prepend "local #{concat [string.as_lua_id(v.value) for v in *to_declare], ", "};\n"
         return to_declare
 
     __tostring: =>

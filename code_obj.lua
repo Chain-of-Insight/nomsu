@@ -291,7 +291,7 @@ do
           local _len_0 = 1
           for _index_0 = 1, #to_declare do
             local v = to_declare[_index_0]
-            _accum_0[_len_0] = v:as_lua_id()
+            _accum_0[_len_0] = string.as_lua_id(v.value)
             _len_0 = _len_0 + 1
           end
           return _accum_0
