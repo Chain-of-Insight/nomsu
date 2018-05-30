@@ -114,15 +114,6 @@ LINE_STARTS = setmetatable {}, {
 --   nomsu_filename, nomsu_file, lua_filename, lua_file
 LUA_METADATA = {}
 
-lua_line_to_nomsu_line = (lua_filename, lua_line_no)->
-    metadata = assert LUA_METADATA[lua_filename], "Failed to find nomsu metadata for: #{lua_filename}."
-    lua_offset = LINE_STARTS[metadata.lua_file][lua_line_no]
-    best = metadata.nomsu_sources[1]
-    for lua,nomsu in pairs metadata.lua_to_nomsu
-        if lua.start <= lua_offset and lua > best
-            best = lua
-    return best\get_line_number!
-
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
 -- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
 -- Note: This globally affects all strings in this instance of Lua!
@@ -420,17 +411,8 @@ class NomsuCompiler
             source = lua.source
             nomsu_raw = FILE_CACHE[source.filename]\sub(source.start, source.stop)
 
-            get_line_starts = (s)->
-                starts = {}
-                pos = 1
-                for line in s\gmatch("[^\n]*\n")
-                    insert starts, pos
-                    pos += #line
-                insert starts, pos
-                return starts
-
-            nomsu_line_to_pos = get_line_starts(nomsu_raw)
-            lua_line_to_pos = get_line_starts(tostring(lua))
+            nomsu_line_to_pos = LINE_STARTS[nomsu_raw]
+            lua_line_to_pos = LINE_STARTS[tostring(lua)]
 
             pos_to_line = (line_starts, pos)->
                 -- Binary search for line number of position
@@ -1036,11 +1018,8 @@ OPTIONS
         else debug_getinfo(thread,f,what)
         if not info or not info.func then return info
         if info.short_src or info.source or info.linedefine or info.currentline
-            for k,v in pairs(nomsu.environment.ACTIONS)
-                if v == info.func
-                    info.name = k
-                    break
-
+            if arg_orders = nomsu.environment.ARG_ORDERS[info.func]
+                info.name = next(arg_orders)
             if map = nomsu.source_map[info.source]
                 if info.currentline
                     info.currentline = assert(map[info.currentline])
@@ -1051,7 +1030,7 @@ OPTIONS
                 info.short_src = info.source\match('"([^[]*)')
         return info
 
-    print_err_msg = (error_message, stack_offset=2)->
+    print_err_msg = (error_message, stack_offset=3)->
         io.stderr\write("#{colored.red "ERROR:"} #{colored.bright colored.red (error_message or "")}\n")
         io.stderr\write("stack traceback:\n")
 
@@ -1059,7 +1038,16 @@ OPTIONS
         ok, to_lua = pcall -> require('moonscript.base').to_lua
         if not ok then to_lua = -> nil
         nomsu_source = FILE_CACHE["nomsu.moon"]
-        _, line_table = to_lua(nomsu_source)
+        LINE_TABLES = setmetatable {},
+            __index: (file)=>
+                _, line_table = to_lua(file)
+                self[file] = line_table or false
+                return line_table or false
+
+        get_line = (file, line_no)->
+            start = LINE_STARTS[file][line_no] or 1
+            stop = (LINE_STARTS[file][line_no+1] or 0) - 1
+            return file\sub(start, stop)
 
         level = stack_offset
         while true
@@ -1069,38 +1057,62 @@ OPTIONS
             if calling_fn.func == run then break
             level += 1
             name = calling_fn.name
+            if calling_fn.linedefined == 0 then name = "main chunk"
             if name == "run_lua_fn" then continue
             line = nil
-            [=[
-            if metadata = nomsu.action_metadata[calling_fn.func]
-                filename, start, stop = metadata.source\match("([^:]*):([0-9]*),([0-9]*)")
-                if filename
-                    file = FILE_CACHE[filename]
-                    line_no = 1
-                    for _ in file\sub(1,tonumber(start))\gmatch("\n") do line_no += 1
-                    offending_statement = file\sub(tonumber(start),tonumber(stop))
-                    if #offending_statement > 50
-                        offending_statement = offending_statement\sub(1,50).."..."
-                    offending_statement = colored.red(offending_statement)
-                    line = colored.yellow(filename..":"..tostring(line_no).."\n    "..offending_statement)
+            if map = nomsu.source_map[calling_fn.source]
+                if calling_fn.currentline
+                    calling_fn.currentline = assert(map[calling_fn.currentline])
+                if calling_fn.linedefined
+                    calling_fn.linedefined = assert(map[calling_fn.linedefined])
+                if calling_fn.lastlinedefined
+                    calling_fn.lastlinedefined = assert(map[calling_fn.lastlinedefined])
+                calling_fn.short_src = calling_fn.source\match('"([^[]*)')
+                filename,start,stop = calling_fn.source\match('"([^[]*)%[([0-9]+):([0-9]+)]"')
+                assert(filename)
+                file = FILE_CACHE[filename]\sub(tonumber(start),tonumber(stop))
+                err_line = get_line(file, calling_fn.currentline)\sub(1,-2)
+                offending_statement = colored.red(err_line)
+                line = colored.yellow("#{filename}:#{calling_fn.currentline}\n#{offending_statement}")
+                if arg_orders = nomsu.environment.ARG_ORDERS[calling_fn.func]
+                    name = colored.bright(colored.yellow next(arg_orders))
                 else
-                    line = colored.yellow(metadata.source)
-                name = colored.bright(colored.yellow(metadata.aliases[1]))
+                    name = colored.bright(colored.yellow "main chunk")
             else
                 if calling_fn.istailcall and not name
                     name = "<tail call>"
-                if calling_fn.short_src == "./nomsu.moon" and line_table
-                    char = line_table[calling_fn.currentline]
+                ok, file = pcall ->FILE_CACHE[calling_fn.short_src]
+                if not ok then file = nil
+                local line_num
+                if name == nil and debug.getinfo(level+1)
+                    i = 1
+                    while true
+                        -- '+1' to get to one level higher than the callsite
+                        varname, val = debug.getlocal(level+1, i)
+                        if not varname then break
+                        if val == calling_fn.func
+                            name = varname
+                            if not varname\match("%(")
+                                break
+                        i += 1
+                if file and calling_fn.short_src\match(".moon$") and LINE_TABLES[file]
+                    char = LINE_TABLES[file][calling_fn.currentline]
                     line_num = 1
-                    for _ in nomsu_source\sub(1,char)\gmatch("\n") do line_num += 1
+                    for _ in file\sub(1,char)\gmatch("\n") do line_num += 1
                     line = colored.cyan("#{calling_fn.short_src}:#{line_num}")
                     name = colored.bright(colored.cyan(name or "???"))
                 else
+                    line_num = calling_fn.currentline
                     line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline}")
                     name = colored.bright(colored.blue(name or "???"))
+
+                if file
+                    err_line = get_line(file, line_num)\sub(1,-2)
+                    offending_statement = colored.red(err_line)
+                    line ..= "\n"..offending_statement
             _from = colored.dim colored.white "|"
             io.stderr\write(("%32s %s %s\n")\format(name, _from, line))
-            ]=]
+
         io.stderr\flush!
     
     run = ->

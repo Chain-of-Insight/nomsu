@@ -124,18 +124,6 @@ LINE_STARTS = setmetatable({ }, {
   end
 })
 local LUA_METADATA = { }
-local lua_line_to_nomsu_line
-lua_line_to_nomsu_line = function(lua_filename, lua_line_no)
-  local metadata = assert(LUA_METADATA[lua_filename], "Failed to find nomsu metadata for: " .. tostring(lua_filename) .. ".")
-  local lua_offset = LINE_STARTS[metadata.lua_file][lua_line_no]
-  local best = metadata.nomsu_sources[1]
-  for lua, nomsu in pairs(metadata.lua_to_nomsu) do
-    if lua.start <= lua_offset and lua > best then
-      best = lua
-    end
-  end
-  return best:get_line_number()
-end
 do
   local STRING_METATABLE = getmetatable("")
   STRING_METATABLE.__add = function(self, other)
@@ -453,19 +441,8 @@ do
         local offset = 1
         local source = lua.source
         local nomsu_raw = FILE_CACHE[source.filename]:sub(source.start, source.stop)
-        local get_line_starts
-        get_line_starts = function(s)
-          local starts = { }
-          local pos = 1
-          for line in s:gmatch("[^\n]*\n") do
-            insert(starts, pos)
-            pos = pos + #line
-          end
-          insert(starts, pos)
-          return starts
-        end
-        local nomsu_line_to_pos = get_line_starts(nomsu_raw)
-        local lua_line_to_pos = get_line_starts(tostring(lua))
+        local nomsu_line_to_pos = LINE_STARTS[nomsu_raw]
+        local lua_line_to_pos = LINE_STARTS[tostring(lua)]
         local pos_to_line
         pos_to_line = function(line_starts, pos)
           local lo, hi = 1, #line_starts
@@ -1459,10 +1436,10 @@ OPTIONS
       return info
     end
     if info.short_src or info.source or info.linedefine or info.currentline then
-      for k, v in pairs(nomsu.environment.ACTIONS) do
-        if v == info.func then
-          info.name = k
-          break
+      do
+        local arg_orders = nomsu.environment.ARG_ORDERS[info.func]
+        if arg_orders then
+          info.name = next(arg_orders)
         end
       end
       do
@@ -1486,7 +1463,7 @@ OPTIONS
   local print_err_msg
   print_err_msg = function(error_message, stack_offset)
     if stack_offset == nil then
-      stack_offset = 2
+      stack_offset = 3
     end
     io.stderr:write(tostring(colored.red("ERROR:")) .. " " .. tostring(colored.bright(colored.red((error_message or "")))) .. "\n")
     io.stderr:write("stack traceback:\n")
@@ -1499,7 +1476,19 @@ OPTIONS
       end
     end
     local nomsu_source = FILE_CACHE["nomsu.moon"]
-    local _, line_table = to_lua(nomsu_source)
+    local LINE_TABLES = setmetatable({ }, {
+      __index = function(self, file)
+        local _, line_table = to_lua(file)
+        self[file] = line_table or false
+        return line_table or false
+      end
+    })
+    local get_line
+    get_line = function(file, line_no)
+      local start = LINE_STARTS[file][line_no] or 1
+      local stop = (LINE_STARTS[file][line_no + 1] or 0) - 1
+      return file:sub(start, stop)
+    end
     local level = stack_offset
     while true do
       local _continue_0 = false
@@ -1513,40 +1502,91 @@ OPTIONS
         end
         level = level + 1
         local name = calling_fn.name
+        if calling_fn.linedefined == 0 then
+          name = "main chunk"
+        end
         if name == "run_lua_fn" then
           _continue_0 = true
           break
         end
         local line = nil
-        _ = [=[            if metadata = nomsu.action_metadata[calling_fn.func]
-                filename, start, stop = metadata.source\match("([^:]*):([0-9]*),([0-9]*)")
-                if filename
-                    file = FILE_CACHE[filename]
-                    line_no = 1
-                    for _ in file\sub(1,tonumber(start))\gmatch("\n") do line_no += 1
-                    offending_statement = file\sub(tonumber(start),tonumber(stop))
-                    if #offending_statement > 50
-                        offending_statement = offending_statement\sub(1,50).."..."
-                    offending_statement = colored.red(offending_statement)
-                    line = colored.yellow(filename..":"..tostring(line_no).."\n    "..offending_statement)
-                else
-                    line = colored.yellow(metadata.source)
-                name = colored.bright(colored.yellow(metadata.aliases[1]))
+        do
+          local map = nomsu.source_map[calling_fn.source]
+          if map then
+            if calling_fn.currentline then
+              calling_fn.currentline = assert(map[calling_fn.currentline])
+            end
+            if calling_fn.linedefined then
+              calling_fn.linedefined = assert(map[calling_fn.linedefined])
+            end
+            if calling_fn.lastlinedefined then
+              calling_fn.lastlinedefined = assert(map[calling_fn.lastlinedefined])
+            end
+            calling_fn.short_src = calling_fn.source:match('"([^[]*)')
+            local filename, start, stop = calling_fn.source:match('"([^[]*)%[([0-9]+):([0-9]+)]"')
+            assert(filename)
+            local file = FILE_CACHE[filename]:sub(tonumber(start), tonumber(stop))
+            local err_line = get_line(file, calling_fn.currentline):sub(1, -2)
+            local offending_statement = colored.red(err_line)
+            line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. "\n" .. tostring(offending_statement))
+            do
+              local arg_orders = nomsu.environment.ARG_ORDERS[calling_fn.func]
+              if arg_orders then
+                name = colored.bright(colored.yellow(next(arg_orders)))
+              else
+                name = colored.bright(colored.yellow("main chunk"))
+              end
+            end
+          else
+            if calling_fn.istailcall and not name then
+              name = "<tail call>"
+            end
+            local file
+            ok, file = pcall(function()
+              return FILE_CACHE[calling_fn.short_src]
+            end)
+            if not ok then
+              file = nil
+            end
+            local line_num
+            if name == nil and debug.getinfo(level + 1) then
+              local i = 1
+              while true do
+                local varname, val = debug.getlocal(level + 1, i)
+                if not varname then
+                  break
+                end
+                if val == calling_fn.func then
+                  name = varname
+                  if not varname:match("%(") then
+                    break
+                  end
+                end
+                i = i + 1
+              end
+            end
+            if file and calling_fn.short_src:match(".moon$") and LINE_TABLES[file] then
+              local char = LINE_TABLES[file][calling_fn.currentline]
+              line_num = 1
+              for _ in file:sub(1, char):gmatch("\n") do
+                line_num = line_num + 1
+              end
+              line = colored.cyan(tostring(calling_fn.short_src) .. ":" .. tostring(line_num))
+              name = colored.bright(colored.cyan(name or "???"))
             else
-                if calling_fn.istailcall and not name
-                    name = "<tail call>"
-                if calling_fn.short_src == "./nomsu.moon" and line_table
-                    char = line_table[calling_fn.currentline]
-                    line_num = 1
-                    for _ in nomsu_source\sub(1,char)\gmatch("\n") do line_num += 1
-                    line = colored.cyan("#{calling_fn.short_src}:#{line_num}")
-                    name = colored.bright(colored.cyan(name or "???"))
-                else
-                    line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline}")
-                    name = colored.bright(colored.blue(name or "???"))
-            _from = colored.dim colored.white "|"
-            io.stderr\write(("%32s %s %s\n")\format(name, _from, line))
-            ]=]
+              line_num = calling_fn.currentline
+              line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline))
+              name = colored.bright(colored.blue(name or "???"))
+            end
+            if file then
+              local err_line = get_line(file, line_num):sub(1, -2)
+              local offending_statement = colored.red(err_line)
+              line = line .. ("\n" .. offending_statement)
+            end
+          end
+        end
+        local _from = colored.dim(colored.white("|"))
+        io.stderr:write(("%32s %s %s\n"):format(name, _from, line))
         _continue_0 = true
       until true
       if not _continue_0 then
