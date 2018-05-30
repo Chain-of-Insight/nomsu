@@ -1,11 +1,8 @@
 file:
-    shebang?
     (ignored_line %nl)*
     (block / action / expression)?
     (%nl ignored_line)*
     (!. / (({} (.* -> "Parse error") %userdata) => error))
-
-shebang: "#!" [^%nl]* (!. / %nl)
 
 inline_block (Block):
     {| inline_statement (%ws* ";" %ws*  inline_statement)+ |}
