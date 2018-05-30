@@ -1056,7 +1056,7 @@ OPTIONS
             if not calling_fn then break
             if calling_fn.func == run then break
             level += 1
-            name = calling_fn.name
+            name = calling_fn.name and "function '#{calling_fn.name}'" or nil
             if calling_fn.linedefined == 0 then name = "main chunk"
             if name == "run_lua_fn" then continue
             line = nil
@@ -1072,46 +1072,57 @@ OPTIONS
                 assert(filename)
                 file = FILE_CACHE[filename]\sub(tonumber(start),tonumber(stop))
                 err_line = get_line(file, calling_fn.currentline)\sub(1,-2)
-                offending_statement = colored.red(err_line)
-                line = colored.yellow("#{filename}:#{calling_fn.currentline}\n#{offending_statement}")
+                offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)")))
                 if arg_orders = nomsu.environment.ARG_ORDERS[calling_fn.func]
-                    name = colored.bright(colored.yellow next(arg_orders))
+                    name = "action '#{next(arg_orders)}'"
                 else
-                    name = colored.bright(colored.yellow "main chunk")
+                    name = "main chunk"
+                line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}")
             else
-                if calling_fn.istailcall and not name
-                    name = "<tail call>"
                 ok, file = pcall ->FILE_CACHE[calling_fn.short_src]
                 if not ok then file = nil
                 local line_num
-                if name == nil and debug.getinfo(level+1)
-                    i = 1
-                    while true
-                        -- '+1' to get to one level higher than the callsite
-                        varname, val = debug.getlocal(level+1, i)
-                        if not varname then break
-                        if val == calling_fn.func
-                            name = varname
-                            if not varname\match("%(")
-                                break
-                        i += 1
+                if name == nil
+                    search_level = level
+                    _info = debug.getinfo(search_level)
+                    while _info and (_info.func == pcall or _info.func == xpcall)
+                        search_level += 1
+                        _info = debug.getinfo(search_level)
+                    if _info
+                        for i=1,999
+                            varname, val = debug.getlocal(search_level, i)
+                            if not varname then break
+                            if val == calling_fn.func
+                                name = "local '#{varname}'"
+                                if not varname\match("%(")
+                                    break
+                        unless name
+                            for i=1,_info.nups
+                                varname, val = debug.getupvalue(_info.func, i)
+                                if not varname then break
+                                if val == calling_fn.func
+                                    name = "upvalue '#{varname}'"
+                                    if not varname\match("%(")
+                                        break
                 if file and calling_fn.short_src\match(".moon$") and LINE_TABLES[file]
                     char = LINE_TABLES[file][calling_fn.currentline]
                     line_num = 1
                     for _ in file\sub(1,char)\gmatch("\n") do line_num += 1
-                    line = colored.cyan("#{calling_fn.short_src}:#{line_num}")
-                    name = colored.bright(colored.cyan(name or "???"))
+                    line = colored.cyan("#{calling_fn.short_src}:#{line_num} in #{name or '?'}")
                 else
                     line_num = calling_fn.currentline
-                    line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline}")
-                    name = colored.bright(colored.blue(name or "???"))
+                    if calling_fn.short_src == '[C]'
+                        line = colored.green("#{calling_fn.short_src} in #{name or '?'}")
+                    else
+                        line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline} in #{name or '?'}")
 
                 if file
                     err_line = get_line(file, line_num)\sub(1,-2)
-                    offending_statement = colored.red(err_line)
-                    line ..= "\n"..offending_statement
-            _from = colored.dim colored.white "|"
-            io.stderr\write(("%32s %s %s\n")\format(name, _from, line))
+                    offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)$")))
+                    line ..= "\n        "..offending_statement
+            io.stderr\write("    #{line}\n")
+            if calling_fn.istailcall
+                io.stderr\write("    #{colored.dim colored.white "  (...tail calls...)"}\n")
 
         io.stderr\flush!
     
@@ -1218,7 +1229,7 @@ OPTIONS
     --require('ProFi')\profile "scratch/profile.txt", (profi)->
     do
         ok, ldt = pcall(require,'ldt')
-        if ok
+        if ok and false
             ldt.guard run
         else xpcall(run, err_hand)
 

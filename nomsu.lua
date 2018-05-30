@@ -1501,7 +1501,7 @@ OPTIONS
           break
         end
         level = level + 1
-        local name = calling_fn.name
+        local name = calling_fn.name and "function '" .. tostring(calling_fn.name) .. "'" or nil
         if calling_fn.linedefined == 0 then
           name = "main chunk"
         end
@@ -1527,20 +1527,17 @@ OPTIONS
             assert(filename)
             local file = FILE_CACHE[filename]:sub(tonumber(start), tonumber(stop))
             local err_line = get_line(file, calling_fn.currentline):sub(1, -2)
-            local offending_statement = colored.red(err_line)
-            line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. "\n" .. tostring(offending_statement))
+            local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)")))
             do
               local arg_orders = nomsu.environment.ARG_ORDERS[calling_fn.func]
               if arg_orders then
-                name = colored.bright(colored.yellow(next(arg_orders)))
+                name = "action '" .. tostring(next(arg_orders)) .. "'"
               else
-                name = colored.bright(colored.yellow("main chunk"))
+                name = "main chunk"
               end
             end
+            line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement))
           else
-            if calling_fn.istailcall and not name then
-              name = "<tail call>"
-            end
             local file
             ok, file = pcall(function()
               return FILE_CACHE[calling_fn.short_src]
@@ -1549,20 +1546,40 @@ OPTIONS
               file = nil
             end
             local line_num
-            if name == nil and debug.getinfo(level + 1) then
-              local i = 1
-              while true do
-                local varname, val = debug.getlocal(level + 1, i)
-                if not varname then
-                  break
-                end
-                if val == calling_fn.func then
-                  name = varname
-                  if not varname:match("%(") then
+            if name == nil then
+              local search_level = level
+              local _info = debug.getinfo(search_level)
+              while _info and (_info.func == pcall or _info.func == xpcall) do
+                search_level = search_level + 1
+                _info = debug.getinfo(search_level)
+              end
+              if _info then
+                for i = 1, 999 do
+                  local varname, val = debug.getlocal(search_level, i)
+                  if not varname then
                     break
                   end
+                  if val == calling_fn.func then
+                    name = "local '" .. tostring(varname) .. "'"
+                    if not varname:match("%(") then
+                      break
+                    end
+                  end
                 end
-                i = i + 1
+                if not (name) then
+                  for i = 1, _info.nups do
+                    local varname, val = debug.getupvalue(_info.func, i)
+                    if not varname then
+                      break
+                    end
+                    if val == calling_fn.func then
+                      name = "upvalue '" .. tostring(varname) .. "'"
+                      if not varname:match("%(") then
+                        break
+                      end
+                    end
+                  end
+                end
               end
             end
             if file and calling_fn.short_src:match(".moon$") and LINE_TABLES[file] then
@@ -1571,22 +1588,26 @@ OPTIONS
               for _ in file:sub(1, char):gmatch("\n") do
                 line_num = line_num + 1
               end
-              line = colored.cyan(tostring(calling_fn.short_src) .. ":" .. tostring(line_num))
-              name = colored.bright(colored.cyan(name or "???"))
+              line = colored.cyan(tostring(calling_fn.short_src) .. ":" .. tostring(line_num) .. " in " .. tostring(name or '?'))
             else
               line_num = calling_fn.currentline
-              line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline))
-              name = colored.bright(colored.blue(name or "???"))
+              if calling_fn.short_src == '[C]' then
+                line = colored.green(tostring(calling_fn.short_src) .. " in " .. tostring(name or '?'))
+              else
+                line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name or '?'))
+              end
             end
             if file then
               local err_line = get_line(file, line_num):sub(1, -2)
-              local offending_statement = colored.red(err_line)
-              line = line .. ("\n" .. offending_statement)
+              local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)$")))
+              line = line .. ("\n        " .. offending_statement)
             end
           end
         end
-        local _from = colored.dim(colored.white("|"))
-        io.stderr:write(("%32s %s %s\n"):format(name, _from, line))
+        io.stderr:write("    " .. tostring(line) .. "\n")
+        if calling_fn.istailcall then
+          io.stderr:write("    " .. tostring(colored.dim(colored.white("  (...tail calls...)"))) .. "\n")
+        end
         _continue_0 = true
       until true
       if not _continue_0 then
@@ -1727,7 +1748,7 @@ OPTIONS
   do
     local ldt
     ok, ldt = pcall(require, 'ldt')
-    if ok then
+    if ok and false then
       ldt.guard(run)
     else
       xpcall(run, err_hand)
