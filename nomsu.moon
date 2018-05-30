@@ -109,11 +109,6 @@ LINE_STARTS = setmetatable {}, {
         return line_starts
 }
 
--- Map from unique nomsu chunkname to:
---   lua_to_nomsu, nomsu_to_lua, lua_sources, nomsu_sources,
---   nomsu_filename, nomsu_file, lua_filename, lua_file
-LUA_METADATA = {}
-
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
 -- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
 -- Note: This globally affects all strings in this instance of Lua!
@@ -133,16 +128,12 @@ NOMSU_DEFS = with {}
     .nl = P("\r")^-1 * P("\n")
     .ws = S(" \t")
     .tonumber = tonumber
-    .print = (src,pos,msg)->
-        print(msg, pos, repr(src\sub(math.max(0,pos-16),math.max(0,pos-1)).."|"..src\sub(pos,pos+16)))
-        return true
     string_escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
     digit, hex = R('09'), R('09','af','AF')
     .escaped_char = (P("\\")*S("xX")*C(hex*hex)) / => string.char(tonumber(@, 16))
     .escaped_char += (P("\\")*C(digit*(digit^-2))) / => string.char(tonumber @)
     .escaped_char += (P("\\")*C(S("ntbavfr"))) / string_escapes
     .operator_char = S("'~`!@$^&*-+=|<>?/")
-    .operator = .operator_char^1
     .utf8_char = (
         R("\194\223")*R("\128\191") +
         R("\224\239")*R("\128\191")*R("\128\191") +
@@ -285,15 +276,16 @@ class NomsuCompiler
         @environment.Types = Types
         @initialize_core!
     
-    stub_defs = {
-        space:(P(' ') + P('\n..'))^0
-        word:(NOMSU_DEFS.ident_char^1 + NOMSU_DEFS.operator)
-        varname:(R('az','AZ','09') + P('_') + NOMSU_DEFS.utf8_char + (-P("'") * NOMSU_DEFS.operator))^0
-    }
+    local stub_defs
+    with NOMSU_DEFS
+        stub_defs = {
+            word: (-R("09") * .ident_char^1) + .operator_char^1
+            varname: (.ident_char^1 * ((-P("'") * .operator_char^1) + .ident_char^1)^0)^-1
+        }
     stub_pattern = re.compile [=[
-        {~ (%space->'') (('%' (%varname->'')) / %word)? ((%space->' ') (('%' (%varname->'')) / %word))* (%space->'') ~}
+        {~ ([ ]*->'') (('%' (%varname->'')) / %word)? (([ ]*->' ') (('%' (%varname->'')) / %word))* ([ ]*->'') ~}
     ]=], stub_defs
-    var_pattern = re.compile "{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs
+    var_pattern = re.compile "{| [ ]* ((('%' {%varname}) / %word) [ ]*)+ |}", stub_defs
     define_action: (signature, fn, is_compile_action=false)=>
         if type(fn) != 'function'
             error("Not a function: #{repr fn}")

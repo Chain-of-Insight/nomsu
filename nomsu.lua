@@ -123,7 +123,6 @@ LINE_STARTS = setmetatable({ }, {
     return line_starts
   end
 })
-local LUA_METADATA = { }
 do
   local STRING_METATABLE = getmetatable("")
   STRING_METATABLE.__add = function(self, other)
@@ -148,10 +147,6 @@ do
   _with_0.nl = P("\r") ^ -1 * P("\n")
   _with_0.ws = S(" \t")
   _with_0.tonumber = tonumber
-  _with_0.print = function(src, pos, msg)
-    print(msg, pos, repr(src:sub(math.max(0, pos - 16), math.max(0, pos - 1)) .. "|" .. src:sub(pos, pos + 16)))
-    return true
-  end
   local string_escapes = {
     n = "\n",
     t = "\t",
@@ -170,7 +165,6 @@ do
   end)
   _with_0.escaped_char = _with_0.escaped_char + ((P("\\") * C(S("ntbavfr"))) / string_escapes)
   _with_0.operator_char = S("'~`!@$^&*-+=|<>?/")
-  _with_0.operator = _with_0.operator_char ^ 1
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
   _with_0.indent = Cmt(Carg(1), function(self, start, userdata)
@@ -251,7 +245,7 @@ end
 local NomsuCompiler
 do
   local _class_0
-  local stub_defs, stub_pattern, var_pattern, _nomsu_chunk_counter, _running_files, MAX_LINE, math_expression
+  local stub_pattern, var_pattern, _nomsu_chunk_counter, _running_files, MAX_LINE, math_expression
   local _base_0 = {
     define_action = function(self, signature, fn, is_compile_action)
       if is_compile_action == nil then
@@ -1351,14 +1345,16 @@ do
   })
   _base_0.__class = _class_0
   local self = _class_0
-  stub_defs = {
-    space = (P(' ') + P('\n..')) ^ 0,
-    word = (NOMSU_DEFS.ident_char ^ 1 + NOMSU_DEFS.operator),
-    varname = (R('az', 'AZ', '09') + P('_') + NOMSU_DEFS.utf8_char + (-P("'") * NOMSU_DEFS.operator)) ^ 0
-  }
-  stub_pattern = re.compile([=[        {~ (%space->'') (('%' (%varname->'')) / %word)? ((%space->' ') (('%' (%varname->'')) / %word))* (%space->'') ~}
+  local stub_defs
+  do
+    stub_defs = {
+      word = (-R("09") * NOMSU_DEFS.ident_char ^ 1) + NOMSU_DEFS.operator_char ^ 1,
+      varname = (NOMSU_DEFS.ident_char ^ 1 * ((-P("'") * NOMSU_DEFS.operator_char ^ 1) + NOMSU_DEFS.ident_char ^ 1) ^ 0) ^ -1
+    }
+  end
+  stub_pattern = re.compile([=[        {~ ([ ]*->'') (('%' (%varname->'')) / %word)? (([ ]*->' ') (('%' (%varname->'')) / %word))* ([ ]*->'') ~}
     ]=], stub_defs)
-  var_pattern = re.compile("{| %space ((('%' {%varname}) / %word) %space)+ |}", stub_defs)
+  var_pattern = re.compile("{| [ ]* ((('%' {%varname}) / %word) [ ]*)+ |}", stub_defs)
   _nomsu_chunk_counter = 0
   _running_files = { }
   MAX_LINE = 80

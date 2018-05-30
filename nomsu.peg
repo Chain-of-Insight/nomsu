@@ -52,9 +52,9 @@ inline_action (Action):
 action (Action):
     {| (expression (dotdot? %ws*))* word ((dotdot? %ws*) (expression / word))* |}
 
-word: { %operator / (!number plain_word) }
+word: { %operator_char+ / (!number %ident_char+) }
 
-text_word (Text): {| {%operator / (!number plain_word)} |}
+text_word (Text): {| word |}
 
 inline_text (Text):
     !('".."' eol)
@@ -90,7 +90,7 @@ number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonum
 
 -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
 -- which is a hack to allow %'s to parse as "%" and "' s" separately
-variable (Var): "%" { (plain_word ((!"'" %operator) / plain_word)*)? }
+variable (Var): "%" { (%ident_char+ ((!"'" %operator_char+) / %ident_char+)*)? }
 
 inline_list (List):
     !('[..]')
@@ -135,4 +135,3 @@ dedent: eol (%nl ignored_line)* (((!.) %dedent) / (&(%nl %dedent)))
 non_dedent_error: (!dedent .)* eol (%nl ignored_line)* (!. / &%nl)
 comma: %ws* "," %ws*
 dotdot: nodent ".."
-plain_word: ([a-zA-Z0-9_-] / %utf8_char)+
