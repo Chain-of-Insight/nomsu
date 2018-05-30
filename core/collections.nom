@@ -110,8 +110,8 @@ immediately
         return %flat
 
     parse [entries in %dict] as: {key:%k, value:%v} for %k = %v in %dict
-    parse [keys in %dict] as: %k for %k = %v in %dict
-    parse [values in %dict] as: %v for %k = %v in %dict
+    parse [keys in %dict, keys of %dict] as: %k for %k = %v in %dict
+    parse [values in %dict, values of %dict] as: %v for %k = %v in %dict
 
 # Metatable stuff
 immediately

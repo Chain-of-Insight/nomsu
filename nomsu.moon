@@ -164,6 +164,9 @@ NOMSU_DEFS = with {}
         seen_errors = userdata.errors
         if seen_errors[start_pos]
             return true
+        if utils.size(seen_errors) >= 10
+            seen_errors[start_pos+1] = colored.bright colored.yellow colored.onred "Too many errors, canceling parsing..."
+            return #src
         err_pos = start_pos
         --if src\sub(err_pos,err_pos)\match("[\r\n]")
         --    err_pos += #src\match("[ \t\n\r]*", err_pos)
@@ -173,11 +176,13 @@ NOMSU_DEFS = with {}
         prev_line = line_no == 1 and "" or src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-2)
         err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-2)
         next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-2)
-        pointer = ("-")\rep(err_pos-LINE_STARTS[src][line_no]) .. "^"
-        err_msg = (err_msg or "Parse error").." at #{userdata.source.filename}:#{line_no}:\n"
-        if #prev_line > 0 then err_msg ..= "\n"..prev_line
-        err_msg ..= "\n#{err_line}\n#{pointer}"
-        if #next_line > 0 then err_msg ..= "\n"..next_line
+        i = err_pos-LINE_STARTS[src][line_no]
+        pointer = ("-")\rep(i) .. "^"
+        err_msg = colored.bright colored.yellow colored.onred (err_msg or "Parse error").." at #{userdata.source.filename}:#{line_no}:"
+        if #prev_line > 0 then err_msg ..= "\n"..colored.dim(prev_line)
+        err_line = colored.white(err_line\sub(1, i))..colored.bright(colored.red(err_line\sub(i+1,i+1)))..colored.dim(err_line\sub(i+2,-1))
+        err_msg ..= "\n#{err_line}\n#{colored.red pointer}"
+        if #next_line > 0 then err_msg ..= "\n"..colored.dim(next_line)
         --error(err_msg)
         seen_errors[start_pos] = err_msg
         return true
@@ -329,7 +334,8 @@ class NomsuCompiler
             keys = utils.keys(userdata.errors)
             table.sort(keys)
             errors = [userdata.errors[k] for k in *keys]
-            error(concat(errors, "\n\n"), 0)
+            io.stderr\write(concat(errors, "\n\n").."\n")
+            os.exit!
         
         return tree
 

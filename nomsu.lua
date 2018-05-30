@@ -190,6 +190,10 @@ do
     if seen_errors[start_pos] then
       return true
     end
+    if utils.size(seen_errors) >= 10 then
+      seen_errors[start_pos + 1] = colored.bright(colored.yellow(colored.onred("Too many errors, canceling parsing...")))
+      return #src
+    end
     local err_pos = start_pos
     local text_loc = userdata.source:sub(err_pos, err_pos)
     local line_no = text_loc:get_line_number()
@@ -197,14 +201,16 @@ do
     local prev_line = line_no == 1 and "" or src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 2)
     local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 2)
     local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 2)
-    local pointer = ("-"):rep(err_pos - LINE_STARTS[src][line_no]) .. "^"
-    err_msg = (err_msg or "Parse error") .. " at " .. tostring(userdata.source.filename) .. ":" .. tostring(line_no) .. ":\n"
+    local i = err_pos - LINE_STARTS[src][line_no]
+    local pointer = ("-"):rep(i) .. "^"
+    err_msg = colored.bright(colored.yellow(colored.onred((err_msg or "Parse error") .. " at " .. tostring(userdata.source.filename) .. ":" .. tostring(line_no) .. ":")))
     if #prev_line > 0 then
-      err_msg = err_msg .. ("\n" .. prev_line)
+      err_msg = err_msg .. ("\n" .. colored.dim(prev_line))
     end
-    err_msg = err_msg .. "\n" .. tostring(err_line) .. "\n" .. tostring(pointer)
+    err_line = colored.white(err_line:sub(1, i)) .. colored.bright(colored.red(err_line:sub(i + 1, i + 1))) .. colored.dim(err_line:sub(i + 2, -1))
+    err_msg = err_msg .. "\n" .. tostring(err_line) .. "\n" .. tostring(colored.red(pointer))
     if #next_line > 0 then
-      err_msg = err_msg .. ("\n" .. next_line)
+      err_msg = err_msg .. ("\n" .. colored.dim(next_line))
     end
     seen_errors[start_pos] = err_msg
     return true
@@ -326,7 +332,8 @@ do
           end
           errors = _accum_0
         end
-        error(concat(errors, "\n\n"), 0)
+        io.stderr:write(concat(errors, "\n\n") .. "\n")
+        os.exit()
       end
       return tree
     end,
