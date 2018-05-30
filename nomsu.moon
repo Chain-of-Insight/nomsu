@@ -325,20 +325,6 @@ class NomsuCompiler
     define_compile_action: (signature, fn)=>
         return @define_action(signature, fn, true)
 
-    lua_line_to_nomsu: (source, line_no)=>
-        pos = 0
-        line = 0
-        filename = source\match('"([^[]*)')
-        for line in FILE_CACHE[filename]\gmatch("[^\n]*\n")
-            line += 1
-            pos += #line
-            if line == line_no
-                break
-        for i, entry in ipairs @source_map[source]
-            if entry[1] > pos
-                return @source_map[source][i-1][2]
-        return @source_map[source][#@source_map[source]][2]
-
     _nomsu_chunk_counter = 0
     parse: (nomsu_code)=>
         if type(nomsu_code) == 'string'
@@ -460,18 +446,17 @@ class NomsuCompiler
             nomsu_line = pos_to_line(nomsu_line_to_pos, lua.source.start)
             fn = (s)->
                 if type(s) == 'string'
-                    map[lua_line] or= {nomsu_line}
                     for nl in s\gmatch("\n")
+                        map[lua_line] or= nomsu_line
                         lua_line += 1
-                        map[lua_line] or= {nomsu_line}
                 else
                     old_line = nomsu_line
                     if s.source
                         nomsu_line = pos_to_line(nomsu_line_to_pos, s.source.start)
-                        if nomsu_line != old_line
-                            insert map[lua_line], nomsu_line
                     for b in *s.bits do fn(b)
             fn(lua)
+            map[lua_line] or= nomsu_line
+            map[0] = 0
             -- Mapping from lua line number to nomsu line numbers
             @source_map[tostring(lua.source)] = map
 
@@ -1058,25 +1043,12 @@ OPTIONS
 
             if map = nomsu.source_map[info.source]
                 if info.currentline
-                    info.currentline = (map[info.currentline] or {info.currentline})[1]
+                    info.currentline = assert(map[info.currentline])
                 if info.linedefined
-                    info.linedefined = (map[info.linedefined] or {info.linedefined})[1]
+                    info.linedefined = assert(map[info.linedefined])
                 if info.lastlinedefined
-                    info.lastlinedefined = (map[info.lastlinedefined] or {info.lastlinedefined})[1]
+                    info.lastlinedefined = assert(map[info.lastlinedefined])
                 info.short_src = info.source\match('"([^[]*)')
-            [=[
-            if metadata = nomsu.action_metadata[info.func]
-                info.name = metadata.aliases[1]
-                filename = if type(metadata.source) == 'string'
-                    metadata.source\match("^[^[:]*")
-                else metadata.source.filename
-                info.short_src = filename
-                info.source = FILE_CACHE[filename]
-                ok, linedefined = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
-                if ok then info.linedefined = linedefined
-                ok, currentline = pcall(lua_line_to_nomsu_line, info.short_src, info.currentline)
-                --if ok then info.currentline = currentline
-                ]=]
         return info
 
     print_err_msg = (error_message, stack_offset=2)->

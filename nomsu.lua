@@ -313,24 +313,6 @@ do
     define_compile_action = function(self, signature, fn)
       return self:define_action(signature, fn, true)
     end,
-    lua_line_to_nomsu = function(self, source, line_no)
-      local pos = 0
-      local line = 0
-      local filename = source:match('"([^[]*)')
-      for line in FILE_CACHE[filename]:gmatch("[^\n]*\n") do
-        line = line + 1
-        pos = pos + #line
-        if line == line_no then
-          break
-        end
-      end
-      for i, entry in ipairs(self.source_map[source]) do
-        if entry[1] > pos then
-          return self.source_map[source][i - 1][2]
-        end
-      end
-      return self.source_map[source][#self.source_map[source]][2]
-    end,
     parse = function(self, nomsu_code)
       if type(nomsu_code) == 'string' then
         _nomsu_chunk_counter = _nomsu_chunk_counter + 1
@@ -502,22 +484,14 @@ do
         local fn
         fn = function(s)
           if type(s) == 'string' then
-            map[lua_line] = map[lua_line] or {
-              nomsu_line
-            }
             for nl in s:gmatch("\n") do
+              map[lua_line] = map[lua_line] or nomsu_line
               lua_line = lua_line + 1
-              map[lua_line] = map[lua_line] or {
-                nomsu_line
-              }
             end
           else
             local old_line = nomsu_line
             if s.source then
               nomsu_line = pos_to_line(nomsu_line_to_pos, s.source.start)
-              if nomsu_line ~= old_line then
-                insert(map[lua_line], nomsu_line)
-              end
             end
             local _list_0 = s.bits
             for _index_0 = 1, #_list_0 do
@@ -527,6 +501,8 @@ do
           end
         end
         fn(lua)
+        map[lua_line] = map[lua_line] or nomsu_line
+        map[0] = 0
         self.source_map[tostring(lua.source)] = map
       end
       return run_lua_fn()
@@ -1493,35 +1469,17 @@ OPTIONS
         local map = nomsu.source_map[info.source]
         if map then
           if info.currentline then
-            info.currentline = (map[info.currentline] or {
-              info.currentline
-            })[1]
+            info.currentline = assert(map[info.currentline])
           end
           if info.linedefined then
-            info.linedefined = (map[info.linedefined] or {
-              info.linedefined
-            })[1]
+            info.linedefined = assert(map[info.linedefined])
           end
           if info.lastlinedefined then
-            info.lastlinedefined = (map[info.lastlinedefined] or {
-              info.lastlinedefined
-            })[1]
+            info.lastlinedefined = assert(map[info.lastlinedefined])
           end
           info.short_src = info.source:match('"([^[]*)')
         end
       end
-      local _ = [=[            if metadata = nomsu.action_metadata[info.func]
-                info.name = metadata.aliases[1]
-                filename = if type(metadata.source) == 'string'
-                    metadata.source\match("^[^[:]*")
-                else metadata.source.filename
-                info.short_src = filename
-                info.source = FILE_CACHE[filename]
-                ok, linedefined = pcall(lua_line_to_nomsu_line, info.short_src, info.linedefined)
-                if ok then info.linedefined = linedefined
-                ok, currentline = pcall(lua_line_to_nomsu_line, info.short_src, info.currentline)
-                --if ok then info.currentline = currentline
-                ]=]
     end
     return info
   end
