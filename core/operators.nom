@@ -51,7 +51,7 @@ immediately
         assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
         lua> ".."
             \%value = \%value:map(function(t)
-                if Action:is_instance(t) and t:get_stub() == "?" then
+                if Action:is_instance(t) and t.stub == "?" then
                     return \%var
                 end
             end)
@@ -75,7 +75,7 @@ immediately
             for i, item in ipairs(\%assignments.value) do
                 local \%target, \%value = item.value[1], item.value[2]
                 \%value = \%value:map(function(t)
-                    if Action:is_instance(t) and t:get_stub() == "?" then
+                    if Action:is_instance(t) and t.stub == "?" then
                         return \%target
                     end
                 end)

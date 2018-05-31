@@ -20,7 +20,7 @@ Tree = (name, kind, methods)->
     with methods
         .type = name
         .name = name
-        .__new = (value, source)=>
+        .__new or= (value, source)=>
             assert source
             if type(source) == 'string'
                 source = Source\from_string(source)
@@ -46,7 +46,10 @@ Tree = (name, kind, methods)->
             ._map = (fn)=>
                 fn(@) or @
 
-    Types[name] = immutable {"value", "source"}, methods
+    if name == "Action"
+        Types[name] = immutable {"value", "source", "stub"}, methods
+    else
+        Types[name] = immutable {"value", "source"}, methods
 
 Tree "Block", 'multi'
 Tree "EscapedNomsu", 'multi'
@@ -60,10 +63,13 @@ Tree "Comment", 'single'
 Tree "Var", 'single'
 
 Tree "Action", 'multi',
-    get_stub: (include_names=false)=>
-        if include_names
-            concat [type(a) == "string" and a or "%#{a.value}" for a in *@value], " "
-        else
-            concat [type(a) == "string" and a or "%" for a in *@value], " "
+    __new: (value, source)=>
+        assert source
+        if type(source) == 'string'
+            source = Source\from_string(source)
+        stub = concat [type(a) == "string" and a or "%" for a in *value], " "
+        return value, source, stub
+    get_spec: =>
+        concat [type(a) == "string" and a or "%#{a.value}" for a in *@value], " "
 
 return Types

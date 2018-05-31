@@ -169,7 +169,7 @@ NOMSU_DEFS = with {}
             return true
         if utils.size(seen_errors) >= 10
             seen_errors[start_pos+1] = colored.bright colored.yellow colored.onred "Too many errors, canceling parsing..."
-            return #src
+            return #src+1
         err_pos = start_pos
         --if src\sub(err_pos,err_pos)\match("[\r\n]")
         --    err_pos += #src\match("[ \t\n\r]*", err_pos)
@@ -398,7 +398,8 @@ class NomsuCompiler
                 ("\n%-3d|")\format(n)
             line_numbered_lua = "1  |"..lua_string\gsub("\n", fn)
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack line_numbered_lua}\n\n#{err}", 0)
-        unless @source_map[tostring(lua.source)]
+        source_key = tostring(lua.source)
+        unless @source_map[source_key]
             map = {}
             offset = 1
             source = lua.source
@@ -433,7 +434,7 @@ class NomsuCompiler
             map[lua_line] or= nomsu_line
             map[0] = 0
             -- Mapping from lua line number to nomsu line numbers
-            @source_map[tostring(lua.source)] = map
+            @source_map[source_key] = map
 
         return run_lua_fn!
 
@@ -442,7 +443,7 @@ class NomsuCompiler
     tree_to_lua: (tree)=>
         switch tree.type
             when "Action"
-                stub = tree\get_stub!
+                stub = tree.stub
                 compile_action = @environment.COMPILE_ACTIONS[stub]
                 if compile_action
                     args = [arg for arg in *tree.value when type(arg) != "string"]
@@ -499,9 +500,9 @@ class NomsuCompiler
                         return repr(t)
                     if t.is_multi
                         bits = [make_tree(bit) for bit in *t.value]
-                        return t.type.."(Tuple("..table.concat(bits, ", ").."), "..repr(t.source)..")"
+                        return t.type.."(Tuple("..table.concat(bits, ", ").."), "..repr(tostring t.source)..")"
                     else
-                        return t.type.."("..repr(t.value)..", "..repr(t.source)..")"
+                        return t.type.."("..repr(t.value)..", "..repr(tostring t.source)..")"
                 Lua.Value tree.source, make_tree(tree.value[1])
             
             when "Block"
@@ -901,13 +902,13 @@ class NomsuCompiler
                     lua\append bit_lua
 
         @define_compile_action "Lua %code", (_code)=>
-            lua = Lua.Value(_code.source, "Lua(", repr(_code.source))
+            lua = Lua.Value(_code.source, "Lua(", repr(tostring _code.source))
             add_lua_string_bits(lua, _code)
             lua\append ")"
             return lua
 
         @define_compile_action "Lua value %code", (_code)=>
-            lua = Lua.Value(_code.source, "Lua.Value(", repr(_code.source))
+            lua = Lua.Value(_code.source, "Lua.Value(", repr(tostring _code.source))
             add_lua_string_bits(lua, _code)
             lua\append ")"
             return lua
@@ -1008,7 +1009,7 @@ OPTIONS
                     info.linedefined = assert(map[info.linedefined])
                 if info.lastlinedefined
                     info.lastlinedefined = assert(map[info.lastlinedefined])
-                info.short_src = info.source\match('"([^[]*)')
+                --info.short_src = info.source\match('@([^[]*)')
         return info
 
     print_err_msg = (error_message, stack_offset=3)->
@@ -1048,8 +1049,8 @@ OPTIONS
                     calling_fn.linedefined = assert(map[calling_fn.linedefined])
                 if calling_fn.lastlinedefined
                     calling_fn.lastlinedefined = assert(map[calling_fn.lastlinedefined])
-                calling_fn.short_src = calling_fn.source\match('"([^[]*)')
-                filename,start,stop = calling_fn.source\match('"([^[]*)%[([0-9]+):([0-9]+)]"')
+                --calling_fn.short_src = calling_fn.source\match('"([^[]*)')
+                filename,start,stop = calling_fn.source\match('@([^[]*)%[([0-9]+):([0-9]+)]')
                 assert(filename)
                 file = FILE_CACHE[filename]\sub(tonumber(start),tonumber(stop))
                 err_line = get_line(file, calling_fn.currentline)\sub(1,-2)

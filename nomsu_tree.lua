@@ -25,7 +25,7 @@ Tree = function(name, kind, methods)
   do
     methods.type = name
     methods.name = name
-    methods.__new = function(self, value, source)
+    methods.__new = methods.__new or function(self, value, source)
       assert(source)
       if type(source) == 'string' then
         source = Source:from_string(source)
@@ -93,10 +93,18 @@ Tree = function(name, kind, methods)
       end
     end
   end
-  Types[name] = immutable({
-    "value",
-    "source"
-  }, methods)
+  if name == "Action" then
+    Types[name] = immutable({
+      "value",
+      "source",
+      "stub"
+    }, methods)
+  else
+    Types[name] = immutable({
+      "value",
+      "source"
+    }, methods)
+  end
 end
 Tree("Block", 'multi')
 Tree("EscapedNomsu", 'multi')
@@ -109,35 +117,35 @@ Tree("Number", 'single')
 Tree("Comment", 'single')
 Tree("Var", 'single')
 Tree("Action", 'multi', {
-  get_stub = function(self, include_names)
-    if include_names == nil then
-      include_names = false
+  __new = function(self, value, source)
+    assert(source)
+    if type(source) == 'string' then
+      source = Source:from_string(source)
     end
-    if include_names then
-      return concat((function()
-        local _accum_0 = { }
-        local _len_0 = 1
-        local _list_0 = self.value
-        for _index_0 = 1, #_list_0 do
-          local a = _list_0[_index_0]
-          _accum_0[_len_0] = type(a) == "string" and a or "%" .. tostring(a.value)
-          _len_0 = _len_0 + 1
-        end
-        return _accum_0
-      end)(), " ")
-    else
-      return concat((function()
-        local _accum_0 = { }
-        local _len_0 = 1
-        local _list_0 = self.value
-        for _index_0 = 1, #_list_0 do
-          local a = _list_0[_index_0]
-          _accum_0[_len_0] = type(a) == "string" and a or "%"
-          _len_0 = _len_0 + 1
-        end
-        return _accum_0
-      end)(), " ")
-    end
+    local stub = concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #value do
+        local a = value[_index_0]
+        _accum_0[_len_0] = type(a) == "string" and a or "%"
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), " ")
+    return value, source, stub
+  end,
+  get_spec = function(self)
+    return concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = self.value
+      for _index_0 = 1, #_list_0 do
+        local a = _list_0[_index_0]
+        _accum_0[_len_0] = type(a) == "string" and a or "%" .. tostring(a.value)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), " ")
   end
 })
 return Types

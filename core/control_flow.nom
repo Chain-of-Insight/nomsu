@@ -51,23 +51,23 @@ immediately
                 Lua value ".."
                     (function()
                         if \(%condition as lua expr) then
-                            return \(%when_true_expr as lua expr);
+                            return \(%when_true_expr as lua expr)
                         else
-                            return \(%when_false_expr as lua expr);
+                            return \(%when_false_expr as lua expr)
                         end
                     end)()
 
 # GOTOs
 immediately
     compile [=== %label ===, --- %label ---, *** %label ***] to
-        Lua "::label_\(%label as lua identifier)::;"
+        Lua "::label_\(%label as lua identifier)::"
     compile [go to %label] to
-        Lua "goto label_\(%label as lua identifier);"
+        Lua "goto label_\(%label as lua identifier)"
 
 # Basic loop control
 immediately
-    compile [do next] to: Lua "continue;"
-    compile [stop] to: Lua "break;"
+    compile [do next] to: Lua "continue"
+    compile [stop] to: Lua "break"
 
 # Helper function
 immediately
@@ -84,25 +84,25 @@ immediately
 
 # While loops
 immediately
-    compile [do next repeat] to: Lua "goto continue_repeat;"
-    compile [stop repeating] to: Lua "goto stop_repeat;"
+    compile [do next repeat] to: Lua "goto continue_repeat"
+    compile [stop repeating] to: Lua "goto stop_repeat"
     compile [repeat while %condition %body] to
         %lua <-
             Lua ".."
                 while \(%condition as lua expr) do
                     \(%body as lua statements)
         if
-            %body has subtree % where: (%.type = "Action") and ((%'s stub) is "do next repeat")
-        ..: to %lua write "\n    ::continue_repeat::;"
+            %body has subtree % where: (%.type = "Action") and (%.stub is "do next repeat")
+        ..: to %lua write "\n    ::continue_repeat::"
         to %lua write "\nend --while-loop"
         if
-            %body has subtree % where: (%.type = "Action") and ((%'s stub) is "stop repeating")
+            %body has subtree % where: (%.type = "Action") and (%.stub is "stop repeating")
         ..
             %lua <-
                 Lua ".."
                     do -- scope of "stop repeating" label
                         \%lua
-                        ::stop_repeat::;
+                        ::stop_repeat::
                     end -- end of "stop repeating" label scope
         return %lua
     parse [repeat %body] as: repeat while (yes) %body
@@ -116,26 +116,26 @@ immediately
                 for i=1,\(%n as lua expr) do
                     \(%body as lua statements)
         if
-            %body has subtree % where: (%.type = "Action") and ((%'s stub) is "do next repeat")
-        ..: to %lua write "\n    ::continue_repeat::;"
+            %body has subtree % where: (%.type = "Action") and (%.stub is "do next repeat")
+        ..: to %lua write "\n    ::continue_repeat::"
         to %lua write "\nend --numeric for-loop"
         if
-            %body has subtree % where: (%.type = "Action") and ((%'s stub) is "stop repeating")
+            %body has subtree % where: (%.type = "Action") and (%.stub is "stop repeating")
         ..
             %lua <-
                 Lua ".."
                     do -- scope of "stop repeating" label
                         \%lua
-                        ::stop_repeat::;
+                        ::stop_repeat::
                     end -- end of "stop repeating" label scope
         return %lua
 
 # For loop control flow
 immediately
     compile [stop %var] to
-        Lua "goto stop_\(%var as lua identifier);"
+        Lua "goto stop_\(%var as lua identifier)"
     compile [do next %var] to
-        Lua "goto continue_\(%var as lua identifier);"
+        Lua "goto continue_\(%var as lua identifier)"
 
 # Numeric range for loops
 immediately
@@ -152,22 +152,22 @@ immediately
         if
             %body has subtree % where
                 (%.type = "Action") and
-                    ((%'s stub) is "do next %") and 
+                    (%.stub is "do next %") and 
                         %.3 = %var
-        ..: to %lua write "\n    ::continue_\(%var as lua identifier)::;"
+        ..: to %lua write "\n    ::continue_\(%var as lua identifier)::"
         to %lua write "\nend --numeric for-loop"
 
         if
             %body has subtree % where
                 (%.type = "Action") and
-                    ((%'s stub) is "stop %") and
+                    (%.stub is "stop %") and
                         %.2 = %var
         ..
             %lua <-
                 Lua ".."
                     do -- scope for stopping for-loop
                         \%lua
-                        ::stop_\(%var as lua identifier)::;
+                        ::stop_\(%var as lua identifier)::
                     end -- end of scope for stopping for-loop
 
         return %lua
@@ -187,21 +187,21 @@ immediately
         if
             %body has subtree % where
                 (%.type = "Action") and
-                    ((%'s stub) is "do next %") and
+                    (%.stub is "do next %") and
                         %.value.3.value = %var.value
-        ..: to %lua write (Lua "\n    ::continue_\(%var as lua identifier)::;")
+        ..: to %lua write (Lua "\n    ::continue_\(%var as lua identifier)::")
         to %lua write "\nend --foreach-loop"
         if
             %body has subtree % where
                 (%.type = "Action") and
-                    ((%'s stub) is "stop %") and
+                    (%.stub is "stop %") and
                         %.value.2.value = %var.value
         ..
             %lua <-
                 Lua ".."
                     do -- scope for stopping for-loop
                         \%lua
-                        ::stop_\(%var as lua identifier)::;
+                        ::stop_\(%var as lua identifier)::
                     end -- end of scope for stopping for-loop
         return %lua
 
@@ -221,32 +221,32 @@ immediately
         if
             %body has subtree % where
                 (%.type = "Action") and
-                    ((%'s stub) is "do next %") and
+                    (%.stub is "do next %") and
                         %.value.3.value = %key.value
-        ..: to %lua write (Lua "\n    ::continue_\(%key as lua identifier)::;")
+        ..: to %lua write (Lua "\n    ::continue_\(%key as lua identifier)::")
 
         if
             %body has subtree % where
                 (%.type = "Action") and
-                    ((%'s stub) is "do next %") and
+                    (%.stub is "do next %") and
                         %.value.3.value = %value.value
-        ..: to %lua write (Lua "\n    ::continue_\(%value as lua identifier)::;")
+        ..: to %lua write (Lua "\n    ::continue_\(%value as lua identifier)::")
         to %lua write "\nend --foreach-loop"
         
         %stop_labels <- (Lua "")
         if
             %body has subtree % where
                 (%.type = "Action") and
-                    ((%'s stub) is "stop %") and
+                    (%.stub is "stop %") and
                         %.value.2.value = %key.value
-        ..: to %stop_labels write "\n::stop_\(%key as lua identifier)::;"
+        ..: to %stop_labels write "\n::stop_\(%key as lua identifier)::"
 
         if
             %body has subtree % where
                 (%.type = "Action") and
-                    ((%'s stub) is "stop %") and
+                    (%.stub is "stop %") and
                         %.value.2.value = %value.value
-        ..: to %stop_labels write "\n::stop_\(%value as lua identifier)::;"
+        ..: to %stop_labels write "\n::stop_\(%value as lua identifier)::"
 
         if: (length of %stop_labels) > 0
             %lua <-
@@ -279,7 +279,7 @@ immediately
                 assume %condition or barf ".."
                     Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
                 if: %action is (nil)
-                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
+                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
                     do next %func_call
 
                 if: %condition = "else"
@@ -289,7 +289,7 @@ immediately
                     %seen_else <- (yes)
                 ..else
                     assume (not %seen_else) or barf "'else' clause needs to be last in 'when' block"
-                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
+                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
                     to %code write "\("if" if %is_first else "\nelseif") "
                     for %i = %condition in %fallthroughs
                         if (%i > 1): to %code write " or "
@@ -333,7 +333,7 @@ immediately
                 ..else
                     assume (not %seen_else) or barf "'else' clause needs to be last in 'when % = ?' block"
                     to %code write "\("if" if %is_first else "\nelseif") "
-                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr));"
+                    lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
                     for %i = % in %fallthroughs
                         if: %i > 1
                             to %code write " or "
@@ -353,7 +353,7 @@ immediately
         %code <-
             Lua ".."
                 do --when % = ?
-                    local branch_value = \(%branch_value as lua expr);
+                    local branch_value = \(%branch_value as lua expr)
                     \%code
                 end --when % = ?
         return %code
@@ -366,18 +366,18 @@ immediately
     ..to
         Lua ".."
             do
-                local fell_through = false;
+                local fell_through = false
                 local ok, ret = pcall(function()
                     \(%action as lua statements)
-                    fell_through = true;
-                end);
+                    fell_through = true
+                end)
                 if ok then
                     \(%success as lua statements)
                 end
                 if not ok then
                     \(%fallback as lua statements)
                 elseif not fell_through then
-                    return ret;
+                    return ret
                 end
             end
     parse [try %action] as
@@ -400,18 +400,18 @@ immediately
     compile [do %action then always %final_action] to
         Lua ".."
             do
-                local fell_through = false;
+                local fell_through = false
                 local ok, ret1 = pcall(function()
                     \(%action as lua statements)
-                    fell_through = true;
-                end);
+                    fell_through = true
+                end)
                 local ok2, ret2 = pcall(function()
                     \(%final_action as lua statements)
-                end);
-                if not ok then error(ret1); end
-                if not ok2 then error(ret2); end
+                end)
+                if not ok then error(ret1) end
+                if not ok2 then error(ret2) end
                 if not fell_through then
-                    return ret1;
+                    return ret1
                 end
             end --do-then-always
 

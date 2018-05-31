@@ -12,15 +12,15 @@ Source = immutable {"filename","start","stop"}, {
         if stop and start > stop+1 then error("Invalid range: #{start}, #{stop}")
         return filename, start, stop
     from_string: (str)=>
-        filename,start,stop = str\match("^(.-)%[(%d+):(%d+)%]$")
+        filename,start,stop = str\match("^@(.-)%[(%d+):(%d+)%]$")
         unless filename
-            filename,start = str\match("^(.-)%[(%d+)%]$")
+            filename,start = str\match("^@(.-)%[(%d+)%]$")
         return Source(filename or str, tonumber(start or 1), tonumber(stop))
     __tostring: =>
         if @stop
-            "\"#{@filename}[#{@start}:#{@stop}]\""
+            "@#{@filename}[#{@start}:#{@stop}]"
         else
-            "\"#{@filename}[#{@start}]\""
+            "@#{@filename}[#{@start}]"
     __lt: (other)=>
         assert(@filename == other.filename, "Cannot compare sources from different files")
         return if @start == other.start

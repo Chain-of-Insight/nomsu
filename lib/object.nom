@@ -1,136 +1,54 @@
 use "core"
 
-compile [@, me] to: Lua value "self"
+lua> "CLASSES = {}"
 
-compile [as %instance %body] to
-    Lua ".."
-        do
-            local self = \(%instance as lua expr);
-            local global_actions = ACTIONS;
-            local ACTIONS = setmetatable({}, {__index=function(_,key)
-                local method = self[key];
-                if method then return (function(...) return method(self, ...); end); end
-                return global_actions[key];
-            end});
-            \(%body as lua statements)
-        end
+immediately
+    compile [@, me] to: Lua value "self"
+action [new %classname %inst]
+    =lua "setmetatable(\%inst, CLASSES[\%classname])"
+immediately
+    parse [new %classname] as: new %classname {}
 
-compile [object %classname %class_body] to
-    %class_id <- (=lua "string.as_lua_id(\(%classname as value)):sub(2,-1)")
-    if: %class_id is ""
-        %class_id <- "class"
-    %methods <-: Lua ""
-    %__index <- %class_id
-    %__newindex <- "nil"
-    for %line in %class_body.value
-        if: %line.type is "Comment"
-            do next %line
-        if: (%line.type is "Action") and ((%line's stub) is "slots %")
-            %slot_index_clauses <- []
-            %slot_newindex_clauses <- []
-            %slots <- %line.value.2
-            for %slot_index = %slot_var in %slots.value
-                to %slot_index_clauses add ".."
-                    if key == \(repr %slot_var.value) or key == \(repr (%slot_var as lua expr)) then
-                        return rawget(self, \%slot_index);
-                    end
-                to %slot_newindex_clauses add ".."
-                    if key == \(repr %slot_var.value) or key == \(repr (%slot_var as lua expr)) or key == \%slot_index then
-                        rawset(self, \%slot_index, value);
-                    end
-
-            %__index <- ".."
-                function(self, key)
-                    \(%slot_index_clauses joined with "\n")
-                    return \%class_id[key];
-                end
-            %__newindex <- ".."
-                function(self, key, value)
-                    \(%slot_newindex_clauses joined with "\n")
-                    error("Attempt to store data in "..repr(key)..", which is not a valid slot on "..tostring(self.class));
-                end
-            do next %line
-        assume ((%line.type is "Action") and ((%line's stub) is "action % %"))
-        ..or barf "Only action definitions are supported inside 'object % %'"
-        %actions <- %line.value.2
-        %body <- %line.value.3
+parse [as %instance %body] as
+    lua> "local self;"
+    do
+        using
+            lua> ".."
+                self = \%instance
+                local cls = self.class
+                local old_self = self.class:set_self(self)
+                ACTIONS = cls.ACTIONS
+                COMPILE_ACTIONS = cls.COMPILE_ACTIONS
+                ARG_ORDERS = cls.ARG_ORDERS
+        ..do
+            %body
+    ..then always
         lua> ".."
-            do
-                local stubs = {}
-                for i, action in ipairs(\%actions.value) do
-                    stubs[i] = action:get_stub(true)
-                end
-                local lua = Lua(\(%line.source), \%class_id, "[ ", repr(stubs[1]), "] = function(self")
-                local args = {}
-                for i,tok in ipairs(\%actions[1]) do
-                    if tok.type == "Var" then args[#args+1] = tok end
-                end
-                for i, arg in ipairs(args) do
-                    lua:append(", ", nomsu:tree_to_lua(arg))
-                end
-                local body_lua = nomsu:tree_to_lua(\%body):as_statements("return ")
-                body_lua:remove_free_vars(args)
-                body_lua:declare_locals()
-                lua:append(")\n    ", body_lua, "\nend;\n")
-                \%methods:append(lua)
+            self.class:set_self(old_self)
+
+parse [object %classname %class_body] as
+    using
+        %cls <- {..}
+            name:%classname
+            ACTIONS:=lua "ACTIONS", COMPILE_ACTIONS:=lua "COMPILE_ACTIONS"
+            ARG_ORDERS:=lua "ARG_ORDERS"
+        (=lua "CLASSES").%classname <- %cls
+        lua> ".."
+            setmetatable(\%cls, {__tostring=function() return \%classname end})
+            local self = nil
+            \%cls.set_self = function(_, inst)
+                local old_self = self
+                self = inst
+                return old_self
             end
-
-    return
-        Lua ".."
-            do -- \%class_id
-                -- Create the class object
-                local \%class_id = setmetatable({
-                    name=\(%classname as lua expr), instances=setmetatable({}, {__mode="k"}),
-                }, {
-                    __tostring=function(c) return c.name; end,
-                    __call=function(cls, initial_values)
-                        local inst = setmetatable({}, cls.instance_metatable);
-                        for k,v in pairs(initial_values) do inst[k] = v; end
-                        cls.instances[inst] = true;
-                        if inst['set % up'] then
-                            inst['set % up'](inst);
-                        end
-                        return inst;
-                    end,
-                });
-                \%class_id.class = \%class_id;
-
-                -- Define the methods
-                \%methods
-
-                -- Define class methods for instantiating and accessing instances
-                \%class_id.instance_metatable = {
-                    __index=\%__index,
-                    __newindex=\%__newindex,
-                    __tostring=\%class_id['as text'] or function(inst)
-                        return "<"..inst.class.name..": "..nomsu.ids[inst]..">";
-                    end,
-                    __len=\%class_id['size of'],
-                    __unm=\%class_id['-'],
-                    __add=\%class_id['+ %'],
-                    __sub=\%class_id['- %'],
-                    __mul=\%class_id['* %'],
-                    __div=\%class_id['/ %'],
-                    __mod=\%class_id['wrapped around %'],
-                    __pow=\%class_id['^ %'],
-                    __band=\%class_id['AND %'],
-                    __bor=\%class_id['OR %'],
-                    __bxor=\%class_id['XOR %'],
-                    __bshl=\%class_id['<< %'],
-                    __bshr=\%class_id['>> %'],
-                    __eq=\%class_id['= %'],
-                    __lt=\%class_id['< %'],
-                    __le=\%class_id['<= %'],
-                };
-                nomsu:define_action("instances of "..\%class_id.name, function()
-                    return utils.keys(\%class_id.instances);
-                end);
-                nomsu:define_action("new "..\%class_id.name.." %instance", function(_instance)
-                    return \%class_id(_instance);
-                end);
-                nomsu:define_action("new "..\%class_id.name, function()
-                    return \%class_id({});
-                end);
-            end -- End of definition of \%class_id
-            \("\n\n")
-        
+            \%cls.__index = \%cls
+            \%cls.class = \%cls
+        %class_body
+        run ".."
+            action [new \%classname %inst]
+                say "NEWING"
+                return: =lua "setmetatable(\\%inst, \\%cls)"
+        lua> ".."
+            if ACTIONS["as text"] then
+                \%cls.__tostring = ACTIONS["as text"]
+            end

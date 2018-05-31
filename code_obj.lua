@@ -22,17 +22,17 @@ Source = immutable({
     return filename, start, stop
   end,
   from_string = function(self, str)
-    local filename, start, stop = str:match("^(.-)%[(%d+):(%d+)%]$")
+    local filename, start, stop = str:match("^@(.-)%[(%d+):(%d+)%]$")
     if not (filename) then
-      filename, start = str:match("^(.-)%[(%d+)%]$")
+      filename, start = str:match("^@(.-)%[(%d+)%]$")
     end
     return Source(filename or str, tonumber(start or 1), tonumber(stop))
   end,
   __tostring = function(self)
     if self.stop then
-      return "\"" .. tostring(self.filename) .. "[" .. tostring(self.start) .. ":" .. tostring(self.stop) .. "]\""
+      return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. ":" .. tostring(self.stop) .. "]"
     else
-      return "\"" .. tostring(self.filename) .. "[" .. tostring(self.start) .. "]\""
+      return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. "]"
     end
   end,
   __lt = function(self, other)

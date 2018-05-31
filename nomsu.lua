@@ -201,7 +201,7 @@ do
     end
     if utils.size(seen_errors) >= 10 then
       seen_errors[start_pos + 1] = colored.bright(colored.yellow(colored.onred("Too many errors, canceling parsing...")))
-      return #src
+      return #src + 1
     end
     local err_pos = start_pos
     local text_loc = userdata.source:sub(err_pos, err_pos)
@@ -436,7 +436,8 @@ do
         local line_numbered_lua = "1  |" .. lua_string:gsub("\n", fn)
         error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(line_numbered_lua)))) .. "\n\n" .. tostring(err), 0)
       end
-      if not (self.source_map[tostring(lua.source)]) then
+      local source_key = tostring(lua.source)
+      if not (self.source_map[source_key]) then
         local map = { }
         local offset = 1
         local source = lua.source
@@ -480,14 +481,14 @@ do
         fn(lua)
         map[lua_line] = map[lua_line] or nomsu_line
         map[0] = 0
-        self.source_map[tostring(lua.source)] = map
+        self.source_map[source_key] = map
       end
       return run_lua_fn()
     end,
     tree_to_lua = function(self, tree)
       local _exp_0 = tree.type
       if "Action" == _exp_0 then
-        local stub = tree:get_stub()
+        local stub = tree.stub
         local compile_action = self.environment.COMPILE_ACTIONS[stub]
         if compile_action then
           local args
@@ -603,9 +604,9 @@ do
               end
               bits = _accum_0
             end
-            return t.type .. "(Tuple(" .. table.concat(bits, ", ") .. "), " .. repr(t.source) .. ")"
+            return t.type .. "(Tuple(" .. table.concat(bits, ", ") .. "), " .. repr(tostring(t.source)) .. ")"
           else
-            return t.type .. "(" .. repr(t.value) .. ", " .. repr(t.source) .. ")"
+            return t.type .. "(" .. repr(t.value) .. ", " .. repr(tostring(t.source)) .. ")"
           end
         end
         return Lua.Value(tree.source, make_tree(tree.value[1]))
@@ -1129,13 +1130,13 @@ do
         end
       end
       self:define_compile_action("Lua %code", function(self, _code)
-        local lua = Lua.Value(_code.source, "Lua(", repr(_code.source))
+        local lua = Lua.Value(_code.source, "Lua(", repr(tostring(_code.source)))
         add_lua_string_bits(lua, _code)
         lua:append(")")
         return lua
       end)
       self:define_compile_action("Lua value %code", function(self, _code)
-        local lua = Lua.Value(_code.source, "Lua.Value(", repr(_code.source))
+        local lua = Lua.Value(_code.source, "Lua.Value(", repr(tostring(_code.source)))
         add_lua_string_bits(lua, _code)
         lua:append(")")
         return lua
@@ -1436,7 +1437,6 @@ OPTIONS
           if info.lastlinedefined then
             info.lastlinedefined = assert(map[info.lastlinedefined])
           end
-          info.short_src = info.source:match('"([^[]*)')
         end
       end
     end
@@ -1504,8 +1504,7 @@ OPTIONS
             if calling_fn.lastlinedefined then
               calling_fn.lastlinedefined = assert(map[calling_fn.lastlinedefined])
             end
-            calling_fn.short_src = calling_fn.source:match('"([^[]*)')
-            local filename, start, stop = calling_fn.source:match('"([^[]*)%[([0-9]+):([0-9]+)]"')
+            local filename, start, stop = calling_fn.source:match('@([^[]*)%[([0-9]+):([0-9]+)]')
             assert(filename)
             local file = FILE_CACHE[filename]:sub(tonumber(start), tonumber(stop))
             local err_line = get_line(file, calling_fn.currentline):sub(1, -2)

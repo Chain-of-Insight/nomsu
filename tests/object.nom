@@ -1,16 +1,15 @@
 use "core"
 use "lib/object.nom"
 
-immediately
-    object "Dog"
-        action [bark]
-            %barks <- ("Bark!" for % in 1 to ((me).barks))
-            return: %barks joined with " "
+object "Dog"
+    action [bark]
+        %barks <- ("Bark!" for % in 1 to ((me).barks))
+        return: %barks joined with " "
 
-        action [get pissed off]
-            ((me).barks) +<- 1
+    action [get pissed off]
+        ((me).barks) +<- 1
 
-%d <-: new Dog {barks:2}
+%d <-: new "Dog" {barks:2}
 as %d
     assume: (me) = %d
     assume: ((me).barks) = 2
@@ -18,10 +17,24 @@ as %d
     get pissed off
     assume: ((me).barks) = 3
     assume: (bark) = "Bark! Bark! Bark!"
-assume: "\(%d's "class")" = "Dog"
+assume: "\(%d.class)" = "Dog"
 assume: (%d's "barks") = 3
 
-as: new Dog {barks:1}
+as: new "Dog" {barks:1}
     assume: (bark) = "Bark!"
+
+action [foo]
+    as: new "Dog" {barks:23}
+        return: (me).barks
+    barf "Reached unreachable code"
+
+assume: (foo) = 23
+
+as: new "Dog" {barks:101}
+    try: as (new "Dog" {barks:8}) (barf)
+    ..and if it succeeds: barf
+
+    assume: (me).barks = 101
+    ..or barf "Error in nested 'as % %' failed to properly reset 'self'"
 
 say "Object test passed."
