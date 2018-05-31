@@ -1,5 +1,7 @@
 use "core"
 
+# TODO: make codegen less verbose
+
 lua> "CLASSES = {}"
 
 immediately
