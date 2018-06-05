@@ -8,7 +8,7 @@ immediately
         nomsu:define_compile_action("compile %actions to %lua", function(tree, \%actions, \%lua)
             local lua = Lua(tree.source, "nomsu:define_compile_action(")
             local specs = {}
-            for i, action in ipairs(\%actions.value) do
+            for i, action in ipairs(\%actions) do
                 specs[i] = action:get_spec()
             end
             specs = repr(specs)
@@ -19,7 +19,7 @@ immediately
             end
             lua:append("function(tree")
             local args = {}
-            for i,tok in ipairs(\%actions.value[1].value) do
+            for i,tok in ipairs(\%actions[1]) do
                 if tok.type == "Var" then args[#args+1] = tok end
             end
             for i, arg in ipairs(args) do
@@ -38,7 +38,7 @@ immediately
         lua> ".."
             local lua = Lua(tree.source, "nomsu:define_action(")
             local specs = {}
-            for i, action in ipairs(\%actions.value) do
+            for i, action in ipairs(\%actions) do
                 specs[i] = action:get_spec()
             end
             specs = repr(specs)
@@ -49,7 +49,7 @@ immediately
             end
             lua:append("function(")
             local args = {}
-            for i,tok in ipairs(\%actions.value[1].value) do
+            for i,tok in ipairs(\%actions[1]) do
                 if tok.type == "Var" then args[#args+1] = tok end
             end
             for i, arg in ipairs(args) do
@@ -68,7 +68,7 @@ immediately
         lua> ".."
             local lua = Lua(tree.source, "nomsu:define_compile_action(")
             local specs = {}
-            for i, action in ipairs(\%shorthand.value) do
+            for i, action in ipairs(\%shorthand) do
                 specs[i] = action:get_spec()
             end
             specs = repr(specs)
@@ -79,7 +79,7 @@ immediately
             end
             lua:append("function(tree")
             local replacements = {}
-            for i,tok in ipairs(\%shorthand.value[1].value) do
+            for i,tok in ipairs(\%shorthand[1]) do
                 if tok.type == "Var" then
                     local lua_var = tostring(nomsu:tree_to_lua(tok))
                     replacements[tok.value] = lua_var
@@ -93,15 +93,15 @@ immediately
                 elseif t.type == 'Var' and replacements[t.value] then
                     return replacements[t.value]
                 elseif t.type == 'Var' then
-                    return t.type.."("..repr(t.value.."#"..tostring(MANGLE_INDEX))..", "..repr(tostring(t.source))..")"
+                    return t.type.."("..repr(tostring(t.source))..", "..repr(t.value.."#"..tostring(MANGLE_INDEX))..")"
                 elseif t.is_multi then
-                    local bits = {}
-                    for i, entry in ipairs(t.value) do
-                        bits[i] = make_tree(entry)
+                    local bits = {repr(tostring(t.source))}
+                    for i, entry in ipairs(t) do
+                        bits[#bits+1] = make_tree(entry)
                     end
-                    return t.type.."(Tuple("..table.concat(bits, ", ").."), "..repr(tostring(t.source))..")"
+                    return t.type.."("..table.concat(bits, ", ")..")"
                 else
-                    return t.type.."("..repr(t.value)..", "..repr(tostring(t.source))..")"
+                    return t.type.."("..repr(tostring(t.source))..", "..repr(t.value)..")"
                 end
             end
             lua:append(")\n    local tree = ", make_tree(\%longhand), "\n    return nomsu:tree_to_lua(tree)\nend);")

@@ -18,19 +18,22 @@ Types.is_node = function(n)
   return type(n) == 'userdata' and getmetatable(n) and Types[n.type] == getmetatable(n)
 end
 local Tree
-Tree = function(name, kind, methods)
+Tree = function(name, fields, methods)
   methods = methods or { }
-  assert((kind == 'single') or (kind == 'multi'))
-  local is_multi = (kind == 'multi')
+  local is_multi = true
+  for _index_0 = 1, #fields do
+    local f = fields[_index_0]
+    is_multi = is_multi and (f ~= "value")
+  end
   do
     methods.type = name
     methods.name = name
-    methods.__new = methods.__new or function(self, value, source)
+    methods.__new = methods.__new or function(self, source, ...)
       assert(source)
       if type(source) == 'string' then
         source = Source:from_string(source)
       end
-      return value, source
+      return source, ...
     end
     methods.is_multi = is_multi
     methods.map = function(self, fn)
@@ -50,9 +53,8 @@ Tree = function(name, kind, methods)
         return tostring(self.name) .. "(" .. tostring(table.concat((function()
           local _accum_0 = { }
           local _len_0 = 1
-          local _list_0 = self.value
-          for _index_0 = 1, #_list_0 do
-            local v = _list_0[_index_0]
+          for _index_0 = 1, #self do
+            local v = self[_index_0]
             _accum_0[_len_0] = repr(v)
             _len_0 = _len_0 + 1
           end
@@ -70,19 +72,15 @@ Tree = function(name, kind, methods)
         do
           local _accum_0 = { }
           local _len_0 = 1
-          local _list_0 = self.value
-          for _index_0 = 1, #_list_0 do
-            local v = _list_0[_index_0]
+          for _index_0 = 1, #self do
+            local v = self[_index_0]
             _accum_0[_len_0] = v._map and v:_map(fn) or v
             _len_0 = _len_0 + 1
           end
           new_vals = _accum_0
         end
-        local ret = getmetatable(self)(Tuple(unpack(new_vals)), self.source)
+        local ret = getmetatable(self)(self.source, unpack(new_vals))
         return ret
-      end
-      methods.__ipairs = function(self)
-        return error()
       end
     else
       methods.__tostring = function(self)
@@ -93,54 +91,60 @@ Tree = function(name, kind, methods)
       end
     end
   end
-  if name == "Action" then
-    Types[name] = immutable({
-      "value",
-      "source",
-      "stub"
-    }, methods)
-  else
-    Types[name] = immutable({
-      "value",
-      "source"
-    }, methods)
-  end
+  Types[name] = immutable(fields, methods)
 end
-Tree("Block", 'multi')
-Tree("EscapedNomsu", 'multi')
-Tree("Text", 'multi')
-Tree("List", 'multi')
-Tree("Dict", 'multi')
-Tree("DictEntry", 'multi')
-Tree("IndexChain", 'multi')
-Tree("Number", 'single')
-Tree("Comment", 'single')
-Tree("Var", 'single')
-Tree("Action", 'multi', {
-  __new = function(self, value, source)
+Tree("Block", {
+  "source"
+})
+Tree("EscapedNomsu", {
+  "source"
+})
+Tree("Text", {
+  "source"
+})
+Tree("List", {
+  "source"
+})
+Tree("Dict", {
+  "source"
+})
+Tree("DictEntry", {
+  "source"
+})
+Tree("IndexChain", {
+  "source"
+})
+Tree("Number", {
+  "source",
+  "value"
+})
+Tree("Var", {
+  "source",
+  "value"
+})
+Tree("Action", {
+  "source",
+  "stub"
+}, {
+  __new = function(self, source, ...)
     assert(source)
     if type(source) == 'string' then
       source = Source:from_string(source)
     end
-    local stub = concat((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      for _index_0 = 1, #value do
-        local a = value[_index_0]
-        _accum_0[_len_0] = type(a) == "string" and a or "%"
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)(), " ")
-    return value, source, stub
+    local stub_bits = { }
+    for i = 1, select("#", ...) do
+      local a = select(i, ...)
+      stub_bits[i] = type(a) == 'string' and a or "%"
+    end
+    local stub = concat(stub_bits, " ")
+    return source, stub, ...
   end,
   get_spec = function(self)
     return concat((function()
       local _accum_0 = { }
       local _len_0 = 1
-      local _list_0 = self.value
-      for _index_0 = 1, #_list_0 do
-        local a = _list_0[_index_0]
+      for _index_0 = 1, #self do
+        local a = self[_index_0]
         _accum_0[_len_0] = type(a) == "string" and a or "%" .. tostring(a.value)
         _len_0 = _len_0 + 1
       end

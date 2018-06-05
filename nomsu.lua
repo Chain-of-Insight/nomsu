@@ -233,9 +233,9 @@ setmetatable(NOMSU_DEFS, {
       local source = userdata.source:sub(start, stop - 1)
       local tree
       if Types[key].is_multi then
-        tree = Types[key](Tuple(unpack(value)), source)
+        tree = Types[key](source, unpack(value))
       else
-        tree = Types[key](value, source)
+        tree = Types[key](source, value)
       end
       return tree
     end
@@ -495,9 +495,8 @@ do
           do
             local _accum_0 = { }
             local _len_0 = 1
-            local _list_0 = tree.value
-            for _index_0 = 1, #_list_0 do
-              local arg = _list_0[_index_0]
+            for _index_0 = 1, #tree do
+              local arg = tree[_index_0]
               if type(arg) ~= "string" then
                 _accum_0[_len_0] = arg
                 _len_0 = _len_0 + 1
@@ -525,7 +524,7 @@ do
         local action = rawget(self.environment.ACTIONS, stub)
         local lua = Lua.Value(tree.source)
         if not action and math_expression:match(stub) then
-          for i, tok in ipairs(tree.value) do
+          for i, tok in ipairs(tree) do
             if type(tok) == 'string' then
               lua:append(tok)
             else
@@ -538,14 +537,14 @@ do
               end
               lua:append(tok_lua)
             end
-            if i < #tree.value then
+            if i < #tree then
               lua:append(" ")
             end
           end
           return lua
         end
         local args = { }
-        for i, tok in ipairs(tree.value) do
+        for i, tok in ipairs(tree) do
           local _continue_0 = false
           repeat
             if type(tok) == "string" then
@@ -596,23 +595,22 @@ do
             do
               local _accum_0 = { }
               local _len_0 = 1
-              local _list_0 = t.value
-              for _index_0 = 1, #_list_0 do
-                local bit = _list_0[_index_0]
+              for _index_0 = 1, #t do
+                local bit = t[_index_0]
                 _accum_0[_len_0] = make_tree(bit)
                 _len_0 = _len_0 + 1
               end
               bits = _accum_0
             end
-            return t.type .. "(Tuple(" .. table.concat(bits, ", ") .. "), " .. repr(tostring(t.source)) .. ")"
+            return t.type .. "(" .. repr(tostring(t.source)) .. ", " .. table.concat(bits, ", ") .. ")"
           else
-            return t.type .. "(" .. repr(t.value) .. ", " .. repr(tostring(t.source)) .. ")"
+            return t.type .. "(" .. repr(tostring(t.source)) .. ", " .. repr(t.value) .. ")"
           end
         end
-        return Lua.Value(tree.source, make_tree(tree.value[1]))
+        return Lua.Value(tree.source, make_tree(tree[1]))
       elseif "Block" == _exp_0 then
         local lua = Lua(tree.source)
-        for i, line in ipairs(tree.value) do
+        for i, line in ipairs(tree) do
           local line_lua = self:tree_to_lua(line)
           if i > 1 then
             lua:append("\n")
@@ -623,7 +621,7 @@ do
       elseif "Text" == _exp_0 then
         local lua = Lua.Value(tree.source)
         local string_buffer = ""
-        for i, bit in ipairs(tree.value) do
+        for i, bit in ipairs(tree) do
           local _continue_0 = false
           repeat
             if type(bit) == "string" then
@@ -668,7 +666,7 @@ do
       elseif "List" == _exp_0 then
         local lua = Lua.Value(tree.source, "{")
         local line_length = 0
-        for i, item in ipairs(tree.value) do
+        for i, item in ipairs(tree) do
           local item_lua = self:tree_to_lua(item)
           if not (item_lua.is_value) then
             error("Cannot use " .. tostring(colored.yellow(repr(item))) .. " as a list item, since it's not an expression.", 0)
@@ -681,7 +679,7 @@ do
           else
             line_length = line_length + #last_line
           end
-          if i < #tree.value then
+          if i < #tree then
             if line_length >= MAX_LINE then
               lua:append(",\n  ")
               line_length = 0
@@ -696,7 +694,7 @@ do
       elseif "Dict" == _exp_0 then
         local lua = Lua.Value(tree.source, "{")
         local line_length = 0
-        for i, entry in ipairs(tree.value) do
+        for i, entry in ipairs(tree) do
           local entry_lua = self:tree_to_lua(entry)
           lua:append(entry_lua)
           local entry_lua_str = tostring(entry_lua)
@@ -706,7 +704,7 @@ do
           else
             line_length = line_length + #entry_lua_str
           end
-          if i < #tree.value then
+          if i < #tree then
             if line_length >= MAX_LINE then
               lua:append(",\n  ")
               line_length = 0
@@ -719,7 +717,7 @@ do
         lua:append("}")
         return lua
       elseif "DictEntry" == _exp_0 then
-        local key, value = tree.value[1], tree.value[2]
+        local key, value = tree[1], tree[2]
         local key_lua = self:tree_to_lua(key)
         if not (key_lua.is_value) then
           error("Cannot use " .. tostring(colored.yellow(repr(key))) .. " as a dict key, since it's not an expression.", 0)
@@ -737,16 +735,16 @@ do
           return Lua(tree.source, "[", key_lua, "]=", value_lua)
         end
       elseif "IndexChain" == _exp_0 then
-        local lua = self:tree_to_lua(tree.value[1])
+        local lua = self:tree_to_lua(tree[1])
         if not (lua.is_value) then
-          error("Cannot index " .. tostring(colored.yellow(repr(tree.value[1]))) .. ", since it's not an expression.", 0)
+          error("Cannot index " .. tostring(colored.yellow(repr(tree[1]))) .. ", since it's not an expression.", 0)
         end
         local first_char = tostring(lua):sub(1, 1)
         if first_char == "{" or first_char == '"' or first_char == "[" then
           lua:parenthesize()
         end
-        for i = 2, #tree.value do
-          local key = tree.value[i]
+        for i = 2, #tree do
+          local key = tree[i]
           local key_lua = self:tree_to_lua(key)
           if not (key_lua.is_value) then
             error("Cannot use " .. tostring(colored.yellow(repr(key))) .. " as an index, since it's not an expression.", 0)
@@ -783,7 +781,7 @@ do
       if "Action" == _exp_0 then
         if inline then
           local nomsu = Nomsu(tree.source)
-          for i, bit in ipairs(tree.value) do
+          for i, bit in ipairs(tree) do
             if type(bit) == "string" then
               if i > 1 then
                 nomsu:append(" ")
@@ -808,7 +806,7 @@ do
           local nomsu = Nomsu(tree.source)
           local next_space = ""
           local last_colon = nil
-          for i, bit in ipairs(tree.value) do
+          for i, bit in ipairs(tree) do
             if type(bit) == "string" then
               nomsu:append(next_space, bit)
               next_space = " "
@@ -861,16 +859,16 @@ do
           return nomsu
         end
       elseif "EscapedNomsu" == _exp_0 then
-        local nomsu = self:tree_to_nomsu(tree.value, true)
+        local nomsu = self:tree_to_nomsu(tree[1], true)
         if nomsu == nil and not inline then
-          nomsu = self:tree_to_nomsu(tree.value[1])
+          nomsu = self:tree_to_nomsu(tree[1])
           return nomsu and Nomsu(tree.source, "\\:\n    ", nomsu)
         end
         return nomsu and Nomsu(tree.source, "\\(", nomsu, ")")
       elseif "Block" == _exp_0 then
         if inline then
           local nomsu = Nomsu(tree.source)
-          for i, line in ipairs(tree.value) do
+          for i, line in ipairs(tree) do
             if i > 1 then
               nomsu:append("; ")
             end
@@ -897,9 +895,8 @@ do
       elseif "Text" == _exp_0 then
         if inline then
           local nomsu = Nomsu(tree.source, '"')
-          local _list_0 = tree.value
-          for _index_0 = 1, #_list_0 do
-            local bit = _list_0[_index_0]
+          for _index_0 = 1, #tree do
+            local bit = tree[_index_0]
             if type(bit) == 'string' then
               nomsu:append((bit:gsub("\\", "\\\\"):gsub("\n", "\\n")))
             else
@@ -949,7 +946,7 @@ do
       elseif "List" == _exp_0 then
         if inline then
           local nomsu = Nomsu(tree.source, "[")
-          for i, item in ipairs(tree.value) do
+          for i, item in ipairs(tree) do
             local item_nomsu = self:tree_to_nomsu(item, true)
             if not (item_nomsu) then
               return nil
@@ -968,9 +965,8 @@ do
           end
           local nomsu = Nomsu(tree.source, "[..]")
           local line = Nomsu(tree.source, "\n    ")
-          local _list_0 = tree.value
-          for _index_0 = 1, #_list_0 do
-            local item = _list_0[_index_0]
+          for _index_0 = 1, #tree do
+            local item = tree[_index_0]
             local item_nomsu = self:tree_to_nomsu(item, true)
             if item_nomsu and #line + #", " + #item_nomsu <= MAX_LINE then
               if #line.bits > 1 then
@@ -999,7 +995,7 @@ do
       elseif "Dict" == _exp_0 then
         if inline then
           local nomsu = Nomsu(tree.source, "{")
-          for i, entry in ipairs(tree.value) do
+          for i, entry in ipairs(tree) do
             local entry_nomsu = self:tree_to_nomsu(entry, true)
             if not (entry_nomsu) then
               return nil
@@ -1018,9 +1014,8 @@ do
           end
           local nomsu = Nomsu(tree.source, "{..}")
           local line = Nomsu(tree.source, "\n    ")
-          local _list_0 = tree.value
-          for _index_0 = 1, #_list_0 do
-            local entry = _list_0[_index_0]
+          for _index_0 = 1, #tree do
+            local entry = tree[_index_0]
             local entry_nomsu = self:tree_to_nomsu(entry)
             if not (entry_nomsu) then
               return nil
@@ -1044,7 +1039,7 @@ do
           return nomsu
         end
       elseif "DictEntry" == _exp_0 then
-        local key, value = tree.value[1], tree.value[2]
+        local key, value = tree[1], tree[2]
         local key_nomsu = self:tree_to_nomsu(key, true)
         if not (key_nomsu) then
           return nil
@@ -1073,7 +1068,7 @@ do
         return Nomsu(tree.source, key_nomsu, ":", value_nomsu)
       elseif "IndexChain" == _exp_0 then
         local nomsu = Nomsu(tree.source)
-        for i, bit in ipairs(tree.value) do
+        for i, bit in ipairs(tree) do
           if i > 1 then
             nomsu:append(".")
           end
@@ -1091,11 +1086,6 @@ do
         return Nomsu(tree.source, tostring(tree.value))
       elseif "Var" == _exp_0 then
         return Nomsu(tree.source, "%", tree.value)
-      elseif "Comment" == _exp_0 then
-        if inline then
-          return nil
-        end
-        return Nomsu(tree.source, "#", tree.value:gsub("\n", "\n    "))
       else
         return error("Unknown type: " .. tostring(tree.type))
       end
@@ -1114,9 +1104,8 @@ do
           lua:append(", ", nomsu:tree_to_lua(code))
           return 
         end
-        local _list_0 = code.value
-        for _index_0 = 1, #_list_0 do
-          local bit = _list_0[_index_0]
+        for _index_0 = 1, #code do
+          local bit = code[_index_0]
           lua:append(", ")
           if type(bit) == "string" then
             lua:append(repr(bit))
@@ -1143,9 +1132,8 @@ do
       end)
       local add_lua_bits
       add_lua_bits = function(lua, code)
-        local _list_0 = code.value
-        for _index_0 = 1, #_list_0 do
-          local bit = _list_0[_index_0]
+        for _index_0 = 1, #code do
+          local bit = code[_index_0]
           if type(bit) == "string" then
             lua:append(bit)
           else
