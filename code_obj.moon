@@ -1,3 +1,6 @@
+-- This file contains objects that are used to track code positions and incrementally
+-- build up generated code, while keeping track of where it came from, and managing
+-- indentation levels.
 {:insert, :remove, :concat} = table
 immutable = require 'immutable'
 local Lua, Source
