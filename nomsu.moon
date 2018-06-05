@@ -111,6 +111,16 @@ LINE_STARTS = setmetatable {}, {
         self[k] = line_starts
         return line_starts
 }
+pos_to_line = (str, pos)->
+    line_starts = LINE_STARTS[str]
+    -- Binary search for line number of position
+    lo, hi = 1, #line_starts
+    while lo <= hi
+        mid = math.floor((lo+hi)/2)
+        if line_starts[mid] > pos
+            hi = mid-1
+        else lo = mid+1
+    return hi
 
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
 -- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
@@ -173,13 +183,13 @@ NOMSU_DEFS = with {}
         err_pos = start_pos
         --if src\sub(err_pos,err_pos)\match("[\r\n]")
         --    err_pos += #src\match("[ \t\n\r]*", err_pos)
-        text_loc = userdata.source\sub(err_pos,err_pos)
-        line_no = text_loc\get_line_number!
-        src = FILE_CACHE[text_loc.filename]
-        prev_line = line_no == 1 and "" or src\sub(LINE_STARTS[src][line_no-1] or 1, LINE_STARTS[src][line_no]-2)
-        err_line = src\sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no+1] or 0)-2)
-        next_line = src\sub(LINE_STARTS[src][line_no+1] or -1, (LINE_STARTS[src][line_no+2] or 0)-2)
-        i = err_pos-LINE_STARTS[src][line_no]
+        line_no = pos_to_line(src, err_pos)
+        src = FILE_CACHE[userdata.source.filename]
+        line_starts = LINE_STARTS[src]
+        prev_line = line_no == 1 and "" or src\sub(line_starts[line_no-1] or 1, line_starts[line_no]-2)
+        err_line = src\sub(line_starts[line_no], (line_starts[line_no+1] or 0)-2)
+        next_line = src\sub(line_starts[line_no+1] or -1, (line_starts[line_no+2] or 0)-2)
+        i = err_pos-line_starts[line_no]
         pointer = ("-")\rep(i) .. "^"
         err_msg = colored.bright colored.yellow colored.onred (err_msg or "Parse error").." at #{userdata.source.filename}:#{line_no}:"
         if #prev_line > 0 then err_msg ..= "\n"..colored.dim(prev_line)
@@ -192,7 +202,9 @@ NOMSU_DEFS = with {}
 
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop, userdata)->
-        source = userdata.source\sub(start, stop-1)
+        local source
+        with userdata.source
+            source = Source(.filename, .start + start-1, .start + stop-1)
         tree = if Types[key].is_multi
             Types[key](source, unpack(value))
         else Types[key](source, value)
@@ -366,13 +378,13 @@ class NomsuCompiler
             insert _running_files, filename
             if filename\match("%.lua$")
                 file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
-                ret = @run_lua(Lua(Source(filename), file))
+                ret = @run_lua(Lua(Source(filename, 1, #file), file))
             elseif filename\match("%.nom$") or filename\match("^/dev/fd/[012]$")
                 if not @skip_precompiled -- Look for precompiled version
                     lua_filename = filename\gsub("%.nom$", ".lua")
                     file = FILE_CACHE[lua_filename]
                     if file
-                        ret = @run_lua(Lua(Source(filename), file))
+                        ret = @run_lua(Lua(Source(filename, 1, #file), file))
                         remove _running_files
                         continue
                 file = file or FILE_CACHE[filename]
@@ -403,23 +415,9 @@ class NomsuCompiler
             map = {}
             offset = 1
             source = lua.source
-            nomsu_raw = FILE_CACHE[source.filename]\sub(source.start, source.stop)
-
-            nomsu_line_to_pos = LINE_STARTS[nomsu_raw]
-            lua_line_to_pos = LINE_STARTS[tostring(lua)]
-
-            pos_to_line = (line_starts, pos)->
-                -- Binary search for line number of position
-                lo, hi = 1, #line_starts
-                while lo <= hi
-                    mid = math.floor((lo+hi)/2)
-                    if line_starts[mid] > pos
-                        hi = mid-1
-                    else lo = mid+1
-                return hi
-
+            nomsu_str = tostring(FILE_CACHE[source.filename]\sub(source.start, source.stop))
             lua_line = 1
-            nomsu_line = pos_to_line(nomsu_line_to_pos, lua.source.start)
+            nomsu_line = pos_to_line(nomsu_str, lua.source.start)
             fn = (s)->
                 if type(s) == 'string'
                     for nl in s\gmatch("\n")
@@ -428,7 +426,7 @@ class NomsuCompiler
                 else
                     old_line = nomsu_line
                     if s.source
-                        nomsu_line = pos_to_line(nomsu_line_to_pos, s.source.start)
+                        nomsu_line = pos_to_line(nomsu_str, s.source.start)
                     for b in *s.bits do fn(b)
             fn(lua)
             map[lua_line] or= nomsu_line
@@ -1113,12 +1111,9 @@ OPTIONS
             args.inputs = {"core"}
             args.interactive = true
 
-        output_file = if args.output_file == "-" then io.stdout
-        elseif args.output_file then io.open(args.output_file, 'w')
-
         print_file = if args.print_file == "-" then io.stdout
         elseif args.print_file then io.open(args.print_file, 'w')
-        elseif output_file == io.stdout then nil
+        elseif args.output_file == '-' then nil
         else io.stdout
 
         nomsu.skip_precompiled = not args.optimized
@@ -1134,8 +1129,10 @@ OPTIONS
                 print_file\write('\n')
                 print_file\flush!
 
-        compile_fn = if output_file
+        compile_fn = if args.output_file
             (code)->
+                output_file = if args.output_file == "-" then io.stdout
+                elseif args.output_file then io.open(args.output_file, 'w')
                 output_file\write("local IMMEDIATE = true;\n"..tostring(code))
                 output_file\flush!
         else nil

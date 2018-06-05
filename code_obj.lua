@@ -11,16 +11,6 @@ Source = immutable({
   "stop"
 }, {
   name = "Source",
-  __new = function(self, filename, start, stop)
-    assert(type(filename) == 'string')
-    if not start then
-      start, stop = 1, #FILE_CACHE[filename]
-    end
-    if stop and start > stop + 1 then
-      error("Invalid range: " .. tostring(start) .. ", " .. tostring(stop))
-    end
-    return filename, start, stop
-  end,
   from_string = function(self, str)
     local filename, start, stop = str:match("^@(.-)%[(%d+):(%d+)%]$")
     if not (filename) then
@@ -60,44 +50,6 @@ Source = immutable({
       end
     end
     return Source(self.filename, self.start + offset, self.stop)
-  end,
-  sub = function(self, start, stop)
-    start = start or 1
-    assert(start > 0 and (stop == nil or stop > 0), "Negative subscripts not supported")
-    if not self.stop then
-      assert(not stop, "cannot subscript non-range with range")
-      return Source(self.filename, self.start + start - 1)
-    else
-      stop = stop or self.stop
-      return Source(self.filename, self.start + start - 1, self.start + stop - 1)
-    end
-  end,
-  get_text = function(self)
-    return FILE_CACHE[self.filename]:sub(self.start, self.stop)
-  end,
-  get_line_number = function(self)
-    local src = FILE_CACHE[self.filename]
-    local line_starts = LINE_STARTS[src]
-    local start_line = 1
-    while (line_starts[start_line + 1] or math.huge) <= self.start do
-      start_line = start_line + 1
-    end
-    local stop_line = start_line
-    while (line_starts[stop_line + 1] or math.huge) <= self.stop do
-      stop_line = stop_line + 1
-    end
-    return start_line, stop_line
-  end,
-  get_line = function(self)
-    return tostring(self.filename) .. ":" .. tostring(self:get_line_number())
-  end,
-  get_line_range = function(self)
-    local start_line, stop_line = self:get_line_number()
-    if stop_line == start_line then
-      return tostring(self.filename) .. ":" .. tostring(start_line)
-    else
-      return tostring(self.filename) .. ":" .. tostring(start_line) .. "-" .. tostring(stop_line)
-    end
   end
 })
 local Code

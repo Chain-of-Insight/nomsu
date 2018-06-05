@@ -5,12 +5,6 @@ export LINE_STARTS
 
 Source = immutable {"filename","start","stop"}, {
     name:"Source"
-    __new: (filename, start, stop)=>
-        assert(type(filename) == 'string')
-        if not start
-            start, stop = 1, #FILE_CACHE[filename]
-        if stop and start > stop+1 then error("Invalid range: #{start}, #{stop}")
-        return filename, start, stop
     from_string: (str)=>
         filename,start,stop = str\match("^@(.-)%[(%d+):(%d+)%]$")
         unless filename
@@ -36,34 +30,6 @@ Source = immutable {"filename","start","stop"}, {
             offset, self = self, offset
         else if type(offset) != 'number' then error("Cannot add Source and #{type(offset)}")
         return Source(@filename, @start+offset, @stop)
-    sub: (start, stop)=>
-        start or= 1
-        assert(start > 0 and (stop == nil or stop > 0), "Negative subscripts not supported")
-        if not @stop
-            assert(not stop, "cannot subscript non-range with range")
-            return Source(@filename, @start + start - 1)
-        else
-            stop or= @stop
-            return Source(@filename, @start + start - 1, @start + stop - 1)
-    get_text: =>
-        FILE_CACHE[@filename]\sub(@start,@stop)
-    get_line_number: =>
-        -- TODO: do a binary search if this is actually slow, which I doubt
-        src = FILE_CACHE[@filename]
-        line_starts = LINE_STARTS[src]
-        start_line = 1
-        while (line_starts[start_line+1] or math.huge) <= @start
-            start_line += 1
-        stop_line = start_line
-        while (line_starts[stop_line+1] or math.huge) <= @stop
-            stop_line += 1
-        return start_line, stop_line
-    get_line: => "#{@filename}:#{@get_line_number!}"
-    get_line_range: =>
-        start_line, stop_line = @get_line_number!
-        return if stop_line == start_line
-            "#{@filename}:#{start_line}"
-        else "#{@filename}:#{start_line}-#{stop_line}"
 }
 
 class Code

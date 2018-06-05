@@ -172,5 +172,3 @@ immediately
                 (% in %seen) <- (yes)
         return %unique
 
-
-# TODO: maybe make a generator/coroutine?

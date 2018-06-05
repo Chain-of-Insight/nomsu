@@ -211,7 +211,6 @@ immediately
                     error(\(repr %assumption), 0);
                 end
     
-    # TODO: factor this out and replace with "unless %condition: barf %message"
     compile [assume %condition or barf %message] to
         Lua ".."
             if not \(%condition as lua expr) then

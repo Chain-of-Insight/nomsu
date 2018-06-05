@@ -22,7 +22,6 @@ immediately
     compile [%x > %y] to: Lua value "(\(%x as lua expr) > \(%y as lua expr))"
     compile [%x <= %y] to: Lua value "(\(%x as lua expr) <= \(%y as lua expr))"
     compile [%x >= %y] to: Lua value "(\(%x as lua expr) >= \(%y as lua expr))"
-    # TODO: optimize case of [%x,%y] = [1,2]
     compile [%a is %b, %a = %b, %a == %b] to
         lua> ".."
             local safe = {Text=true, Number=true}

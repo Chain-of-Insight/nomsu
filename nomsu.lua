@@ -132,6 +132,20 @@ LINE_STARTS = setmetatable({ }, {
     return line_starts
   end
 })
+local pos_to_line
+pos_to_line = function(str, pos)
+  local line_starts = LINE_STARTS[str]
+  local lo, hi = 1, #line_starts
+  while lo <= hi do
+    local mid = math.floor((lo + hi) / 2)
+    if line_starts[mid] > pos then
+      hi = mid - 1
+    else
+      lo = mid + 1
+    end
+  end
+  return hi
+end
 do
   local STRING_METATABLE = getmetatable("")
   STRING_METATABLE.__add = function(self, other)
@@ -204,13 +218,13 @@ do
       return #src + 1
     end
     local err_pos = start_pos
-    local text_loc = userdata.source:sub(err_pos, err_pos)
-    local line_no = text_loc:get_line_number()
-    src = FILE_CACHE[text_loc.filename]
-    local prev_line = line_no == 1 and "" or src:sub(LINE_STARTS[src][line_no - 1] or 1, LINE_STARTS[src][line_no] - 2)
-    local err_line = src:sub(LINE_STARTS[src][line_no], (LINE_STARTS[src][line_no + 1] or 0) - 2)
-    local next_line = src:sub(LINE_STARTS[src][line_no + 1] or -1, (LINE_STARTS[src][line_no + 2] or 0) - 2)
-    local i = err_pos - LINE_STARTS[src][line_no]
+    local line_no = pos_to_line(src, err_pos)
+    src = FILE_CACHE[userdata.source.filename]
+    local line_starts = LINE_STARTS[src]
+    local prev_line = line_no == 1 and "" or src:sub(line_starts[line_no - 1] or 1, line_starts[line_no] - 2)
+    local err_line = src:sub(line_starts[line_no], (line_starts[line_no + 1] or 0) - 2)
+    local next_line = src:sub(line_starts[line_no + 1] or -1, (line_starts[line_no + 2] or 0) - 2)
+    local i = err_pos - line_starts[line_no]
     local pointer = ("-"):rep(i) .. "^"
     err_msg = colored.bright(colored.yellow(colored.onred((err_msg or "Parse error") .. " at " .. tostring(userdata.source.filename) .. ":" .. tostring(line_no) .. ":")))
     if #prev_line > 0 then
@@ -230,7 +244,11 @@ setmetatable(NOMSU_DEFS, {
   __index = function(self, key)
     local make_node
     make_node = function(start, value, stop, userdata)
-      local source = userdata.source:sub(start, stop - 1)
+      local source
+      do
+        local _with_0 = userdata.source
+        source = Source(_with_0.filename, _with_0.start + start - 1, _with_0.start + stop - 1)
+      end
       local tree
       if Types[key].is_multi then
         tree = Types[key](source, unpack(value))
@@ -391,13 +409,13 @@ do
           insert(_running_files, filename)
           if filename:match("%.lua$") then
             local file = assert(FILE_CACHE[filename], "Could not find file: " .. tostring(filename))
-            ret = self:run_lua(Lua(Source(filename), file))
+            ret = self:run_lua(Lua(Source(filename, 1, #file), file))
           elseif filename:match("%.nom$") or filename:match("^/dev/fd/[012]$") then
             if not self.skip_precompiled then
               local lua_filename = filename:gsub("%.nom$", ".lua")
               local file = FILE_CACHE[lua_filename]
               if file then
-                ret = self:run_lua(Lua(Source(filename), file))
+                ret = self:run_lua(Lua(Source(filename, 1, #file), file))
                 remove(_running_files)
                 _continue_0 = true
                 break
@@ -441,24 +459,9 @@ do
         local map = { }
         local offset = 1
         local source = lua.source
-        local nomsu_raw = FILE_CACHE[source.filename]:sub(source.start, source.stop)
-        local nomsu_line_to_pos = LINE_STARTS[nomsu_raw]
-        local lua_line_to_pos = LINE_STARTS[tostring(lua)]
-        local pos_to_line
-        pos_to_line = function(line_starts, pos)
-          local lo, hi = 1, #line_starts
-          while lo <= hi do
-            local mid = math.floor((lo + hi) / 2)
-            if line_starts[mid] > pos then
-              hi = mid - 1
-            else
-              lo = mid + 1
-            end
-          end
-          return hi
-        end
+        local nomsu_str = tostring(FILE_CACHE[source.filename]:sub(source.start, source.stop))
         local lua_line = 1
-        local nomsu_line = pos_to_line(nomsu_line_to_pos, lua.source.start)
+        local nomsu_line = pos_to_line(nomsu_str, lua.source.start)
         local fn
         fn = function(s)
           if type(s) == 'string' then
@@ -469,7 +472,7 @@ do
           else
             local old_line = nomsu_line
             if s.source then
-              nomsu_line = pos_to_line(nomsu_line_to_pos, s.source.start)
+              nomsu_line = pos_to_line(nomsu_str, s.source.start)
             end
             local _list_0 = s.bits
             for _index_0 = 1, #_list_0 do
@@ -1598,18 +1601,12 @@ OPTIONS
       }
       args.interactive = true
     end
-    local output_file
-    if args.output_file == "-" then
-      output_file = io.stdout
-    elseif args.output_file then
-      output_file = io.open(args.output_file, 'w')
-    end
     local print_file
     if args.print_file == "-" then
       print_file = io.stdout
     elseif args.print_file then
       print_file = io.open(args.print_file, 'w')
-    elseif output_file == io.stdout then
+    elseif args.output_file == '-' then
       print_file = nil
     else
       print_file = io.stdout
@@ -1631,8 +1628,14 @@ OPTIONS
       end
     end
     local compile_fn
-    if output_file then
+    if args.output_file then
       compile_fn = function(code)
+        local output_file
+        if args.output_file == "-" then
+          output_file = io.stdout
+        elseif args.output_file then
+          output_file = io.open(args.output_file, 'w')
+        end
         output_file:write("local IMMEDIATE = true;\n" .. tostring(code))
         return output_file:flush()
       end
