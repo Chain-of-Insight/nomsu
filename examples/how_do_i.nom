@@ -18,7 +18,7 @@ say "Hello world!"
 
 # How do I set a variable?
 %foobar <- 1
-%str <- "Hello world"
+%text <- "Hello world"
 # Expressions that are more than just literal values require parentheses:
 %foobar <- (2 + 3)
 %one-two <- 12
@@ -30,20 +30,38 @@ say %one-two
 %foobar +<- 1
 
 # How do I define a mutli-line string?
-%mutli-str <- ".."
-    Start with "..", then put lines below it
-    that are indented one level.
-    The string will continue until the indentation ends.
+# In Nomsu, "strings" are called "text", and multi-line text looks like:
+%mutli-text <- ".."
+    Start with "..", then put indented lines below it. The indented lines will not include
+    the indentation, except when the lines are indented more than 4 spaces relative
+    to the "..".
+      <- E.g. the 2 spaces here will be included as part of the text.
+    But this line will have no leading spaces.
 
-# How do I put values inside a string?
-%format-str <- ".."
-    Strings can contain a backslash followed by a variable, list, dict, or parenthesized
-    expression. This escaped value will be converted to a readable string, like so:
-    The value of %x is \%x, isn't that nice?
-    These are some numbers: \[1+1,2+1,3+1]
+    The text will continue until the indentation ends, skipping trailing newlines.
+
+# How do I put values inside text? (AKA string formatting, string interpolation)
+say ".."
+    Text can contain a backslash followed by a variable, list, dict, or parenthesized
+    expression. This escaped value will be converted to readable text, like so:
+    The value of %foobar is \%foobar, isn't that nice?
+    These are some numbers: \[1+1, 2+1, 3+1]
     The sum of 2 and 4 is \(2 + 4).
-    If you need to use a plain ol' backslash, you can do \\ <-- that
-%format-str2 <- "Single-line strings can contain escape sequences like \", \\, \n, \065, and \x0A"
+
+    A backslash not followed by any of these, and not at the end of a line
+    like this: \ will just be treated as a backslash.
+
+    Or, two backlashes will be treated as a single backslash, no matter what follows,
+    like this: \\%foobar <- won't insert any values
+
+    If you need to split a long line without inserting a newline, you can \
+    ..end a line with backslash and start the next line with two periods, like that.
+
+    Similarly, you can put a long interpolated indented value like: \
+        1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
+    .. between a backslash and two periods.
+
+say "Single-line text can contain escape sequences like \", \\, \n, \065, and \x0A"
 
 # How do I define a list?
 %my-list <- [1,2,"hello"]
@@ -307,17 +325,17 @@ say: best of [2,-3,4,-8] according to (function %: % * %)
     could use a macro to generate a single block of code that inlines the expression you
     want to use:
 immediately
-    parse [best of %items according to %key-expr] as
+    parse [best of %items according to %key-var in %key-expr] as
         result of
             <- {%best:nil, %best-key:nil}
-            for % in %items
+            for %key-var in %items
                 %key <- %key-expr
                 if: (%best is (nil)) or (%key > %best-key)
                     <- {%best:%, %best-key:%key}
             return %best
 # This results in generated code that is more efficient (no function calls in the
     inner loop)
-say: best of [2,-3,4,-8] according to (% * %)
+say: best of [2,-3,4,-8] according to % in (% * %)
 
 # In a functional programming language, you might do something like:
         doubled = map(list, function(x) return 2 * x end)
