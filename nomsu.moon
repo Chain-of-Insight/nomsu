@@ -290,10 +290,10 @@ class NomsuCompiler
             varname: (.ident_char^1 * ((-P("'") * .operator_char^1) + .ident_char^1)^0)^-1
         }
     stub_pattern = re.compile [=[
-        stub <- {| tok ([ ]* tok)* |} !.
+        stub <- {| tok (([ ])* tok)* |} !.
         tok <- ({'%'} %varname) / {%word}
     ]=], stub_defs
-    var_pattern = re.compile "{| ((('%' {%varname}) / %word) [ ]*)+ !. |}", stub_defs
+    var_pattern = re.compile "{| ((('%' {%varname}) / %word) ([ ])*)+ !. |}", stub_defs
     define_action: (signature, fn, is_compile_action=false)=>
         if type(fn) != 'function'
             error("Not a function: #{repr fn}")

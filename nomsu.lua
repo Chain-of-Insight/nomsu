@@ -1339,10 +1339,10 @@ do
       varname = (NOMSU_DEFS.ident_char ^ 1 * ((-P("'") * NOMSU_DEFS.operator_char ^ 1) + NOMSU_DEFS.ident_char ^ 1) ^ 0) ^ -1
     }
   end
-  stub_pattern = re.compile([=[        stub <- {| tok ([ ]* tok)* |} !.
+  stub_pattern = re.compile([=[        stub <- {| tok (([ ])* tok)* |} !.
         tok <- ({'%'} %varname) / {%word}
     ]=], stub_defs)
-  var_pattern = re.compile("{| ((('%' {%varname}) / %word) [ ]*)+ !. |}", stub_defs)
+  var_pattern = re.compile("{| ((('%' {%varname}) / %word) ([ ])*)+ !. |}", stub_defs)
   _running_files = { }
   MAX_LINE = 80
   math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])

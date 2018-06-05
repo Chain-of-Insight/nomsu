@@ -373,11 +373,11 @@ immediately
                 end)
                 if ok then
                     \(%success as lua statements)
-                end
-                if not ok then
+                    if not fell_through then
+                        return ret
+                    end
+                else
                     \(%fallback as lua statements)
-                elseif not fell_through then
-                    return ret
                 end
             end
     parse [try %action] as
@@ -401,19 +401,14 @@ immediately
         Lua ".."
             do
                 local fell_through = false
-                local ok, ret1 = pcall(function()
+                local ok, ret = pcall(function()
                     \(%action as lua statements)
                     fell_through = true
                 end)
-                local ok2, ret2 = pcall(function()
-                    \(%final_action as lua statements)
-                end)
-                if not ok then error(ret1) end
-                if not ok2 then error(ret2) end
-                if not fell_through then
-                    return ret1
-                end
-            end --do-then-always
+                \(%final_action as lua statements)
+                if not ok then error(ret) end
+                if not fell_through then return ret end
+            end
 
 # Inline thunk:
 immediately

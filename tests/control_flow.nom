@@ -178,9 +178,10 @@ try
     do
         barf
     ..then always
-        %x <- 1
+        %x <- 3
 ..and if it barfs: do nothing
-assume (%x = 1) or barf "do/then always failed"
+lua> "collectgarbage()"
+assume (%x = 3) or barf "do/then always failed"
 
 say "Control flow test passed."
 

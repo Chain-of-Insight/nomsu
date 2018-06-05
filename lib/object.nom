@@ -11,22 +11,26 @@ action [new %classname %inst]
 immediately
     parse [new %classname] as: new %classname {}
 
-parse [as %instance %body] as
-    lua> "local self;"
-    do
-        using
-            lua> ".."
-                self = \%instance
-                local cls = self.class
-                local old_self = self.class:set_self(self)
-                ACTIONS = cls.ACTIONS
-                COMPILE_ACTIONS = cls.COMPILE_ACTIONS
-                ARG_ORDERS = cls.ARG_ORDERS
-        ..do
-            %body
-    ..then always
-        lua> ".."
+compile [as %instance %body] to
+    Lua ".."
+        do
+            local self = \(%instance as lua expr)
+            local old_self = self.class:set_self(self)
+            old_actions, ACTIONS = ACTIONS, self.class.ACTIONS
+            old_compile_actions, COMPILE_ACTIONS = COMPILE_ACTIONS, self.class.COMPILE_ACTIONS
+            old_arg_orders, ARG_ORDERS = ARG_ORDERS, self.class.ARG_ORDERS
+            local fell_through = false
+            local ok, ret = pcall(function()
+                \(%body as lua statements)
+                fell_through = true
+            end)
             self.class:set_self(old_self)
+            ACTIONS = old_actions
+            COMPILE_ACTIONS = old_compile_actions
+            ARG_ORDERS = old_arg_orders
+            if not ok then error(ret) end
+            if not fell_through then return ret end
+        end
 
 parse [object %classname %class_body] as
     using

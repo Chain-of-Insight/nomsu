@@ -26,9 +26,9 @@ as: new "Dog" {barks:1}
 action [foo]
     as: new "Dog" {barks:23}
         return: (me).barks
-    barf "Reached unreachable code"
 
 assume: (foo) = 23
+..or barf: "Oops, \(foo) != 23"
 
 as: new "Dog" {barks:101}
     try: as (new "Dog" {barks:8}) (barf)
