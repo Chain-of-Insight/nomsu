@@ -278,7 +278,7 @@ end
 local NomsuCompiler
 do
   local _class_0
-  local stub_pattern, var_pattern, _running_files, MAX_LINE, math_expression
+  local stub_pattern, var_pattern, _running_files, _report_error, MAX_LINE, math_expression
   local _base_0 = {
     define_action = function(self, signature, fn, is_compile_action)
       if is_compile_action == nil then
@@ -520,7 +520,9 @@ do
           end
           local ret = compile_action(tree, unpack(args))
           if not ret then
-            error("Failed to produce any Lua")
+            _report_error(tree, function(src)
+              return "Compile-time action:\n" .. tostring(src) .. "\nfailed to produce any Lua"
+            end)
           end
           return ret
         end
@@ -533,7 +535,9 @@ do
             else
               local tok_lua = self:tree_to_lua(tok)
               if not (tok_lua.is_value) then
-                error("non-expression value inside math expression: " .. tostring(colored.yellow(repr(tok))))
+                _report_error(tok, function(src)
+                  return "Non-expression value inside math expression:\n" .. tostring(src)
+                end)
               end
               if tok.type == "Action" then
                 tok_lua:parenthesize()
@@ -556,7 +560,9 @@ do
             end
             local arg_lua = self:tree_to_lua(tok)
             if not (arg_lua.is_value) then
-              error("Cannot use:\n" .. tostring(colored.yellow(repr(tok))) .. "\nas an argument to " .. tostring(stub) .. ", since it's not an expression, it produces: " .. tostring(repr(arg_lua)), 0)
+              _report_error(tok, function(src)
+                return "Cannot use:\n" .. tostring(src) .. "\nas an argument to " .. tostring(stub) .. ", since it's not an expression, it produces: " .. tostring(repr(arg_lua)), 0
+              end)
             end
             insert(args, arg_lua)
             _continue_0 = true
@@ -641,7 +647,11 @@ do
             end
             local bit_lua = self:tree_to_lua(bit)
             if not (bit_lua.is_value) then
-              error("Cannot use " .. tostring(colored.yellow(repr(bit))) .. " as a string interpolation value, since it's not an expression.", 0)
+              local src = '    ' .. tostring(self:tree_to_nomsu(bit)):gsub('\n', '\n    ')
+              local line = tostring(bit.source.filename) .. ":" .. tostring(pos_to_line(FILE_CACHE[bit.source.filename], bit.source.start))
+              _report_error(bit, function(src)
+                return "Cannot use:\n" .. tostring(src) .. "\nas a string interpolation value, since it's not an expression."
+              end)
             end
             if #lua.bits > 0 then
               lua:append("..")
@@ -672,7 +682,9 @@ do
         for i, item in ipairs(tree) do
           local item_lua = self:tree_to_lua(item)
           if not (item_lua.is_value) then
-            error("Cannot use " .. tostring(colored.yellow(repr(item))) .. " as a list item, since it's not an expression.", 0)
+            _report_error(item, function(src)
+              return "Cannot use:\n" .. tostring(src) .. "\nas a list item, since it's not an expression."
+            end)
           end
           lua:append(item_lua)
           local item_string = tostring(item_lua)
@@ -723,11 +735,15 @@ do
         local key, value = tree[1], tree[2]
         local key_lua = self:tree_to_lua(key)
         if not (key_lua.is_value) then
-          error("Cannot use " .. tostring(colored.yellow(repr(key))) .. " as a dict key, since it's not an expression.", 0)
+          _report_error(tree[1], function(src)
+            return "Cannot use:\n" .. tostring(src) .. "\nas a dict key, since it's not an expression."
+          end)
         end
         local value_lua = value and self:tree_to_lua(value) or Lua.Value(key.source, "true")
         if not (value_lua.is_value) then
-          error("Cannot use " .. tostring(colored.yellow(repr(value))) .. " as a dict value, since it's not an expression.", 0)
+          _report_error(tree[2], function(src)
+            return "Cannot use:\n" .. tostring(src) .. "\nas a dict value, since it's not an expression."
+          end)
         end
         local key_str = tostring(key_lua):match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
         if key_str then
@@ -740,7 +756,9 @@ do
       elseif "IndexChain" == _exp_0 then
         local lua = self:tree_to_lua(tree[1])
         if not (lua.is_value) then
-          error("Cannot index " .. tostring(colored.yellow(repr(tree[1]))) .. ", since it's not an expression.", 0)
+          _report_error(tree[1], function(src)
+            return "Cannot index:\n" .. tostring(src) .. "\nsince it's not an expression."
+          end)
         end
         local first_char = tostring(lua):sub(1, 1)
         if first_char == "{" or first_char == '"' or first_char == "[" then
@@ -750,7 +768,9 @@ do
           local key = tree[i]
           local key_lua = self:tree_to_lua(key)
           if not (key_lua.is_value) then
-            error("Cannot use " .. tostring(colored.yellow(repr(key))) .. " as an index, since it's not an expression.", 0)
+            _report_error(key, function(src)
+              return "Cannot use:\n" .. tostring(key) .. "\nas an index, since it's not an expression."
+            end)
           end
           local key_lua_str = tostring(key_lua)
           do
@@ -884,10 +904,10 @@ do
           return nomsu
         end
         local nomsu = Nomsu(tree.source)
-        for i, line in ipairs(self) do
+        for i, line in ipairs(tree) do
           line = assert(self:tree_to_nomsu(line, nil, true), "Could not convert line to nomsu")
           nomsu:append(line)
-          if i < #self then
+          if i < #tree then
             nomsu:append("\n")
             if tostring(line):match("\n") then
               nomsu:append("\n")
@@ -1115,7 +1135,9 @@ do
           else
             local bit_lua = nomsu:tree_to_lua(bit)
             if not (bit_lua.is_value) then
-              error("Cannot use " .. tostring(colored.yellow(repr(bit))) .. " as a string interpolation value, since it's not an expression.")
+              _report_error(bit, function(src)
+                return "Cannot use:\n" .. tostring(src) .. "\nas a string interpolation value, since it's not an expression."
+              end)
             end
             lua:append(bit_lua)
           end
@@ -1142,7 +1164,9 @@ do
           else
             local bit_lua = nomsu:tree_to_lua(bit)
             if not (bit_lua.is_value) then
-              error("Cannot use " .. tostring(colored.yellow(repr(bit))) .. " as a string interpolation value, since it's not an expression.", 0)
+              _report_error(bit, function(src)
+                return "Cannot use:\n" .. tostring(src) .. "\nas a string interpolation value, since it's not an expression."
+              end)
             end
             lua:append(bit_lua)
           end
@@ -1335,6 +1359,18 @@ do
     ]=], stub_defs)
   var_pattern = re.compile("{| ((('%' {%varname}) / %word) ([ ])*)+ !. |}", stub_defs)
   _running_files = { }
+  _report_error = function(tok, fn)
+    local file = FILE_CACHE[tok.source.filename]
+    local line_no = pos_to_line(file, tok.source.start)
+    local line_start = LINE_STARTS[file][line_no]
+    local src = colored.dim(file:sub(line_start, tok.source.start - 1))
+    src = src .. colored.underscore(colored.bright(colored.red(file:sub(tok.source.start, tok.source.stop - 1))))
+    local end_of_line = (LINE_STARTS[file][pos_to_line(file, tok.source.stop) + 1] or 0) - 1
+    src = src .. colored.dim(file:sub(tok.source.stop, end_of_line - 1))
+    src = '    ' .. src:gsub('\n', '\n    ')
+    local err_msg = fn(src)
+    return error(tostring(tok.source.filename) .. ":" .. tostring(line_no) .. ": " .. err_msg, 0)
+  end
   MAX_LINE = 80
   math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])
   NomsuCompiler = _class_0
