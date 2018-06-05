@@ -156,7 +156,7 @@ NOMSU_DEFS = with {}
     -- If the line begins with #indent+4 spaces, the pattern matches *those* spaces
     -- and adds them to the stack (not any more).
     .indent = Cmt Carg(1), (start, userdata)=>
-        if #@match("^[ ]*", start) == userdata.indent + 4
+        if #@match("^[ ]*", start) >= userdata.indent + 4
             userdata.indent += 4
             return start + userdata.indent
     -- If the number of leading space characters is <= the number of space on the top of the

@@ -191,7 +191,7 @@ do
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
   _with_0.indent = Cmt(Carg(1), function(self, start, userdata)
-    if #self:match("^[ ]*", start) == userdata.indent + 4 then
+    if #self:match("^[ ]*", start) >= userdata.indent + 4 then
       userdata.indent = userdata.indent + 4
       return start + userdata.indent
     end
