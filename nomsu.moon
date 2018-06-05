@@ -407,7 +407,6 @@ class NomsuCompiler
         src ..= colored.underscore colored.bright colored.red(file\sub(tok.source.start, tok.source.stop-1))
         end_of_line = (LINE_STARTS[file][pos_to_line(file, tok.source.stop) + 1] or 0) - 1
         src ..= colored.dim(file\sub(tok.source.stop, end_of_line-1))
-        --src = '    '..tostring(@tree_to_nomsu(tok))\gsub('\n','\n    ')
         src = '    '..src\gsub('\n', '\n    ')
         err_msg = fn(src)
         error("#{tok.source.filename}:#{line_no}: "..err_msg, 0)
