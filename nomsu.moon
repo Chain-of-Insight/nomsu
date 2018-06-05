@@ -1185,7 +1185,9 @@ OPTIONS
                         print_file\write(formatted, "\n")
                         print_file\flush!
             elseif input == STDIN
-                nomsu\run(io.input!\read("*a"), compile_fn)
+                file = io.input!\read("*a")
+                FILE_CACHE.stdin = file
+                nomsu\run(Nomsu(Source('stdin',1,#file), file), compile_fn)
             else
                 nomsu\run_file(input, compile_fn)
 
