@@ -241,30 +241,29 @@ local function sort(list, keyFn, reverse)
 end
 
 local function equivalent(x, y, depth)
-    depth = depth or -1
-    if x == y then
+    depth = depth or 0
+    if rawequal(x, y) then
         return true
     end
     if type(x) ~= type(y) then
         return false
     end
-    if type(x) ~= 'table' then
+    if type(x) ~= 'table' then return false end
+    if getmetatable(x) ~= getmetatable(y) then
         return false
     end
-    if depth == 0 then
-        return false
-    elseif depth < -999 then
+    if depth >= 99 then
         error("Exceeded maximum comparison depth")
     end
     local checked = {}
     for k, v in pairs(x) do
-        if not equivalent(y[k], v, depth - 1) then
+        if not equivalent(y[k], v, depth + 1) then
             return false
         end
         checked[k] = true
     end
     for k, v in pairs(y) do
-        if not checked[k] and not equivalent(x[k], v, depth - 1) then
+        if not checked[k] and not equivalent(x[k], v, depth + 1) then
             return false
         end
     end

@@ -677,7 +677,7 @@ do
         end
         return lua
       elseif "List" == _exp_0 then
-        local lua = Lua.Value(tree.source, "{")
+        local lua = Lua.Value(tree.source, "list{")
         local line_length = 0
         for i, item in ipairs(tree) do
           local item_lua = self:tree_to_lua(item)
@@ -707,7 +707,7 @@ do
         lua:append("}")
         return lua
       elseif "Dict" == _exp_0 then
-        local lua = Lua.Value(tree.source, "{")
+        local lua = Lua.Value(tree.source, "dict{")
         local line_length = 0
         for i, entry in ipairs(tree) do
           local entry_lua = self:tree_to_lua(entry)
@@ -1216,6 +1216,43 @@ do
         end
       })
       self.source_map = { }
+      local _list_mt = {
+        __eq = utils.equivalent,
+        __tostring = function(self)
+          return "[" .. concat((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            for _index_0 = 1, #self do
+              local b = self[_index_0]
+              _accum_0[_len_0] = repr(b)
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)(), ", ") .. "]"
+        end
+      }
+      local list
+      list = function(t)
+        return setmetatable(t, _list_mt)
+      end
+      local _dict_mt = {
+        __eq = utils.equivalent,
+        __tostring = function(self)
+          return "{" .. concat((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            for k, v in pairs(self) do
+              _accum_0[_len_0] = tostring(repr(k)) .. ": " .. tostring(repr(v))
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)(), ", ") .. "}"
+        end
+      }
+      local dict
+      dict = function(t)
+        return setmetatable(t, _dict_mt)
+      end
       self.environment = {
         nomsu = self,
         repr = repr,
@@ -1256,9 +1293,9 @@ do
         debug = debug,
         math = math,
         io = io,
-        pairs = pairs,
         load = load,
-        ipairs = ipairs
+        list = list,
+        dict = dict
       }
       if jit then
         self.environment.len = function(x)
@@ -1289,11 +1326,10 @@ do
               if mt.__ipairs then
                 return mt.__ipairs(x)
               end
-            else
-              return _ipairs(x)
             end
           end
         end
+        return _ipairs(x)
       end
       self.environment.pairs = function(x)
         if type(x) == 'function' then
@@ -1307,11 +1343,10 @@ do
               if mt.__pairs then
                 return mt.__pairs(x)
               end
-            else
-              return _pairs(x)
             end
           end
         end
+        return _pairs(x)
       end
       for k, v in pairs(Types) do
         self.environment[k] = v

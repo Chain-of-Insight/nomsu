@@ -245,6 +245,17 @@ class NomsuCompiler
         })
         @source_map = {}
 
+        _list_mt =
+            __eq:utils.equivalent
+            -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
+            __tostring: =>
+                "["..concat([repr(b) for b in *@], ", ").."]"
+        list = (t)-> setmetatable(t, _list_mt)
+        _dict_mt =
+            __eq:utils.equivalent
+            __tostring: =>
+                "{"..concat(["#{repr(k)}: #{repr(v)}" for k,v in pairs @], ", ").."}"
+        dict = (t)-> setmetatable(t, _dict_mt)
         @environment = {
             -- Discretionary/convenience stuff
             nomsu:self, repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re,
@@ -252,8 +263,9 @@ class NomsuCompiler
             :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
             :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
             :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :bit32, :rawlen,
-            :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :pairs,
-            :load, :ipairs,
+            :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :load,
+            -- Nomsu types:
+            :list, :dict,
         }
         @environment.len = if jit
             (x)->
@@ -270,7 +282,7 @@ class NomsuCompiler
             elseif mt = getmetatable(x)
                 if mt.__ipairs
                     return mt.__ipairs(x)
-            else return _ipairs(x)
+            return _ipairs(x)
         @environment.pairs = (x)->
             if type(x) == 'function'
                 return coroutine.wrap(x)
@@ -279,7 +291,7 @@ class NomsuCompiler
             elseif mt = getmetatable(x)
                 if mt.__pairs
                     return mt.__pairs(x)
-            else return _pairs(x)
+            return _pairs(x)
         for k,v in pairs(Types) do @environment[k] = v
         @environment.Tuple = Tuple
         @environment.Lua = Lua
@@ -558,7 +570,7 @@ class NomsuCompiler
                 return lua
 
             when "List"
-                lua = Lua.Value tree.source, "{"
+                lua = Lua.Value tree.source, "list{"
                 line_length = 0
                 for i, item in ipairs tree
                     item_lua = @tree_to_lua(item)
@@ -583,7 +595,7 @@ class NomsuCompiler
                 return lua
 
             when "Dict"
-                lua = Lua.Value tree.source, "{"
+                lua = Lua.Value tree.source, "dict{"
                 line_length = 0
                 for i, entry in ipairs tree
                     entry_lua = @tree_to_lua(entry)

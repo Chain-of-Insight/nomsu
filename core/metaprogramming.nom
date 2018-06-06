@@ -132,7 +132,7 @@ immediately
         lua> ".."
             local lua = nomsu:tree_to_lua(\%tree)
             if not lua.is_value then
-                error("Invalid thing to convert to lua expr: "..\%tree)
+                error("Invalid thing to convert to lua expr: "..tostring(\%tree))
             end
             return lua
 
@@ -164,8 +164,9 @@ immediately
     parse [to %var write %code] as: lua> "\%var:append(\%code);"
 
 immediately
-    compile [repr %obj] to: Lua value "repr(\(%obj as lua expr))"
-    compile [%obj as text] to: Lua value "tostring(\(%obj as lua expr))"
+    compile [quote %s] to
+        Lua value ".."
+            ('"'..\(%s as lua expr):gsub("\\\\", "\\\\\\\\"):gsub("\n","\\\\n"):gsub('"', '\\\\"')..'"')
     compile [type of %obj] to: Lua value "type(\(%obj as lua expr))"
 
 immediately
@@ -175,7 +176,7 @@ immediately
 # Compiler tools
 immediately
     compile [run %code] to
-        Lua "nomsu:run(Nomsu(\"\(%code.source as text)\", \(%code as lua expr)))"
+        Lua value "nomsu:run(Nomsu(\(quote "\(%code.source)"), \(%code as lua expr)))"
 
 immediately
     compile [show lua %block] to
@@ -189,7 +190,7 @@ immediately
             if \%message.type == "Text" then
                 return Lua(tree.source, "print(", \(%message as lua expr), ");");
             else
-                return Lua(tree.source, "print(stringify(", \(%message as lua expr), "));");
+                return Lua(tree.source, "print(tostring(", \(%message as lua expr), "));");
             end
 
 # Return
@@ -208,7 +209,7 @@ immediately
         return
             Lua ".."
                 if not \(%condition as lua expr) then
-                    error(\(repr %assumption), 0);
+                    error(\(quote "\%assumption"), 0);
                 end
     
     compile [assume %condition or barf %message] to

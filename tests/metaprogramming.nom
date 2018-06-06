@@ -55,15 +55,13 @@ try: foo 99
 
 assume ((\(5 + 5) as value) = 10) or barf "%tree as value failed."
 
-assume (((\(foo %x) as nomsu) as text) = "foo %x") or barf "source code failed."
-
-assume ((repr [1,2]) = "{1, 2}") or barf "repr failed."
+assume ("\(\(foo %x) as nomsu)" = "foo %x") or barf "source code failed."
 
 assume ((type of {}) = "table") or barf "type of failed."
 
 assume ((nomsu) = (=lua "nomsu")) or barf "nomsu failed"
 
-assume (((\%x as lua identifier) as text) = "_x") or barf "converting to identifier failed."
+assume ("\(\%x as lua identifier)" = "_x") or barf "converting to identifier failed."
 
 assume ((run "return 99") = 99) or barf "run % failed."
 

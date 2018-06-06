@@ -134,10 +134,6 @@ immediately
                 self[\(%key as lua expr)] = value
                 return value
             end})
-    
-immediately
-    parse [new counter] as: {} with fallback % -> 0
-    parse [new default dict] as: {} with fallback % -> {}
 
 # Sorting
 immediately

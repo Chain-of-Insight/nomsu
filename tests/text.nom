@@ -30,7 +30,7 @@ assume (%s = "one two\\nthreefour")
     list:\[..]
         1,2,3
     ..
-assume (%s = "list:{1, 2, 3}")
+assume (%s = "list:[1, 2, 3]")
 
 assume
     ".."

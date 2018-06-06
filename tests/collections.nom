@@ -37,9 +37,5 @@ assume (%x = [3,2,1])
 sort %x by % = %keys.%
 assume (%x = [2,3,1])
 assume ((unique [1,2,1,3,2,3]) = [1,2,3])
-%c <- (new counter)
-for % in ["x","y","x","x","y"]
-    %c.% +<- 1
-assume (%c = {x:3,y:2})
 
 say "Collections test passed."

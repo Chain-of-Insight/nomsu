@@ -23,23 +23,9 @@ immediately
     compile [%x <= %y] to: Lua value "(\(%x as lua expr) <= \(%y as lua expr))"
     compile [%x >= %y] to: Lua value "(\(%x as lua expr) >= \(%y as lua expr))"
     compile [%a is %b, %a = %b, %a == %b] to
-        lua> ".."
-            local safe = {Text=true, Number=true}
-            local a_lua, b_lua = \(%a as lua), \(%b as lua)
-            if safe[\%a.type] or safe[\%b.type] then
-                return Lua.Value(tree.source, "(", a_lua, " == ", b_lua, ")")
-            else
-                return Lua.Value(tree.source, "utils.equivalent(", a_lua, ", ", b_lua, ")")
-            end
+        Lua value "(\(%a as lua expr) == \(%b as lua expr))"
     compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
-        lua> ".."
-            local safe = {Text=true, Number=true}
-            local a_lua, b_lua = \(%a as lua), \(%b as lua)
-            if safe[\%a.type] or safe[\%b.type] then
-                return Lua.Value(tree.source, "(", a_lua, " ~= ", b_lua, ")")
-            else
-                return Lua.Value(tree.source, "(not utils.equivalent(", a_lua, ", ", b_lua, "))")
-            end
+        Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
     # For strict identity checking, use (%x's id) is (%y's id)
     compile [%'s id, id of %] to: Lua value "nomsu.ids[\(% as lua expr)]"
 
