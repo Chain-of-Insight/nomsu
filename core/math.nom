@@ -15,7 +15,7 @@ compile [golden ratio] to: Lua value "((1+math.sqrt(5))/2)"
 compile [e] to: Lua value "math.exp(1)"
 
 # Functions:
-compile [% as a number] to: Lua value "tonumber(\(% as lua expr))"
+compile [% as a number, % as number] to: Lua value "tonumber(\(% as lua expr))"
 compile [absolute value %, | % |, abs %] to: Lua value "math.abs(\(% as lua expr))"
 compile [square root %, square root of %, √%, sqrt %] to: Lua value "math.sqrt(\(% as lua expr))"
 compile [sine %, sin %] to: Lua value "math.sin(\(% as lua expr))"
