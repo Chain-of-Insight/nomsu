@@ -94,14 +94,14 @@ immediately
                     return replacements[t.value]
                 elseif t.type == 'Var' then
                     return t.type.."("..repr(tostring(t.source))..", "..repr(t.value.."#"..tostring(MANGLE_INDEX))..")"
-                elseif t.is_multi then
+                elseif t.value then
+                    return t.type.."("..repr(tostring(t.source))..", "..repr(t.value)..")"
+                else
                     local bits = {repr(tostring(t.source))}
                     for i, entry in ipairs(t) do
                         bits[#bits+1] = make_tree(entry)
                     end
                     return t.type.."("..table.concat(bits, ", ")..")"
-                else
-                    return t.type.."("..repr(tostring(t.source))..", "..repr(t.value)..")"
                 end
             end
             lua:append(")\n    local tree = ", make_tree(\%longhand), "\n    return nomsu:tree_to_lua(tree)\nend);")

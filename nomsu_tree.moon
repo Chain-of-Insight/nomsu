@@ -1,69 +1,53 @@
 -- This file contains the datastructures used to represent parsed Nomsu syntax trees,
 -- as well as the logic for converting them to Lua code.
-utils = require 'utils'
-{:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
-immutable = require 'immutable'
+{:repr} = require 'utils'
 {:insert, :remove, :concat} = table
-{:Lua, :Nomsu, :Source} = require "code_obj"
+{:Source} = require "code_obj"
 
-MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
-
-Types = {}
-Types.is_node = (n)->
-    type(n) == 'userdata' and getmetatable(n) and Types[n.type] == getmetatable(n)
+AST = {}
+AST.is_syntax_tree = (n)->
+    type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
 
 -- Helper method:
-Tree = (name, fields, methods)->
-    methods or= {}
-    is_multi = true
-    for f in *fields do is_multi and= (f != "value")
-    with methods
+Tree = (name, leaf_or_branch, methods)->
+    cls = methods or {}
+    is_multi = leaf_or_branch == 'branch'
+    with cls
         .type = name
-        .name = name
-        .__new or= (source, ...)=>
-            assert source
+        .is_instance = (x)=> getmetatable(x) == @
+        .__index = cls
+        .__tostring = => "#{@name}(#{@value and repr(@value) or table.concat([repr(v) for v in *@]), ', '})"
+        .map = (fn)=>
+            if replacement = fn(@) then return replacement
+            if @value then return @
+            new_vals = [v.map and v\map(fn) or v for v in *@]
+            return getmetatable(self)(@source, unpack(new_vals))
+
+    AST[name] = setmetatable cls,
+        __tostring: => @name
+        __call: (source, ...)=>
             if type(source) == 'string'
                 source = Source\from_string(source)
-            --assert Source\is_instance(source)
-            return source, ...
-        .is_multi = is_multi
-        if is_multi
-            .__tostring = => "#{@name}(#{table.concat [repr(v) for v in *@], ', '})"
-            .map = (fn)=>
-                if replacement = fn(@)
-                    return replacement
-                new_vals = [v.map and v\map(fn) or v for v in *@]
-                return getmetatable(self)(@source, unpack(new_vals))
-        else
-            .__tostring = => "#{@name}(#{repr(@value)})"
-            .map = (fn)=>
-                fn(@) or @
+            assert(Source\is_instance(source))
+            inst = if is_multi then {:source, ...} else {:source, value:...}
+            setmetatable(inst, @)
+            if inst.__init then inst\__init!
+            return inst
 
-    Types[name] = immutable fields, methods
-
-Tree "Block", {"source"}
-Tree "EscapedNomsu", {"source"}
-Tree "Text", {"source"}
-Tree "List", {"source"}
-Tree "Dict", {"source"}
-Tree "DictEntry", {"source"}
-Tree "IndexChain", {"source"}
-Tree "Number", {"source", "value"}
-Tree "Var", {"source", "value"}
-
-Tree "Action", {"source", "stub"},
-    __new: (source, ...)=>
-        assert source
-        if type(source) == 'string'
-            source = Source\from_string(source)
-        --assert Source\is_instance(source)
-        stub_bits = {}
-        for i=1,select("#",...)
-            a = select(i, ...)
-            stub_bits[i] = type(a) == 'string' and a or "%"
-        stub = concat stub_bits, " "
-        return source, stub, ...
+Tree "Number", 'leaf'
+Tree "Var", 'leaf'
+Tree "Block", 'branch'
+Tree "EscapedNomsu", 'branch'
+Tree "Text", 'branch'
+Tree "List", 'branch'
+Tree "Dict", 'branch'
+Tree "DictEntry", 'branch'
+Tree "IndexChain", 'branch'
+Tree "Action", 'branch',
+    __init: =>
+        stub_bits = [type(a) == 'string' and a or '%' for a in *@]
+        @stub = concat stub_bits, " "
     get_spec: =>
         concat [type(a) == "string" and a or "%#{a.value}" for a in *@], " "
 
-return Types
+return AST

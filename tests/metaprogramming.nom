@@ -55,7 +55,9 @@ try: foo 99
 
 assume ((\(5 + 5) as value) = 10) or barf "%tree as value failed."
 
-assume ("\(\(foo %x) as nomsu)" = "foo %x") or barf "source code failed."
+assume ("\(\(foo %x) as nomsu)" = "foo %x") or barf "action source code failed."
+
+assume ("\(\%x as nomsu)" = "%x") or barf "var source code failed."
 
 assume ((type of {}) = "table") or barf "type of failed."
 

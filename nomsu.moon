@@ -40,9 +40,6 @@ lpeg.setmaxstack 10000
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt,:Carg} = lpeg
 utils = require 'utils'
 new_uuid = require 'uuid'
-immutable = require 'immutable'
-export Tuple
-Tuple = immutable(nil, {name:"Tuple"})
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
 export colored
@@ -134,7 +131,7 @@ do
         if type(i) == 'number' then return string.sub(@, i, i)
         elseif type(i) == 'table' then return string.sub(@, i[1], i[2])
 
-Types = require "nomsu_tree"
+AST = require "nomsu_tree"
 
 NOMSU_DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
@@ -205,10 +202,11 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
         local source
         with userdata.source
             source = Source(.filename, .start + start-1, .start + stop-1)
-        tree = if Types[key].is_multi
-            Types[key](source, unpack(value))
-        else Types[key](source, value)
-        return tree
+        value.source = source
+        setmetatable(value, AST[key])
+        if value.__init then value\__init!
+        return value
+
     self[key] = make_node
     return make_node
 })
@@ -254,6 +252,8 @@ class NomsuCompiler
                 @[key] = id
                 return id
         })
+        -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
+        -- from lua line number to nomsu line number
         @source_map = {}
 
         _list_mt =
@@ -304,8 +304,7 @@ class NomsuCompiler
                 if mt.__pairs
                     return mt.__pairs(x)
             return _pairs(x)
-        for k,v in pairs(Types) do @environment[k] = v
-        @environment.Tuple = Tuple
+        for k,v in pairs(AST) do @environment[k] = v
         @environment.Lua = Lua
         @environment.Nomsu = Nomsu
         @environment.Source = Source
@@ -316,7 +315,7 @@ class NomsuCompiler
         @environment.COMPILE_ACTIONS = {}
         @environment.ARG_ORDERS = setmetatable({}, {__mode:"k"})
         @environment.LOADED = {}
-        @environment.Types = Types
+        @environment.AST = AST
         @initialize_core!
     
     local stub_defs
@@ -427,7 +426,7 @@ class NomsuCompiler
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, tostring(lua.source), "t", @environment)
+        run_lua_fn, err = load(lua_string, nil and tostring(lua.source), "t", @environment)
         if not run_lua_fn
             n = 1
             fn = ->
@@ -525,13 +524,13 @@ class NomsuCompiler
 
             when "EscapedNomsu"
                 make_tree = (t)->
-                    if type(t) != 'userdata'
+                    unless AST.is_syntax_tree(t)
                         return repr(t)
-                    if t.is_multi
+                    if t.value
+                        return t.type.."("..repr(tostring t.source)..", "..repr(t.value)..")"
+                    else
                         bits = [make_tree(bit) for bit in *t]
                         return t.type.."("..repr(tostring t.source)..", "..table.concat(bits, ", ")..")"
-                    else
-                        return t.type.."("..repr(tostring t.source)..", "..repr(t.value)..")"
                 Lua.Value tree.source, make_tree(tree[1])
             
             when "Block"

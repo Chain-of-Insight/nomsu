@@ -34,10 +34,6 @@ local P, R, V, S, Cg, C, Cp, B, Cmt, Carg
 P, R, V, S, Cg, C, Cp, B, Cmt, Carg = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt, lpeg.Carg
 local utils = require('utils')
 local new_uuid = require('uuid')
-local immutable = require('immutable')
-Tuple = immutable(nil, {
-  name = "Tuple"
-})
 local repr, stringify, min, max, equivalent, set, is_list, sum
 repr, stringify, min, max, equivalent, set, is_list, sum = utils.repr, utils.stringify, utils.min, utils.max, utils.equivalent, utils.set, utils.is_list, utils.sum
 local colors = setmetatable({ }, {
@@ -163,7 +159,7 @@ do
     end
   end
 end
-local Types = require("nomsu_tree")
+local AST = require("nomsu_tree")
 local NOMSU_DEFS
 do
   local _with_0 = { }
@@ -249,13 +245,12 @@ setmetatable(NOMSU_DEFS, {
         local _with_0 = userdata.source
         source = Source(_with_0.filename, _with_0.start + start - 1, _with_0.start + stop - 1)
       end
-      local tree
-      if Types[key].is_multi then
-        tree = Types[key](source, unpack(value))
-      else
-        tree = Types[key](source, value)
+      value.source = source
+      setmetatable(value, AST[key])
+      if value.__init then
+        value:__init()
       end
-      return tree
+      return value
     end
     self[key] = make_node
     return make_node
@@ -444,7 +439,7 @@ do
     run_lua = function(self, lua)
       assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
       local lua_string = tostring(lua)
-      local run_lua_fn, err = load(lua_string, tostring(lua.source), "t", self.environment)
+      local run_lua_fn, err = load(lua_string, nil and tostring(lua.source), "t", self.environment)
       if not run_lua_fn then
         local n = 1
         local fn
@@ -592,10 +587,12 @@ do
       elseif "EscapedNomsu" == _exp_0 then
         local make_tree
         make_tree = function(t)
-          if type(t) ~= 'userdata' then
+          if not (AST.is_syntax_tree(t)) then
             return repr(t)
           end
-          if t.is_multi then
+          if t.value then
+            return t.type .. "(" .. repr(tostring(t.source)) .. ", " .. repr(t.value) .. ")"
+          else
             local bits
             do
               local _accum_0 = { }
@@ -608,8 +605,6 @@ do
               bits = _accum_0
             end
             return t.type .. "(" .. repr(tostring(t.source)) .. ", " .. table.concat(bits, ", ") .. ")"
-          else
-            return t.type .. "(" .. repr(tostring(t.source)) .. ", " .. repr(t.value) .. ")"
           end
         end
         return Lua.Value(tree.source, make_tree(tree[1]))
@@ -1327,10 +1322,9 @@ do
         end
         return _pairs(x)
       end
-      for k, v in pairs(Types) do
+      for k, v in pairs(AST) do
         self.environment[k] = v
       end
-      self.environment.Tuple = Tuple
       self.environment.Lua = Lua
       self.environment.Nomsu = Nomsu
       self.environment.Source = Source
@@ -1346,7 +1340,7 @@ do
         __mode = "k"
       })
       self.environment.LOADED = { }
-      self.environment.Types = Types
+      self.environment.AST = AST
       return self:initialize_core()
     end,
     __base = _base_0,

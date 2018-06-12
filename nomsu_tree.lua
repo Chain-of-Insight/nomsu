@@ -1,130 +1,105 @@
-local utils = require('utils')
-local repr, stringify, min, max, equivalent, set, is_list, sum
-repr, stringify, min, max, equivalent, set, is_list, sum = utils.repr, utils.stringify, utils.min, utils.max, utils.equivalent, utils.set, utils.is_list, utils.sum
-local immutable = require('immutable')
+local repr
+repr = require('utils').repr
 local insert, remove, concat
 do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local Lua, Nomsu, Source
-do
-  local _obj_0 = require("code_obj")
-  Lua, Nomsu, Source = _obj_0.Lua, _obj_0.Nomsu, _obj_0.Source
-end
-local MAX_LINE = 80
-local Types = { }
-Types.is_node = function(n)
-  return type(n) == 'userdata' and getmetatable(n) and Types[n.type] == getmetatable(n)
+local Source
+Source = require("code_obj").Source
+local AST = { }
+AST.is_syntax_tree = function(n)
+  return type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
 end
 local Tree
-Tree = function(name, fields, methods)
-  methods = methods or { }
-  local is_multi = true
-  for _index_0 = 1, #fields do
-    local f = fields[_index_0]
-    is_multi = is_multi and (f ~= "value")
-  end
+Tree = function(name, leaf_or_branch, methods)
+  local cls = methods or { }
+  local is_multi = leaf_or_branch == 'branch'
   do
-    methods.type = name
-    methods.name = name
-    methods.__new = methods.__new or function(self, source, ...)
-      assert(source)
+    cls.type = name
+    cls.is_instance = function(self, x)
+      return getmetatable(x) == self
+    end
+    cls.__index = cls
+    cls.__tostring = function(self)
+      return tostring(self.name) .. "(#{@value and repr(@value) or table.concat([repr(v) for v in *@]), ', '})"
+    end
+    cls.map = function(self, fn)
+      do
+        local replacement = fn(self)
+        if replacement then
+          return replacement
+        end
+      end
+      if self.value then
+        return self
+      end
+      local new_vals
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_0 = 1, #self do
+          local v = self[_index_0]
+          _accum_0[_len_0] = v.map and v:map(fn) or v
+          _len_0 = _len_0 + 1
+        end
+        new_vals = _accum_0
+      end
+      return getmetatable(self)(self.source, unpack(new_vals))
+    end
+  end
+  AST[name] = setmetatable(cls, {
+    __tostring = function(self)
+      return self.name
+    end,
+    __call = function(self, source, ...)
       if type(source) == 'string' then
         source = Source:from_string(source)
       end
-      return source, ...
+      assert(Source:is_instance(source))
+      local inst
+      if is_multi then
+        inst = {
+          source = source,
+          ...
+        }
+      else
+        inst = {
+          source = source,
+          value = ...
+        }
+      end
+      setmetatable(inst, self)
+      if inst.__init then
+        inst:__init()
+      end
+      return inst
     end
-    methods.is_multi = is_multi
-    if is_multi then
-      methods.__tostring = function(self)
-        return tostring(self.name) .. "(" .. tostring(table.concat((function()
-          local _accum_0 = { }
-          local _len_0 = 1
-          for _index_0 = 1, #self do
-            local v = self[_index_0]
-            _accum_0[_len_0] = repr(v)
-            _len_0 = _len_0 + 1
-          end
-          return _accum_0
-        end)(), ', ')) .. ")"
-      end
-      methods.map = function(self, fn)
-        do
-          local replacement = fn(self)
-          if replacement then
-            return replacement
-          end
-        end
-        local new_vals
-        do
-          local _accum_0 = { }
-          local _len_0 = 1
-          for _index_0 = 1, #self do
-            local v = self[_index_0]
-            _accum_0[_len_0] = v.map and v:map(fn) or v
-            _len_0 = _len_0 + 1
-          end
-          new_vals = _accum_0
-        end
-        return getmetatable(self)(self.source, unpack(new_vals))
-      end
-    else
-      methods.__tostring = function(self)
-        return tostring(self.name) .. "(" .. tostring(repr(self.value)) .. ")"
-      end
-      methods.map = function(self, fn)
-        return fn(self) or self
-      end
-    end
-  end
-  Types[name] = immutable(fields, methods)
+  })
 end
-Tree("Block", {
-  "source"
-})
-Tree("EscapedNomsu", {
-  "source"
-})
-Tree("Text", {
-  "source"
-})
-Tree("List", {
-  "source"
-})
-Tree("Dict", {
-  "source"
-})
-Tree("DictEntry", {
-  "source"
-})
-Tree("IndexChain", {
-  "source"
-})
-Tree("Number", {
-  "source",
-  "value"
-})
-Tree("Var", {
-  "source",
-  "value"
-})
-Tree("Action", {
-  "source",
-  "stub"
-}, {
-  __new = function(self, source, ...)
-    assert(source)
-    if type(source) == 'string' then
-      source = Source:from_string(source)
+Tree("Number", 'leaf')
+Tree("Var", 'leaf')
+Tree("Block", 'branch')
+Tree("EscapedNomsu", 'branch')
+Tree("Text", 'branch')
+Tree("List", 'branch')
+Tree("Dict", 'branch')
+Tree("DictEntry", 'branch')
+Tree("IndexChain", 'branch')
+Tree("Action", 'branch', {
+  __init = function(self)
+    local stub_bits
+    do
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #self do
+        local a = self[_index_0]
+        _accum_0[_len_0] = type(a) == 'string' and a or '%'
+        _len_0 = _len_0 + 1
+      end
+      stub_bits = _accum_0
     end
-    local stub_bits = { }
-    for i = 1, select("#", ...) do
-      local a = select(i, ...)
-      stub_bits[i] = type(a) == 'string' and a or "%"
-    end
-    local stub = concat(stub_bits, " ")
-    return source, stub, ...
+    self.stub = concat(stub_bits, " ")
   end,
   get_spec = function(self)
     return concat((function()
@@ -139,4 +114,4 @@ Tree("Action", {
     end)(), " ")
   end
 })
-return Types
+return AST

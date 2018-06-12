@@ -2,38 +2,46 @@
 -- build up generated code, while keeping track of where it came from, and managing
 -- indentation levels.
 {:insert, :remove, :concat} = table
-immutable = require 'immutable'
 local Lua, Source
 export LINE_STARTS
 
-Source = immutable {"filename","start","stop"}, {
-    name:"Source"
-    from_string: (str)=>
+class Source
+    new: (@filename, @start, @stop)=>
+
+    @from_string: (str)=>
         filename,start,stop = str\match("^@(.-)%[(%d+):(%d+)%]$")
         unless filename
             filename,start = str\match("^@(.-)%[(%d+)%]$")
-        return Source(filename or str, tonumber(start or 1), tonumber(stop))
+        return @(filename or str, tonumber(start or 1), tonumber(stop))
+
+    @is_instance: (x)=> type(x) == 'table' and x.__class == @
+
     __tostring: =>
         if @stop
             "@#{@filename}[#{@start}:#{@stop}]"
         else
             "@#{@filename}[#{@start}]"
+    
+    __eq: (other)=>
+        getmetatable(@) == getmetatable(other) and @filename == other.filename and @start == other.start and @stop == other.stop
+
     __lt: (other)=>
         assert(@filename == other.filename, "Cannot compare sources from different files")
         return if @start == other.start
             (@stop or @start) < (other.stop or other.start)
         else @start < other.start
+
     __le: (other)=>
         assert(@filename == other.filename, "Cannot compare sources from different files")
         return if @start == other.start
             (@stop or @start) <= (other.stop or other.start)
         else @start <= other.start
+
     __add: (offset)=>
         if type(self) == 'number'
             offset, self = self, offset
         else if type(offset) != 'number' then error("Cannot add Source and #{type(offset)}")
         return Source(@filename, @start+offset, @stop)
-}
 
 class Code
     new: (@source, ...)=>
@@ -90,7 +98,7 @@ class Lua extends Code
         return unless #vars > 0
         seen = {[v]:true for v in *@free_vars}
         for var in *vars
-            assert(type(var) == 'userdata' and var.type == "Var")
+            assert(var.type == "Var")
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
@@ -100,7 +108,7 @@ class Lua extends Code
         return unless #vars > 0
         removals = {}
         for var in *vars
-            assert(type(var) == 'userdata' and var.type == "Var")
+            assert(var.type == "Var")
             removals[var.value] = true
         
         stack = {self}

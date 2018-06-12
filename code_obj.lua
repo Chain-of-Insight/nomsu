@@ -3,55 +3,76 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local immutable = require('immutable')
 local Lua, Source
-Source = immutable({
-  "filename",
-  "start",
-  "stop"
-}, {
-  name = "Source",
-  from_string = function(self, str)
+do
+  local _class_0
+  local _base_0 = {
+    __tostring = function(self)
+      if self.stop then
+        return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. ":" .. tostring(self.stop) .. "]"
+      else
+        return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. "]"
+      end
+    end,
+    __eq = function(self, other)
+      return getmetatable(self) == getmetatable(other) and self.filename == other.filename and self.start == other.start and self.stop == other.stop
+    end,
+    __lt = function(self, other)
+      assert(self.filename == other.filename, "Cannot compare sources from different files")
+      if self.start == other.start then
+        return (self.stop or self.start) < (other.stop or other.start)
+      else
+        return self.start < other.start
+      end
+    end,
+    __le = function(self, other)
+      assert(self.filename == other.filename, "Cannot compare sources from different files")
+      if self.start == other.start then
+        return (self.stop or self.start) <= (other.stop or other.start)
+      else
+        return self.start <= other.start
+      end
+    end,
+    __add = function(self, offset)
+      if type(self) == 'number' then
+        offset, self = self, offset
+      else
+        if type(offset) ~= 'number' then
+          error("Cannot add Source and " .. tostring(type(offset)))
+        end
+      end
+      return Source(self.filename, self.start + offset, self.stop)
+    end
+  }
+  _base_0.__index = _base_0
+  _class_0 = setmetatable({
+    __init = function(self, filename, start, stop)
+      self.filename, self.start, self.stop = filename, start, stop
+    end,
+    __base = _base_0,
+    __name = "Source"
+  }, {
+    __index = _base_0,
+    __call = function(cls, ...)
+      local _self_0 = setmetatable({}, _base_0)
+      cls.__init(_self_0, ...)
+      return _self_0
+    end
+  })
+  _base_0.__class = _class_0
+  local self = _class_0
+  self.from_string = function(self, str)
     local filename, start, stop = str:match("^@(.-)%[(%d+):(%d+)%]$")
     if not (filename) then
       filename, start = str:match("^@(.-)%[(%d+)%]$")
     end
-    return Source(filename or str, tonumber(start or 1), tonumber(stop))
-  end,
-  __tostring = function(self)
-    if self.stop then
-      return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. ":" .. tostring(self.stop) .. "]"
-    else
-      return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. "]"
-    end
-  end,
-  __lt = function(self, other)
-    assert(self.filename == other.filename, "Cannot compare sources from different files")
-    if self.start == other.start then
-      return (self.stop or self.start) < (other.stop or other.start)
-    else
-      return self.start < other.start
-    end
-  end,
-  __le = function(self, other)
-    assert(self.filename == other.filename, "Cannot compare sources from different files")
-    if self.start == other.start then
-      return (self.stop or self.start) <= (other.stop or other.start)
-    else
-      return self.start <= other.start
-    end
-  end,
-  __add = function(self, offset)
-    if type(self) == 'number' then
-      offset, self = self, offset
-    else
-      if type(offset) ~= 'number' then
-        error("Cannot add Source and " .. tostring(type(offset)))
-      end
-    end
-    return Source(self.filename, self.start + offset, self.stop)
+    return self(filename or str, tonumber(start or 1), tonumber(stop))
   end
-})
+  self.is_instance = function(self, x)
+    return type(x) == 'table' and x.__class == self
+  end
+  Source = _class_0
+end
 local Code
 do
   local _class_0
@@ -150,7 +171,7 @@ do
       end
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
-        assert(type(var) == 'userdata' and var.type == "Var")
+        assert(var.type == "Var")
         if not (seen[var]) then
           self.free_vars[#self.free_vars + 1] = var
           seen[var] = true
@@ -165,7 +186,7 @@ do
       local removals = { }
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
-        assert(type(var) == 'userdata' and var.type == "Var")
+        assert(var.type == "Var")
         removals[var.value] = true
       end
       local stack = {
