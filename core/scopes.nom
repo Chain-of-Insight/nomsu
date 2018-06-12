@@ -30,7 +30,7 @@ compile [using %definitions %body, using %definitions do %body] to
                 \%setup_lua
                 if not ok then
                     ACTIONS, COMPILE_ACTIONS, ARG_ORDERS = old_actions, old_compile_actions, old_arg_orders
-                    error(ret)
+                    error(ret, 0)
                 end
                 if not fell_through then
                     ACTIONS, COMPILE_ACTIONS, ARG_ORDERS = old_actions, old_compile_actions, old_arg_orders
@@ -42,7 +42,7 @@ compile [using %definitions %body, using %definitions do %body] to
                 \%body_lua
                 ACTIONS, COMPILE_ACTIONS, ARG_ORDERS = old_actions, old_compile_actions, old_arg_orders
                 if not ok then
-                    error(ret)
+                    error(ret, 0)
                 end
                 if not fell_through then
                     return ret

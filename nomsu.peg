@@ -16,7 +16,7 @@ noindex_inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
     / ( "("
             %ws* (inline_block / inline_action / inline_expression) %ws*
-            (comma %ws* (inline_block / inline_action / inline_expression) %ws*)*
+            (%ws* ',' %ws* (inline_block / inline_action / inline_expression) %ws*)*
         (")"
             / (({} ((!. / &%nl) -> 'Line ended without finding a closing )-parenthesis') %userdata) => error)
             / (({} ([^%nl]* -> 'Unexpected character while parsing subexpression') %userdata) => error)
@@ -47,17 +47,21 @@ indented_nomsu (EscapedNomsu):
 index_chain (IndexChain):
     {| noindex_inline_expression ("." (text_word / noindex_inline_expression))+ |}
 
--- Actions need at least one word in them
+-- Actions need either at least 1 word, or at least 2 tokens
 inline_action (Action):
     {|
-    (inline_expression %ws*)* word (%ws* (inline_expression / word))*
+    (   (inline_expression (%ws* (inline_expression / word))+)
+      / (word              (%ws* (inline_expression / word))*))
     (%ws* ":" %ws* (inline_block / inline_action / inline_expression
         / (({} ('' -> "Missing expression after the ':'") %userdata) => error)))?
     |}
 action (Action):
-    {| (expression (dotdot? %ws*))* word ((dotdot? %ws*) (expression / word))* |}
+    {|
+       (expression ((nodent "..")? %ws* (expression / word))+)
+     / (word       ((nodent "..")? %ws* (expression / word))*)
+    |}
 
-word: { %operator_char+ / (!number %ident_char+) }
+word: !number { %operator_char+ / %ident_char+ }
 
 text_word (Text): {| word |}
 
@@ -84,7 +88,7 @@ inline_text_interpolation:
         variable / inline_list / inline_dict / inline_text
         / ("("
             %ws* (inline_block / inline_action / inline_expression) %ws*
-            (comma %ws* (inline_block / inline_action / inline_expression) %ws*)*
+            (%ws* ',' %ws* (inline_block / inline_action / inline_expression) %ws*)*
         (")"
             / (({} (&%nl -> 'Line ended without finding a closing )-parenthesis') %userdata) => error)
             / (({} ([^%nl]* -> 'Unexpected character while parsing Text interpolation') %userdata) => error))
@@ -103,7 +107,7 @@ variable (Var): "%" { (%ident_char+ ((!"'" %operator_char+) / %ident_char+)*)? }
 inline_list (List):
     !('[..]')
     "[" %ws*
-        {| (inline_list_item (comma inline_list_item)* comma?)? |} %ws*
+        {| (inline_list_item (%ws* ',' %ws* inline_list_item)* (%ws* ',')?)? |} %ws*
     ("]" / (","? (
         (({} (eol->"Line ended before finding a closing ]-bracket") %userdata) => error)
        /(({} ([^%nl]*->"Unexpected character while parsing List") %userdata) => error)
@@ -113,14 +117,14 @@ indented_list (List):
         {| list_line (nodent list_line)* |}
     (dedent / ((","? {} (non_dedent_error -> "Unexpected character while parsing List") %userdata) => error))
 list_line:
-     ((action / expression) !comma)
-     / (inline_list_item (comma list_line?)?)
+     ((action / expression) !(%ws* ','))
+     / (inline_list_item ((%ws* ',' %ws*) list_line?)?)
 inline_list_item: inline_block / inline_action / inline_expression
 
 inline_dict (Dict):
     !('{..}')
     "{" %ws*
-        {| (inline_dict_entry (comma inline_dict_entry)*)? |} %ws*
+        {| (inline_dict_entry (%ws* ',' %ws* inline_dict_entry)*)? |} %ws*
     ("}" / (","? (
         (({} (%ws* eol->"Line ended before finding a closing }-brace") %userdata) => error)
       / (({} ([^%nl]*->"Unexpected character while parsing Dictionary") %userdata) => error)
@@ -130,7 +134,7 @@ indented_dict (Dict):
         {| dict_line (nodent dict_line)* |}
     (dedent / ((","? {} (non_dedent_error -> "Unexpected character while parsing Dictionary") %userdata) => error))
 dict_line:
-    (dict_entry !comma) / (inline_dict_entry (comma dict_line?)?)
+    (dict_entry !(%ws* ',')) / (inline_dict_entry (%ws* ',' %ws dict_line?)?)
 dict_entry(DictEntry):
     {| dict_key (%ws* ":" %ws* (action / expression))? |}
 inline_dict_entry(DictEntry):
@@ -147,5 +151,3 @@ indent: eol (%nl ignored_line)* %nl %indent (comment (%nl ignored_line)* nodent)
 nodent: eol (%nl ignored_line)* %nl %nodent
 dedent: eol (%nl ignored_line)* (((!.) %dedent) / (&(%nl %dedent)))
 non_dedent_error: (!dedent .)* eol (%nl ignored_line)* (!. / &%nl)
-comma: %ws* "," %ws*
-dotdot: nodent ".."

@@ -36,18 +36,6 @@ Tree = function(name, fields, methods)
       return source, ...
     end
     methods.is_multi = is_multi
-    methods.map = function(self, fn)
-      if type(fn) == 'table' then
-        if not (next(fn)) then
-          return self
-        end
-        local _replacements = fn
-        fn = function(k)
-          return _replacements[k]
-        end
-      end
-      return self:_map(fn)
-    end
     if is_multi then
       methods.__tostring = function(self)
         return tostring(self.name) .. "(" .. tostring(table.concat((function()
@@ -61,11 +49,11 @@ Tree = function(name, fields, methods)
           return _accum_0
         end)(), ', ')) .. ")"
       end
-      methods._map = function(self, fn)
+      methods.map = function(self, fn)
         do
-          local ret = fn(self)
-          if ret then
-            return ret
+          local replacement = fn(self)
+          if replacement then
+            return replacement
           end
         end
         local new_vals
@@ -74,19 +62,18 @@ Tree = function(name, fields, methods)
           local _len_0 = 1
           for _index_0 = 1, #self do
             local v = self[_index_0]
-            _accum_0[_len_0] = v._map and v:_map(fn) or v
+            _accum_0[_len_0] = v.map and v:map(fn) or v
             _len_0 = _len_0 + 1
           end
           new_vals = _accum_0
         end
-        local ret = getmetatable(self)(self.source, unpack(new_vals))
-        return ret
+        return getmetatable(self)(self.source, unpack(new_vals))
       end
     else
       methods.__tostring = function(self)
         return tostring(self.name) .. "(" .. tostring(repr(self.value)) .. ")"
       end
-      methods._map = function(self, fn)
+      methods.map = function(self, fn)
         return fn(self) or self
       end
     end

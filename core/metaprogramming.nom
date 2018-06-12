@@ -132,15 +132,25 @@ immediately
         lua> ".."
             local lua = nomsu:tree_to_lua(\%tree)
             if not lua.is_value then
-                error("Invalid thing to convert to lua expr: "..tostring(\%tree))
+                compile_error(\%tree, "Invalid thing to convert to lua expr:\n%s")
             end
             return lua
 
     action [%tree as lua statements]
         =lua "nomsu:tree_to_lua(\%tree):as_statements()"
+
+    action [%tree as lua return]
+        =lua "nomsu:tree_to_lua(\%tree):as_statements('return ')"
     
-    action [%tree with vars %vars]
-        =lua "\%tree:map(\%vars)"
+immediately
+    compile [%tree with vars %vars] to
+        barf "Deprecated"
+
+    compile [%tree with %t -> %replacement] to
+        Lua value ".."
+            \(%tree as lua expr):map(function(\(%t as lua expr))
+                \(%replacement as lua return)
+            end)
     
     compile [declare locals in %code] to
         Lua value "\(%code as lua expr):declare_locals()"
@@ -202,6 +212,8 @@ immediately
 
 # Error functions
 immediately
+    compile [traceback] to: Lua value "debug.traceback()"
+    compile [traceback %] to: Lua value "debug.traceback('', \(% as lua expr))"
     compile [barf] to: Lua "error(nil, 0);"
     compile [barf %msg] to: Lua "error(\(%msg as lua expr), 0);"
     compile [assume %condition] to

@@ -278,7 +278,7 @@ end
 local NomsuCompiler
 do
   local _class_0
-  local stub_pattern, var_pattern, _running_files, _report_error, MAX_LINE, math_expression
+  local compile_error, stub_pattern, var_pattern, _running_files, MAX_LINE, math_expression
   local _base_0 = {
     define_action = function(self, signature, fn, is_compile_action)
       if is_compile_action == nil then
@@ -304,12 +304,13 @@ do
         end
         fn_arg_positions = _tbl_0
       end
+      local actions = (is_compile_action and self.environment.COMPILE_ACTIONS or self.environment.ACTIONS)
       local arg_orders = { }
       for _index_0 = 1, #signature do
         local alias = signature[_index_0]
         local stub = concat(assert(stub_pattern:match(alias)), ' ')
-        local stub_args = assert(var_pattern:match(alias));
-        (is_compile_action and self.environment.COMPILE_ACTIONS or self.environment.ACTIONS)[stub] = fn
+        local stub_args = assert(var_pattern:match(alias))
+        actions[stub] = fn
         do
           local _accum_0 = { }
           local _len_0 = 1
@@ -507,10 +508,11 @@ do
             end
             args = _accum_0
           end
+          local arg_orders = self.environment.ARG_ORDERS[compile_action]
           do
             local _accum_0 = { }
             local _len_0 = 1
-            local _list_0 = self.environment.ARG_ORDERS[compile_action][stub]
+            local _list_0 = arg_orders[stub]
             for _index_0 = 1, #_list_0 do
               local p = _list_0[_index_0]
               _accum_0[_len_0] = args[p - 1]
@@ -520,9 +522,7 @@ do
           end
           local ret = compile_action(tree, unpack(args))
           if not ret then
-            _report_error(tree, function(src)
-              return "Compile-time action:\n" .. tostring(src) .. "\nfailed to produce any Lua"
-            end)
+            compile_error(tree, "Compile-time action:\n%s\nfailed to produce any Lua")
           end
           return ret
         end
@@ -535,9 +535,7 @@ do
             else
               local tok_lua = self:tree_to_lua(tok)
               if not (tok_lua.is_value) then
-                _report_error(tok, function(src)
-                  return "Non-expression value inside math expression:\n" .. tostring(src)
-                end)
+                compile_error(tok, "Non-expression value inside math expression:\n%s")
               end
               if tok.type == "Action" then
                 tok_lua:parenthesize()
@@ -560,9 +558,7 @@ do
             end
             local arg_lua = self:tree_to_lua(tok)
             if not (arg_lua.is_value) then
-              _report_error(tok, function(src)
-                return "Cannot use:\n" .. tostring(src) .. "\nas an argument to " .. tostring(stub) .. ", since it's not an expression, it produces: " .. tostring(repr(arg_lua)), 0
-              end)
+              compile_error(tok, "Cannot use:\n%s\nas an argument to %s, since it's not an expression, it produces: %s", stub, repr(arg_lua))
             end
             insert(args, arg_lua)
             _continue_0 = true
@@ -649,9 +645,7 @@ do
             if not (bit_lua.is_value) then
               local src = '    ' .. tostring(self:tree_to_nomsu(bit)):gsub('\n', '\n    ')
               local line = tostring(bit.source.filename) .. ":" .. tostring(pos_to_line(FILE_CACHE[bit.source.filename], bit.source.start))
-              _report_error(bit, function(src)
-                return "Cannot use:\n" .. tostring(src) .. "\nas a string interpolation value, since it's not an expression."
-              end)
+              compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
             end
             if #lua.bits > 0 then
               lua:append("..")
@@ -682,9 +676,7 @@ do
         for i, item in ipairs(tree) do
           local item_lua = self:tree_to_lua(item)
           if not (item_lua.is_value) then
-            _report_error(item, function(src)
-              return "Cannot use:\n" .. tostring(src) .. "\nas a list item, since it's not an expression."
-            end)
+            compile_error(item, "Cannot use:\n%s\nas a list item, since it's not an expression.")
           end
           lua:append(item_lua)
           local item_string = tostring(item_lua)
@@ -735,15 +727,11 @@ do
         local key, value = tree[1], tree[2]
         local key_lua = self:tree_to_lua(key)
         if not (key_lua.is_value) then
-          _report_error(tree[1], function(src)
-            return "Cannot use:\n" .. tostring(src) .. "\nas a dict key, since it's not an expression."
-          end)
+          compile_error(tree[1], "Cannot use:\n%s\nas a dict key, since it's not an expression.")
         end
         local value_lua = value and self:tree_to_lua(value) or Lua.Value(key.source, "true")
         if not (value_lua.is_value) then
-          _report_error(tree[2], function(src)
-            return "Cannot use:\n" .. tostring(src) .. "\nas a dict value, since it's not an expression."
-          end)
+          compile_error(tree[2], "Cannot use:\n%s\nas a dict value, since it's not an expression.")
         end
         local key_str = tostring(key_lua):match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
         if key_str then
@@ -756,9 +744,7 @@ do
       elseif "IndexChain" == _exp_0 then
         local lua = self:tree_to_lua(tree[1])
         if not (lua.is_value) then
-          _report_error(tree[1], function(src)
-            return "Cannot index:\n" .. tostring(src) .. "\nsince it's not an expression."
-          end)
+          compile_error(tree[1], "Cannot index:\n%s\nsince it's not an expression.")
         end
         local first_char = tostring(lua):sub(1, 1)
         if first_char == "{" or first_char == '"' or first_char == "[" then
@@ -768,9 +754,7 @@ do
           local key = tree[i]
           local key_lua = self:tree_to_lua(key)
           if not (key_lua.is_value) then
-            _report_error(key, function(src)
-              return "Cannot use:\n" .. tostring(key) .. "\nas an index, since it's not an expression."
-            end)
+            compile_error(key, "Cannot use:\n%s\nas an index, since it's not an expression.")
           end
           local key_lua_str = tostring(key_lua)
           do
@@ -1135,9 +1119,7 @@ do
           else
             local bit_lua = nomsu:tree_to_lua(bit)
             if not (bit_lua.is_value) then
-              _report_error(bit, function(src)
-                return "Cannot use:\n" .. tostring(src) .. "\nas a string interpolation value, since it's not an expression."
-              end)
+              compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
             end
             lua:append(bit_lua)
           end
@@ -1164,9 +1146,7 @@ do
           else
             local bit_lua = nomsu:tree_to_lua(bit)
             if not (bit_lua.is_value) then
-              _report_error(bit, function(src)
-                return "Cannot use:\n" .. tostring(src) .. "\nas a string interpolation value, since it's not an expression."
-              end)
+              compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
             end
             lua:append(bit_lua)
           end
@@ -1186,12 +1166,10 @@ do
         return add_lua_bits(Lua.Value(self.source), _code)
       end)
       return self:define_compile_action("use %path", function(self, _path)
-        local path
-        if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string' then
-          path = _path[1]
-        else
-          path = nomsu:run_lua(Lua(_path.source, "return ", nomsu:tree_to_lua(_path)))
+        if not (_path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string') then
+          return Lua(_path.source, "nomsu:run_file(" .. tostring(nomsu:tree_to_lua(_path)) .. ");")
         end
+        local path = _path[1]
         nomsu:run_file(path)
         return Lua(_path.source, "nomsu:run_file(" .. tostring(repr(path)) .. ");")
       end)
@@ -1260,6 +1238,7 @@ do
         utils = utils,
         lpeg = lpeg,
         re = re,
+        compile_error = compile_error,
         next = next,
         unpack = unpack,
         setmetatable = setmetatable,
@@ -1382,6 +1361,18 @@ do
   })
   _base_0.__class = _class_0
   local self = _class_0
+  compile_error = function(tok, err_format_string, ...)
+    local file = FILE_CACHE[tok.source.filename]
+    local line_no = pos_to_line(file, tok.source.start)
+    local line_start = LINE_STARTS[file][line_no]
+    local src = colored.dim(file:sub(line_start, tok.source.start - 1))
+    src = src .. colored.underscore(colored.bright(colored.red(file:sub(tok.source.start, tok.source.stop - 1))))
+    local end_of_line = (LINE_STARTS[file][pos_to_line(file, tok.source.stop) + 1] or 0) - 1
+    src = src .. colored.dim(file:sub(tok.source.stop, end_of_line - 1))
+    src = '    ' .. src:gsub('\n', '\n    ')
+    local err_msg = err_format_string:format(src, ...)
+    return error(tostring(tok.source.filename) .. ":" .. tostring(line_no) .. ": " .. err_msg, 0)
+  end
   local stub_defs
   do
     stub_defs = {
@@ -1394,18 +1385,6 @@ do
     ]=], stub_defs)
   var_pattern = re.compile("{| ((('%' {%varname}) / %word) ([ ])*)+ !. |}", stub_defs)
   _running_files = { }
-  _report_error = function(tok, fn)
-    local file = FILE_CACHE[tok.source.filename]
-    local line_no = pos_to_line(file, tok.source.start)
-    local line_start = LINE_STARTS[file][line_no]
-    local src = colored.dim(file:sub(line_start, tok.source.start - 1))
-    src = src .. colored.underscore(colored.bright(colored.red(file:sub(tok.source.start, tok.source.stop - 1))))
-    local end_of_line = (LINE_STARTS[file][pos_to_line(file, tok.source.stop) + 1] or 0) - 1
-    src = src .. colored.dim(file:sub(tok.source.stop, end_of_line - 1))
-    src = '    ' .. src:gsub('\n', '\n    ')
-    local err_msg = fn(src)
-    return error(tostring(tok.source.filename) .. ":" .. tostring(line_no) .. ": " .. err_msg, 0)
-  end
   MAX_LINE = 80
   math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])
   NomsuCompiler = _class_0

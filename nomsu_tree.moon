@@ -27,23 +27,16 @@ Tree = (name, fields, methods)->
             --assert Source\is_instance(source)
             return source, ...
         .is_multi = is_multi
-        .map = (fn)=>
-            if type(fn) == 'table'
-                return @ unless next(fn)
-                _replacements = fn
-                fn = (k)-> _replacements[k]
-            return @_map(fn)
         if is_multi
             .__tostring = => "#{@name}(#{table.concat [repr(v) for v in *@], ', '})"
-            ._map = (fn)=>
-                if ret = fn(@)
-                    return ret
-                new_vals = [v._map and v\_map(fn) or v for v in *@]
-                ret = getmetatable(self)(@source, unpack(new_vals))
-                return ret
+            .map = (fn)=>
+                if replacement = fn(@)
+                    return replacement
+                new_vals = [v.map and v\map(fn) or v for v in *@]
+                return getmetatable(self)(@source, unpack(new_vals))
         else
             .__tostring = => "#{@name}(#{repr(@value)})"
-            ._map = (fn)=>
+            .map = (fn)=>
                 fn(@) or @
 
     Types[name] = immutable fields, methods

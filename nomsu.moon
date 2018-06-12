@@ -230,6 +230,17 @@ NOMSU_PATTERN = do
     re.compile(nomsu_peg, NOMSU_DEFS)
 
 class NomsuCompiler
+    compile_error = (tok, err_format_string, ...)->
+        file = FILE_CACHE[tok.source.filename]
+        line_no = pos_to_line(file, tok.source.start)
+        line_start = LINE_STARTS[file][line_no]
+        src = colored.dim(file\sub(line_start, tok.source.start-1))
+        src ..= colored.underscore colored.bright colored.red(file\sub(tok.source.start, tok.source.stop-1))
+        end_of_line = (LINE_STARTS[file][pos_to_line(file, tok.source.stop) + 1] or 0) - 1
+        src ..= colored.dim(file\sub(tok.source.stop, end_of_line-1))
+        src = '    '..src\gsub('\n', '\n    ')
+        err_msg = err_format_string\format(src, ...)
+        error("#{tok.source.filename}:#{line_no}: "..err_msg, 0)
     new: =>
         -- Weak-key mapping from objects to randomly generated unique IDs
         NaN_surrogate = {}
@@ -259,6 +270,7 @@ class NomsuCompiler
         @environment = {
             -- Discretionary/convenience stuff
             nomsu:self, repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re,
+            :compile_error
             -- Lua stuff:
             :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
             :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
@@ -329,11 +341,12 @@ class NomsuCompiler
         fn_info = debug_getinfo(fn, "u")
         assert(not fn_info.isvararg, "Vararg functions aren't supported. Sorry, use a list instead.")
         fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
+        actions = (is_compile_action and @environment.COMPILE_ACTIONS or @environment.ACTIONS)
         arg_orders = {}
         for alias in *signature
             stub = concat(assert(stub_pattern\match(alias)), ' ')
             stub_args = assert(var_pattern\match(alias))
-            (is_compile_action and @environment.COMPILE_ACTIONS or @environment.ACTIONS)[stub] = fn
+            actions[stub] = fn
             arg_orders[stub] = [fn_arg_positions[string.as_lua_id a] for a in *stub_args]
         @environment.ARG_ORDERS[fn] = arg_orders
 
@@ -411,17 +424,6 @@ class NomsuCompiler
         loaded[filename] = ret or true
         return ret
 
-    _report_error = (tok, fn)->
-        file = FILE_CACHE[tok.source.filename]
-        line_no = pos_to_line(file, tok.source.start)
-        line_start = LINE_STARTS[file][line_no]
-        src = colored.dim(file\sub(line_start, tok.source.start-1))
-        src ..= colored.underscore colored.bright colored.red(file\sub(tok.source.start, tok.source.stop-1))
-        end_of_line = (LINE_STARTS[file][pos_to_line(file, tok.source.stop) + 1] or 0) - 1
-        src ..= colored.dim(file\sub(tok.source.stop, end_of_line-1))
-        src = '    '..src\gsub('\n', '\n    ')
-        err_msg = fn(src)
-        error("#{tok.source.filename}:#{line_no}: "..err_msg, 0)
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
         lua_string = tostring(lua)
@@ -469,13 +471,14 @@ class NomsuCompiler
                 if compile_action
                     args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force all compile-time actions to take a tree location
-                    args = [args[p-1] for p in *@environment.ARG_ORDERS[compile_action][stub]]
+                    arg_orders = @environment.ARG_ORDERS[compile_action]
+                    args = [args[p-1] for p in *arg_orders[stub]]
                     -- Force Lua to avoid tail call optimization for debugging purposes
                     -- TODO: use tail call
                     ret = compile_action(tree, unpack(args))
                     if not ret
-                        _report_error tree, (src)->
-                            "Compile-time action:\n#{src}\nfailed to produce any Lua"
+                        compile_error tree,
+                            "Compile-time action:\n%s\nfailed to produce any Lua"
                     return ret
                 action = rawget(@environment.ACTIONS, stub)
                 lua = Lua.Value(tree.source)
@@ -489,8 +492,8 @@ class NomsuCompiler
                         else
                             tok_lua = @tree_to_lua(tok)
                             unless tok_lua.is_value
-                                _report_error tok, (src)->
-                                    "Non-expression value inside math expression:\n#{src}"
+                                compile_error tok,
+                                    "Non-expression value inside math expression:\n%s"
                             if tok.type == "Action"
                                 tok_lua\parenthesize!
                             lua\append tok_lua
@@ -503,8 +506,9 @@ class NomsuCompiler
                     if type(tok) == "string" then continue
                     arg_lua = @tree_to_lua(tok)
                     unless arg_lua.is_value
-                        _report_error tok, (src)->
-                            "Cannot use:\n#{src}\nas an argument to #{stub}, since it's not an expression, it produces: #{repr arg_lua}", 0
+                        compile_error tok,
+                            "Cannot use:\n%s\nas an argument to %s, since it's not an expression, it produces: %s",
+                            stub, repr arg_lua
                     insert args, arg_lua
 
                 if action
@@ -554,8 +558,8 @@ class NomsuCompiler
                     unless bit_lua.is_value
                         src = '    '..tostring(@tree_to_nomsu(bit))\gsub('\n','\n    ')
                         line = "#{bit.source.filename}:#{pos_to_line(FILE_CACHE[bit.source.filename], bit.source.start)}"
-                        _report_error bit, (src)->
-                            "Cannot use:\n#{src}\nas a string interpolation value, since it's not an expression."
+                        compile_error bit,
+                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     if #lua.bits > 0 then lua\append ".."
                     if bit.type != "Text"
                         bit_lua = Lua.Value(bit.source, "stringify(",bit_lua,")")
@@ -575,8 +579,8 @@ class NomsuCompiler
                 for i, item in ipairs tree
                     item_lua = @tree_to_lua(item)
                     unless item_lua.is_value
-                        _report_error item, (src)->
-                            "Cannot use:\n#{src}\nas a list item, since it's not an expression."
+                        compile_error item,
+                            "Cannot use:\n%s\nas a list item, since it's not an expression."
                     lua\append item_lua
                     item_string = tostring(item_lua)
                     last_line = item_string\match("[^\n]*$")
@@ -621,12 +625,12 @@ class NomsuCompiler
                 key, value = tree[1], tree[2]
                 key_lua = @tree_to_lua(key)
                 unless key_lua.is_value
-                    _report_error tree[1], (src)->
-                        "Cannot use:\n#{src}\nas a dict key, since it's not an expression."
+                    compile_error tree[1],
+                        "Cannot use:\n%s\nas a dict key, since it's not an expression."
                 value_lua = value and @tree_to_lua(value) or Lua.Value(key.source, "true")
                 unless value_lua.is_value
-                    _report_error tree[2], (src)->
-                        "Cannot use:\n#{src}\nas a dict value, since it's not an expression."
+                    compile_error tree[2],
+                        "Cannot use:\n%s\nas a dict value, since it's not an expression."
                 key_str = tostring(key_lua)\match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                 return if key_str
                     Lua tree.source, key_str,"=",value_lua
@@ -641,8 +645,8 @@ class NomsuCompiler
             when "IndexChain"
                 lua = @tree_to_lua(tree[1])
                 unless lua.is_value
-                    _report_error tree[1], (src)->
-                        "Cannot index:\n#{src}\nsince it's not an expression."
+                    compile_error tree[1],
+                        "Cannot index:\n%s\nsince it's not an expression."
                 first_char = tostring(lua)\sub(1,1)
                 if first_char == "{" or first_char == '"' or first_char == "["
                     lua\parenthesize!
@@ -651,8 +655,8 @@ class NomsuCompiler
                     key = tree[i]
                     key_lua = @tree_to_lua(key)
                     unless key_lua.is_value
-                        _report_error key, (src)->
-                            "Cannot use:\n#{key}\nas an index, since it's not an expression."
+                        compile_error key,
+                            "Cannot use:\n%s\nas an index, since it's not an expression."
                     key_lua_str = tostring(key_lua)
                     if lua_id = key_lua_str\match("^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
                         lua\append ".#{lua_id}"
@@ -927,8 +931,8 @@ class NomsuCompiler
                 else
                     bit_lua = nomsu\tree_to_lua(bit)
                     unless bit_lua.is_value
-                        _report_error bit, (src)->
-                            "Cannot use:\n#{src}\nas a string interpolation value, since it's not an expression."
+                        compile_error bit,
+                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     lua\append bit_lua
 
         @define_compile_action "Lua %code", (_code)=>
@@ -950,8 +954,8 @@ class NomsuCompiler
                 else
                     bit_lua = nomsu\tree_to_lua(bit)
                     unless bit_lua.is_value
-                        _report_error bit, (src)->
-                            "Cannot use:\n#{src}\nas a string interpolation value, since it's not an expression."
+                        compile_error bit,
+                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     lua\append bit_lua
             return lua
 
@@ -966,10 +970,9 @@ class NomsuCompiler
             return add_lua_bits(Lua.Value(@source), _code)
 
         @define_compile_action "use %path", (_path)=>
-            path = if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
-                _path[1]
-            else
-                nomsu\run_lua Lua(_path.source, "return ",nomsu\tree_to_lua(_path))
+            unless _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
+                return Lua(_path.source, "nomsu:run_file(#{nomsu\tree_to_lua(_path)});")
+            path = _path[1]
             nomsu\run_file(path)
             return Lua(_path.source, "nomsu:run_file(#{repr path});")
 
