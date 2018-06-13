@@ -11,19 +11,40 @@ local AST = { }
 AST.is_syntax_tree = function(n)
   return type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
 end
-local Tree
-Tree = function(name, methods)
-  local cls = methods or { }
+local types = {
+  "Number",
+  "Var",
+  "Block",
+  "EscapedNomsu",
+  "Text",
+  "List",
+  "Dict",
+  "DictEntry",
+  "IndexChain",
+  "Action"
+}
+for _index_0 = 1, #types do
+  local name = types[_index_0]
+  local cls = { }
   do
-    cls.type = name
     cls.__class = cls
+    cls.__index = cls
     cls.__name = name
+    cls.type = name
     cls.is_instance = function(self, x)
       return getmetatable(x) == self
     end
-    cls.__index = cls
     cls.__tostring = function(self)
-      return tostring(self.name) .. "(#{table.concat([repr(v) for v in *@]), ', '})"
+      return tostring(self.name) .. "(" .. tostring(concat((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_1 = 1, #self do
+          local v = self[_index_1]
+          _accum_0[_len_0] = repr(v)
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)(), ', ')) .. ")"
     end
     cls.map = function(self, fn)
       do
@@ -32,26 +53,29 @@ Tree = function(name, methods)
           return replacement
         end
       end
-      local made_changes, new_vals = false, { }
-      for i, v in ipairs(self) do
-        if AST.is_syntax_tree(v) then
-          do
-            local replacement = v:map(fn)
-            if replacement then
-              if replacement ~= v then
-                made_changes = true
-                v = replacement
-              end
-            end
-          end
+      local replacements
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_1 = 1, #self do
+          local v = self[_index_1]
+          _accum_0[_len_0] = AST.is_syntax_tree(v) and v:map(fn) or nil
+          _len_0 = _len_0 + 1
         end
-        new_vals[i] = v
+        replacements = _accum_0
       end
-      if not (made_changes) then
+      if not (next(replacements)) then
         return self
       end
-      local replacement = getmetatable(self)(self.source, unpack(new_vals))
-      return replacement
+      return (self.__class)(self.source, unpack((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        for i, v in ipairs(self) do
+          _accum_0[_len_0] = replacements[i] or v
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)()))
     end
   end
   AST[name] = setmetatable(cls, {
@@ -78,41 +102,18 @@ Tree = function(name, methods)
     end
   })
 end
-Tree("Number")
-Tree("Var")
-Tree("Block")
-Tree("EscapedNomsu")
-Tree("Text")
-Tree("List")
-Tree("Dict")
-Tree("DictEntry")
-Tree("IndexChain")
-Tree("Action", {
-  __init = function(self)
-    local stub_bits
-    do
-      local _accum_0 = { }
-      local _len_0 = 1
-      for _index_0 = 1, #self do
-        local a = self[_index_0]
-        _accum_0[_len_0] = type(a) == 'string' and a or '%'
-        _len_0 = _len_0 + 1
-      end
-      stub_bits = _accum_0
+AST.Action.__init = function(self)
+  local stub_bits
+  do
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _index_0 = 1, #self do
+      local a = self[_index_0]
+      _accum_0[_len_0] = type(a) == 'string' and a or '%'
+      _len_0 = _len_0 + 1
     end
-    self.stub = concat(stub_bits, " ")
-  end,
-  get_spec = function(self)
-    return concat((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      for _index_0 = 1, #self do
-        local a = self[_index_0]
-        _accum_0[_len_0] = type(a) == "string" and a or "%" .. tostring(a[1])
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)(), " ")
+    stub_bits = _accum_0
   end
-})
+  self.stub = concat(stub_bits, " ")
+end
 return AST
