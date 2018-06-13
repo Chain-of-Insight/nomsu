@@ -1288,6 +1288,10 @@ do
       self.environment.ALIASES = setmetatable({ }, {
         __mode = "k"
       })
+      self.environment.compile_time = function(fn)
+        self.environment.COMPILE_TIME[fn] = true
+        return fn
+      end
       self.environment.COMPILE_TIME = { }
       self.environment.LOADED = { }
       self.environment.AST = AST

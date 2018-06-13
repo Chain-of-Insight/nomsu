@@ -5,10 +5,10 @@
 # Compile-time action to make compile-time actions:
 immediately
     lua> ".."
-        _ENV['ACTION'..string.as_lua_id("compile % to %")] = function(tree, \%actions, \%lua)
+        _ENV['ACTION'..string.as_lua_id("compile % to %")] = compile_time(function(tree, \%actions, \%lua)
             local lua = Lua(tree.source)
             local canonical = \%actions[1]
-            lua:append("ACTION", string.as_lua_id(canonical.stub), ' = function(tree')
+            lua:append("ACTION", string.as_lua_id(canonical.stub), ' = compile_time(function(tree')
             local args = {}
             for i,tok in ipairs(canonical) do
                 if tok.type == "Var" then args[#args+1] = tok end
@@ -21,8 +21,7 @@ immediately
             local body_lua = nomsu:tree_to_lua(\%lua):as_statements("return ")
             body_lua:remove_free_vars(args)
             body_lua:declare_locals()
-            lua:append(")\n    ", body_lua, "\nend")
-            lua:append("\nCOMPILE_TIME[ACTION", string.as_lua_id(canonical.stub), "] = true")
+            lua:append(")\n    ", body_lua, "\nend)")
 
             for i=2,#\%actions do
                 local action = \%actions[i]
@@ -35,7 +34,6 @@ immediately
                     end
                 end
                 lua:append("\n", "ARG_ORDERS[", repr(action.stub), "] = ", repr(arg_positions))
-                lua:append("\nCOMPILE_TIME[ACTION", string.as_lua_id(action.stub), "] = true")
             end
             lua:append("\nALIASES[ACTION", string.as_lua_id(canonical.stub), "] = {")
             for i,action in ipairs(\%actions) do
@@ -44,8 +42,7 @@ immediately
             end
             lua:append("}")
             return lua
-        end
-        COMPILE_TIME[_ENV['ACTION'..string.as_lua_id("compile % to %")]] = true
+        end)
 
 # Compile-time action to make actions
 immediately
@@ -95,7 +92,7 @@ immediately
         lua> ".."
             local lua = Lua(tree.source)
             local canonical = \%shorthand[1]
-            lua:append("ACTION", string.as_lua_id(canonical.stub), ' = function(tree')
+            lua:append("ACTION", string.as_lua_id(canonical.stub), ' = compile_time(function(tree')
             local args = {}
             for i,tok in ipairs(canonical) do
                 if tok.type == "Var" then args[#args+1] = tok end
@@ -129,8 +126,7 @@ immediately
                     return t.type.."("..table.concat(bits, ", ")..")"
                 end
             end
-            lua:append(")\n    local tree = ", make_tree(\%longhand), "\n    return nomsu:tree_to_lua(tree)\nend")
-            lua:append("\nCOMPILE_TIME[ACTION", string.as_lua_id(canonical.stub), "] = true")
+            lua:append(")\n    local tree = ", make_tree(\%longhand), "\n    return nomsu:tree_to_lua(tree)\nend)")
 
             for i=2,#\%shorthand do
                 local action = \%shorthand[i]
@@ -143,7 +139,6 @@ immediately
                     end
                 end
                 lua:append("\n", "ARG_ORDERS[", repr(action.stub), "] = ", repr(arg_positions))
-                lua:append("\nCOMPILE_TIME[ACTION", string.as_lua_id(action.stub), "] = true")
             end
             lua:append("\nALIASES[ACTION", string.as_lua_id(canonical.stub), "] = {")
             for i,action in ipairs(\%shorthand) do

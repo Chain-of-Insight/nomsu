@@ -283,6 +283,9 @@ class NomsuCompiler
         @environment.Source = Source
         @environment.ARG_ORDERS = setmetatable({}, {__mode:"k"})
         @environment.ALIASES = setmetatable({}, {__mode:"k"})
+        @environment.compile_time = (fn)->
+            @environment.COMPILE_TIME[fn] = true
+            return fn
         @environment.COMPILE_TIME = {}
         @environment.LOADED = {}
         @environment.AST = AST
