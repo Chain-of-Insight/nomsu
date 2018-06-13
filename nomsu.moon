@@ -36,7 +36,14 @@ debug_getinfo = debug.getinfo
 STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 
 string.as_lua_id = (str)->
-    "_"..(gsub(str, "%W", (c)-> if c == "_" then "__" else format("_%x", byte(c))))
+    argnum = 0
+    str = gsub str, "%W", (c)->
+        if c == ' ' then '_'
+        elseif c == '%' then
+            argnum += 1
+            tostring(argnum)
+        else format("x%X", byte(c))
+    return '_'..str
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -194,6 +201,7 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
         value.source = source
         setmetatable(value, AST[key])
         if value.__init then value\__init!
+        for i=1,#value do assert(value[i])
         return value
 
     self[key] = make_node
@@ -273,14 +281,12 @@ class NomsuCompiler
         @environment.Lua = Lua
         @environment.Nomsu = Nomsu
         @environment.Source = Source
-        @environment.ACTIONS = setmetatable({}, {__index:(key)=>
-            (...)->
-                error("Attempt to run undefined action: #{key}", 0)
-        })
-        @environment.COMPILE_ACTIONS = {}
         @environment.ARG_ORDERS = setmetatable({}, {__mode:"k"})
+        @environment.ALIASES = setmetatable({}, {__mode:"k"})
+        @environment.COMPILE_TIME = {}
         @environment.LOADED = {}
         @environment.AST = AST
+        @environment._ENV = @environment
         @initialize_core!
     
     local stub_defs
@@ -294,7 +300,7 @@ class NomsuCompiler
         tok <- ({'%'} %varname) / {%word}
     ]=], stub_defs
     var_pattern = re.compile "{| ((('%' {%varname}) / %word) ([ ])*)+ !. |}", stub_defs
-    define_action: (signature, fn, is_compile_action=false)=>
+    define_action: (signature, fn)=>
         if type(fn) != 'function'
             error("Not a function: #{repr fn}")
         if type(signature) == 'string'
@@ -305,17 +311,17 @@ class NomsuCompiler
         fn_info = debug_getinfo(fn, "u")
         assert(not fn_info.isvararg, "Vararg functions aren't supported. Sorry, use a list instead.")
         fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
-        actions = (is_compile_action and @environment.COMPILE_ACTIONS or @environment.ACTIONS)
         arg_orders = {}
         for alias in *signature
             stub = concat(assert(stub_pattern\match(alias)), ' ')
             stub_args = assert(var_pattern\match(alias))
-            actions[stub] = fn
+            @environment['ACTION'..string.as_lua_id(stub)] = fn
             arg_orders[stub] = [fn_arg_positions[string.as_lua_id a] for a in *stub_args]
         @environment.ARG_ORDERS[fn] = arg_orders
 
     define_compile_action: (signature, fn)=>
-        return @define_action(signature, fn, true)
+        @define_action(signature, fn)
+        @environment.COMPILE_TIME[fn] = true
 
     parse: (nomsu_code)=>
         assert(type(nomsu_code) != 'string')
@@ -391,7 +397,7 @@ class NomsuCompiler
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, tostring(lua.source), "t", @environment)
+        run_lua_fn, err = load(lua_string, nil and tostring(lua.source), "t", @environment)
         if not run_lua_fn
             n = 1
             fn = ->
@@ -431,20 +437,19 @@ class NomsuCompiler
         switch tree.type
             when "Action"
                 stub = tree.stub
-                compile_action = @environment.COMPILE_ACTIONS[stub]
-                if compile_action
+                action = @environment['ACTION'..string.as_lua_id(stub)]
+                if action and @environment.COMPILE_TIME[action]
                     args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force all compile-time actions to take a tree location
-                    arg_orders = @environment.ARG_ORDERS[compile_action]
-                    args = [args[p-1] for p in *arg_orders[stub]]
+                    if arg_orders = @environment.ARG_ORDERS[stub]
+                        args = [args[p] for p in *arg_orders]
                     -- Force Lua to avoid tail call optimization for debugging purposes
                     -- TODO: use tail call
-                    ret = compile_action(tree, unpack(args))
+                    ret = action(tree, unpack(args))
                     if not ret
                         compile_error tree,
                             "Compile-time action:\n%s\nfailed to produce any Lua"
                     return ret
-                action = rawget(@environment.ACTIONS, stub)
                 lua = Lua.Value(tree.source)
                 if not action and math_expression\match(stub)
                     -- This is a bit of a hack, but this code handles arbitrarily complex
@@ -476,11 +481,10 @@ class NomsuCompiler
                     insert args, arg_lua
 
                 if action
-                    args = [args[p] for p in *@environment.ARG_ORDERS[action][stub]]
+                    if arg_orders = @environment.ARG_ORDERS[stub]
+                        args = [args[p] for p in *arg_orders]
 
-                -- Not really worth bothering with ACTIONS.foo(...) style since almost every action
-                -- has arguments, so it won't work
-                lua\append "ACTIONS[",repr(stub),"]("
+                lua\append "ACTION",string.as_lua_id(stub),"("
                 for i, arg in ipairs args
                     lua\append arg
                     if i < #args then lua\append ", "
@@ -883,19 +887,26 @@ class NomsuCompiler
             return Lua(_block.source, "if IMMEDIATE then\n    ", lua, "\nend")
 
         add_lua_string_bits = (lua, code)->
+            line_len = 0
             if code.type != "Text"
                 lua\append ", ", nomsu\tree_to_lua(code)
                 return
             for bit in *code
-                lua\append ", "
-                if type(bit) == "string"
-                    lua\append repr(bit)
+                bit_lua = if type(bit) == "string"
+                    repr(bit)
                 else
                     bit_lua = nomsu\tree_to_lua(bit)
                     unless bit_lua.is_value
                         compile_error bit,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
-                    lua\append bit_lua
+                    bit_lua
+                line_len += #tostring(bit_lua)
+                if line_len > MAX_LINE
+                    lua\append ",\n    "
+                    line_len = 4
+                else
+                    lua\append ", "
+                lua\append bit_lua
 
         @define_compile_action "Lua %code", (_code)=>
             lua = Lua.Value(_code.source, "Lua(", repr(tostring _code.source))

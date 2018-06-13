@@ -62,6 +62,9 @@ Tree = function(name, methods)
       if type(source) == 'string' then
         source = Source:from_string(source)
       end
+      for i = 1, select('#', ...) do
+        assert(select(i, ...))
+      end
       assert(Source:is_instance(source))
       local inst = {
         source = source,

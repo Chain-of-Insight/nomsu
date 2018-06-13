@@ -83,6 +83,7 @@ do
       local match = string.match
       for i = 1, n do
         local b = select(i, ...)
+        assert(b)
         bits[#bits + 1] = b
         if type(b) == 'string' then
           do
@@ -171,7 +172,6 @@ do
       end
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
-        assert(var.type == "Var")
         if not (seen[var]) then
           self.free_vars[#self.free_vars + 1] = var
           seen[var] = true
@@ -186,7 +186,6 @@ do
       local removals = { }
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
-        assert(var.type == "Var")
         removals[var[1]] = true
       end
       local stack = {
@@ -264,7 +263,7 @@ do
           local _len_0 = 1
           for _index_0 = 1, #to_declare do
             local v = to_declare[_index_0]
-            _accum_0[_len_0] = string.as_lua_id(v[1])
+            _accum_0[_len_0] = type(v) == 'string' and v or string.as_lua_id(v[1])
             _len_0 = _len_0 + 1
           end
           return _accum_0

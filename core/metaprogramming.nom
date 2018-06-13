@@ -5,85 +5,112 @@
 # Compile-time action to make compile-time actions:
 immediately
     lua> ".."
-        nomsu:define_compile_action("compile %actions to %lua", function(tree, \%actions, \%lua)
-            local lua = Lua(tree.source, "nomsu:define_compile_action(")
-            local specs = {}
-            for i, action in ipairs(\%actions) do
-                specs[i] = action:get_spec()
-            end
-            specs = repr(specs)
-            if #specs > 80 then
-                lua:append("\n    ",specs,",\n    ")
-            else
-                lua:append(specs,", ")
-            end
-            lua:append("function(tree")
+        _ENV['ACTION'..string.as_lua_id("compile % to %")] = function(tree, \%actions, \%lua)
+            local lua = Lua(tree.source)
+            local canonical = \%actions[1]
+            lua:append("ACTION", string.as_lua_id(canonical.stub), ' = function(tree')
             local args = {}
-            for i,tok in ipairs(\%actions[1]) do
+            for i,tok in ipairs(canonical) do
                 if tok.type == "Var" then args[#args+1] = tok end
             end
+            local canonical_arg_positions = {}
             for i, arg in ipairs(args) do
+                canonical_arg_positions[arg[1]] = i
                 lua:append(", ", nomsu:tree_to_lua(arg))
             end
             local body_lua = nomsu:tree_to_lua(\%lua):as_statements("return ")
             body_lua:remove_free_vars(args)
             body_lua:declare_locals()
-            lua:append(")\n    ", body_lua, "\nend);")
+            lua:append(")\n    ", body_lua, "\nend")
+            lua:append("\nCOMPILE_TIME[ACTION", string.as_lua_id(canonical.stub), "] = true")
+
+            for i=2,#\%actions do
+                local action = \%actions[i]
+                lua:append("\n", "ACTION", string.as_lua_id(action.stub), " = ACTION", string.as_lua_id(canonical.stub))
+
+                local arg_positions = {}
+                for _,tok in ipairs(action) do
+                    if tok.type == 'Var' then
+                        arg_positions[#arg_positions+1] = canonical_arg_positions[tok[1]]
+                    end
+                end
+                lua:append("\n", "ARG_ORDERS[", repr(action.stub), "] = ", repr(arg_positions))
+                lua:append("\nCOMPILE_TIME[ACTION", string.as_lua_id(action.stub), "] = true")
+            end
+            lua:append("\nALIASES[ACTION", string.as_lua_id(canonical.stub), "] = {")
+            for i,action in ipairs(\%actions) do
+                if i > 1 then lua:append(", ") end
+                lua:append(repr(action.stub))
+            end
+            lua:append("}")
             return lua
-        end);
+        end
+        COMPILE_TIME[_ENV['ACTION'..string.as_lua_id("compile % to %")]] = true
 
 # Compile-time action to make actions
 immediately
     compile [action %actions %body] to
         lua> ".."
-            local lua = Lua(tree.source, "nomsu:define_action(")
-            local specs = {}
-            for i, action in ipairs(\%actions) do
-                specs[i] = action:get_spec()
-            end
-            specs = repr(specs)
-            if #specs > 80 then
-                lua:append("\n    ",specs,",\n    ")
-            else
-                lua:append(specs,", ")
-            end
-            lua:append("function(")
+            local lua = Lua(tree.source)
+            local canonical = \%actions[1]
+            lua:append("ACTION", string.as_lua_id(canonical.stub), ' = function(')
             local args = {}
-            for i,tok in ipairs(\%actions[1]) do
+            for i,tok in ipairs(canonical) do
                 if tok.type == "Var" then args[#args+1] = tok end
             end
+            local canonical_arg_positions = {}
             for i, arg in ipairs(args) do
+                canonical_arg_positions[arg[1]] = i
                 lua:append(nomsu:tree_to_lua(arg))
                 if i < #args then lua:append(", ") end
             end
             local body_lua = nomsu:tree_to_lua(\%body):as_statements("return ")
             body_lua:remove_free_vars(args)
             body_lua:declare_locals()
-            lua:append(")\n    ", body_lua, "\nend);")
+            lua:append(")\n    ", body_lua, "\nend")
+
+            for i=2,#\%actions do
+                local action = \%actions[i]
+                lua:append("\n", "ACTION", string.as_lua_id(action.stub), " = ACTION", string.as_lua_id(canonical.stub))
+
+                local arg_positions = {}
+                for _,tok in ipairs(action) do
+                    if tok.type == 'Var' then
+                        arg_positions[#arg_positions+1] = canonical_arg_positions[tok[1]]
+                    end
+                end
+                lua:append("\n", "ARG_ORDERS[", repr(action.stub), "] = ", repr(arg_positions))
+            end
+            lua:append("\nALIASES[ACTION", string.as_lua_id(canonical.stub), "] = {")
+            for i,action in ipairs(\%actions) do
+                if i > 1 then lua:append(", ") end
+                lua:append(repr(action.stub))
+            end
+            lua:append("}")
             return lua
 
 # Macro to make nomsu macros
 immediately
     compile [parse %shorthand as %longhand] to
         lua> ".."
-            local lua = Lua(tree.source, "nomsu:define_compile_action(")
-            local specs = {}
-            for i, action in ipairs(\%shorthand) do
-                specs[i] = action:get_spec()
+            local lua = Lua(tree.source)
+            local canonical = \%shorthand[1]
+            lua:append("ACTION", string.as_lua_id(canonical.stub), ' = function(tree')
+            local args = {}
+            for i,tok in ipairs(canonical) do
+                if tok.type == "Var" then args[#args+1] = tok end
             end
-            specs = repr(specs)
-            if #specs > 80 then
-                lua:append("\n    ",specs,",\n    ")
-            else
-                lua:append(specs,", ")
+            local canonical_arg_positions = {}
+            for i, arg in ipairs(args) do
+                canonical_arg_positions[arg[1]] = i
+                lua:append(", ", nomsu:tree_to_lua(arg))
             end
-            lua:append("function(tree")
+
             local replacements = {}
-            for i,tok in ipairs(\%shorthand[1]) do
+            for i,tok in ipairs(canonical) do
                 if tok.type == "Var" then
                     local lua_var = tostring(nomsu:tree_to_lua(tok))
                     replacements[tok[1]] = lua_var
-                    lua:append(", ", lua_var)
                 end
             end
             MANGLE_INDEX = (MANGLE_INDEX or 0) + 1
@@ -102,18 +129,39 @@ immediately
                     return t.type.."("..table.concat(bits, ", ")..")"
                 end
             end
-            lua:append(")\n    local tree = ", make_tree(\%longhand), "\n    return nomsu:tree_to_lua(tree)\nend);")
+            lua:append(")\n    local tree = ", make_tree(\%longhand), "\n    return nomsu:tree_to_lua(tree)\nend")
+            lua:append("\nCOMPILE_TIME[ACTION", string.as_lua_id(canonical.stub), "] = true")
+
+            for i=2,#\%shorthand do
+                local action = \%shorthand[i]
+                lua:append("\n", "ACTION", string.as_lua_id(action.stub), " = ACTION", string.as_lua_id(canonical.stub))
+
+                local arg_positions = {}
+                for _,tok in ipairs(action) do
+                    if tok.type == 'Var' then
+                        arg_positions[#arg_positions+1] = canonical_arg_positions[tok[1]]
+                    end
+                end
+                lua:append("\n", "ARG_ORDERS[", repr(action.stub), "] = ", repr(arg_positions))
+                lua:append("\nCOMPILE_TIME[ACTION", string.as_lua_id(action.stub), "] = true")
+            end
+            lua:append("\nALIASES[ACTION", string.as_lua_id(canonical.stub), "] = {")
+            for i,action in ipairs(\%shorthand) do
+                if i > 1 then lua:append(", ") end
+                lua:append(repr(action.stub))
+            end
+            lua:append("}")
             return lua
 
 compile [remove action %action] to
     Lua ".."
         do
-            local fn = ACTIONS[\(=lua "repr(\%action.stub)")]
-            local stubs = ARG_ORDERS[fn]
-            for stub in pairs(stubs) do
-                ACTIONS[stub] = nil
+            local fn = ACTION\(=lua "string.as_lua_id(\(%action.stub))")
+            for stub in pairs(ALIASES[fn]) do
+                _ENV['ACTION'..string.as_lua_id(stub)] = nil
             end
             ARG_ORDERS[fn] = nil
+            COMPILE_TIME[fn] = nil
         end
 
 immediately

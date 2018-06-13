@@ -15,11 +15,11 @@ using
 action [baz]
     return "outer"
 
-using
-    action [baz]
-        return "inner"
-..do
-    assume: (baz) = "inner"
-assume: (baz) = "outer"
+#
+    do
+        local action [baz]
+            return "inner"
+        assume: (baz) = "inner"
+    assume: (baz) = "outer"
 
 say "Scopes test passed."

@@ -43,13 +43,18 @@ do
 end
 local STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 string.as_lua_id = function(str)
-  return "_" .. (gsub(str, "%W", function(c)
-    if c == "_" then
-      return "__"
+  local argnum = 0
+  str = gsub(str, "%W", function(c)
+    if c == ' ' then
+      return '_'
+    elseif c == '%' then
+      argnum = argnum + 1
+      return tostring(argnum)
     else
-      return format("_%x", byte(c))
+      return format("x%X", byte(c))
     end
-  end))
+  end)
+  return '_' .. str
 end
 FILE_CACHE = setmetatable({ }, {
   __index = function(self, filename)
@@ -237,6 +242,9 @@ setmetatable(NOMSU_DEFS, {
       if value.__init then
         value:__init()
       end
+      for i = 1, #value do
+        assert(value[i])
+      end
       return value
     end
     self[key] = make_node
@@ -262,10 +270,7 @@ do
   local _class_0
   local compile_error, stub_pattern, var_pattern, _running_files, MAX_LINE, math_expression
   local _base_0 = {
-    define_action = function(self, signature, fn, is_compile_action)
-      if is_compile_action == nil then
-        is_compile_action = false
-      end
+    define_action = function(self, signature, fn)
       if type(fn) ~= 'function' then
         error("Not a function: " .. tostring(repr(fn)))
       end
@@ -286,13 +291,12 @@ do
         end
         fn_arg_positions = _tbl_0
       end
-      local actions = (is_compile_action and self.environment.COMPILE_ACTIONS or self.environment.ACTIONS)
       local arg_orders = { }
       for _index_0 = 1, #signature do
         local alias = signature[_index_0]
         local stub = concat(assert(stub_pattern:match(alias)), ' ')
         local stub_args = assert(var_pattern:match(alias))
-        actions[stub] = fn
+        self.environment['ACTION' .. string.as_lua_id(stub)] = fn
         do
           local _accum_0 = { }
           local _len_0 = 1
@@ -307,7 +311,8 @@ do
       self.environment.ARG_ORDERS[fn] = arg_orders
     end,
     define_compile_action = function(self, signature, fn)
-      return self:define_action(signature, fn, true)
+      self:define_action(signature, fn)
+      self.environment.COMPILE_TIME[fn] = true
     end,
     parse = function(self, nomsu_code)
       assert(type(nomsu_code) ~= 'string')
@@ -426,7 +431,7 @@ do
     run_lua = function(self, lua)
       assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
       local lua_string = tostring(lua)
-      local run_lua_fn, err = load(lua_string, tostring(lua.source), "t", self.environment)
+      local run_lua_fn, err = load(lua_string, nil and tostring(lua.source), "t", self.environment)
       if not run_lua_fn then
         local n = 1
         local fn
@@ -475,8 +480,8 @@ do
       local _exp_0 = tree.type
       if "Action" == _exp_0 then
         local stub = tree.stub
-        local compile_action = self.environment.COMPILE_ACTIONS[stub]
-        if compile_action then
+        local action = self.environment['ACTION' .. string.as_lua_id(stub)]
+        if action and self.environment.COMPILE_TIME[action] then
           local args
           do
             local _accum_0 = { }
@@ -490,25 +495,27 @@ do
             end
             args = _accum_0
           end
-          local arg_orders = self.environment.ARG_ORDERS[compile_action]
           do
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_0 = arg_orders[stub]
-            for _index_0 = 1, #_list_0 do
-              local p = _list_0[_index_0]
-              _accum_0[_len_0] = args[p - 1]
-              _len_0 = _len_0 + 1
+            local arg_orders = self.environment.ARG_ORDERS[stub]
+            if arg_orders then
+              do
+                local _accum_0 = { }
+                local _len_0 = 1
+                for _index_0 = 1, #arg_orders do
+                  local p = arg_orders[_index_0]
+                  _accum_0[_len_0] = args[p]
+                  _len_0 = _len_0 + 1
+                end
+                args = _accum_0
+              end
             end
-            args = _accum_0
           end
-          local ret = compile_action(tree, unpack(args))
+          local ret = action(tree, unpack(args))
           if not ret then
             compile_error(tree, "Compile-time action:\n%s\nfailed to produce any Lua")
           end
           return ret
         end
-        local action = rawget(self.environment.ACTIONS, stub)
         local lua = Lua.Value(tree.source)
         if not action and math_expression:match(stub) then
           for i, tok in ipairs(tree) do
@@ -551,18 +558,22 @@ do
         end
         if action then
           do
-            local _accum_0 = { }
-            local _len_0 = 1
-            local _list_0 = self.environment.ARG_ORDERS[action][stub]
-            for _index_0 = 1, #_list_0 do
-              local p = _list_0[_index_0]
-              _accum_0[_len_0] = args[p]
-              _len_0 = _len_0 + 1
+            local arg_orders = self.environment.ARG_ORDERS[stub]
+            if arg_orders then
+              do
+                local _accum_0 = { }
+                local _len_0 = 1
+                for _index_0 = 1, #arg_orders do
+                  local p = arg_orders[_index_0]
+                  _accum_0[_len_0] = args[p]
+                  _len_0 = _len_0 + 1
+                end
+                args = _accum_0
+              end
             end
-            args = _accum_0
           end
         end
-        lua:append("ACTIONS[", repr(stub), "](")
+        lua:append("ACTION", string.as_lua_id(stub), "(")
         for i, arg in ipairs(args) do
           lua:append(arg)
           if i < #args then
@@ -1085,22 +1096,31 @@ do
       end)
       local add_lua_string_bits
       add_lua_string_bits = function(lua, code)
+        local line_len = 0
         if code.type ~= "Text" then
           lua:append(", ", nomsu:tree_to_lua(code))
           return 
         end
         for _index_0 = 1, #code do
           local bit = code[_index_0]
-          lua:append(", ")
+          local bit_lua
           if type(bit) == "string" then
-            lua:append(repr(bit))
+            bit_lua = repr(bit)
           else
-            local bit_lua = nomsu:tree_to_lua(bit)
+            bit_lua = nomsu:tree_to_lua(bit)
             if not (bit_lua.is_value) then
               compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
             end
-            lua:append(bit_lua)
+            bit_lua = bit_lua
           end
+          line_len = line_len + #tostring(bit_lua)
+          if line_len > MAX_LINE then
+            lua:append(",\n    ")
+            line_len = 4
+          else
+            lua:append(", ")
+          end
+          lua:append(bit_lua)
         end
       end
       self:define_compile_action("Lua %code", function(self, _code)
@@ -1262,19 +1282,16 @@ do
       self.environment.Lua = Lua
       self.environment.Nomsu = Nomsu
       self.environment.Source = Source
-      self.environment.ACTIONS = setmetatable({ }, {
-        __index = function(self, key)
-          return function(...)
-            return error("Attempt to run undefined action: " .. tostring(key), 0)
-          end
-        end
-      })
-      self.environment.COMPILE_ACTIONS = { }
       self.environment.ARG_ORDERS = setmetatable({ }, {
         __mode = "k"
       })
+      self.environment.ALIASES = setmetatable({ }, {
+        __mode = "k"
+      })
+      self.environment.COMPILE_TIME = { }
       self.environment.LOADED = { }
       self.environment.AST = AST
+      self.environment._ENV = self.environment
       return self:initialize_core()
     end,
     __base = _base_0,

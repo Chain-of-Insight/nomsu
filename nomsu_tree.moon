@@ -37,6 +37,7 @@ Tree = (name, methods)->
         __call: (source, ...)=>
             if type(source) == 'string'
                 source = Source\from_string(source)
+            for i=1,select('#', ...) do assert(select(i,...))
             assert(Source\is_instance(source))
             inst = {:source, ...}
             setmetatable(inst, @)

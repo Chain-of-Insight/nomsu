@@ -57,6 +57,7 @@ class Code
         match = string.match
         for i=1,n
             b = select(i, ...)
+            assert(b)
             bits[#bits+1] = b
             if type(b) == 'string'
                 if spaces = match(b, "\n([ ]*)[^\n]*$")
@@ -98,7 +99,6 @@ class Lua extends Code
         return unless #vars > 0
         seen = {[v]:true for v in *@free_vars}
         for var in *vars
-            assert(var.type == "Var")
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
@@ -108,7 +108,6 @@ class Lua extends Code
         return unless #vars > 0
         removals = {}
         for var in *vars
-            assert(var.type == "Var")
             removals[var[1]] = true
         
         stack = {self}
@@ -147,7 +146,7 @@ class Lua extends Code
             gather_from self
         if #to_declare > 0
             @remove_free_vars to_declare
-            @prepend "local #{concat [string.as_lua_id(v[1]) for v in *to_declare], ", "};\n"
+            @prepend "local #{concat [type(v) == 'string' and v or string.as_lua_id(v[1]) for v in *to_declare], ", "};\n"
         return to_declare
 
     __tostring: =>
