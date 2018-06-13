@@ -140,22 +140,24 @@ NOMSU_DEFS = with {}
     .ident_char = R("az","AZ","09") + P("_") + .utf8_char
 
     -- If the line begins with #indent+4 spaces, the pattern matches *those* spaces
-    -- and adds them to the stack (not any more).
+    -- and adds them to the current indent (not any more).
     .indent = Cmt Carg(1), (start, userdata)=>
-        if #match(@, "^[ ]*", start) >= userdata.indent + 4
-            userdata.indent += 4
-            return start + userdata.indent
-    -- If the number of leading space characters is <= the number of space on the top of the
-    -- stack minus 4, this pattern matches and pops off the top of the stack exactly once.
+        indented = userdata.indent..'    '
+        if sub(@, start, start+#indented-1) == indented
+            userdata.indent = indented
+            return start + #indented
+    -- If the number of leading space characters is <= the number of spaces in the current
+    -- indent minus 4, this pattern matches and decrements the current indent exactly once.
     .dedent = Cmt Carg(1), (start, userdata)=>
-        if #match(@, "^[ ]*", start) <= userdata.indent - 4
-            userdata.indent -= 4
+        dedented = sub(userdata.indent, 1, -5)
+        if #match(@, "^[ ]*", start) <= #dedented
+            userdata.indent = dedented
             return start
-    -- If the number of leading space characters is >= the number on the top of the
-    -- stack, this pattern matches and does not modify the stack.
+    -- If the number of leading space characters is >= the number of spaces in the current
+    -- indent, this pattern matches and does not modify the indent.
     .nodent = Cmt Carg(1), (start, userdata)=>
-        if #match(@, "^[ ]*", start) >= userdata.indent
-            return start + userdata.indent
+        if sub(@, start, start+#userdata.indent-1) == userdata.indent
+            return start + #userdata.indent
 
     .userdata = Carg(1)
 
@@ -318,7 +320,7 @@ class NomsuCompiler
     parse: (nomsu_code)=>
         assert(type(nomsu_code) != 'string')
         userdata = {
-            source_code:nomsu_code, indent: 0, errors: {},
+            source_code:nomsu_code, indent: "", errors: {},
             source: nomsu_code.source,
         }
         tree = NOMSU_PATTERN\match(tostring(nomsu_code), nil, userdata)

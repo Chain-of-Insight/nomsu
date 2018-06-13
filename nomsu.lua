@@ -172,20 +172,22 @@ do
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
   _with_0.indent = Cmt(Carg(1), function(self, start, userdata)
-    if #match(self, "^[ ]*", start) >= userdata.indent + 4 then
-      userdata.indent = userdata.indent + 4
-      return start + userdata.indent
+    local indented = userdata.indent .. '    '
+    if sub(self, start, start + #indented - 1) == indented then
+      userdata.indent = indented
+      return start + #indented
     end
   end)
   _with_0.dedent = Cmt(Carg(1), function(self, start, userdata)
-    if #match(self, "^[ ]*", start) <= userdata.indent - 4 then
-      userdata.indent = userdata.indent - 4
+    local dedented = sub(userdata.indent, 1, -5)
+    if #match(self, "^[ ]*", start) <= #dedented then
+      userdata.indent = dedented
       return start
     end
   end)
   _with_0.nodent = Cmt(Carg(1), function(self, start, userdata)
-    if #match(self, "^[ ]*", start) >= userdata.indent then
-      return start + userdata.indent
+    if sub(self, start, start + #userdata.indent - 1) == userdata.indent then
+      return start + #userdata.indent
     end
   end)
   _with_0.userdata = Carg(1)
@@ -311,7 +313,7 @@ do
       assert(type(nomsu_code) ~= 'string')
       local userdata = {
         source_code = nomsu_code,
-        indent = 0,
+        indent = "",
         errors = { },
         source = nomsu_code.source
       }
