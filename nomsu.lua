@@ -904,11 +904,11 @@ do
           for _index_0 = 1, #tree do
             local bit = tree[_index_0]
             if type(bit) == 'string' then
-              nomsu:append((gsub(gsub(bit, "\\", "\\\\"), "\n", "\\n")))
+              nomsu:append((gsub(gsub(gsub(bit, "\\", "\\\\"), "\n", "\\n"), '"', '\\"')))
             else
               local interp_nomsu = self:tree_to_nomsu(bit, true)
               if interp_nomsu then
-                if bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
+                if bit.type ~= "Var" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
                   interp_nomsu:parenthesize()
                 end
                 nomsu:append("\\", interp_nomsu)
@@ -960,7 +960,7 @@ do
             else
               local interp_nomsu = self:tree_to_nomsu(bit, true)
               if interp_nomsu then
-                if bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
+                if bit.type ~= "Var" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
                   interp_nomsu:parenthesize()
                 end
                 nomsu:append("\\", interp_nomsu)

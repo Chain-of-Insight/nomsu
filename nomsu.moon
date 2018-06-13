@@ -751,11 +751,11 @@ class NomsuCompiler
                     for bit in *tree
                         if type(bit) == 'string'
                             -- TODO: unescape better?
-                            nomsu\append (gsub(gsub(bit,"\\","\\\\"),"\n","\\n"))
+                            nomsu\append (gsub(gsub(gsub(bit,"\\","\\\\"),"\n","\\n"),'"','\\"'))
                         else
                             interp_nomsu = @tree_to_nomsu(bit, true)
                             if interp_nomsu
-                                if bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
+                                if bit.type != "Var" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
                                     interp_nomsu\parenthesize!
                                 nomsu\append "\\", interp_nomsu
                             else return nil
@@ -791,7 +791,7 @@ class NomsuCompiler
                         else
                             interp_nomsu = @tree_to_nomsu(bit, true)
                             if interp_nomsu
-                                if bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
+                                if bit.type != "Var" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
                                     interp_nomsu\parenthesize!
                                 nomsu\append "\\", interp_nomsu
                             else
