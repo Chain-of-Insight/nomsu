@@ -30,10 +30,10 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local match, sub, rep, gsub, format, byte
+local match, sub, rep, gsub, format, byte, find
 do
   local _obj_0 = string
-  match, sub, rep, gsub, format, byte, match = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match
+  match, sub, rep, gsub, format, byte, match, find = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match, _obj_0.find
 end
 local debug_getinfo = debug.getinfo
 local Nomsu, Lua, Source
@@ -98,6 +98,11 @@ all_files = function(path)
 end
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*
+]], {
+  nl = P("\r") ^ -1 * P("\n")
+})
+local get_lines = re.compile([[    lines <- {| line (%nl line)* |}
+    line <- {[^%nl]*}
 ]], {
   nl = P("\r") ^ -1 * P("\n")
 })
@@ -801,9 +806,10 @@ do
         else
           local nomsu = Nomsu(tree.source)
           local next_space = ""
-          local last_colon = nil
+          local line_len, last_colon = 0, nil
           for i, bit in ipairs(tree) do
             if type(bit) == "string" then
+              line_len = line_len + #next_space + #bit
               nomsu:append(next_space, bit)
               next_space = " "
             else
@@ -815,18 +821,21 @@ do
               else
                 arg_nomsu = self:tree_to_nomsu(bit, true)
               end
-              if arg_nomsu and #arg_nomsu < MAX_LINE then
+              if arg_nomsu and line_len + #tostring(arg_nomsu) < MAX_LINE then
                 if bit.type == "Action" then
                   if can_use_colon and i > 1 then
                     nomsu:append(match(next_space, "[^ ]*"), ": ", arg_nomsu)
                     next_space = "\n.."
+                    line_len = 2
                     last_colon = i
                   else
                     nomsu:append(next_space, "(", arg_nomsu, ")")
+                    line_len = line_len + #next_space + 2 + #tostring(arg_nomsu)
                     next_space = " "
                   end
                 else
                   nomsu:append(next_space, arg_nomsu)
+                  line_len = line_len + #next_space + #tostring(arg_nomsu)
                   next_space = " "
                 end
               else
@@ -846,6 +855,7 @@ do
                 end
                 nomsu:append(next_space, arg_nomsu)
                 next_space = "\n.."
+                line_len = 2
               end
               if next_space == " " and #(match(tostring(nomsu), "[^\n]*$")) > MAX_LINE then
                 next_space = "\n.."
@@ -915,9 +925,38 @@ do
             return inline_version
           end
           local nomsu = Nomsu(tree.source, '".."\n    ')
-          for i, bit in ipairs(self) do
+          for i, bit in ipairs(tree) do
             if type(bit) == 'string' then
-              nomsu:append((gsub(gsub(bit, "\\", "\\\\"), "\n", "\\n")))
+              local bit_lines = get_lines:match(bit)
+              for j, line in ipairs(bit_lines) do
+                if j > 1 then
+                  nomsu:append("\n    ")
+                end
+                if #line > 1.25 * MAX_LINE then
+                  local remainder = line
+                  while #remainder > 0 do
+                    local split = find(remainder, " ", MAX_LINE, true)
+                    if split then
+                      local chunk
+                      chunk, remainder = sub(remainder, 1, split), sub(remainder, split + 1, -1)
+                      nomsu:append(chunk)
+                    elseif #remainder > 1.75 * MAX_LINE then
+                      split = math.floor(1.5 * MAX_LINE)
+                      local chunk
+                      chunk, remainder = sub(remainder, 1, split), sub(remainder, split + 1, -1)
+                      nomsu:append(chunk)
+                    else
+                      nomsu:append(remainder)
+                      break
+                    end
+                    if #remainder > 0 then
+                      nomsu:append("\\\n    ..")
+                    end
+                  end
+                else
+                  nomsu:append(line)
+                end
+              end
             else
               local interp_nomsu = self:tree_to_nomsu(bit, true)
               if interp_nomsu then
@@ -926,12 +965,12 @@ do
                 end
                 nomsu:append("\\", interp_nomsu)
               else
-                interp_nomsu = self:tree_to_nomsu(bit)
+                interp_nomsu = assert(self:tree_to_nomsu(bit))
                 if not (interp_nomsu) then
                   return nil
                 end
                 nomsu:append("\\\n        ", interp_nomsu)
-                if i < #self then
+                if i < #tree then
                   nomsu:append("\n    ..")
                 end
               end

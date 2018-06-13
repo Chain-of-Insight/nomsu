@@ -30,7 +30,7 @@ colors = setmetatable({}, {__index:->""})
 export colored
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
-{:match, :sub, :rep, :gsub, :format, :byte, :match} = string
+{:match, :sub, :rep, :gsub, :format, :byte, :match, :find} = string
 debug_getinfo = debug.getinfo
 {:Nomsu, :Lua, :Source} = require "code_obj"
 STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
@@ -88,6 +88,10 @@ all_files = (path)->
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*
+]], nl:P("\r")^-1 * P("\n"))
+get_lines = re.compile([[
+    lines <- {| line (%nl line)* |}
+    line <- {[^%nl]*}
 ]], nl:P("\r")^-1 * P("\n"))
 -- Mapping from line number -> character offset
 export LINE_STARTS
@@ -668,10 +672,10 @@ class NomsuCompiler
                 else
                     nomsu = Nomsu(tree.source)
                     next_space = ""
-                    -- TODO: track line length as we go and use 80-that instead of 80 for wrapping
-                    last_colon = nil
+                    line_len, last_colon = 0, nil
                     for i,bit in ipairs tree
                         if type(bit) == "string"
+                            line_len += #next_space + #bit
                             nomsu\append next_space, bit
                             next_space = " "
                         else
@@ -679,17 +683,20 @@ class NomsuCompiler
                             elseif bit.type == "Block" then nil
                             else @tree_to_nomsu(bit,true)
 
-                            if arg_nomsu and #arg_nomsu < MAX_LINE
+                            if arg_nomsu and line_len + #tostring(arg_nomsu) < MAX_LINE
                                 if bit.type == "Action"
                                     if can_use_colon and i > 1
                                         nomsu\append match(next_space,"[^ ]*"), ": ", arg_nomsu
                                         next_space = "\n.."
+                                        line_len = 2
                                         last_colon = i
                                     else
                                         nomsu\append next_space, "(", arg_nomsu, ")"
+                                        line_len += #next_space + 2 + #tostring(arg_nomsu)
                                         next_space = " "
                                 else
                                     nomsu\append next_space, arg_nomsu
+                                    line_len += #next_space + #tostring(arg_nomsu)
                                     next_space = " "
                             else
                                 arg_nomsu = @tree_to_nomsu(bit, nil, true)
@@ -705,6 +712,7 @@ class NomsuCompiler
                                     next_space = ""
                                 nomsu\append next_space, arg_nomsu
                                 next_space = "\n.."
+                                line_len = 2
 
                             if next_space == " " and #(match(tostring(nomsu),"[^\n]*$")) > MAX_LINE
                                 next_space = "\n.."
@@ -758,10 +766,28 @@ class NomsuCompiler
                     if inline_version and #inline_version <= MAX_LINE
                         return inline_version
                     nomsu = Nomsu(tree.source, '".."\n    ')
-                    for i, bit in ipairs @
+                    for i, bit in ipairs tree
                         if type(bit) == 'string'
-                            -- TODO: unescape better?
-                            nomsu\append (gsub(gsub(bit,"\\","\\\\"),"\n","\\n"))
+                            bit_lines = get_lines\match(bit)
+                            for j, line in ipairs bit_lines
+                                if j > 1 then nomsu\append "\n    "
+                                if #line > 1.25*MAX_LINE
+                                    remainder = line
+                                    while #remainder > 0
+                                        split = find(remainder, " ", MAX_LINE, true)
+                                        if split
+                                            chunk, remainder = sub(remainder, 1, split), sub(remainder, split+1, -1)
+                                            nomsu\append chunk
+                                        elseif #remainder > 1.75*MAX_LINE
+                                            split = math.floor(1.5*MAX_LINE)
+                                            chunk, remainder = sub(remainder, 1, split), sub(remainder, split+1, -1)
+                                            nomsu\append chunk
+                                        else
+                                            nomsu\append remainder
+                                            break
+                                        if #remainder > 0 then nomsu\append "\\\n    .."
+                                else
+                                    nomsu\append line
                         else
                             interp_nomsu = @tree_to_nomsu(bit, true)
                             if interp_nomsu
@@ -769,10 +795,10 @@ class NomsuCompiler
                                     interp_nomsu\parenthesize!
                                 nomsu\append "\\", interp_nomsu
                             else
-                                interp_nomsu = @tree_to_nomsu(bit)
+                                interp_nomsu = assert(@tree_to_nomsu(bit))
                                 return nil unless interp_nomsu
                                 nomsu\append "\\\n        ", interp_nomsu
-                                if i < #@
+                                if i < #tree
                                     nomsu\append "\n    .."
                     return nomsu
 
