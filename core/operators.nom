@@ -160,8 +160,7 @@ immediately
     # Unary operators
     compile [- %] to: Lua value "(- \(% as lua expr))"
     compile [not %] to: Lua value "(not \(% as lua expr))"
-    # Using custom "len()" instead of Lua's "#" operator for compatibility with luajit.
-    compile [length of %list] to: Lua value "len(\(%list as lua expr))"
+    compile [length of %list] to: Lua value "(#\(%list as lua expr))"
 
 # Update operators
 immediately

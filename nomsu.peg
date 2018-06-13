@@ -98,11 +98,11 @@ text_interpolation:
     inline_text_interpolation /
     ("\" indented_expression nodent "..")
 
-number (Number): {| {:value: (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) :} |}
+number (Number): {| (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) |}
 
 -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
 -- which is a hack to allow %'s to parse as "%" and "' s" separately
-variable (Var): "%" {| {:value: (%ident_char+ ((!"'" %operator_char+) / %ident_char+)*)? :} |}
+variable (Var): "%" {| {(%ident_char+ ((!"'" %operator_char+) / %ident_char+)*)?} |}
 
 inline_list (List):
     !('[..]')

@@ -82,7 +82,7 @@ immediately
             for i,tok in ipairs(\%shorthand[1]) do
                 if tok.type == "Var" then
                     local lua_var = tostring(nomsu:tree_to_lua(tok))
-                    replacements[tok.value] = lua_var
+                    replacements[tok[1]] = lua_var
                     lua:append(", ", lua_var)
                 end
             end
@@ -90,12 +90,10 @@ immediately
             local function make_tree(t)
                 if type(t) ~= 'table' and type(t) ~= 'userdata' then
                     return repr(t)
-                elseif t.type == 'Var' and replacements[t.value] then
-                    return replacements[t.value]
+                elseif t.type == 'Var' and replacements[t[1]] then
+                    return replacements[t[1]]
                 elseif t.type == 'Var' then
-                    return t.type.."("..repr(tostring(t.source))..", "..repr(t.value.."#"..tostring(MANGLE_INDEX))..")"
-                elseif t.value then
-                    return t.type.."("..repr(tostring(t.source))..", "..repr(t.value)..")"
+                    return t.type.."("..repr(tostring(t.source))..", "..repr(t[1].."#"..tostring(MANGLE_INDEX))..")"
                 else
                     local bits = {repr(tostring(t.source))}
                     for i, entry in ipairs(t) do

@@ -187,7 +187,7 @@ do
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
         assert(var.type == "Var")
-        removals[var.value] = true
+        removals[var[1]] = true
       end
       local stack = {
         self
@@ -196,7 +196,7 @@ do
         local lua
         lua, stack[#stack] = stack[#stack], nil
         for i = #lua.free_vars, 1, -1 do
-          if removals[lua.free_vars[i].value] then
+          if removals[lua.free_vars[i][1]] then
             remove(lua.free_vars, i)
           end
         end
@@ -264,7 +264,7 @@ do
           local _len_0 = 1
           for _index_0 = 1, #to_declare do
             local v = to_declare[_index_0]
-            _accum_0[_len_0] = string.as_lua_id(v.value)
+            _accum_0[_len_0] = string.as_lua_id(v[1])
             _len_0 = _len_0 + 1
           end
           return _accum_0

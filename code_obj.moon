@@ -109,13 +109,13 @@ class Lua extends Code
         removals = {}
         for var in *vars
             assert(var.type == "Var")
-            removals[var.value] = true
+            removals[var[1]] = true
         
         stack = {self}
         while #stack > 0
             lua, stack[#stack] = stack[#stack], nil
             for i=#lua.free_vars,1,-1
-                if removals[lua.free_vars[i].value]
+                if removals[lua.free_vars[i][1]]
                     remove lua.free_vars, i
             for b in *lua.bits
                 if type(b) != 'string'
@@ -147,7 +147,7 @@ class Lua extends Code
             gather_from self
         if #to_declare > 0
             @remove_free_vars to_declare
-            @prepend "local #{concat [string.as_lua_id(v.value) for v in *to_declare], ", "};\n"
+            @prepend "local #{concat [string.as_lua_id(v[1]) for v in *to_declare], ", "};\n"
         return to_declare
 
     __tostring: =>

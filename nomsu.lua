@@ -1,33 +1,10 @@
 local _pairs, _ipairs = pairs, ipairs
 if jit then
   package.cpath = "./luajit_lpeg/?.so;" .. package.cpath
-  lpeg = require('lpeg')
+  package.path = "./luajit_lpeg/?.lua;" .. package.path
   bit32 = require('bit')
-  pairs = function(x)
-    do
-      local mt = getmetatable(x)
-      if mt then
-        if mt.__pairs then
-          return mt.__pairs(x)
-        end
-      end
-    end
-    return _pairs(x)
-  end
-  ipairs = function(x)
-    do
-      local mt = getmetatable(x)
-      if mt then
-        if mt.__ipairs then
-          return mt.__ipairs(x)
-        end
-      end
-    end
-    return _ipairs(x)
-  end
-else
-  lpeg = require('lpeg')
 end
+lpeg = require('lpeg')
 re = require('re')
 lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt, Carg
@@ -53,6 +30,11 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
+local match, sub, rep, gsub, format, byte
+do
+  local _obj_0 = string
+  match, sub, rep, gsub, format, byte, match = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match
+end
 local debug_getinfo = debug.getinfo
 local Nomsu, Lua, Source
 do
@@ -61,11 +43,11 @@ do
 end
 local STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 string.as_lua_id = function(str)
-  return "_" .. (str:gsub("%W", function(c)
+  return "_" .. (gsub(str, "%W", function(c)
     if c == "_" then
       return "__"
     else
-      return ("_%x"):format(c:byte())
+      return format("_%x", byte(c))
     end
   end))
 end
@@ -91,10 +73,13 @@ iterate_single = function(item, prev)
 end
 local all_files
 all_files = function(path)
-  if path:match("%.nom$") or path:match("%.lua$") or path:match("^/dev/fd/[012]$") then
+  if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$") then
     return iterate_single, path
   end
-  path = path:gsub("\\", "\\\\"):gsub("`", ""):gsub('"', '\\"'):gsub("$", "")
+  path = gsub(path, "\\", "\\\\")
+  path = gsub(path, "`", "")
+  path = gsub(path, '"', '\\"')
+  path = gsub(path, "$", "")
   return coroutine.wrap(function()
     local f = io.popen('find -L "' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
     for line in f:lines() do
@@ -153,9 +138,9 @@ do
       return ret
     end
     if type(i) == 'number' then
-      return string.sub(self, i, i)
+      return sub(self, i, i)
     elseif type(i) == 'table' then
-      return string.sub(self, i[1], i[2])
+      return sub(self, i[1], i[2])
     end
   end
 end
@@ -187,19 +172,19 @@ do
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
   _with_0.indent = Cmt(Carg(1), function(self, start, userdata)
-    if #self:match("^[ ]*", start) >= userdata.indent + 4 then
+    if #match(self, "^[ ]*", start) >= userdata.indent + 4 then
       userdata.indent = userdata.indent + 4
       return start + userdata.indent
     end
   end)
   _with_0.dedent = Cmt(Carg(1), function(self, start, userdata)
-    if #self:match("^[ ]*", start) <= userdata.indent - 4 then
+    if #match(self, "^[ ]*", start) <= userdata.indent - 4 then
       userdata.indent = userdata.indent - 4
       return start
     end
   end)
   _with_0.nodent = Cmt(Carg(1), function(self, start, userdata)
-    if #self:match("^[ ]*", start) >= userdata.indent then
+    if #match(self, "^[ ]*", start) >= userdata.indent then
       return start + userdata.indent
     end
   end)
@@ -403,12 +388,12 @@ do
             end
           end
           insert(_running_files, filename)
-          if filename:match("%.lua$") then
+          if match(filename, "%.lua$") then
             local file = assert(FILE_CACHE[filename], "Could not find file: " .. tostring(filename))
             ret = self:run_lua(Lua(Source(filename, 1, #file), file))
-          elseif filename:match("%.nom$") or filename:match("^/dev/fd/[012]$") then
+          elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$") then
             if not self.skip_precompiled then
-              local lua_filename = filename:gsub("%.nom$", ".lua")
+              local lua_filename = gsub(filename, "%.nom$", ".lua")
               local file = FILE_CACHE[lua_filename]
               if file then
                 ret = self:run_lua(Lua(Source(filename, 1, #file), file))
@@ -439,7 +424,7 @@ do
     run_lua = function(self, lua)
       assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
       local lua_string = tostring(lua)
-      local run_lua_fn, err = load(lua_string, nil and tostring(lua.source), "t", self.environment)
+      local run_lua_fn, err = load(lua_string, tostring(lua.source), "t", self.environment)
       if not run_lua_fn then
         local n = 1
         local fn
@@ -590,22 +575,18 @@ do
           if not (AST.is_syntax_tree(t)) then
             return repr(t)
           end
-          if t.value then
-            return t.type .. "(" .. repr(tostring(t.source)) .. ", " .. repr(t.value) .. ")"
-          else
-            local bits
-            do
-              local _accum_0 = { }
-              local _len_0 = 1
-              for _index_0 = 1, #t do
-                local bit = t[_index_0]
-                _accum_0[_len_0] = make_tree(bit)
-                _len_0 = _len_0 + 1
-              end
-              bits = _accum_0
+          local bits
+          do
+            local _accum_0 = { }
+            local _len_0 = 1
+            for _index_0 = 1, #t do
+              local bit = t[_index_0]
+              _accum_0[_len_0] = make_tree(bit)
+              _len_0 = _len_0 + 1
             end
-            return t.type .. "(" .. repr(tostring(t.source)) .. ", " .. table.concat(bits, ", ") .. ")"
+            bits = _accum_0
           end
+          return t.type .. "(" .. repr(tostring(t.source)) .. ", " .. table.concat(bits, ", ") .. ")"
         end
         return Lua.Value(tree.source, make_tree(tree[1]))
       elseif "Block" == _exp_0 then
@@ -638,7 +619,7 @@ do
             end
             local bit_lua = self:tree_to_lua(bit)
             if not (bit_lua.is_value) then
-              local src = '    ' .. tostring(self:tree_to_nomsu(bit)):gsub('\n', '\n    ')
+              local src = '    ' .. gsub(tostring(self:tree_to_nomsu(bit)), '\n', '\n    ')
               local line = tostring(bit.source.filename) .. ":" .. tostring(pos_to_line(FILE_CACHE[bit.source.filename], bit.source.start))
               compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
             end
@@ -675,8 +656,8 @@ do
           end
           lua:append(item_lua)
           local item_string = tostring(item_lua)
-          local last_line = item_string:match("[^\n]*$")
-          if item_string:match("\n") then
+          local last_line = match(item_string, "[^\n]*$")
+          if match(item_string, "\n") then
             line_length = #last_line
           else
             line_length = line_length + #last_line
@@ -700,7 +681,7 @@ do
           local entry_lua = self:tree_to_lua(entry)
           lua:append(entry_lua)
           local entry_lua_str = tostring(entry_lua)
-          local last_line = entry_lua_str:match("\n([^\n]*)$")
+          local last_line = match(entry_lua_str, "\n([^\n]*)$")
           if last_line then
             line_length = #last_line
           else
@@ -728,10 +709,10 @@ do
         if not (value_lua.is_value) then
           compile_error(tree[2], "Cannot use:\n%s\nas a dict value, since it's not an expression.")
         end
-        local key_str = tostring(key_lua):match([=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
+        local key_str = match(tostring(key_lua), [=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
         if key_str then
           return Lua(tree.source, key_str, "=", value_lua)
-        elseif tostring(key_lua):sub(1, 1) == "[" then
+        elseif sub(tostring(key_lua), 1, 1) == "[" then
           return Lua(tree.source, "[ ", key_lua, "]=", value_lua)
         else
           return Lua(tree.source, "[", key_lua, "]=", value_lua)
@@ -741,7 +722,7 @@ do
         if not (lua.is_value) then
           compile_error(tree[1], "Cannot index:\n%s\nsince it's not an expression.")
         end
-        local first_char = tostring(lua):sub(1, 1)
+        local first_char = sub(tostring(lua), 1, 1)
         if first_char == "{" or first_char == '"' or first_char == "[" then
           lua:parenthesize()
         end
@@ -753,10 +734,10 @@ do
           end
           local key_lua_str = tostring(key_lua)
           do
-            local lua_id = key_lua_str:match("^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
+            local lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
             if lua_id then
               lua:append("." .. tostring(lua_id))
-            elseif key_lua_str:sub(1, 1) == '[' then
+            elseif sub(key_lua_str, 1, 1) == '[' then
               lua:append("[ ", key_lua, " ]")
             else
               lua:append("[", key_lua, "]")
@@ -765,9 +746,9 @@ do
         end
         return lua
       elseif "Number" == _exp_0 then
-        return Lua.Value(tree.source, tostring(tree.value))
+        return Lua.Value(tree.source, tostring(tree[1]))
       elseif "Var" == _exp_0 then
-        return Lua.Value(tree.source, string.as_lua_id(tree.value))
+        return Lua.Value(tree.source, string.as_lua_id(tree[1]))
       else
         return error("Unknown type: " .. tostring(tree.type))
       end
@@ -824,7 +805,7 @@ do
               if arg_nomsu and #arg_nomsu < MAX_LINE then
                 if bit.type == "Action" then
                   if can_use_colon and i > 1 then
-                    nomsu:append(next_space:match("[^ ]*"), ": ", arg_nomsu)
+                    nomsu:append(match(next_space, "[^ ]*"), ": ", arg_nomsu)
                     next_space = "\n.."
                     last_colon = i
                   else
@@ -853,7 +834,7 @@ do
                 nomsu:append(next_space, arg_nomsu)
                 next_space = "\n.."
               end
-              if next_space == " " and #(tostring(nomsu):match("[^\n]*$")) > MAX_LINE then
+              if next_space == " " and #(match(tostring(nomsu), "[^\n]*$")) > MAX_LINE then
                 next_space = "\n.."
               end
             end
@@ -888,7 +869,7 @@ do
           nomsu:append(line)
           if i < #tree then
             nomsu:append("\n")
-            if tostring(line):match("\n") then
+            if match(tostring(line), "\n") then
               nomsu:append("\n")
             end
           end
@@ -900,7 +881,7 @@ do
           for _index_0 = 1, #tree do
             local bit = tree[_index_0]
             if type(bit) == 'string' then
-              nomsu:append((bit:gsub("\\", "\\\\"):gsub("\n", "\\n")))
+              nomsu:append((gsub(gsub(bit, "\\", "\\\\"), "\n", "\\n")))
             else
               local interp_nomsu = self:tree_to_nomsu(bit, true)
               if interp_nomsu then
@@ -923,7 +904,7 @@ do
           local nomsu = Nomsu(tree.source, '".."\n    ')
           for i, bit in ipairs(self) do
             if type(bit) == 'string' then
-              nomsu:append((bit:gsub("\\", "\\\\"):gsub("\n", "\n    ")))
+              nomsu:append((gsub(gsub(bit, "\\", "\\\\"), "\n", "\\n")))
             else
               local interp_nomsu = self:tree_to_nomsu(bit, true)
               if interp_nomsu then
@@ -1085,9 +1066,9 @@ do
         end
         return nomsu
       elseif "Number" == _exp_0 then
-        return Nomsu(tree.source, tostring(tree.value))
+        return Nomsu(tree.source, tostring(tree[1]))
       elseif "Var" == _exp_0 then
-        return Nomsu(tree.source, "%", tree.value)
+        return Nomsu(tree.source, "%", tree[1])
       else
         return error("Unknown type: " .. tostring(tree.type))
       end
@@ -1268,60 +1249,11 @@ do
         math = math,
         io = io,
         load = load,
+        pairs = pairs,
+        ipairs = ipairs,
         list = list,
         dict = dict
       }
-      if jit then
-        self.environment.len = function(x)
-          do
-            local mt = getmetatable(x)
-            if mt then
-              if mt.__len then
-                return mt.__len(x)
-              end
-            end
-          end
-          return #x
-        end
-      else
-        self.environment.len = (function(x)
-          return #x
-        end)
-      end
-      self.environment.ipairs = function(x)
-        if type(x) == 'function' then
-          return coroutine.wrap(x)
-        elseif type(x) == 'thread' then
-          return coroutine.resume, x, nil
-        else
-          do
-            local mt = getmetatable(x)
-            if mt then
-              if mt.__ipairs then
-                return mt.__ipairs(x)
-              end
-            end
-          end
-        end
-        return _ipairs(x)
-      end
-      self.environment.pairs = function(x)
-        if type(x) == 'function' then
-          return coroutine.wrap(x)
-        elseif type(x) == 'thread' then
-          return coroutine.resume, x, nil
-        else
-          do
-            local mt = getmetatable(x)
-            if mt then
-              if mt.__pairs then
-                return mt.__pairs(x)
-              end
-            end
-          end
-        end
-        return _pairs(x)
-      end
       for k, v in pairs(AST) do
         self.environment[k] = v
       end

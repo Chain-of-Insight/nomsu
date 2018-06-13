@@ -9,19 +9,28 @@ AST.is_syntax_tree = (n)->
     type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
 
 -- Helper method:
-Tree = (name, leaf_or_branch, methods)->
+Tree = (name, methods)->
     cls = methods or {}
-    is_multi = leaf_or_branch == 'branch'
     with cls
         .type = name
+        .__class = cls
+        .__name = name
         .is_instance = (x)=> getmetatable(x) == @
         .__index = cls
-        .__tostring = => "#{@name}(#{@value and repr(@value) or table.concat([repr(v) for v in *@]), ', '})"
+        .__tostring = => "#{@name}(#{table.concat([repr(v) for v in *@]), ', '})"
         .map = (fn)=>
             if replacement = fn(@) then return replacement
-            if @value then return @
-            new_vals = [v.map and v\map(fn) or v for v in *@]
-            return getmetatable(self)(@source, unpack(new_vals))
+            made_changes, new_vals = false, {}
+            for i,v in ipairs @
+                if AST.is_syntax_tree(v)
+                    if replacement = v\map(fn)
+                        if replacement ~= v
+                            made_changes = true
+                            v = replacement
+                new_vals[i] = v
+            return @ unless made_changes
+            replacement = getmetatable(self)(@source, unpack(new_vals))
+            return replacement
 
     AST[name] = setmetatable cls,
         __tostring: => @name
@@ -29,25 +38,25 @@ Tree = (name, leaf_or_branch, methods)->
             if type(source) == 'string'
                 source = Source\from_string(source)
             assert(Source\is_instance(source))
-            inst = if is_multi then {:source, ...} else {:source, value:...}
+            inst = {:source, ...}
             setmetatable(inst, @)
             if inst.__init then inst\__init!
             return inst
 
-Tree "Number", 'leaf'
-Tree "Var", 'leaf'
-Tree "Block", 'branch'
-Tree "EscapedNomsu", 'branch'
-Tree "Text", 'branch'
-Tree "List", 'branch'
-Tree "Dict", 'branch'
-Tree "DictEntry", 'branch'
-Tree "IndexChain", 'branch'
-Tree "Action", 'branch',
+Tree "Number"
+Tree "Var"
+Tree "Block"
+Tree "EscapedNomsu"
+Tree "Text"
+Tree "List"
+Tree "Dict"
+Tree "DictEntry"
+Tree "IndexChain"
+Tree "Action",
     __init: =>
         stub_bits = [type(a) == 'string' and a or '%' for a in *@]
         @stub = concat stub_bits, " "
     get_spec: =>
-        concat [type(a) == "string" and a or "%#{a.value}" for a in *@], " "
+        concat [type(a) == "string" and a or "%#{a[1]}" for a in *@], " "
 
 return AST

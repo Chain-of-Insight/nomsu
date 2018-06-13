@@ -188,14 +188,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     (%.stub is "do next %") and
-                        %.3.value = %var.value
+                        %.3.(1) = %var.(1)
         ..: to %lua write (Lua "\n    ::continue_\(%var as lua identifier)::")
         to %lua write "\nend --foreach-loop"
         if
             %body has subtree % where
                 (%.type = "Action") and
                     (%.stub is "stop %") and
-                        %.2.value = %var.value
+                        %.2.(1) = %var.(1)
         ..
             %lua <-
                 Lua ".."
@@ -222,14 +222,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     (%.stub is "do next %") and
-                        %.3.value = %key.value
+                        %.3.(1) = %key.(1)
         ..: to %lua write (Lua "\n    ::continue_\(%key as lua identifier)::")
 
         if
             %body has subtree % where
                 (%.type = "Action") and
                     (%.stub is "do next %") and
-                        %.3.value = %value.value
+                        %.3.(1) = %value.(1)
         ..: to %lua write (Lua "\n    ::continue_\(%value as lua identifier)::")
         to %lua write "\nend --foreach-loop"
         
@@ -238,14 +238,14 @@ immediately
             %body has subtree % where
                 (%.type = "Action") and
                     (%.stub is "stop %") and
-                        %.2.value = %key.value
+                        %.2.(1) = %key.(1)
         ..: to %stop_labels write "\n::stop_\(%key as lua identifier)::"
 
         if
             %body has subtree % where
                 (%.type = "Action") and
                     (%.stub is "stop %") and
-                        %.2.value = %value.value
+                        %.2.(1) = %value.(1)
         ..: to %stop_labels write "\n::stop_\(%value as lua identifier)::"
 
         if: (length of %stop_labels) > 0

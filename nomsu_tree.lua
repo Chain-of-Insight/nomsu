@@ -12,17 +12,18 @@ AST.is_syntax_tree = function(n)
   return type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
 end
 local Tree
-Tree = function(name, leaf_or_branch, methods)
+Tree = function(name, methods)
   local cls = methods or { }
-  local is_multi = leaf_or_branch == 'branch'
   do
     cls.type = name
+    cls.__class = cls
+    cls.__name = name
     cls.is_instance = function(self, x)
       return getmetatable(x) == self
     end
     cls.__index = cls
     cls.__tostring = function(self)
-      return tostring(self.name) .. "(#{@value and repr(@value) or table.concat([repr(v) for v in *@]), ', '})"
+      return tostring(self.name) .. "(#{table.concat([repr(v) for v in *@]), ', '})"
     end
     cls.map = function(self, fn)
       do
@@ -31,21 +32,26 @@ Tree = function(name, leaf_or_branch, methods)
           return replacement
         end
       end
-      if self.value then
+      local made_changes, new_vals = false, { }
+      for i, v in ipairs(self) do
+        if AST.is_syntax_tree(v) then
+          do
+            local replacement = v:map(fn)
+            if replacement then
+              if replacement ~= v then
+                made_changes = true
+                v = replacement
+              end
+            end
+          end
+        end
+        new_vals[i] = v
+      end
+      if not (made_changes) then
         return self
       end
-      local new_vals
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #self do
-          local v = self[_index_0]
-          _accum_0[_len_0] = v.map and v:map(fn) or v
-          _len_0 = _len_0 + 1
-        end
-        new_vals = _accum_0
-      end
-      return getmetatable(self)(self.source, unpack(new_vals))
+      local replacement = getmetatable(self)(self.source, unpack(new_vals))
+      return replacement
     end
   end
   AST[name] = setmetatable(cls, {
@@ -57,18 +63,10 @@ Tree = function(name, leaf_or_branch, methods)
         source = Source:from_string(source)
       end
       assert(Source:is_instance(source))
-      local inst
-      if is_multi then
-        inst = {
-          source = source,
-          ...
-        }
-      else
-        inst = {
-          source = source,
-          value = ...
-        }
-      end
+      local inst = {
+        source = source,
+        ...
+      }
       setmetatable(inst, self)
       if inst.__init then
         inst:__init()
@@ -77,16 +75,16 @@ Tree = function(name, leaf_or_branch, methods)
     end
   })
 end
-Tree("Number", 'leaf')
-Tree("Var", 'leaf')
-Tree("Block", 'branch')
-Tree("EscapedNomsu", 'branch')
-Tree("Text", 'branch')
-Tree("List", 'branch')
-Tree("Dict", 'branch')
-Tree("DictEntry", 'branch')
-Tree("IndexChain", 'branch')
-Tree("Action", 'branch', {
+Tree("Number")
+Tree("Var")
+Tree("Block")
+Tree("EscapedNomsu")
+Tree("Text")
+Tree("List")
+Tree("Dict")
+Tree("DictEntry")
+Tree("IndexChain")
+Tree("Action", {
   __init = function(self)
     local stub_bits
     do
@@ -107,7 +105,7 @@ Tree("Action", 'branch', {
       local _len_0 = 1
       for _index_0 = 1, #self do
         local a = self[_index_0]
-        _accum_0[_len_0] = type(a) == "string" and a or "%" .. tostring(a.value)
+        _accum_0[_len_0] = type(a) == "string" and a or "%" .. tostring(a[1])
         _len_0 = _len_0 + 1
       end
       return _accum_0
