@@ -1,0 +1,10 @@
+#
+    Tests for the stuff defined in lib/os.nom
+
+use "core"
+use "lib/os.nom"
+
+%lines <-: lines in: read file "tests/os.nom"
+assume: %lines.2 = "    Tests for the stuff defined in lib/os.nom"
+
+say "OS test passed."

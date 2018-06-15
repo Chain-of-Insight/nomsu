@@ -10,8 +10,7 @@ assume (("asdf" with "X" instead of "s") = "aXdf") or barf "substitution failed"
 assume ("\n" = (newline)) or barf "Text literals failed."
 %x <- "\(green)hello\(reset color)"
 assume (("x" + "y") = "xy")
-
-say "Text test passed."
+assume ((lines in "one\ntwo") = ["one", "two"])
 
 immediately
     parse [アクション %spec %body] as: action %spec %body
@@ -52,3 +51,5 @@ assume
             block comment
         ..gap
     ..= "nogap"
+
+say "Text test passed."

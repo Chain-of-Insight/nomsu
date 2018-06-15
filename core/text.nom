@@ -20,7 +20,7 @@ compile [%text with %sub instead of %patt, %text s/%patt/%sub] to
 
 action [lines in %text, lines of %text]
     lua> ".."
-        local result = {}
+        local result = list{}
         for line in (\%text):gmatch('[^\n]+') do
             result[#result+1] = line
         end

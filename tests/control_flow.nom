@@ -159,31 +159,10 @@ when 5 = ?
     * else: %when_worked <- (yes)
 assume %when_worked
 
-try: barf
-..and if it succeeds: barf "try failed."
-
-%worked <- (no)
-try: barf
-..and if it barfs: %worked <- (yes)
-assume %worked or barf "try/catch failed"
-
 %x <- 1
 do
     %x <- 2
 assume (%x = 2) or barf "'do' is redefining locals"
-
-%x <- 1
-try
-    %x <- 2
-    do
-        barf
-    ..then always
-        %x <- 3
-..and if it barfs: do nothing
-lua> "collectgarbage()"
-assume (%x = 3) or barf "do/then always failed"
-
-say "Control flow test passed."
 
 assume
     (..)
@@ -192,4 +171,6 @@ assume
             for % in [1,2,3]: %n +<- %
             return %n
     ..= 6
+..or barf "'result of %' failed"
 
+say "Control flow test passed."
