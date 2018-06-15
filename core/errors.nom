@@ -1,0 +1,22 @@
+#
+    This file contains basic error reporting code
+
+use "core/metaprogramming.nom"
+
+compile [traceback] to: Lua value "debug.traceback()"
+compile [traceback %] to: Lua value "debug.traceback('', \(% as lua expr))"
+compile [barf] to: Lua "error(nil, 0);"
+compile [barf %msg] to: Lua "error(\(%msg as lua expr), 0);"
+compile [assume %condition] to
+    lua> "local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition));"
+    return
+        Lua ".."
+            if not \(%condition as lua expr) then
+                error(\(quote "\%assumption"), 0);
+            end
+
+compile [assume %condition or barf %message] to
+    Lua ".."
+        if not \(%condition as lua expr) then
+            error(\(%message as lua expr), 0);
+        end

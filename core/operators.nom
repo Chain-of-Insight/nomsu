@@ -2,6 +2,7 @@
     This file contains definitions of operators like "+" and "and".
 
 use "core/metaprogramming.nom"
+use "core/errors.nom"
 
 # Comparison Operators
 immediately

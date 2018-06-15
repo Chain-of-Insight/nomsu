@@ -94,20 +94,6 @@ compile [remove action %action] to
         COMPILE_TIME[fn] = nil
 
 immediately
-    action [read file %filename]
-        lua> ".."
-            local file = io.open(\%filename)
-            local contents = file:read("*a")
-            file:close()
-            return contents
-    
-    action [sh> %cmd]
-        lua> ".."
-            local result = io.popen(\%cmd)
-            local contents = result:read("*a")
-            result:close()
-            return contents
-
     action [%tree as nomsu]
         =lua "nomsu:tree_to_nomsu(\%tree)"
 
@@ -133,11 +119,6 @@ immediately
 
     action [%var as lua identifier]
         =lua "type(\%var) == 'string' and string.as_lua_id(\%var) or nomsu:tree_to_lua(\%var)"
-
-immediately
-    compile [parse %text] to
-        Lua value ".."
-            nomsu:parse(Nomsu("\("\(%text.source)")", \(%text as lua expr)))
     
 immediately
     compile [%tree with %t -> %replacement] to
@@ -155,15 +136,6 @@ immediately
     compile [remove free vars %vars from %code] to
         Lua "\(%code as lua expr):remove_free_vars(\(%vars as lua expr));"
 
-    action [%tree as value]
-        lua> ".."
-            if \%tree.type == 'Text' and #\%tree == 1 and type(\%tree[1]) == 'string' then
-                return \%tree[1]
-            end
-            local lua = Lua(\%tree.source, "return ",nomsu:tree_to_lua(\%tree))
-            return nomsu:run_lua(lua)
-    
-immediately
     parse [%lua <-write %code, to %lua write %code] as: lua> "\%lua:append(\%code);"
 
 immediately
@@ -173,35 +145,23 @@ immediately
     compile [type of %obj] to: Lua value "type(\(%obj as lua expr))"
 
 immediately
-    compile [nomsu] to: Lua value "nomsu"
+    compile [parse %text] to
+        Lua value ".."
+            nomsu:parse(Nomsu("\("\(%text.source)")", \(%text as lua expr)))
 
-# Compiler tools
-immediately
-    compile [run %code] to
-        Lua value "nomsu:run(Nomsu(\(quote "\(%code.source)"), \(%code as lua expr)))"
+    compile [run %nomsu_code] to
+        Lua value "nomsu:run(Nomsu(\(quote "\(%nomsu_code.source)"), \(%nomsu_code as lua expr)))"
 
-immediately
-    compile [show lua %block] to
+    action [run tree %tree, %tree as value]
         lua> ".."
-            local \%lua = nomsu:tree_to_lua(\%block);
-            return Lua(tree.source, "print(", repr(tostring(\%lua)), ");");
-
-immediately
-    compile [say %message] to
-        lua> ".."
-            if \%message.type == "Text" then
-                return Lua(tree.source, "io.write(", \(%message as lua expr), ", '\\\\n');");
-            else
-                return Lua(tree.source, "io.write(tostring(", \(%message as lua expr), "), '\\\\n');");
+            if \%tree.type == 'Text' and #\%tree == 1 and type(\%tree[1]) == 'string' then
+                return \%tree[1]
             end
+            local lua = Lua(\%tree.source, "return ",nomsu:tree_to_lua(\%tree))
+            return nomsu:run_lua(lua)
 
-    compile [ask %prompt] to
-        lua> ".."
-            if \%prompt.type == "Text" then
-                return Lua.Value(tree.source, "(io.write(", \(%prompt as lua expr), ") and io.read())");
-            else
-                return Lua.Value(tree.source, "(io.write(tostring(", \(%prompt as lua expr), ")) and io.read())");
-            end
+    compile [compile %block, compiled %block, %block compiled] to
+        Lua value "nomsu:tree_to_lua(\(%block as lua))"
 
 # Return
 immediately
@@ -209,26 +169,6 @@ immediately
         put code after a return statement, unless you wrap it in a block.
     compile [return] to: Lua "do return; end"
     compile [return %return_value] to: Lua "do return \(%return_value as lua expr); end"
-
-# Error functions
-immediately
-    compile [traceback] to: Lua value "debug.traceback()"
-    compile [traceback %] to: Lua value "debug.traceback('', \(% as lua expr))"
-    compile [barf] to: Lua "error(nil, 0);"
-    compile [barf %msg] to: Lua "error(\(%msg as lua expr), 0);"
-    compile [assume %condition] to
-        lua> "local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition));"
-        return
-            Lua ".."
-                if not \(%condition as lua expr) then
-                    error(\(quote "\%assumption"), 0);
-                end
-    
-    compile [assume %condition or barf %message] to
-        Lua ".."
-            if not \(%condition as lua expr) then
-                error(\(%message as lua expr), 0);
-            end
 
 # Literals
 immediately

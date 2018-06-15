@@ -5,6 +5,7 @@
 use "core/metaprogramming.nom"
 use "core/text.nom"
 use "core/operators.nom"
+use "core/errors.nom"
 
 # No-Op
 immediately

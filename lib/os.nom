@@ -1,0 +1,22 @@
+use "core"
+
+action [sh> %cmd]
+    lua> ".."
+        local result = io.popen(\%cmd)
+        local contents = result:read("*a")
+        result:close()
+        return contents
+
+action [read file %filename]
+    lua> ".."
+        local file = io.open(\%filename)
+        local contents = file:read("*a")
+        file:close()
+        return contents
+
+action [write to file %filename %text, to file %filename write %text]
+    lua> ".."
+        local file = io.open(\%filename, 'w')
+        file:write(\%text)
+        file:close()
+
