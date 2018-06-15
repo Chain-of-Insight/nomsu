@@ -23,18 +23,10 @@ Nomsu's only dependencies are [Lua 5.2 or later](https://www.lua.org/) (tested w
 * `utils.lua` - A set of utility actions used by nomsu.moon.
 * `consolecolors.lua` - Lua module that defines ANSI color codes for colored console output (used internally in nomsu.moon).
 * `examples/how_do_i.nom` - A simple walkthrough of some of the features of nomsu, written in nomsu. **This is a good place to start.**
-* `core/collections.nom` - Core library definitions related to collections, like lists and dictionaries.
-* `core/control_flow.nom` - Core library definitions related to control flow, like `if` statements and `for` loops.
-* `core/math.nom` - Core library definitions of math actions, like `sum of %` and `sqrt %`.
-* `core/metaprogramming.nom` - Core library essential functionality for metaprogramming, including macros to define macros, rules to define rules, and so on. This is where the language pulls itself up by its hair out the swamps of nothingness.
-* `core/operators.nom` - Core library definitions for operators like `=` and `+`.
-* `core/scopes.nom` - Core library definitions for instantiating new variable scopes.
-* `core/text.nom` - Core library definitions of text actions for stuff like concatenating strings.
-* `lib/object.nom` - An optional library for doing object-oriented programming.
-* `lib/file_hash.nom` - An optional library for hashing files and looking up files by hash.
-* `lib/training_wheels.nom` - An optional library to define some syntactic sugar that makes Nomsu resemble other programming languages more closely. 
-* `tests/*.nom` - A somewhat exhaustive set of minimalist tests for almost every language feature defined in `lib/*.nom`
-* `compile_lib.sh` - script to precompile lib/\*.nom so they can be loaded faster. This is optional.
+* `core/*.nom` - Core language definitions of stuff like control flow, operators, and metaprogramming, broken down into different files.
+* `lib/*.nom` - Optional language libraries for stuff you might want, like interfacing with the OS, or doing Object Oriented Programming.
+* `tests/*.nom` - A somewhat exhaustive set of minimalist tests for almost every language feature defined in `core/*.nom` and `lib/*.nom`
+* `compile_lib.sh` - script to precompile `core/*.nom` and `lib/*.nom` so they can be loaded faster. This is optional.
 
 ## Extra
 
