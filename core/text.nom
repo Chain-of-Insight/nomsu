@@ -18,6 +18,14 @@ compile [capitalized %text, %text capitalized] to
 compile [%text with %sub instead of %patt, %text s/%patt/%sub] to
     Lua value "((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))"
 
+action [lines in %text, lines of %text]
+    lua> ".."
+        local result = {}
+        for line in (\%text):gmatch('[^\n]+') do
+            result[#result+1] = line
+        end
+        return result
+
 # Text literals
 lua> ".."
     do
@@ -26,8 +34,8 @@ lua> ".."
             backspace="\\\\b", ["form feed"]="\\\\f", formfeed="\\\\f", ["vertical tab"]="\\\\v",
         };
         for name, e in pairs(escapes) do
-            local lua = "'"..e.."'";
-            nomsu:define_compile_action(name, function(tree) return Lua.Value(tree.source, lua); end);
+            local lua = "'"..e.."'"
+            _ENV["A"..name:as_lua_id()] = compile_time(function(tree) return Lua.Value(tree.source, lua) end)
         end
         local colors = {
             ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
@@ -42,10 +50,10 @@ lua> ".."
         for name, c in pairs(colors) do
             local color = "'"..c.."'";
             local reset = "'"..colors["reset color"].."'";
-            nomsu:define_compile_action(name, function(tree) return Lua.Value(tree.source, color); end);
-            nomsu:define_compile_action(name.." %", function(\%)
-                return Lua.Value(tree.source, color, "..", \(% as lua), "..", reset);
-            end);
+            _ENV["A"..name:as_lua_id()] = compile_time(function(tree) return Lua.Value(tree.source, color) end)
+            _ENV["A"..name:as_lua_id().."_1"] = compile_time(function(tree, text)
+                return Lua.Value(tree.source, color, "..", nomsu:tree_to_lua(text), "..", reset);
+            end)
         end
     end
 

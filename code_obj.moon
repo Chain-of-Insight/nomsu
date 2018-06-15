@@ -65,6 +65,22 @@ class Code
             elseif @current_indent != 0
                 indents[#bits] = @current_indent
         @__str = nil
+            
+    concat_append: (values, joiner)=>
+        bits, indents = @bits, @indents
+        match = string.match
+        for i=1,#values
+            b = values[i]
+            assert(b)
+            if i > 1
+                bits[#bits+1] = joiner
+            bits[#bits+1] = b
+            if type(b) == 'string'
+                if spaces = match(b, "\n([ ]*)[^\n]*$")
+                    @current_indent = #spaces
+            elseif @current_indent != 0
+                indents[#bits] = @current_indent
+        @__str = nil
     
     prepend: (...)=>
         n = select("#",...)

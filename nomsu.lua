@@ -44,6 +44,7 @@ end
 local STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 string.as_lua_id = function(str)
   local argnum = 0
+  str = gsub(str, "x([0-9A-F][0-9A-F])", "x\0%1")
   str = gsub(str, "%W", function(c)
     if c == ' ' then
       return '_'
@@ -51,10 +52,19 @@ string.as_lua_id = function(str)
       argnum = argnum + 1
       return tostring(argnum)
     else
-      return format("x%X", byte(c))
+      return format("x%02X", byte(c))
     end
   end)
   return '_' .. str
+end
+table.map = function(self, fn)
+  local _accum_0 = { }
+  local _len_0 = 1
+  for _, v in ipairs(self) do
+    _accum_0[_len_0] = fn(v)
+    _len_0 = _len_0 + 1
+  end
+  return _accum_0
 end
 FILE_CACHE = setmetatable({ }, {
   __index = function(self, filename)
@@ -273,52 +283,8 @@ end
 local NomsuCompiler
 do
   local _class_0
-  local compile_error, stub_pattern, var_pattern, _running_files, MAX_LINE, math_expression
+  local compile_error, _running_files, MAX_LINE, math_expression
   local _base_0 = {
-    define_action = function(self, signature, fn)
-      if type(fn) ~= 'function' then
-        error("Not a function: " .. tostring(repr(fn)))
-      end
-      if type(signature) == 'string' then
-        signature = {
-          signature
-        }
-      elseif type(signature) ~= 'table' then
-        error("Invalid signature, expected list of strings, but got: " .. tostring(repr(signature)), 0)
-      end
-      local fn_info = debug_getinfo(fn, "u")
-      assert(not fn_info.isvararg, "Vararg functions aren't supported. Sorry, use a list instead.")
-      local fn_arg_positions
-      do
-        local _tbl_0 = { }
-        for i = 1, fn_info.nparams do
-          _tbl_0[debug.getlocal(fn, i)] = i
-        end
-        fn_arg_positions = _tbl_0
-      end
-      local arg_orders = { }
-      for _index_0 = 1, #signature do
-        local alias = signature[_index_0]
-        local stub = concat(assert(stub_pattern:match(alias)), ' ')
-        local stub_args = assert(var_pattern:match(alias))
-        self.environment['ACTION' .. string.as_lua_id(stub)] = fn
-        do
-          local _accum_0 = { }
-          local _len_0 = 1
-          for _index_1 = 1, #stub_args do
-            local a = stub_args[_index_1]
-            _accum_0[_len_0] = fn_arg_positions[string.as_lua_id(a)]
-            _len_0 = _len_0 + 1
-          end
-          arg_orders[stub] = _accum_0
-        end
-      end
-      self.environment.ARG_ORDERS[fn] = arg_orders
-    end,
-    define_compile_action = function(self, signature, fn)
-      self:define_action(signature, fn)
-      self.environment.COMPILE_TIME[fn] = true
-    end,
     parse = function(self, nomsu_code)
       assert(type(nomsu_code) ~= 'string')
       local userdata = {
@@ -485,7 +451,7 @@ do
       local _exp_0 = tree.type
       if "Action" == _exp_0 then
         local stub = tree.stub
-        local action = self.environment['ACTION' .. string.as_lua_id(stub)]
+        local action = self.environment['A' .. string.as_lua_id(stub)]
         if action and self.environment.COMPILE_TIME[action] then
           local args
           do
@@ -578,7 +544,7 @@ do
             end
           end
         end
-        lua:append("ACTION", string.as_lua_id(stub), "(")
+        lua:append("A", string.as_lua_id(stub), "(")
         for i, arg in ipairs(args) do
           lua:append(arg)
           if i < #args then
@@ -1127,89 +1093,93 @@ do
     end,
     initialize_core = function(self)
       local nomsu = self
-      self:define_compile_action("immediately %block", function(self, _block)
-        local lua = nomsu:tree_to_lua(_block):as_statements()
-        lua:declare_locals()
-        nomsu:run_lua(lua)
-        return Lua(_block.source, "if IMMEDIATE then\n    ", lua, "\nend")
-      end)
-      local add_lua_string_bits
-      add_lua_string_bits = function(lua, code)
-        local line_len = 0
-        if code.type ~= "Text" then
-          lua:append(", ", nomsu:tree_to_lua(code))
-          return 
-        end
-        for _index_0 = 1, #code do
-          local bit = code[_index_0]
-          local bit_lua
-          if type(bit) == "string" then
-            bit_lua = repr(bit)
-          else
-            bit_lua = nomsu:tree_to_lua(bit)
-            if not (bit_lua.is_value) then
-              compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+      do
+        local _with_0 = nomsu.environment
+        _with_0.A_immediately_1 = _with_0.compile_time(function(self, _block)
+          local lua = nomsu:tree_to_lua(_block):as_statements()
+          lua:declare_locals()
+          nomsu:run_lua(lua)
+          return Lua(_block.source, "if IMMEDIATE then\n    ", lua, "\nend")
+        end)
+        local add_lua_string_bits
+        add_lua_string_bits = function(lua, code)
+          local line_len = 0
+          if code.type ~= "Text" then
+            lua:append(", ", nomsu:tree_to_lua(code))
+            return 
+          end
+          for _index_0 = 1, #code do
+            local bit = code[_index_0]
+            local bit_lua
+            if type(bit) == "string" then
+              bit_lua = repr(bit)
+            else
+              bit_lua = nomsu:tree_to_lua(bit)
+              if not (bit_lua.is_value) then
+                compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+              end
+              bit_lua = bit_lua
             end
-            bit_lua = bit_lua
-          end
-          line_len = line_len + #tostring(bit_lua)
-          if line_len > MAX_LINE then
-            lua:append(",\n    ")
-            line_len = 4
-          else
-            lua:append(", ")
-          end
-          lua:append(bit_lua)
-        end
-      end
-      self:define_compile_action("Lua %code", function(self, _code)
-        local lua = Lua.Value(_code.source, "Lua(", repr(tostring(_code.source)))
-        add_lua_string_bits(lua, _code)
-        lua:append(")")
-        return lua
-      end)
-      self:define_compile_action("Lua value %code", function(self, _code)
-        local lua = Lua.Value(_code.source, "Lua.Value(", repr(tostring(_code.source)))
-        add_lua_string_bits(lua, _code)
-        lua:append(")")
-        return lua
-      end)
-      local add_lua_bits
-      add_lua_bits = function(lua, code)
-        for _index_0 = 1, #code do
-          local bit = code[_index_0]
-          if type(bit) == "string" then
-            lua:append(bit)
-          else
-            local bit_lua = nomsu:tree_to_lua(bit)
-            if not (bit_lua.is_value) then
-              compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+            line_len = line_len + #tostring(bit_lua)
+            if line_len > MAX_LINE then
+              lua:append(",\n    ")
+              line_len = 4
+            else
+              lua:append(", ")
             end
             lua:append(bit_lua)
           end
         end
-        return lua
+        _with_0.A_Lua_1 = _with_0.compile_time(function(self, _code)
+          local lua = Lua.Value(_code.source, "Lua(", repr(tostring(_code.source)))
+          add_lua_string_bits(lua, _code)
+          lua:append(")")
+          return lua
+        end)
+        _with_0.A_Lua_value_1 = _with_0.compile_time(function(self, _code)
+          local lua = Lua.Value(_code.source, "Lua.Value(", repr(tostring(_code.source)))
+          add_lua_string_bits(lua, _code)
+          lua:append(")")
+          return lua
+        end)
+        local add_lua_bits
+        add_lua_bits = function(lua, code)
+          for _index_0 = 1, #code do
+            local bit = code[_index_0]
+            if type(bit) == "string" then
+              lua:append(bit)
+            else
+              local bit_lua = nomsu:tree_to_lua(bit)
+              if not (bit_lua.is_value) then
+                compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+              end
+              lua:append(bit_lua)
+            end
+          end
+          return lua
+        end
+        nomsu.environment["A" .. string.as_lua_id("lua > 1")] = _with_0.compile_time(function(self, _code)
+          if _code.type ~= "Text" then
+            return Lua(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ");")
+          end
+          return add_lua_bits(Lua(self.source), _code)
+        end)
+        nomsu.environment["A" .. string.as_lua_id("= lua 1")] = _with_0.compile_time(function(self, _code)
+          if _code.type ~= "Text" then
+            return Lua.Value(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ":as_statements('return '))")
+          end
+          return add_lua_bits(Lua.Value(self.source), _code)
+        end)
+        _with_0.A_use_1 = _with_0.compile_time(function(self, _path)
+          if not (_path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string') then
+            return Lua(_path.source, "nomsu:run_file(" .. tostring(nomsu:tree_to_lua(_path)) .. ");")
+          end
+          local path = _path[1]
+          nomsu:run_file(path)
+          return Lua(_path.source, "nomsu:run_file(" .. tostring(repr(path)) .. ");")
+        end)
+        return _with_0
       end
-      self:define_compile_action("lua> %code", function(self, _code)
-        if _code.type ~= "Text" then
-          return Lua(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ");")
-        end
-        return add_lua_bits(Lua(self.source), _code)
-      end)
-      self:define_compile_action("=lua %code", function(self, _code)
-        if _code.type ~= "Text" then
-          return Lua.Value(self.source, "nomsu:run_lua(", nomsu:tree_to_lua(_code), ":as_statements('return '))")
-        end
-        return add_lua_bits(Lua.Value(self.source), _code)
-      end)
-      return self:define_compile_action("use %path", function(self, _path)
-        if not (_path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string') then
-          return Lua(_path.source, "nomsu:run_file(" .. tostring(nomsu:tree_to_lua(_path)) .. ");")
-        end
-        local path = _path[1]
-        nomsu:run_file(path)
-        return Lua(_path.source, "nomsu:run_file(" .. tostring(repr(path)) .. ");")
-      end)
     end
   }
   _base_0.__index = _base_0
@@ -1361,17 +1331,6 @@ do
     local err_msg = err_format_string:format(src, ...)
     return error(tostring(tok.source.filename) .. ":" .. tostring(line_no) .. ": " .. err_msg, 0)
   end
-  local stub_defs
-  do
-    stub_defs = {
-      word = (-R("09") * NOMSU_DEFS.ident_char ^ 1) + NOMSU_DEFS.operator_char ^ 1,
-      varname = (NOMSU_DEFS.ident_char ^ 1 * ((-P("'") * NOMSU_DEFS.operator_char ^ 1) + NOMSU_DEFS.ident_char ^ 1) ^ 0) ^ -1
-    }
-  end
-  stub_pattern = re.compile([=[        stub <- {| tok (([ ])* tok)* |} !.
-        tok <- ({'%'} %varname) / {%word}
-    ]=], stub_defs)
-  var_pattern = re.compile("{| ((('%' {%varname}) / %word) ([ ])*)+ !. |}", stub_defs)
   _running_files = { }
   MAX_LINE = 80
   math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])

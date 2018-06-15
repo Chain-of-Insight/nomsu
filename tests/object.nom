@@ -18,7 +18,7 @@ as %d
     assume: ((me).barks) = 3
     assume: (bark) = "Bark! Bark! Bark!"
 assume: "\(%d.class)" = "Dog"
-assume: (%d's "barks") = 3
+assume: %d.barks = 3
 
 as: new "Dog" {barks:1}
     assume: (bark) = "Bark!"

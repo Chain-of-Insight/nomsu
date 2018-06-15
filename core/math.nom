@@ -5,6 +5,7 @@ use "core/metaprogramming.nom"
 use "core/text.nom"
 use "core/operators.nom"
 use "core/control_flow.nom"
+use "core/collections.nom"
 
 # Literals:
 compile [infinity, inf] to: Lua value "math.huge"
@@ -30,7 +31,7 @@ compile [hyperbolic cosine %, cosh %] to: Lua value "math.cosh(\(% as lua expr))
 compile [hyperbolic tangent %, tanh %] to: Lua value "math.tanh(\(% as lua expr))"
 compile [e^%, exp %] to: Lua value "math.exp(\(% as lua expr))"
 compile [natural log %, ln %, log %] to: Lua value "math.log(\(% as lua expr))"
-compile [log % base %base, log_%base %, log base %base %] to: Lua value "math.log(\(% as lua expr), \(%base as lua expr))"
+compile [log % base %base, log base %base of %] to: Lua value "math.log(\(% as lua expr), \(%base as lua expr))"
 compile [floor %] to: Lua value "math.floor(\(% as lua expr))"
 compile [ceiling %, ceil %] to: Lua value "math.ceil(\(% as lua expr))"
 compile [round %, % rounded] to: Lua value "math.floor(\(% as lua expr) + .5)"
@@ -39,34 +40,26 @@ action [%n to the nearest %rounder]
 
 # Any/all/none
 compile [all of %items, all %items] to
-    unless: (%items' "type") is "List"
+    unless: %items.type is "List"
         return: Lua value "utils.all(\(%items as lua expr))"
-    %clauses <- []
-    for % in %items
-        lua> "table.insert(\%clauses, \(% as lua expr));"
+    %clauses <- ((% as lua expr) for % in %items)
     return: Lua value "(\(%clauses joined with " and "))"
 parse [not all of %items, not all %items] as: not (all of %items)
 compile [any of %items, any %items] to
-    unless: (%items' "type") is "List"
+    unless: %items.type is "List"
         return: Lua value "utils.any(\(%items as lua expr))"
-    %clauses <- []
-    for % in %items
-        lua> "table.insert(\%clauses, \(% as lua expr));"
+    %clauses <- ((% as lua expr) for % in %items)
     return: Lua value "(\(%clauses joined with " or "))"
 parse [none of %items, none %items] as: not (any of %items)
 compile [sum of %items, sum %items] to
-    unless: (%items' "type") is "List"
+    unless: %items.type is "List"
         return: Lua value "utils.sum(\(%items as lua expr))"
-    %clauses <- []
-    for % in %items
-        lua> "table.insert(\%clauses, \(% as lua expr));"
+    %clauses <- ((% as lua expr) for % in %items)
     return: Lua value "(\(%clauses joined with " + "))"
 compile [product of %items, product %items] to
-    unless: (%items' "type") is "List"
+    unless: %items.type is "List"
         return: Lua value "utils.product(\(%items as lua expr))"
-    %clauses <- []
-    for % in %items
-        lua> "table.insert(\%clauses, \(% as lua expr));"
+    %clauses <- ((% as lua expr) for % in %items)
     return: Lua value "(\(%clauses joined with " * "))"
 action [avg of %items, average of %items]
     =lua "(utils.sum(\%items)/#\%items)"

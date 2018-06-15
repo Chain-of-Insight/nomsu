@@ -37,13 +37,18 @@ STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 
 string.as_lua_id = (str)->
     argnum = 0
+    -- Cut up escape-sequence-like chunks
+    str = gsub str, "x([0-9A-F][0-9A-F])", "x\0%1"
+    -- Alphanumeric unchanged, spaces to underscores, and everything else to hex escape sequences
     str = gsub str, "%W", (c)->
         if c == ' ' then '_'
         elseif c == '%' then
             argnum += 1
             tostring(argnum)
-        else format("x%X", byte(c))
+        else format("x%02X", byte(c))
     return '_'..str
+
+table.map = (fn)=> [fn(v) for _,v in ipairs(@)]
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -296,40 +301,6 @@ class NomsuCompiler
         @environment._ENV = @environment
         @initialize_core!
     
-    local stub_defs
-    with NOMSU_DEFS
-        stub_defs = {
-            word: (-R("09") * .ident_char^1) + .operator_char^1
-            varname: (.ident_char^1 * ((-P("'") * .operator_char^1) + .ident_char^1)^0)^-1
-        }
-    stub_pattern = re.compile [=[
-        stub <- {| tok (([ ])* tok)* |} !.
-        tok <- ({'%'} %varname) / {%word}
-    ]=], stub_defs
-    var_pattern = re.compile "{| ((('%' {%varname}) / %word) ([ ])*)+ !. |}", stub_defs
-    define_action: (signature, fn)=>
-        if type(fn) != 'function'
-            error("Not a function: #{repr fn}")
-        if type(signature) == 'string'
-            signature = {signature}
-        elseif type(signature) != 'table'
-            error("Invalid signature, expected list of strings, but got: #{repr signature}", 0)
-
-        fn_info = debug_getinfo(fn, "u")
-        assert(not fn_info.isvararg, "Vararg functions aren't supported. Sorry, use a list instead.")
-        fn_arg_positions = {debug.getlocal(fn, i), i for i=1,fn_info.nparams}
-        arg_orders = {}
-        for alias in *signature
-            stub = concat(assert(stub_pattern\match(alias)), ' ')
-            stub_args = assert(var_pattern\match(alias))
-            @environment['ACTION'..string.as_lua_id(stub)] = fn
-            arg_orders[stub] = [fn_arg_positions[string.as_lua_id a] for a in *stub_args]
-        @environment.ARG_ORDERS[fn] = arg_orders
-
-    define_compile_action: (signature, fn)=>
-        @define_action(signature, fn)
-        @environment.COMPILE_TIME[fn] = true
-
     parse: (nomsu_code)=>
         assert(type(nomsu_code) != 'string')
         userdata = {
@@ -444,7 +415,7 @@ class NomsuCompiler
         switch tree.type
             when "Action"
                 stub = tree.stub
-                action = @environment['ACTION'..string.as_lua_id(stub)]
+                action = @environment['A'..string.as_lua_id(stub)]
                 if action and @environment.COMPILE_TIME[action]
                     args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force all compile-time actions to take a tree location
@@ -491,7 +462,7 @@ class NomsuCompiler
                     if arg_orders = @environment.ARG_ORDERS[stub]
                         args = [args[p] for p in *arg_orders]
 
-                lua\append "ACTION",string.as_lua_id(stub),"("
+                lua\append "A",string.as_lua_id(stub),"("
                 for i, arg in ipairs args
                     lua\append arg
                     if i < #args then lua\append ", "
@@ -909,74 +880,75 @@ class NomsuCompiler
     initialize_core: =>
         -- Sets up some core functionality
         nomsu = self
-        @define_compile_action "immediately %block", (_block)=>
-            lua = nomsu\tree_to_lua(_block)\as_statements!
-            lua\declare_locals!
-            nomsu\run_lua(lua)
-            return Lua(_block.source, "if IMMEDIATE then\n    ", lua, "\nend")
+        with nomsu.environment
+            .A_immediately_1 = .compile_time (_block)=>
+                lua = nomsu\tree_to_lua(_block)\as_statements!
+                lua\declare_locals!
+                nomsu\run_lua(lua)
+                return Lua(_block.source, "if IMMEDIATE then\n    ", lua, "\nend")
 
-        add_lua_string_bits = (lua, code)->
-            line_len = 0
-            if code.type != "Text"
-                lua\append ", ", nomsu\tree_to_lua(code)
-                return
-            for bit in *code
-                bit_lua = if type(bit) == "string"
-                    repr(bit)
-                else
-                    bit_lua = nomsu\tree_to_lua(bit)
-                    unless bit_lua.is_value
-                        compile_error bit,
-                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
-                    bit_lua
-                line_len += #tostring(bit_lua)
-                if line_len > MAX_LINE
-                    lua\append ",\n    "
-                    line_len = 4
-                else
-                    lua\append ", "
-                lua\append bit_lua
-
-        @define_compile_action "Lua %code", (_code)=>
-            lua = Lua.Value(_code.source, "Lua(", repr(tostring _code.source))
-            add_lua_string_bits(lua, _code)
-            lua\append ")"
-            return lua
-
-        @define_compile_action "Lua value %code", (_code)=>
-            lua = Lua.Value(_code.source, "Lua.Value(", repr(tostring _code.source))
-            add_lua_string_bits(lua, _code)
-            lua\append ")"
-            return lua
-
-        add_lua_bits = (lua, code)->
-            for bit in *code
-                if type(bit) == "string"
-                    lua\append bit
-                else
-                    bit_lua = nomsu\tree_to_lua(bit)
-                    unless bit_lua.is_value
-                        compile_error bit,
-                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+            add_lua_string_bits = (lua, code)->
+                line_len = 0
+                if code.type != "Text"
+                    lua\append ", ", nomsu\tree_to_lua(code)
+                    return
+                for bit in *code
+                    bit_lua = if type(bit) == "string"
+                        repr(bit)
+                    else
+                        bit_lua = nomsu\tree_to_lua(bit)
+                        unless bit_lua.is_value
+                            compile_error bit,
+                                "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                        bit_lua
+                    line_len += #tostring(bit_lua)
+                    if line_len > MAX_LINE
+                        lua\append ",\n    "
+                        line_len = 4
+                    else
+                        lua\append ", "
                     lua\append bit_lua
-            return lua
 
-        @define_compile_action "lua> %code", (_code)=>
-            if _code.type != "Text"
-                return Lua @source, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ");"
-            return add_lua_bits(Lua(@source), _code)
+            .A_Lua_1 = .compile_time (_code)=>
+                lua = Lua.Value(_code.source, "Lua(", repr(tostring _code.source))
+                add_lua_string_bits(lua, _code)
+                lua\append ")"
+                return lua
+            
+            .A_Lua_value_1 = .compile_time (_code)=>
+                lua = Lua.Value(_code.source, "Lua.Value(", repr(tostring _code.source))
+                add_lua_string_bits(lua, _code)
+                lua\append ")"
+                return lua
 
-        @define_compile_action "=lua %code", (_code)=>
-            if _code.type != "Text"
-                return Lua.Value @source, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ":as_statements('return '))"
-            return add_lua_bits(Lua.Value(@source), _code)
+            add_lua_bits = (lua, code)->
+                for bit in *code
+                    if type(bit) == "string"
+                        lua\append bit
+                    else
+                        bit_lua = nomsu\tree_to_lua(bit)
+                        unless bit_lua.is_value
+                            compile_error bit,
+                                "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                        lua\append bit_lua
+                return lua
 
-        @define_compile_action "use %path", (_path)=>
-            unless _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
-                return Lua(_path.source, "nomsu:run_file(#{nomsu\tree_to_lua(_path)});")
-            path = _path[1]
-            nomsu\run_file(path)
-            return Lua(_path.source, "nomsu:run_file(#{repr path});")
+            nomsu.environment["A"..string.as_lua_id("lua > 1")] = .compile_time (_code)=>
+                if _code.type != "Text"
+                    return Lua @source, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ");"
+                return add_lua_bits(Lua(@source), _code)
+
+            nomsu.environment["A"..string.as_lua_id("= lua 1")] = .compile_time (_code)=>
+                if _code.type != "Text"
+                    return Lua.Value @source, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ":as_statements('return '))"
+                return add_lua_bits(Lua.Value(@source), _code)
+
+            .A_use_1 = .compile_time (_path)=>
+                unless _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
+                    return Lua(_path.source, "nomsu:run_file(#{nomsu\tree_to_lua(_path)});")
+                path = _path[1]
+                nomsu\run_file(path)
+                return Lua(_path.source, "nomsu:run_file(#{repr path});")
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug_getinfo(2).func != require

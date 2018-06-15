@@ -16,8 +16,8 @@ immediately
     ..to: Lua value "utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))"
 
 immediately
-    parse [first in %list, first %list] as: 1 st in %list
-    parse [last in %list, last %list] as: 1 st to last in %list
+    parse [last in %list] as: 1st to last in %list
+    parse [first in %list] as: %list.1
 
 # Membership testing
 immediately
@@ -62,8 +62,8 @@ immediately
     parse [%expression for %item in %iterable] as
         result of
             %comprehension <- []
-            for %i = %item in %iterable
-                %comprehension.%i <- %expression
+            for %item in %iterable
+                add %expression to %comprehension
             return %comprehension
 
     parse [..]
@@ -163,8 +163,8 @@ immediately
         %unique <- []
         %seen <- {}
         for % in %items
-            unless: % in %seen
+            unless: %seen.%
                 add % to %unique
-                (% in %seen) <- (yes)
+                %seen.% <- (yes)
         return %unique
 

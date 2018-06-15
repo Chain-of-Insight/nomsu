@@ -116,4 +116,16 @@ AST.Action.__init = function(self)
   end
   self.stub = concat(stub_bits, " ")
 end
+AST.Action.get_args = function(self)
+  local _accum_0 = { }
+  local _len_0 = 1
+  for _index_0 = 1, #self do
+    local tok = self[_index_0]
+    if type(tok) ~= 'string' then
+      _accum_0[_len_0] = tok
+      _len_0 = _len_0 + 1
+    end
+  end
+  return _accum_0
+end
 return AST

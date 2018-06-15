@@ -41,4 +41,7 @@ AST.Action.__init = =>
     stub_bits = [type(a) == 'string' and a or '%' for a in *@]
     @stub = concat stub_bits, " "
 
+AST.Action.get_args = =>
+    [tok for tok in *@ when type(tok) != 'string']
+
 return AST

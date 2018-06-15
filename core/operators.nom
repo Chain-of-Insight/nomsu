@@ -3,19 +3,6 @@
 
 use "core/metaprogramming.nom"
 
-# Indexing
-immediately
-    #   NOTE!!! It's critical that there are spaces around %key if it's a string,
-        otherwise, Lua will get confused and interpret %obj[[[foo]]] as %obj("[foo]")
-        instead of %obj[ "foo" ].
-        It's also critical to have parens around %obj, otherwise Lua is too dumb to
-        realize that {x=1}["x"] is the same as ({x=1})["x"] or that
-        {x=1}.x is the same as ({x=1}).x
-    parse [..]
-        %obj' %key, %obj's %key, %key in %obj, %key'th in %obj, %key of %obj,
-        %key st in %obj, %key nd in %obj, %key rd in %obj, %key th in %obj,
-    ..as: %obj.%key
-
 # Comparison Operators
 immediately
     compile [%x < %y] to: Lua value "(\(%x as lua expr) < \(%y as lua expr))"
@@ -53,7 +40,7 @@ immediately
 immediately
     # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
     compile [<- %assignments] to
-        assume ((%assignments' "type") is "Dict") or barf ".."
+        assume (%assignments.type is "Dict") or barf ".."
             Expected a Dict for the assignments part of '<- %' statement, not \%assignments
         lua> ".."
             local lhs, rhs = Lua(tree.source), Lua(tree.source)

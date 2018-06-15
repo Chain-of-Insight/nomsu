@@ -3,10 +3,6 @@
 
 use "core"
 
-assume (({x:5}'s "x") = 5) or barf "indexing doesn't work."
-try: % <- ({}'s "[[[\n]]]")
-..and if it barfs: barf "failed to index a table literal with a string containing brackets n stuff"
-
 <-{%x:10,%y:20}
 assume ((%x = 10) and (%y = 20)) or barf "mutli-assignment failed."
 <-{%x:%y, %y:%x}

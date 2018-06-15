@@ -104,7 +104,7 @@ assume (%x = 6) or barf "backwards numeric for range failed"
 
 %result <- {}
 for %key = %value in {x:1,y:2}
-    (%result's ("\%key\%key")) <- (%value * 11)
+    %result.("\%key\%key") <- (%value * 11)
 assume (%result = {xx:11,yy:22}) or barf "key/value iteration failed"
 
 for %key = %value in {x:1,y:2}

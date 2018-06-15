@@ -98,6 +98,29 @@ do
       end
       self.__str = nil
     end,
+    concat_append = function(self, values, joiner)
+      local bits, indents = self.bits, self.indents
+      local match = string.match
+      for i = 1, #values do
+        local b = values[i]
+        assert(b)
+        if i > 1 then
+          bits[#bits + 1] = joiner
+        end
+        bits[#bits + 1] = b
+        if type(b) == 'string' then
+          do
+            local spaces = match(b, "\n([ ]*)[^\n]*$")
+            if spaces then
+              self.current_indent = #spaces
+            end
+          end
+        elseif self.current_indent ~= 0 then
+          indents[#bits] = self.current_indent
+        end
+      end
+      self.__str = nil
+    end,
     prepend = function(self, ...)
       local n = select("#", ...)
       local bits, indents = self.bits, self.indents
