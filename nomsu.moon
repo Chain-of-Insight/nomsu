@@ -379,7 +379,7 @@ class NomsuCompiler
     run_lua: (lua)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, nil and tostring(lua.source), "t", @environment)
+        run_lua_fn, err = load(lua_string, tostring(lua.source), "t", @environment)
         if not run_lua_fn
             n = 1
             fn = ->
