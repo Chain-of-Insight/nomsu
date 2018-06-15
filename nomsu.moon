@@ -299,6 +299,10 @@ class NomsuCompiler
         @environment.LOADED = {}
         @environment.AST = AST
         @environment._ENV = @environment
+        setmetatable @environment,
+            __index: (k)=>
+                if _self = rawget(@, "self")
+                    return _self[k]
         @initialize_core!
     
     parse: (nomsu_code)=>

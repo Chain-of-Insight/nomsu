@@ -1,5 +1,5 @@
 #..
-    Tests for the stuff defined in lib/text.nom
+    Tests for the stuff defined in core/text.nom
 
 use "core"
 

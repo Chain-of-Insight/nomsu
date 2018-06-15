@@ -1,25 +1,16 @@
 use "core"
 
-using
-    %x <- 99
-..do
-    assume: %x = 99
+%x <- "outer"
+with local %x
+    %x <- "inner"
+    assume: %x = "inner"
+assume: %x = "outer"
 
-using
-    action [foo]
-        return 99
-    
-..do
-    assume: (foo) = 99
+action [foo] "outer foo"
+with local (foo)
+    action [foo] "inner foo"
+    assume: (foo) = "inner foo"
+assume: (foo) = "outer foo"
 
-action [baz]
-    return "outer"
-
-#
-    do
-        local action [baz]
-            return "inner"
-        assume: (baz) = "inner"
-    assume: (baz) = "outer"
 
 say "Scopes test passed."

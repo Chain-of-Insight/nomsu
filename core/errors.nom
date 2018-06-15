@@ -20,3 +20,49 @@ compile [assume %condition or barf %message] to
         if not \(%condition as lua expr) then
             error(\(%message as lua expr), 0);
         end
+
+# Try/except
+immediately
+    compile [..]
+        try %action and if it succeeds %success or if it barfs %msg %fallback
+        try %action and if it barfs %msg %fallback or if it succeeds %success
+    ..to
+        Lua ".."
+            do
+                local fell_through = false
+                local err, erred = nil, false
+                local ok, ret = xpcall(function()
+                    \(%action as lua statements)
+                    fell_through = true
+                end, function(\(%msg as lua expr))
+                    local ok, ret = pcall(function()
+                        \(%fallback as lua statements)
+                    end)
+                    if not ok then err, erred = ret, true end
+                end)
+                if ok then
+                    \(%success as lua statements)
+                    if not fell_through then
+                        return ret
+                    end
+                elseif erred then
+                    error(err, 0)
+                end
+            end
+immediately
+    parse [..]
+        try %action and if it succeeds %success or if it barfs %fallback
+        try %action and if it barfs %fallback or if it succeeds %success
+    ..as: try %action and if it succeeds %success or if it barfs (=lua "") %fallback
+immediately
+    parse [try %action] as
+        try %action and if it succeeds: do nothing
+        ..or if it barfs: do nothing
+    parse [try %action and if it barfs %fallback] as
+        try %action and if it succeeds: do nothing
+        ..or if it barfs %fallback
+    parse [try %action and if it barfs %msg %fallback] as
+        try %action and if it succeeds: do nothing
+        ..or if it barfs %msg %fallback
+    parse [try %action and if it succeeds %success] as
+        try %action and if it succeeds %success or if it barfs: do nothing

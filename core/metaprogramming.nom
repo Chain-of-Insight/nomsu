@@ -117,8 +117,12 @@ immediately
     action [%tree as lua return]
         =lua "nomsu:tree_to_lua(\%tree):as_statements('return ')"
 
-    action [%var as lua identifier]
-        =lua "type(\%var) == 'string' and string.as_lua_id(\%var) or nomsu:tree_to_lua(\%var)"
+    action [%var as lua identifier, %var as lua id]
+        lua> ".."
+            if type(\%var) == 'string' then return string.as_lua_id(\%var)
+            elseif \%var.type == 'Var' then return string.as_lua_id(\%var[1])
+            elseif \%var.type == 'Action' then return "A"..string.as_lua_id(\%var.stub)
+            end
     
 immediately
     compile [%tree with %t -> %replacement] to

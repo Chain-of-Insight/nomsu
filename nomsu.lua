@@ -1305,6 +1305,16 @@ do
       self.environment.LOADED = { }
       self.environment.AST = AST
       self.environment._ENV = self.environment
+      setmetatable(self.environment, {
+        __index = function(self, k)
+          do
+            local _self = rawget(self, "self")
+            if _self then
+              return _self[k]
+            end
+          end
+        end
+      })
       return self:initialize_core()
     end,
     __base = _base_0,

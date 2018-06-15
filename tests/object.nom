@@ -1,3 +1,6 @@
+#
+    Tests for the object model defined in lib/object.nom
+
 use "core"
 use "lib/object.nom"
 

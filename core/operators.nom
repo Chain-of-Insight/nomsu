@@ -40,7 +40,7 @@ immediately
 
 immediately
     # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
-    compile [<- %assignments] to
+    compile [<- %assignments, assign %assignments] to
         assume (%assignments.type is "Dict") or barf ".."
             Expected a Dict for the assignments part of '<- %' statement, not \%assignments
         lua> ".."

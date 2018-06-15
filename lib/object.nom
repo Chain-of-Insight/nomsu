@@ -1,7 +1,5 @@
 use "core"
 
-# TODO: make codegen less verbose
-
 lua> "CLASSES = {}"
 
 immediately
@@ -11,50 +9,41 @@ action [new %classname %inst]
 immediately
     parse [new %classname] as: new %classname {}
 
-compile [as %instance %body] to
-    Lua ".."
-        do
-            local self = \(%instance as lua expr)
-            local old_self = self.class:set_self(self)
-            old_actions, ACTIONS = ACTIONS, self.class.ACTIONS
-            old_compile_actions, COMPILE_ACTIONS = COMPILE_ACTIONS, self.class.COMPILE_ACTIONS
-            old_arg_orders, ARG_ORDERS = ARG_ORDERS, self.class.ARG_ORDERS
-            local fell_through = false
-            local ok, ret = pcall(function()
-                \(%body as lua statements)
-                fell_through = true
-            end)
-            self.class:set_self(old_self)
-            ACTIONS = old_actions
-            COMPILE_ACTIONS = old_compile_actions
-            ARG_ORDERS = old_arg_orders
-            if not ok then error(ret) end
-            if not fell_through then return ret end
-        end
+immediately
+    compile [call method %method] to: Lua value "self:\(%method as lua expr)"
 
-parse [object %classname %class_body] as
-    using
-        %cls <- {..}
-            name:%classname
-            ACTIONS:=lua "ACTIONS", COMPILE_ACTIONS:=lua "COMPILE_ACTIONS"
-            ARG_ORDERS:=lua "ARG_ORDERS"
-        (=lua "CLASSES").%classname <- %cls
-        lua> ".."
-            setmetatable(\%cls, {__tostring=function() return \%classname end})
-            local self = nil
-            \%cls.set_self = function(_, inst)
-                local old_self = self
-                self = inst
-                return old_self
-            end
-            \%cls.__index = \%cls
-            \%cls.class = \%cls
-        %class_body
-        run ".."
-            action [new \%classname %inst]
-                say "NEWING"
-                return: =lua "setmetatable(\\%inst, \\%cls)"
-        lua> ".."
-            if ACTIONS["as text"] then
-                \%cls.__tostring = ACTIONS["as text"]
-            end
+parse [as %instance %body] as
+    result of
+        %old_self <- (me)
+        (me) <- %instance
+        try
+            %body
+        ..and if it barfs %msg
+            (me) <- %old_self
+            barf %msg
+        ..or if it succeeds
+            (me) <- %old_self
+
+compile [object %classname %class_body] to
+    %lua <-
+        Lua ".."
+            do
+                local class = {name=\(%classname as lua expr)}
+                setmetatable(class, {__tostring=function(cls) return cls.name end})
+                CLASSES[class.name] = class
+                class.__index = class
+                class.class = class
+
+    if: %class_body.type != "Block"
+        %class_body <- [%class_body]
+    for %statement in %class_body
+        assume: (%statement.type is "Action") and (%statement.stub is "action % %")
+        to %lua write "\n    class."
+        to %lua write (%statement as lua)
+    
+    to %lua write ".."
+            
+            class.__tostring = class["A"..string.as_lua_id("as text")]
+        end
+    
+    return %lua
