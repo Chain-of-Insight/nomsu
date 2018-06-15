@@ -1067,12 +1067,25 @@ do
           if i > 1 then
             nomsu:append(".")
           end
-          local bit_nomsu = self:tree_to_nomsu(bit, true)
+          local bit_nomsu
+          if bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' then
+            if (NOMSU_DEFS.ident_char ^ 1):match(bit[1]) then
+              bit_nomsu = bit[1]
+            end
+          end
+          if not (bit_nomsu) then
+            bit_nomsu = self:tree_to_nomsu(bit, true)
+          end
           if not (bit_nomsu) then
             return nil
           end
-          if bit.type == "Action" or bit.type == "Block" then
+          local _exp_1 = bit.type
+          if "Action" == _exp_1 or "Block" == _exp_1 or "IndexChain" == _exp_1 then
             bit_nomsu:parenthesize()
+          elseif "Number" == _exp_1 then
+            if i < #tree then
+              bit_nomsu:parenthesize()
+            end
           end
           nomsu:append(bit_nomsu)
         end

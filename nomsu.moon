@@ -865,10 +865,18 @@ class NomsuCompiler
                 for i, bit in ipairs tree
                     if i > 1
                         nomsu\append "."
-                    bit_nomsu = @tree_to_nomsu(bit, true)
+                    local bit_nomsu
+                    if bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string'
+                        if (NOMSU_DEFS.ident_char^1)\match(bit[1])
+                            bit_nomsu = bit[1]
+                    unless bit_nomsu then bit_nomsu = @tree_to_nomsu(bit, true)
                     return nil unless bit_nomsu
-                    if bit.type == "Action" or bit.type == "Block"
-                        bit_nomsu\parenthesize!
+                    switch bit.type
+                        when "Action", "Block", "IndexChain"
+                            bit_nomsu\parenthesize!
+                        when "Number"
+                            if i < #tree
+                                bit_nomsu\parenthesize!
                     nomsu\append bit_nomsu
                 return nomsu
             
