@@ -4,13 +4,5 @@
 set -e
 moonc *.moon
 rm -f core/*.lua lib/*.lua
-for file in core/*.nom; do
-    printf "Compiling $file ..."
-    luajit ./nomsu.lua -O -o "core/$(basename $file .nom).lua" $file
-    echo "done."
-done
-for file in lib/*.nom; do
-    printf "Compiling $file ..."
-    luajit ./nomsu.lua -O -o "lib/$(basename $file .nom).lua" $file
-    echo "done."
-done
+luajit ./nomsu.lua -c core lib
+echo "done."

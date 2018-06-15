@@ -11,8 +11,8 @@ Nomsu's only dependencies are [Lua 5.2 or later](https://www.lua.org/) (tested w
 ## Usage
 
 * To get a nomsu [REPL](https://en.wikipedia.org/wiki/Read-eval-print_loop), simply run `lua nomsu.lua`.
-* To run a .nom file with nomsu code, run `lua nomsu.lua your_file.nom`. Or `lua nomsu.lua -` if reading from stdin.
-* (Advanced/optional) To precompile a .nom file into lua, run `lua nomsu.lua -o <output_filename> <input_file>` to precompile your file into lua (by default, saved at `<your_file>.lua`). If you run the compiler with the "-O" (for Optimized) flag, the compiler will run the precompiled lua files directly, instead of parsing and compiling the .nom files before running them. This is not necessary, but it can speed things up if you precompile a bunch of code that involves macros or compile-time activity.
+* To run a .nom file with nomsu code, run `lua nomsu.lua your_file.nom`.
+* (Advanced/optional) To precompile a .nom file into lua, run `lua nomsu.lua -c <input_file>` to precompile your file into lua (by default, saved in the same location, but with a `.lua` extension instead of `.nom`). If you run the compiler with the "-O" (for Optimized) flag, the compiler will run the precompiled lua files directly, instead of parsing and compiling the .nom files before running them. This is not necessary, but it can speed things up if you precompile a bunch of code that involves macros or compile-time activity.
 * More usage options are avilable via `lua nomsu.lua --help`.
 
 ## Layout

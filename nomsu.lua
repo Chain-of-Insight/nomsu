@@ -316,10 +316,7 @@ do
       end
       return tree
     end,
-    run = function(self, nomsu_code, compile_fn)
-      if compile_fn == nil then
-        compile_fn = nil
-      end
+    run = function(self, nomsu_code)
       local tree = assert(self:parse(nomsu_code))
       if type(tree) == 'number' then
         return nil
@@ -327,15 +324,12 @@ do
       local lua = self:tree_to_lua(tree):as_statements()
       lua:declare_locals()
       lua:prepend("-- File: " .. tostring(nomsu_code.source or "") .. "\n")
-      if compile_fn then
-        compile_fn(lua)
+      if self.compile_fn then
+        self.compile_fn(lua, nomsu_code.source.filename)
       end
       return self:run_lua(lua)
     end,
-    run_file = function(self, filename, compile_fn)
-      if compile_fn == nil then
-        compile_fn = nil
-      end
+    run_file = function(self, filename)
       local loaded = self.environment.LOADED
       if loaded[filename] then
         return loaded[filename]
@@ -384,7 +378,7 @@ do
             if not file then
               error("File does not exist: " .. tostring(filename), 0)
             end
-            ret = self:run(Nomsu(Source(filename, 1, #file), file), compile_fn)
+            ret = self:run(Nomsu(Source(filename, 1, #file), file))
           else
             error("Invalid filetype for " .. tostring(filename), 0)
           end
@@ -1355,7 +1349,8 @@ if arg and debug_getinfo(2).func ~= require then
           / {:format: ("-f" -> true) :}
           / {:syntax: ("-s" -> true) :}
           / {:print_file: "-p" ";" {file} :}
-          / {:output_file: "-o" ";" {file} :}
+          / {:compile: ("-c" -> true) :}
+          / {:verbose: ("-v" -> true) :}
           / {:help: (("-h" / "--help") -> true) :}
         file <- "-" / [^;]+
     ]], {
@@ -1368,15 +1363,16 @@ if arg and debug_getinfo(2).func ~= require then
   if not args or args.help then
     print([=[Nomsu Compiler
 
-Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-f] [-s] [--help] [-o output] [-p print_file] file1 file2... [-- nomsu args...]
+Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-v] [-c] [-f] [-s] [--help] [-p print_file] file1 file2... [-- nomsu args...]
 
 OPTIONS
     -i Run the compiler in interactive mode (REPL)
     -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available)
+    -v Verbose: print compiled lua code
+    -c Compile .nom files into .lua files
     -f Auto-format the given Nomsu file and print the result.
     -s Check the program for syntax errors.
     -h/--help Print this message.
-    -o <file> Output the compiled Lua file to the given file (use "-" to output to stdout; if outputting to stdout and -p is not specified, -p will default to /dev/null)
     -p <file> Print to the specified file instead of stdout.
     <input> Input file can be "-" to use stdin.
 ]=])
@@ -1613,8 +1609,6 @@ OPTIONS
       print_file = io.stdout
     elseif args.print_file then
       print_file = io.open(args.print_file, 'w')
-    elseif args.output_file == '-' then
-      print_file = nil
     else
       print_file = io.stdout
     end
@@ -1634,55 +1628,64 @@ OPTIONS
         return print_file:flush()
       end
     end
-    local compile_fn
-    if args.output_file then
-      compile_fn = function(code)
-        local output_file
-        if args.output_file == "-" then
-          output_file = io.stdout
-        elseif args.output_file then
-          output_file = io.open(args.output_file, 'w')
-        end
-        output_file:write("local IMMEDIATE = true;\n" .. tostring(code))
-        return output_file:flush()
-      end
-    else
-      compile_fn = nil
-    end
-    local parse_errs = { }
+    local input_files = { }
+    local to_run = { }
     local _list_0 = args.inputs
     for _index_0 = 1, #_list_0 do
       local input = _list_0[_index_0]
-      if args.syntax then
-        for input_file in all_files(input) do
-          local err
-          ok, err = pcall(nomsu.parse, nomsu, Nomsu(input_file, io.open(input_file):read("*a")))
-          if not ok then
-            insert(parse_errs, err)
-          elseif print_file then
-            print_file:write("Parse succeeded: " .. tostring(input_file) .. "\n")
-            print_file:flush()
+      for f in all_files(input) do
+        input_files[#input_files + 1] = f
+        to_run[f] = true
+      end
+    end
+    if args.compile or args.verbose then
+      nomsu.compile_fn = function(code, from_file)
+        if to_run[from_file] then
+          if args.verbose then
+            io.write(tostring(code), "\n")
           end
+          if args.compile and from_file:match("%.nom$") then
+            local output_filename = from_file:gsub("%.nom$", ".lua")
+            local output_file = io.open(output_filename, 'w')
+            output_file:write("local IMMEDIATE = true;\n", tostring(code))
+            output_file:flush()
+            print(("Compiled %-25s -> %s"):format(from_file, output_filename))
+            return output_file:close()
+          end
+        end
+      end
+    else
+      nomsu.compile_fn = nil
+    end
+    local parse_errs = { }
+    for _index_0 = 1, #input_files do
+      local filename = input_files[_index_0]
+      if args.syntax then
+        local err
+        ok, err = pcall(nomsu.parse, nomsu, Nomsu(filename, io.open(filename):read("*a")))
+        if not ok then
+          insert(parse_errs, err)
+        elseif print_file then
+          print_file:write("Parse succeeded: " .. tostring(filename) .. "\n")
+          print_file:flush()
         end
       elseif args.format then
-        for input_file in all_files(input) do
-          local tree = nomsu:parse(io.open(input_file):read("*a"))
-          local formatted = tostring(self:tree_to_nomsu(tree))
-          if output_file then
-            output_file:write(formatted, "\n")
-            output_file:flush()
-          end
-          if print_file then
-            print_file:write(formatted, "\n")
-            print_file:flush()
-          end
+        local file = FILE_CACHE[filename]
+        if not file then
+          error("File does not exist: " .. tostring(filename), 0)
         end
-      elseif input == STDIN then
+        local tree = nomsu:parse(Nomsu(Source(filename, 1, #file), file))
+        local formatted = tostring(nomsu:tree_to_nomsu(tree))
+        if print_file then
+          print_file:write(formatted, "\n")
+          print_file:flush()
+        end
+      elseif filename == STDIN then
         local file = io.input():read("*a")
         FILE_CACHE.stdin = file
-        nomsu:run(Nomsu(Source('stdin', 1, #file), file), compile_fn)
+        nomsu:run(Nomsu(Source('stdin', 1, #file), file))
       else
-        nomsu:run_file(input, compile_fn)
+        nomsu:run_file(filename)
       end
     end
     if #parse_errs > 0 then
@@ -1693,9 +1696,9 @@ OPTIONS
       os.exit(true, true)
     end
     if args.interactive then
-      while true do
+      for repl_line = 1, math.huge do
         io.write(colored.bright(colored.yellow(">> ")))
-        local buff = ""
+        local buff = { }
         while true do
           local line = io.read("*L")
           if line == "\n" or not line then
@@ -1705,14 +1708,21 @@ OPTIONS
             break
           end
           line = line:gsub("\t", "    ")
-          buff = buff .. line
+          insert(buff, line)
           io.write(colored.dim(colored.yellow(".. ")))
         end
         if #buff == 0 then
           break
         end
+        buff = concat(buff)
+        FILE_CACHE["REPL#" .. repl_line] = buff
+        local code = Nomsu(Source("REPL#" .. repl_line, 1, #buff), buff)
+        local err_hand
+        err_hand = function(error_message)
+          return print_err_msg(error_message)
+        end
         local ret
-        ok, ret = pcall(nomsu.run, nomsu, buff)
+        ok, ret = xpcall(nomsu.run, err_hand, nomsu, code)
         if ok and ret ~= nil then
           print("= " .. repr(ret))
         elseif not ok then
