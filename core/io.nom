@@ -6,15 +6,15 @@ use "core/metaprogramming.nom"
 compile [say %message] to
     lua> ".."
         if \%message.type == "Text" then
-            return Lua(tree.source, "io.write(", \(%message as lua expr), ", '\\\\n');");
+            return LuaCode(tree.source, "io.write(", \(%message as lua expr), ", '\\\\n');");
         else
-            return Lua(tree.source, "io.write(tostring(", \(%message as lua expr), "), '\\\\n');");
+            return LuaCode(tree.source, "io.write(tostring(", \(%message as lua expr), "), '\\\\n');");
         end
 
 compile [ask %prompt] to
     lua> ".."
         if \%prompt.type == "Text" then
-            return Lua.Value(tree.source, "(io.write(", \(%prompt as lua expr), ") and io.read())");
+            return LuaCode.Value(tree.source, "(io.write(", \(%prompt as lua expr), ") and io.read())");
         else
-            return Lua.Value(tree.source, "(io.write(tostring(", \(%prompt as lua expr), ")) and io.read())");
+            return LuaCode.Value(tree.source, "(io.write(tostring(", \(%prompt as lua expr), ")) and io.read())");
         end

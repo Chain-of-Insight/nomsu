@@ -10,29 +10,20 @@
 --        nomsu:run(your_nomsu_code)
 --    Or from the command line:
 --        lua nomsu.lua your_file.nom
-export lpeg, re
-_pairs, _ipairs = pairs, ipairs
-if jit
-    package.cpath = "./luajit_lpeg/?.so;"..package.cpath
-    package.path = "./luajit_lpeg/?.lua;"..package.path
-    
-    export bit32
-    bit32 = require('bit')
-
 lpeg = require 'lpeg'
 re = require 're'
 lpeg.setmaxstack 10000
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt,:Carg} = lpeg
 utils = require 'utils'
-new_uuid = require 'uuid'
 {:repr, :stringify, :min, :max, :equivalent, :set, :is_list, :sum} = utils
 colors = setmetatable({}, {__index:->""})
 export colored
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
+unpack or= table.unpack
 {:match, :sub, :rep, :gsub, :format, :byte, :match, :find} = string
 debug_getinfo = debug.getinfo
-{:Nomsu, :Lua, :Source} = require "code_obj"
+{:NomsuCode, :LuaCode, :Source} = require "code_obj"
 STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 
 string.as_lua_id = (str)->
@@ -138,103 +129,53 @@ do
 
 AST = require "nomsu_tree"
 
-NOMSU_DEFS = with {}
-    -- Newline supports either windows-style CR+LF or unix-style LF
-    .nl = P("\r")^-1 * P("\n")
-    .ws = S(" \t")
-    .tonumber = tonumber
-    string_escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
-    digit, hex = R('09'), R('09','af','AF')
-    .escaped_char = (P("\\")*S("xX")*C(hex*hex)) / => string.char(tonumber(@, 16))
-    .escaped_char += (P("\\")*C(digit*(digit^-2))) / => string.char(tonumber @)
-    .escaped_char += (P("\\")*C(S("ntbavfr"))) / string_escapes
-    .operator_char = S("'~`!@$^&*-+=|<>?/")
-    .utf8_char = (
-        R("\194\223")*R("\128\191") +
-        R("\224\239")*R("\128\191")*R("\128\191") +
-        R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
-    .ident_char = R("az","AZ","09") + P("_") + .utf8_char
+_list_mt =
+    __eq:utils.equivalent
+    -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
+    __tostring: =>
+        "["..concat([repr(b) for b in *@], ", ").."]"
+list = (t)-> setmetatable(t, _list_mt)
 
-    -- If the line begins with #indent+4 spaces, the pattern matches *those* spaces
-    -- and adds them to the current indent (not any more).
-    .indent = Cmt Carg(1), (start, userdata)=>
-        indented = userdata.indent..'    '
-        if sub(@, start, start+#indented-1) == indented
-            userdata.indent = indented
-            return start + #indented
-    -- If the number of leading space characters is <= the number of spaces in the current
-    -- indent minus 4, this pattern matches and decrements the current indent exactly once.
-    .dedent = Cmt Carg(1), (start, userdata)=>
-        dedented = sub(userdata.indent, 1, -5)
-        if #match(@, "^[ ]*", start) <= #dedented
-            userdata.indent = dedented
-            return start
-    -- If the number of leading space characters is >= the number of spaces in the current
-    -- indent, this pattern matches and does not modify the indent.
-    .nodent = Cmt Carg(1), (start, userdata)=>
-        if sub(@, start, start+#userdata.indent-1) == userdata.indent
-            return start + #userdata.indent
+_dict_mt =
+    __eq:utils.equivalent
+    __tostring: =>
+        "{"..concat(["#{repr(k)}: #{repr(v)}" for k,v in pairs @], ", ").."}"
+dict = (t)-> setmetatable(t, _dict_mt)
 
-    .userdata = Carg(1)
+MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
+NomsuCompiler = setmetatable({}, {__index: (k)=> if _self = rawget(@, "self") then _self[k] else nil})
+with NomsuCompiler
+    ._ENV = NomsuCompiler
+    .nomsu = NomsuCompiler
+    parse = require("parser")
+    .parse = (...)=> parse(...)
 
-    .error = (src,end_pos,start_pos,err_msg,userdata)->
-        seen_errors = userdata.errors
-        if seen_errors[start_pos]
-            return true
-        if utils.size(seen_errors) >= 10
-            seen_errors[start_pos+1] = colored.bright colored.yellow colored.onred "Too many errors, canceling parsing..."
-            return #src+1
-        err_pos = start_pos
-        line_no = pos_to_line(src, err_pos)
-        src = FILE_CACHE[userdata.source.filename]
-        line_starts = LINE_STARTS[src]
-        prev_line = line_no == 1 and "" or src\sub(line_starts[line_no-1] or 1, line_starts[line_no]-2)
-        err_line = src\sub(line_starts[line_no], (line_starts[line_no+1] or 0)-2)
-        next_line = src\sub(line_starts[line_no+1] or -1, (line_starts[line_no+2] or 0)-2)
-        i = err_pos-line_starts[line_no]
-        pointer = ("-")\rep(i) .. "^"
-        err_msg = colored.bright colored.yellow colored.onred (err_msg or "Parse error").." at #{userdata.source.filename}:#{line_no}:"
-        if #prev_line > 0 then err_msg ..= "\n"..colored.dim(prev_line)
-        err_line = colored.white(err_line\sub(1, i))..colored.bright(colored.red(err_line\sub(i+1,i+1)))..colored.dim(err_line\sub(i+2,-1))
-        err_msg ..= "\n#{err_line}\n#{colored.red pointer}"
-        if #next_line > 0 then err_msg ..= "\n"..colored.dim(next_line)
-        --error(err_msg)
-        seen_errors[start_pos] = err_msg
-        return true
+    -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
+    -- from lua line number to nomsu line number
+    .source_map = {}
+    -- Discretionary/convenience stuff
+    to_add = {
+        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re,
+        -- Lua stuff:
+        :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
+        :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
+        :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
+        :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :load,
+        :pairs, :ipairs,
+        -- Nomsu types:
+        :list, :dict,
+    }
+    for k,v in pairs(to_add) do NomsuCompiler[k] = v
+    for k,v in pairs(AST) do NomsuCompiler[k] = v
+    .LuaCode = LuaCode
+    .NomsuCode = NomsuCode
+    .Source = Source
+    .ARG_ORDERS = setmetatable({}, {__mode:"k"})
+    .ALIASES = setmetatable({}, {__mode:"k"})
+    .LOADED = {}
+    .AST = AST
 
-setmetatable(NOMSU_DEFS, {__index:(key)=>
-    make_node = (start, value, stop, userdata)->
-        local source
-        with userdata.source
-            source = Source(.filename, .start + start-1, .start + stop-1)
-        value.source = source
-        setmetatable(value, AST[key])
-        if value.__init then value\__init!
-        for i=1,#value do assert(value[i])
-        return value
-
-    self[key] = make_node
-    return make_node
-})
-
-NOMSU_PATTERN = do
-    -- Just for cleanliness, I put the language spec in its own file using a slightly modified
-    -- version of the lpeg.re syntax.
-    peg_tidier = re.compile [[
-    file <- {~ %nl* (def/comment) (%nl+ (def/comment))* %nl* ~}
-    def <- anon_def / captured_def
-    anon_def <- ({ident} (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
-    captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {} %%userdata) -> %2)"
-    ident <- [a-zA-Z_][a-zA-Z0-9_]*
-    comment <- "--" [^%nl]*
-    ]]
-    nomsu_peg = peg_tidier\match(FILE_CACHE["nomsu.peg"])
-    re.compile(nomsu_peg, NOMSU_DEFS)
-
-class NomsuCompiler
-    compile_error = (tok, err_format_string, ...)->
+    .compile_error = (tok, err_format_string, ...)=>
         file = FILE_CACHE[tok.source.filename]
         line_no = pos_to_line(file, tok.source.start)
         line_start = LINE_STARTS[file][line_no]
@@ -245,105 +186,132 @@ class NomsuCompiler
         src = '    '..src\gsub('\n', '\n    ')
         err_msg = err_format_string\format(src, ...)
         error("#{tok.source.filename}:#{line_no}: "..err_msg, 0)
-    new: =>
-        -- Weak-key mapping from objects to randomly generated unique IDs
-        NaN_surrogate = {}
-        nil_surrogate = {}
-        @ids = setmetatable({}, {
-            __mode: "k"
-            __index: (key)=>
-                if key == nil then return @[nil_surrogate]
-                elseif key != key then return @[NaN_surrogate]
-                id = new_uuid!
-                @[key] = id
-                return id
-        })
-        -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
-        -- from lua line number to nomsu line number
-        @source_map = {}
 
-        _list_mt =
-            __eq:utils.equivalent
-            -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
-            __tostring: =>
-                "["..concat([repr(b) for b in *@], ", ").."]"
-        list = (t)-> setmetatable(t, _list_mt)
-        _dict_mt =
-            __eq:utils.equivalent
-            __tostring: =>
-                "{"..concat(["#{repr(k)}: #{repr(v)}" for k,v in pairs @], ", ").."}"
-        dict = (t)-> setmetatable(t, _dict_mt)
-        @environment = {
-            -- Discretionary/convenience stuff
-            nomsu:self, repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re,
-            :compile_error
-            -- Lua stuff:
-            :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
-            :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
-            :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :bit32, :rawlen,
-            :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :load,
-            :pairs, :ipairs,
-            -- Nomsu types:
-            :list, :dict,
-        }
-        for k,v in pairs(AST) do @environment[k] = v
-        @environment.Lua = Lua
-        @environment.Nomsu = Nomsu
-        @environment.Source = Source
-        @environment.ARG_ORDERS = setmetatable({}, {__mode:"k"})
-        @environment.ALIASES = setmetatable({}, {__mode:"k"})
-        @environment.compile_time = (fn)->
-            @environment.COMPILE_TIME[fn] = true
-            return fn
-        @environment.COMPILE_TIME = {}
-        @environment.LOADED = {}
-        @environment.AST = AST
-        @environment._ENV = @environment
-        setmetatable @environment,
-            __index: (k)=>
-                if _self = rawget(@, "self")
-                    return _self[k]
-        @initialize_core!
+    -- This is a bit of a hack, but this code handles arbitrarily complex
+    -- math expressions like 2*x + 3^2 without having to define a single
+    -- action for every possibility.
+    math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
+    add_lua_bits = (lua, code)=>
+        for bit in *code
+            if type(bit) == "string"
+                lua\append bit
+            else
+                bit_lua = @compile(bit)
+                unless bit_lua.is_value
+                    @compile_error bit,
+                        "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                lua\append bit_lua
+        return lua
+
+    add_lua_string_bits = (lua, code)=>
+        line_len = 0
+        if code.type != "Text"
+            lua\append ", ", @compile(code)
+            return
+        for bit in *code
+            bit_lua = if type(bit) == "string"
+                repr(bit)
+            else
+                bit_lua = @compile(bit)
+                unless bit_lua.is_value
+                    @compile_error bit,
+                        "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                bit_lua
+            line_len += #tostring(bit_lua)
+            if line_len > MAX_LINE
+                lua\append ",\n    "
+                line_len = 4
+            else
+                lua\append ", "
+            lua\append bit_lua
+
+    .COMPILE_ACTIONS = setmetatable {
+        compile_math_expr: (tree, ...)=>
+            lua = LuaCode.Value(tree.source)
+            for i,tok in ipairs tree
+                if type(tok) == 'string'
+                    lua\append tok
+                else
+                    tok_lua = @compile(tok)
+                    unless tok_lua.is_value
+                        @compile_error tok,
+                            "Non-expression value inside math expression:\n%s"
+                    if tok.type == "Action"
+                        tok_lua\parenthesize!
+                    lua\append tok_lua
+                if i < #tree
+                    lua\append " "
+            return lua
+
+        ["Lua %"]: (tree, _code)=>
+            lua = LuaCode.Value(_code.source, "LuaCode(", repr(tostring _code.source))
+            add_lua_string_bits(@, lua, _code)
+            lua\append ")"
+            return lua
     
-    parse: (nomsu_code)=>
-        assert(type(nomsu_code) != 'string')
-        userdata = {
-            source_code:nomsu_code, indent: "", errors: {},
-            source: nomsu_code.source,
-        }
-        tree = NOMSU_PATTERN\match(tostring(nomsu_code), nil, userdata)
-        unless tree
-            error "In file #{colored.blue filename} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
+        ["Lua value %"]: (tree, _code)=>
+            lua = LuaCode.Value(_code.source, "LuaCode.Value(", repr(tostring _code.source))
+            add_lua_string_bits(@, lua, _code)
+            lua\append ")"
+            return lua
 
-        if next(userdata.errors)
-            keys = utils.keys(userdata.errors)
-            table.sort(keys)
-            errors = [userdata.errors[k] for k in *keys]
-            io.stderr\write(concat(errors, "\n\n").."\n")
-            os.exit!
-        
-        return tree
+        ["lua > %"]: (tree, _code)=>
+            if _code.type != "Text"
+                return LuaCode tree.source, "nomsu:run_lua(", @compile(_code), ");"
+            return add_lua_bits(@, LuaCode(tree.source), _code)
 
-    run: (nomsu_code)=>
-        tree = assert(@parse(nomsu_code))
-        if type(tree) == 'number' -- Happens if pattern matches, but there are no captures, e.g. an empty string
+        ["= lua %"]: (tree, _code)=>
+            if _code.type != "Text"
+                return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(_code), ":as_statements('return '))"
+            return add_lua_bits(@, LuaCode.Value(tree.source), _code)
+
+        ["use %"]: (tree, _path)=>
+            unless _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
+                return LuaCode(tree.source, "nomsu:run_file(#{@compile(_path)});")
+            path = _path[1]
+            @run_file(path)
+            return LuaCode(tree.source, "nomsu:run_file(#{repr path});")
+    }, {
+        __index: (stub)=>
+            if math_expression\match(stub)
+                return @compile_math_expr
+    }
+
+    .fork = =>
+        setmetatable({COMPILE_ACTIONS:setmetatable({}, {__index:@COMPILE_ACTIONS})}, {__index:@})
+
+    .run = (to_run, source=nil)=>
+        tree = if AST.is_syntax_tree(to_run) then tree else @parse(to_run, source or to_run.source)
+        if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
-        lua = @tree_to_lua(tree)\as_statements!
-        lua\declare_locals!
-        lua\prepend "-- File: #{nomsu_code.source or ""}\n"
-        if @compile_fn
-            self.compile_fn(lua, nomsu_code.source.filename)
-        return @run_lua(lua)
+        if tree.type == "FileChunks"
+            ret = nil
+            all_lua = {}
+            for chunk in *tree
+                lua = @compile(chunk)\as_statements!
+                lua\declare_locals!
+                lua\prepend "-- File: #{chunk.source or ""}\n"
+                insert all_lua, tostring(lua)
+                ret = @run_lua(lua)
+            if @on_compile
+                self.on_compile(concat(all_lua, "\n"), (source or to_run.source).filename)
+            return ret
+        else
+            lua = @compile(tree, compile_actions)\as_statements!
+            lua\declare_locals!
+            lua\prepend "-- File: #{source or to_run.source or ""}\n"
+            if @on_compile
+                self.on_compile(lua, (source or to_run.source).filename)
+            return @run_lua(lua)
 
     _running_files = {} -- For detecting circular imports
-    run_file: (filename)=>
-        loaded = @environment.LOADED
-        if loaded[filename]
-            return loaded[filename]
+    .run_file = (filename)=>
+        if @LOADED[filename]
+            return @LOADED[filename]
         ret = nil
         for filename in all_files(filename)
-            if loaded[filename]
-                ret = loaded[filename]
+            if @LOADED[filename]
+                ret = @LOADED[filename]
                 continue
 
             for i,running in ipairs _running_files
@@ -355,31 +323,31 @@ class NomsuCompiler
             insert _running_files, filename
             if match(filename, "%.lua$")
                 file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
-                ret = @run_lua(Lua(Source(filename, 1, #file), file))
+                ret = @run_lua file, Source(filename, 1, #file)
             elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$")
                 if not @skip_precompiled -- Look for precompiled version
                     lua_filename = gsub(filename, "%.nom$", ".lua")
                     file = FILE_CACHE[lua_filename]
                     if file
-                        ret = @run_lua(Lua(Source(filename, 1, #file), file))
+                        ret = @run_lua file, Source(filename, 1, #file)
                         remove _running_files
                         continue
                 file = file or FILE_CACHE[filename]
                 if not file
                     error("File does not exist: #{filename}", 0)
-                ret = @run(Nomsu(Source(filename,1,#file), file))
+                ret = @run file, Source(filename,1,#file)
             else
                 error("Invalid filetype for #{filename}", 0)
-            loaded[filename] = ret or true
+            @LOADED[filename] = ret or true
             remove _running_files
 
-        loaded[filename] = ret or true
+        @LOADED[filename] = ret or true
         return ret
 
-    run_lua: (lua)=>
+    .run_lua = (lua, source=nil)=>
         assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, tostring(lua.source), "t", @environment)
+        run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
         if not run_lua_fn
             n = 1
             fn = ->
@@ -387,14 +355,14 @@ class NomsuCompiler
                 ("\n%-3d|")\format(n)
             line_numbered_lua = "1  |"..lua_string\gsub("\n", fn)
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack line_numbered_lua}\n\n#{err}", 0)
-        source_key = tostring(lua.source)
+        source_key = tostring(source or lua.source)
         unless @source_map[source_key]
             map = {}
             offset = 1
-            source = lua.source
+            source or= lua.source
             nomsu_str = tostring(FILE_CACHE[source.filename]\sub(source.start, source.stop))
             lua_line = 1
-            nomsu_line = pos_to_line(nomsu_str, lua.source.start)
+            nomsu_line = pos_to_line(nomsu_str, source.start)
             fn = (s)->
                 if type(s) == 'string'
                     for nl in s\gmatch("\n")
@@ -413,26 +381,26 @@ class NomsuCompiler
 
         return run_lua_fn!
 
-    MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
-    math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
-    tree_to_lua: (tree)=>
+    .compile = (tree)=>
+        assert(LuaCode)
         switch tree.type
             when "Action"
                 stub = tree.stub
-                action = @environment['A'..string.as_lua_id(stub)]
-                if action and @environment.COMPILE_TIME[action]
+                if compile_action = @COMPILE_ACTIONS[stub]
                     args = [arg for arg in *tree when type(arg) != "string"]
-                    -- Force all compile-time actions to take a tree location
-                    if arg_orders = @environment.ARG_ORDERS[stub]
+                    if arg_orders = @ARG_ORDERS[stub]
                         args = [args[p] for p in *arg_orders]
                     -- Force Lua to avoid tail call optimization for debugging purposes
-                    -- TODO: use tail call
-                    ret = action(tree, unpack(args))
+                    -- TODO: use tail call?
+                    ret = compile_action(@, tree, unpack(args))
                     if not ret
-                        compile_error tree,
+                        @compile_error tree,
                             "Compile-time action:\n%s\nfailed to produce any Lua"
                     return ret
-                lua = Lua.Value(tree.source)
+
+                action = @['A'..string.as_lua_id(stub)]
+
+                lua = LuaCode.Value(tree.source)
                 if not action and math_expression\match(stub)
                     -- This is a bit of a hack, but this code handles arbitrarily complex
                     -- math expressions like 2*x + 3^2 without having to define a single
@@ -441,9 +409,9 @@ class NomsuCompiler
                         if type(tok) == 'string'
                             lua\append tok
                         else
-                            tok_lua = @tree_to_lua(tok)
+                            tok_lua = @compile(tok)
                             unless tok_lua.is_value
-                                compile_error tok,
+                                @compile_error tok,
                                     "Non-expression value inside math expression:\n%s"
                             if tok.type == "Action"
                                 tok_lua\parenthesize!
@@ -455,15 +423,15 @@ class NomsuCompiler
                 args = {}
                 for i, tok in ipairs tree
                     if type(tok) == "string" then continue
-                    arg_lua = @tree_to_lua(tok)
+                    arg_lua = @compile(tok)
                     unless arg_lua.is_value
-                        compile_error tok,
+                        @compile_error tok,
                             "Cannot use:\n%s\nas an argument to %s, since it's not an expression, it produces: %s",
                             stub, repr arg_lua
                     insert args, arg_lua
 
                 if action
-                    if arg_orders = @environment.ARG_ORDERS[stub]
+                    if arg_orders = @ARG_ORDERS[stub]
                         args = [args[p] for p in *arg_orders]
 
                 lua\append "A",string.as_lua_id(stub),"("
@@ -479,19 +447,19 @@ class NomsuCompiler
                         return repr(t)
                     bits = [make_tree(bit) for bit in *t]
                     return t.type.."("..repr(tostring t.source)..", "..table.concat(bits, ", ")..")"
-                Lua.Value tree.source, make_tree(tree[1])
+                LuaCode.Value tree.source, make_tree(tree[1])
             
             when "Block"
-                lua = Lua(tree.source)
+                lua = LuaCode(tree.source)
                 for i,line in ipairs tree
-                    line_lua = @tree_to_lua(line)
+                    line_lua = @compile(line)
                     if i > 1
                         lua\append "\n"
                     lua\append line_lua\as_statements!
                 return lua
 
             when "Text"
-                lua = Lua.Value(tree.source)
+                lua = LuaCode.Value(tree.source)
                 string_buffer = ""
                 for i, bit in ipairs tree
                     if type(bit) == "string"
@@ -501,15 +469,15 @@ class NomsuCompiler
                         if #lua.bits > 0 then lua\append ".."
                         lua\append repr(string_buffer)
                         string_buffer = ""
-                    bit_lua = @tree_to_lua(bit)
+                    bit_lua = @compile(bit)
                     unless bit_lua.is_value
                         src = '    '..gsub(tostring(@tree_to_nomsu(bit)), '\n','\n    ')
                         line = "#{bit.source.filename}:#{pos_to_line(FILE_CACHE[bit.source.filename], bit.source.start)}"
-                        compile_error bit,
+                        @compile_error bit,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     if #lua.bits > 0 then lua\append ".."
                     if bit.type != "Text"
-                        bit_lua = Lua.Value(bit.source, "stringify(",bit_lua,")")
+                        bit_lua = LuaCode.Value(bit.source, "stringify(",bit_lua,")")
                     lua\append bit_lua
 
                 if string_buffer ~= "" or #lua.bits == 0
@@ -521,12 +489,12 @@ class NomsuCompiler
                 return lua
 
             when "List"
-                lua = Lua.Value tree.source, "list{"
+                lua = LuaCode.Value tree.source, "list{"
                 line_length = 0
                 for i, item in ipairs tree
-                    item_lua = @tree_to_lua(item)
+                    item_lua = @compile(item)
                     unless item_lua.is_value
-                        compile_error item,
+                        @compile_error item,
                             "Cannot use:\n%s\nas a list item, since it's not an expression."
                     lua\append item_lua
                     item_string = tostring(item_lua)
@@ -546,10 +514,10 @@ class NomsuCompiler
                 return lua
 
             when "Dict"
-                lua = Lua.Value tree.source, "dict{"
+                lua = LuaCode.Value tree.source, "dict{"
                 line_length = 0
                 for i, entry in ipairs tree
-                    entry_lua = @tree_to_lua(entry)
+                    entry_lua = @compile(entry)
                     lua\append entry_lua
                     entry_lua_str = tostring(entry_lua)
                     -- TODO: maybe make this more accurate? It's only a heuristic, so eh...
@@ -570,29 +538,29 @@ class NomsuCompiler
 
             when "DictEntry"
                 key, value = tree[1], tree[2]
-                key_lua = @tree_to_lua(key)
+                key_lua = @compile(key)
                 unless key_lua.is_value
-                    compile_error tree[1],
+                    @compile_error tree[1],
                         "Cannot use:\n%s\nas a dict key, since it's not an expression."
-                value_lua = value and @tree_to_lua(value) or Lua.Value(key.source, "true")
+                value_lua = value and @compile(value) or LuaCode.Value(key.source, "true")
                 unless value_lua.is_value
-                    compile_error tree[2],
+                    @compile_error tree[2],
                         "Cannot use:\n%s\nas a dict value, since it's not an expression."
                 key_str = match(tostring(key_lua), [=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
                 return if key_str
-                    Lua tree.source, key_str,"=",value_lua
+                    LuaCode tree.source, key_str,"=",value_lua
                 elseif sub(tostring(key_lua),1,1) == "["
                     -- NOTE: this *must* use a space after the [ to avoid freaking out
                     -- Lua's parser if the inner expression is a long string. Lua
                     -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                    Lua tree.source, "[ ",key_lua,"]=",value_lua
+                    LuaCode tree.source, "[ ",key_lua,"]=",value_lua
                 else
-                    Lua tree.source, "[",key_lua,"]=",value_lua
+                    LuaCode tree.source, "[",key_lua,"]=",value_lua
             
             when "IndexChain"
-                lua = @tree_to_lua(tree[1])
+                lua = @compile(tree[1])
                 unless lua.is_value
-                    compile_error tree[1],
+                    @compile_error tree[1],
                         "Cannot index:\n%s\nsince it's not an expression."
                 first_char = sub(tostring(lua),1,1)
                 if first_char == "{" or first_char == '"' or first_char == "["
@@ -600,9 +568,9 @@ class NomsuCompiler
 
                 for i=2,#tree
                     key = tree[i]
-                    key_lua = @tree_to_lua(key)
+                    key_lua = @compile(key)
                     unless key_lua.is_value
-                        compile_error key,
+                        @compile_error key,
                             "Cannot use:\n%s\nas an index, since it's not an expression."
                     key_lua_str = tostring(key_lua)
                     if lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
@@ -617,19 +585,19 @@ class NomsuCompiler
                 return lua
 
             when "Number"
-                Lua.Value(tree.source, tostring(tree[1]))
+                LuaCode.Value(tree.source, tostring(tree[1]))
 
             when "Var"
-                Lua.Value(tree.source, string.as_lua_id(tree[1]))
+                LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
             
             else
                 error("Unknown type: #{tree.type}")
 
-    tree_to_nomsu: (tree, inline=false, can_use_colon=false)=>
+    .tree_to_nomsu = (tree, inline=false, can_use_colon=false)=>
         switch tree.type
             when "Action"
                 if inline
-                    nomsu = Nomsu(tree.source)
+                    nomsu = NomsuCode(tree.source)
                     for i,bit in ipairs tree
                         if type(bit) == "string"
                             if i > 1
@@ -645,7 +613,7 @@ class NomsuCompiler
                             nomsu\append arg_nomsu
                     return nomsu
                 else
-                    nomsu = Nomsu(tree.source)
+                    nomsu = NomsuCode(tree.source)
                     next_space = ""
                     line_len, last_colon = 0, nil
                     for i,bit in ipairs tree
@@ -679,9 +647,9 @@ class NomsuCompiler
                                 -- These types carry their own indentation
                                 if bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
                                     if i == 1
-                                        arg_nomsu = Nomsu(bit.source, "(..)\n    ", arg_nomsu)
+                                        arg_nomsu = NomsuCode(bit.source, "(..)\n    ", arg_nomsu)
                                     else
-                                        arg_nomsu = Nomsu(bit.source, "\n    ", arg_nomsu)
+                                        arg_nomsu = NomsuCode(bit.source, "\n    ", arg_nomsu)
                                 
                                 if last_colon == i-1 and (bit.type == "Action" or bit.type == "Block")
                                     next_space = ""
@@ -697,12 +665,12 @@ class NomsuCompiler
                 nomsu = @tree_to_nomsu(tree[1], true)
                 if nomsu == nil and not inline
                     nomsu = @tree_to_nomsu(tree[1])
-                    return nomsu and Nomsu tree.source, "\\:\n    ", nomsu
-                return nomsu and Nomsu tree.source, "\\(", nomsu, ")"
+                    return nomsu and NomsuCode tree.source, "\\:\n    ", nomsu
+                return nomsu and NomsuCode tree.source, "\\(", nomsu, ")"
 
             when "Block"
                 if inline
-                    nomsu = Nomsu(tree.source)
+                    nomsu = NomsuCode(tree.source)
                     for i,line in ipairs tree
                         if i > 1
                             nomsu\append "; "
@@ -710,7 +678,7 @@ class NomsuCompiler
                         return nil unless line_nomsu
                         nomsu\append line_nomsu
                     return nomsu
-                nomsu = Nomsu(tree.source)
+                nomsu = NomsuCode(tree.source)
                 for i, line in ipairs tree
                     line = assert(@tree_to_nomsu(line, nil, true), "Could not convert line to nomsu")
                     nomsu\append line
@@ -722,7 +690,7 @@ class NomsuCompiler
 
             when "Text"
                 if inline
-                    nomsu = Nomsu(tree.source, '"')
+                    nomsu = NomsuCode(tree.source, '"')
                     for bit in *tree
                         if type(bit) == 'string'
                             -- TODO: unescape better?
@@ -740,7 +708,7 @@ class NomsuCompiler
                     inline_version = @tree_to_nomsu(tree, true)
                     if inline_version and #inline_version <= MAX_LINE
                         return inline_version
-                    nomsu = Nomsu(tree.source, '".."\n    ')
+                    nomsu = NomsuCode(tree.source, '".."\n    ')
                     for i, bit in ipairs tree
                         if type(bit) == 'string'
                             bit_lines = get_lines\match(bit)
@@ -779,7 +747,7 @@ class NomsuCompiler
 
             when "List"
                 if inline
-                    nomsu = Nomsu(tree.source, "[")
+                    nomsu = NomsuCode(tree.source, "[")
                     for i, item in ipairs tree
                         item_nomsu = @tree_to_nomsu(item, true)
                         return nil unless item_nomsu
@@ -792,8 +760,8 @@ class NomsuCompiler
                     inline_version = @tree_to_nomsu(tree, true)
                     if inline_version and #inline_version <= MAX_LINE
                         return inline_version
-                    nomsu = Nomsu(tree.source, "[..]")
-                    line = Nomsu(tree.source, "\n    ")
+                    nomsu = NomsuCode(tree.source, "[..]")
+                    line = NomsuCode(tree.source, "\n    ")
                     for item in *tree
                         item_nomsu = @tree_to_nomsu(item, true)
                         if item_nomsu and #line + #", " + #item_nomsu <= MAX_LINE
@@ -806,7 +774,7 @@ class NomsuCompiler
                                 return nil unless item_nomsu
                             if #line.bits > 1
                                 nomsu\append line
-                                line = Nomsu(line.source, "\n    ")
+                                line = NomsuCode(line.source, "\n    ")
                             line\append item_nomsu
                     if #line.bits > 1
                         nomsu\append line
@@ -814,7 +782,7 @@ class NomsuCompiler
             
             when "Dict"
                 if inline
-                    nomsu = Nomsu(tree.source, "{")
+                    nomsu = NomsuCode(tree.source, "{")
                     for i, entry in ipairs tree
                         entry_nomsu = @tree_to_nomsu(entry, true)
                         return nil unless entry_nomsu
@@ -826,8 +794,8 @@ class NomsuCompiler
                 else
                     inline_version = @tree_to_nomsu(tree, true)
                     if inline_version then return inline_version
-                    nomsu = Nomsu(tree.source, "{..}")
-                    line = Nomsu(tree.source, "\n    ")
+                    nomsu = NomsuCode(tree.source, "{..}")
+                    line = NomsuCode(tree.source, "\n    ")
                     for entry in *tree
                         entry_nomsu = @tree_to_nomsu(entry)
                         return nil unless entry_nomsu
@@ -838,7 +806,7 @@ class NomsuCompiler
                         else
                             if #line.bits > 1
                                 nomsu\append line
-                                line = Nomsu(line.source, "\n    ")
+                                line = NomsuCode(line.source, "\n    ")
                             line\append entry_nomsu
                     if #line.bits > 1
                         nomsu\append line
@@ -852,22 +820,23 @@ class NomsuCompiler
                     key_nomsu\parenthesize!
                 value_nomsu = if value
                     @tree_to_nomsu(value, true)
-                else Nomsu(tree.source, "")
+                else NomsuCode(tree.source, "")
                 if inline and not value_nomsu then return nil
                 if not value_nomsu
                     return nil if inline
                     value_nomsu = @tree_to_nomsu(value)
                     return nil unless value_nomsu
-                return Nomsu tree.source, key_nomsu, ":", value_nomsu
+                return NomsuCode tree.source, key_nomsu, ":", value_nomsu
             
             when "IndexChain"
-                nomsu = Nomsu(tree.source)
+                nomsu = NomsuCode(tree.source)
                 for i, bit in ipairs tree
                     if i > 1
                         nomsu\append "."
                     local bit_nomsu
                     if bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string'
-                        if (NOMSU_DEFS.ident_char^1)\match(bit[1])
+                        -- TODO: support arbitrary words here, including operators and unicode
+                        if bit[1]\match("[_a-zA-Z][_a-zA-Z0-9]*")
                             bit_nomsu = bit[1]
                     unless bit_nomsu then bit_nomsu = @tree_to_nomsu(bit, true)
                     return nil unless bit_nomsu
@@ -881,86 +850,22 @@ class NomsuCompiler
                 return nomsu
             
             when "Number"
-                return Nomsu(tree.source, tostring(tree[1]))
+                return NomsuCode(tree.source, tostring(tree[1]))
 
             when "Var"
-                return Nomsu(tree.source, "%", tree[1])
+                return NomsuCode(tree.source, "%", tree[1])
             
             else
                 error("Unknown type: #{tree.type}")
     
-    initialize_core: =>
-        -- Sets up some core functionality
-        nomsu = self
-        with nomsu.environment
-            .A_immediately_1 = .compile_time (_block)=>
-                lua = nomsu\tree_to_lua(_block)\as_statements!
-                lua\declare_locals!
-                nomsu\run_lua(lua)
-                return Lua(_block.source, "if IMMEDIATE then\n    ", lua, "\nend")
 
-            add_lua_string_bits = (lua, code)->
-                line_len = 0
-                if code.type != "Text"
-                    lua\append ", ", nomsu\tree_to_lua(code)
-                    return
-                for bit in *code
-                    bit_lua = if type(bit) == "string"
-                        repr(bit)
-                    else
-                        bit_lua = nomsu\tree_to_lua(bit)
-                        unless bit_lua.is_value
-                            compile_error bit,
-                                "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
-                        bit_lua
-                    line_len += #tostring(bit_lua)
-                    if line_len > MAX_LINE
-                        lua\append ",\n    "
-                        line_len = 4
-                    else
-                        lua\append ", "
-                    lua\append bit_lua
 
-            .A_Lua_1 = .compile_time (_code)=>
-                lua = Lua.Value(_code.source, "Lua(", repr(tostring _code.source))
-                add_lua_string_bits(lua, _code)
-                lua\append ")"
-                return lua
-            
-            .A_Lua_value_1 = .compile_time (_code)=>
-                lua = Lua.Value(_code.source, "Lua.Value(", repr(tostring _code.source))
-                add_lua_string_bits(lua, _code)
-                lua\append ")"
-                return lua
 
-            add_lua_bits = (lua, code)->
-                for bit in *code
-                    if type(bit) == "string"
-                        lua\append bit
-                    else
-                        bit_lua = nomsu\tree_to_lua(bit)
-                        unless bit_lua.is_value
-                            compile_error bit,
-                                "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
-                        lua\append bit_lua
-                return lua
 
-            nomsu.environment["A"..string.as_lua_id("lua > 1")] = .compile_time (_code)=>
-                if _code.type != "Text"
-                    return Lua @source, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ");"
-                return add_lua_bits(Lua(@source), _code)
 
-            nomsu.environment["A"..string.as_lua_id("= lua 1")] = .compile_time (_code)=>
-                if _code.type != "Text"
-                    return Lua.Value @source, "nomsu:run_lua(", nomsu\tree_to_lua(_code), ":as_statements('return '))"
-                return add_lua_bits(Lua.Value(@source), _code)
+-- Command line interface:
 
-            .A_use_1 = .compile_time (_path)=>
-                unless _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
-                    return Lua(_path.source, "nomsu:run_file(#{nomsu\tree_to_lua(_path)});")
-                path = _path[1]
-                nomsu\run_file(path)
-                return Lua(_path.source, "nomsu:run_file(#{repr path});")
+
 
 -- Only run this code if this file was run directly with command line arguments, and not require()'d:
 if arg and debug_getinfo(2).func != require
@@ -1000,8 +905,8 @@ OPTIONS
 ]=]
         os.exit!
 
-    nomsu = NomsuCompiler!
-    nomsu.environment.arg = args.nomsu_args
+    nomsu = NomsuCompiler
+    nomsu.arg = args.nomsu_args
 
     ok, to_lua = pcall -> require('moonscript.base').to_lua
     if not ok then to_lua = nil
@@ -1022,7 +927,7 @@ OPTIONS
         else debug_getinfo(thread,f,what)
         if not info or not info.func then return info
         if info.short_src or info.source or info.linedefine or info.currentline
-            if arg_orders = nomsu.environment.ARG_ORDERS[info.func]
+            if arg_orders = nomsu.ARG_ORDERS[info.func]
                 info.name = next(arg_orders)
             if map = nomsu.source_map[info.source]
                 if info.currentline
@@ -1077,7 +982,7 @@ OPTIONS
                 file = FILE_CACHE[filename]\sub(tonumber(start),tonumber(stop))
                 err_line = get_line(file, calling_fn.currentline)\sub(1,-2)
                 offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)")))
-                if arg_orders = nomsu.environment.ARG_ORDERS[calling_fn.func]
+                if arg_orders = nomsu.ARG_ORDERS[calling_fn.func]
                     name = "action '#{next(arg_orders)}'"
                 else
                     name = "main chunk"
@@ -1145,9 +1050,9 @@ OPTIONS
 
         nomsu.skip_precompiled = not args.optimized
         if print_file == nil
-            nomsu.environment.print = ->
+            nomsu.print = ->
         elseif print_file != io.stdout
-            nomsu.environment.print = (...)->
+            nomsu.print = (...)->
                 N = select("#",...)
                 if N > 0
                     print_file\write(tostring(select(1,...)))
@@ -1163,7 +1068,7 @@ OPTIONS
                 input_files[#input_files+1] = f
                 to_run[f] = true
 
-        nomsu.compile_fn = if args.compile or args.verbose
+        nomsu.on_compile = if args.compile or args.verbose
             (code, from_file)->
                 if to_run[from_file]
                     if args.verbose
@@ -1171,7 +1076,7 @@ OPTIONS
                     if args.compile and from_file\match("%.nom$")
                         output_filename = from_file\gsub("%.nom$", ".lua")
                         output_file = io.open(output_filename, 'w')
-                        output_file\write("local IMMEDIATE = true;\n", tostring(code))
+                        output_file\write(tostring(code))
                         output_file\flush!
                         print ("Compiled %-25s -> %s")\format(from_file, output_filename)
                         output_file\close!
@@ -1181,7 +1086,8 @@ OPTIONS
         for filename in *input_files
             if args.syntax
                 -- Check syntax:
-                ok,err = pcall nomsu.parse, nomsu, Nomsu(filename, io.open(filename)\read("*a"))
+                file_contents = io.open(filename)\read('*a')
+                ok,err = pcall nomsu.parse, nomsu, file_contents, Source(filename, 1, #file_contents)
                 if not ok
                     insert parse_errs, err
                 elseif print_file
@@ -1192,7 +1098,7 @@ OPTIONS
                 file = FILE_CACHE[filename]
                 if not file
                     error("File does not exist: #{filename}", 0)
-                tree = nomsu\parse(Nomsu(Source(filename,1,#file), file))
+                tree = nomsu\parse(file, Source(filename,1,#file))
                 formatted = tostring(nomsu\tree_to_nomsu(tree))
                 if print_file
                     print_file\write(formatted, "\n")
@@ -1200,7 +1106,7 @@ OPTIONS
             elseif filename == STDIN
                 file = io.input!\read("*a")
                 FILE_CACHE.stdin = file
-                nomsu\run(Nomsu(Source('stdin',1,#file), file))
+                nomsu\run(file, Source('stdin',1,#file))
             else
                 nomsu\run_file(filename)
 
@@ -1230,10 +1136,9 @@ OPTIONS
                 
                 buff = concat(buff)
                 FILE_CACHE["REPL#"..repl_line] = buff
-                code = Nomsu(Source("REPL#"..repl_line, 1, #buff), buff)
                 err_hand = (error_message)->
                     print_err_msg error_message
-                ok, ret = xpcall(nomsu.run, err_hand, nomsu, code)
+                ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source("REPL#"..repl_line, 1, #buff))
                 if ok and ret != nil
                     print "= "..repr(ret)
                 elseif not ok

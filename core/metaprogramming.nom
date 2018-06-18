@@ -3,89 +3,122 @@
     functions to make that easier.
 
 # Compile-time action to make compile-time actions:
-immediately
-    lua> ".."
-        A_give_1_nickname_2 = compile_time(function(tree, \%action, \%nickname, is_compile_time)
-            local function arg_to_string(a) return tostring(nomsu:tree_to_lua(a)) end
-            local action_args = table.map(\%action:get_args(), arg_to_string)
-            local nickname_args = table.map(\%nickname:get_args(), arg_to_string)
-            if utils.equivalent(action_args, nickname_args) then
-                return Lua(tree.source, "A", string.as_lua_id(\%nickname.stub), " = A", string.as_lua_id(\%action.stub)) 
+lua> ".."
+    nomsu.COMPILE_ACTIONS["give % nickname %"] = (function(nomsu, tree, \%action, \%nickname, is_compile_time)
+        local function arg_to_string(a) return tostring(nomsu:compile(a)) end
+        local action_args = table.map(\%action:get_args(), arg_to_string)
+        local nickname_args = table.map(\%nickname:get_args(), arg_to_string)
+        if utils.equivalent(action_args, nickname_args) then
+            if is_compile_time then
+                return LuaCode(tree.source, "nomsu.COMPILE_ACTIONS[", repr(\%nickname.stub), "] = nomsu.COMPILE_ACTIONS[", repr(\%action.stub), "]")
+            else
+                return LuaCode(tree.source, "A", string.as_lua_id(\%nickname.stub), " = A", string.as_lua_id(\%action.stub)) 
             end
-            local lua = Lua(tree.source, "A", string.as_lua_id(\%nickname.stub), " = ")
-            if is_compile_time or COMPILE_TIME[_ENV["A"..string.as_lua_id(\%action.stub)]] then
-                lua:append("compile_time")
-                table.insert(action_args, 1, "tree")
-                table.insert(nickname_args, 1, "tree")
-            end
-            lua:append("(function(")
-            lua:concat_append(nickname_args, ", ")
+        end
+        local lua = LuaCode(tree.source)
+        if is_compile_time then
+            lua:append("nomsu.COMPILE_ACTIONS[", repr(\%nickname.stub), "] = ")
+            table.insert(action_args, 1, "nomsu")
+            table.insert(nickname_args, 1, "nomsu")
+            table.insert(action_args, 2, "tree")
+            table.insert(nickname_args, 2, "tree")
+        else
+            lua:append("A", string.as_lua_id(\%nickname.stub), " = ")
+        end
+        lua:append("(function(")
+        lua:concat_append(nickname_args, ", ")
+        if is_compile_time then
+            lua:append(")\n    return nomsu.COMPILE_ACTIONS[", repr(\%action.stub), "](")
+        else
             lua:append(")\n    return A", string.as_lua_id(\%action.stub), "(")
-            lua:concat_append(action_args, ", ")
-            lua:append(")\nend)")
-            return lua
-        end)
+        end
+        lua:concat_append(action_args, ", ")
+        lua:append(")\nend)")
+        if not is_compile_time then
+            lua:add_free_vars({"A"..string.as_lua_id(\%nickname.stub)})
+        end
+        return lua
+    end)
 
-        __MANGLE_INDEX = 0
-        A_parse_1_as_2 = compile_time(function(tree, \%actions, \%body)
-            local replacements = {}
-            for i,arg in ipairs(\%actions[1]:get_args()) do
-                replacements[arg[1]] = tostring(nomsu:tree_to_lua(arg))
+    __MANGLE_INDEX = 0
+    nomsu.COMPILE_ACTIONS["parse % as %"] = (function(nomsu, tree, \%actions, \%body)
+        local replacements = {}
+        for i,arg in ipairs(\%actions[1]:get_args()) do
+            replacements[arg[1]] = tostring(nomsu:compile(arg))
+        end
+        local function make_tree(t)
+            if not AST.is_syntax_tree(t) then
+                return repr(t)
+            elseif t.type ~= 'Var' then
+                local args = table.map(t, make_tree)
+                table.insert(args, 1, repr(tostring(t.source)))
+                return t.type.."("..table.concat(args, ", ")..")"
+            elseif replacements[t[1]] then
+                return replacements[t[1]]
+            else
+                return t.type.."("..repr(tostring(t.source))..", "..repr(t[1].." \\0").."..('%X'):format(__MANGLE_INDEX))"
             end
-            local function make_tree(t)
-                if not AST.is_syntax_tree(t) then
-                    return repr(t)
-                elseif t.type ~= 'Var' then
-                    local args = table.map(t, make_tree)
-                    table.insert(args, 1, repr(tostring(t.source)))
-                    return t.type.."("..table.concat(args, ", ")..")"
-                elseif replacements[t[1]] then
-                    return replacements[t[1]]
-                else
-                    return t.type.."("..repr(tostring(t.source))..", "..repr(t[1].." \\0").."..('%X'):format(__MANGLE_INDEX))"
-                end
-            end
-            local lua = Lua(tree.source, "A", string.as_lua_id(\%actions[1].stub), " = compile_time(function(tree")
-            for _,arg in ipairs(\%actions[1]:get_args()) do
-                lua:append(", ", nomsu:tree_to_lua(arg))
-            end
-            lua:append(")\n    __MANGLE_INDEX = __MANGLE_INDEX + 1",
-                "\n    local tree = ", make_tree(\%body),
-                "\n    local lua = nomsu:tree_to_lua(tree)",
-                "\n    lua:remove_free_vars({")
-            local vars = table.map(\%actions[1]:get_args(), function(a)
-                return "Var("..repr(tostring(a.source))..", "..repr(a[1])..")"
-            end)
-            lua:concat_append(vars, ", ")
-            lua:append("})\n    return lua\nend)")
-
-            for i=2,#\%actions do
-                lua:append("\n", A_give_1_nickname_2(\%actions[i], \%actions[1], \%actions[i], true))
-            end
-            return lua
+        end
+        local lua = LuaCode(tree.source, "nomsu.COMPILE_ACTIONS[", repr(\%actions[1].stub), "] = (function(nomsu, tree")
+        lua:add_free_vars({"A"..string.as_lua_id(\%actions[1].stub)})
+        for _,arg in ipairs(\%actions[1]:get_args()) do
+            lua:append(", ", nomsu:compile(arg))
+        end
+        lua:append(")\n    __MANGLE_INDEX = __MANGLE_INDEX + 1",
+            "\n    local tree = ", make_tree(\%body),
+            "\n    local lua = nomsu:compile(tree)",
+            "\n    lua:remove_free_vars({")
+        local vars = table.map(\%actions[1]:get_args(), function(a)
+            return "Var("..repr(tostring(a.source))..", "..repr(a[1])..")"
         end)
+        lua:concat_append(vars, ", ")
+        lua:append("})\n    return lua\nend)")
 
-        A_action_1_2 = compile_time(function(tree, \%actions, \%body, is_compile_time)
-            local lua = Lua(tree.source, "A", string.as_lua_id(\%actions[1].stub), " = ")
-            if is_compile_time then lua:append("compile_time") end
-            lua:append("(function(")
-            local args = \%actions[1]:get_args()
-            local lua_args = table.map(args, function(a) return nomsu:tree_to_lua(a) end)
-            if is_compile_time then table.insert(lua_args, 1, "tree") end
-            lua:concat_append(lua_args, ", ")
-            local body_lua = nomsu:tree_to_lua(\%body):as_statements("return ")
-            body_lua:remove_free_vars(args)
-            body_lua:declare_locals()
-            lua:append(")\n    ", body_lua, "\nend)")
-            for i=2,#\%actions do
-                lua:append("\n", A_give_1_nickname_2(\%actions[i], \%actions[1], \%actions[i], is_compile_time))
-            end
-            return lua
-        end)
+        for i=2,#\%actions do
+            lua:append("\n", nomsu.COMPILE_ACTIONS["give % nickname %"](nomsu, \%actions[i], \%actions[1], \%actions[i], true))
+        end
+        return lua
+    end)
 
-        A_compile_1_to_2 = compile_time(function(tree, \%actions, \%body)
-            return A_action_1_2(tree, \%actions, \%body, true)
-        end)
+    nomsu.COMPILE_ACTIONS["local action % %"] = (function(nomsu, tree, \%actions, \%body, is_compile_time)
+        local lua = LuaCode(tree.source)
+        if is_compile_time then
+            lua:append("nomsu.COMPILE_ACTIONS[", repr(\%actions[1].stub), "] = ")
+        else
+            lua:append("A", string.as_lua_id(\%actions[1].stub), " = ")
+            lua:add_free_vars({"A"..string.as_lua_id(\%actions[1].stub)})
+        end
+        lua:append("(function(")
+        local args = \%actions[1]:get_args()
+        local lua_args = table.map(args, function(a) return nomsu:compile(a) end)
+        if is_compile_time then
+            table.insert(lua_args, 1, "nomsu")
+            table.insert(lua_args, 2, "tree")
+        end
+        lua:concat_append(lua_args, ", ")
+        local body_lua = nomsu:compile(\%body):as_statements("return ")
+        body_lua:remove_free_vars(args)
+        body_lua:declare_locals()
+        lua:append(")\n    ", body_lua, "\nend)")
+        for i=2,#\%actions do
+            lua:append("\n", nomsu.COMPILE_ACTIONS["give % nickname %"](nomsu, \%actions[i], \%actions[1], \%actions[i], is_compile_time))
+        end
+        return lua
+    end)
+
+    -- Compile-time actions are always global, since they affect the state of the compiler
+    nomsu.COMPILE_ACTIONS["compile % to %"] = (function(nomsu, tree, \%actions, \%body)
+        local lua = nomsu.COMPILE_ACTIONS["local action % %"](nomsu, tree, \%actions, \%body, true)
+        return lua
+    end)
+
+    nomsu.COMPILE_ACTIONS["action % %"] = (function(nomsu, tree, \%actions, \%body)
+        local lua = nomsu.COMPILE_ACTIONS["local action % %"](nomsu, tree, \%actions, \%body)
+        lua:remove_free_vars(table.map(\%actions, function(a) return "A"..a.stub:as_lua_id() end))
+        return lua
+    end)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 compile [remove action %action] to
     Lua ".."
@@ -93,90 +126,87 @@ compile [remove action %action] to
         ARG_ORDERS[fn] = nil
         COMPILE_TIME[fn] = nil
 
-immediately
-    action [%tree as nomsu]
-        =lua "nomsu:tree_to_nomsu(\%tree)"
+action [%tree as nomsu]
+    =lua "nomsu:tree_to_nomsu(\%tree)"
 
-    action [%tree as inline nomsu]
-        =lua "nomsu:tree_to_nomsu(\%tree, true)"
+action [%tree as inline nomsu]
+    =lua "nomsu:tree_to_nomsu(\%tree, true)"
 
-    action [%tree as lua]
-        =lua "nomsu:tree_to_lua(\%tree)"
+action [%tree as lua]
+    =lua "nomsu:compile(\%tree)"
 
-    action [%tree as lua expr]
-        lua> ".."
-            local lua = nomsu:tree_to_lua(\%tree)
-            if not lua.is_value then
-                compile_error(\%tree, "Invalid thing to convert to lua expr:\n%s")
-            end
-            return lua
+action [%tree as lua expr]
+    lua> ".."
+        local lua = nomsu:compile(\%tree)
+        if not lua.is_value then
+            nomsu:compile_error(\%tree, "Invalid thing to convert to lua expr:\n%s")
+        end
+        return lua
 
-    action [%tree as lua statements]
-        =lua "nomsu:tree_to_lua(\%tree):as_statements()"
+action [%tree as lua statements]
+    =lua "nomsu:compile(\%tree):as_statements()"
 
-    action [%tree as lua return]
-        =lua "nomsu:tree_to_lua(\%tree):as_statements('return ')"
+action [%tree as lua return]
+    =lua "nomsu:compile(\%tree):as_statements('return ')"
 
-    action [%var as lua identifier, %var as lua id]
-        lua> ".."
-            if type(\%var) == 'string' then return string.as_lua_id(\%var)
-            elseif \%var.type == 'Var' then return string.as_lua_id(\%var[1])
-            elseif \%var.type == 'Action' then return "A"..string.as_lua_id(\%var.stub)
-            end
+action [%var as lua identifier, %var as lua id]
+    lua> ".."
+        if type(\%var) == 'string' then return string.as_lua_id(\%var)
+        elseif \%var.type == 'Var' then return string.as_lua_id(\%var[1])
+        elseif \%var.type == 'Action' then return "A"..string.as_lua_id(\%var.stub)
+        end
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-immediately
-    compile [%tree with %t -> %replacement] to
-        Lua value ".."
-            \(%tree as lua expr):map(function(\(%t as lua expr))
-                \(%replacement as lua return)
-            end)
-    
-    compile [declare locals in %code] to
-        Lua value "\(%code as lua expr):declare_locals()"
-    
-    compile [declare locals %locals in %code] to
-        Lua value "\(%code as lua expr):declare_locals(\(%locals as lua expr))"
-    
-    compile [remove free vars %vars from %code] to
-        Lua "\(%code as lua expr):remove_free_vars(\(%vars as lua expr));"
+compile [%tree with %t -> %replacement] to
+    Lua value ".."
+        \(%tree as lua expr):map(function(\(%t as lua expr))
+            \(%replacement as lua return)
+        end)
 
-    parse [%lua <-write %code, to %lua write %code] as: lua> "\%lua:append(\%code);"
+compile [declare locals in %code] to
+    Lua value "\(%code as lua expr):declare_locals()"
 
-immediately
-    compile [quote %s] to
-        Lua value ".."
-            ('"'..\(%s as lua expr):gsub("\\\\", "\\\\\\\\"):gsub("\n","\\\\n"):gsub('"', '\\\\"')..'"')
-    compile [type of %obj] to: Lua value "type(\(%obj as lua expr))"
+compile [declare locals %locals in %code] to
+    Lua value "\(%code as lua expr):declare_locals(\(%locals as lua expr))"
 
-immediately
-    compile [parse %text] to
-        Lua value ".."
-            nomsu:parse(Nomsu("\("\(%text.source)")", \(%text as lua expr)))
+compile [remove free vars %vars from %code] to
+    Lua "\(%code as lua expr):remove_free_vars(\(%vars as lua expr));"
 
-    compile [run %nomsu_code] to
-        Lua value "nomsu:run(Nomsu(\(quote "\(%nomsu_code.source)"), \(%nomsu_code as lua expr)))"
+parse [%lua <-write %code, to %lua write %code] as: lua> "\%lua:append(\%code);"
 
-    action [run tree %tree, %tree as value]
-        lua> ".."
-            if \%tree.type == 'Text' and #\%tree == 1 and type(\%tree[1]) == 'string' then
-                return \%tree[1]
-            end
-            local lua = Lua(\%tree.source, "return ",nomsu:tree_to_lua(\%tree))
-            return nomsu:run_lua(lua)
+compile [quote %s] to
+    Lua value ".."
+        ('"'..\(%s as lua expr):gsub("\\\\", "\\\\\\\\"):gsub("\n","\\\\n"):gsub('"', '\\\\"')..'"')
+compile [type of %obj] to: Lua value "type(\(%obj as lua expr))"
 
-    compile [compile %block, compiled %block, %block compiled] to
-        Lua value "nomsu:tree_to_lua(\(%block as lua))"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Return
-immediately
-    # Return statement is wrapped in a do..end block because Lua is unhappy if you
-        put code after a return statement, unless you wrap it in a block.
-    compile [return] to: Lua "do return; end"
-    compile [return %return_value] to: Lua "do return \(%return_value as lua expr); end"
+compile [parse %text] to
+    Lua value ".."
+        nomsu:parse(NomsuCode("\("\(%text.source)")", \(%text as lua expr)))
+
+compile [run %nomsu_code] to
+    Lua value "nomsu:run(NomsuCode(\(quote "\(%nomsu_code.source)"), \(%nomsu_code as lua expr)))"
+
+action [run tree %tree, %tree as value]
+    lua> ".."
+        if \%tree.type == 'Text' and #\%tree == 1 and type(\%tree[1]) == 'string' then
+            return \%tree[1]
+        end
+        local lua = LuaCode(\%tree.source, "return ",nomsu:compile(\%tree))
+        return nomsu:run_lua(lua)
+
+compile [compile %block, compiled %block, %block compiled] to
+    Lua value "nomsu:compile(\(%block as lua))"
+
+# Return statement is wrapped in a do..end block because Lua is unhappy if you
+    put code after a return statement, unless you wrap it in a block.
+compile [return] to: Lua "do return; end"
+compile [return %return_value] to: Lua "do return \(%return_value as lua expr); end"
 
 # Literals
-immediately
-    compile [yes] to: Lua value "true"
-    compile [no] to: Lua value "false"
-    compile [nothing, nil, null] to: Lua value "nil"
+compile [yes] to: Lua value "true"
+compile [no] to: Lua value "false"
+compile [nothing, nil, null] to: Lua value "nil"
 

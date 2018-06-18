@@ -3,13 +3,14 @@
 {:repr} = require 'utils'
 {:insert, :remove, :concat} = table
 {:Source} = require "code_obj"
+unpack or= table.unpack
 
 AST = {}
 AST.is_syntax_tree = (n)->
     type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
 
 types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
-    "IndexChain", "Action"}
+    "IndexChain", "Action", "FileChunks"}
 for name in *types
     cls = {}
     with cls

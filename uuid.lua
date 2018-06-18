@@ -1,4 +1,5 @@
 -- A simple UUID function based on RFC 4122: http://www.ietf.org/rfc/rfc4122.txt
+local unpack = unpack or table.unpack
 local function uuid()
     local r = math.random
     -- Set all the other bits to randomly (or pseudo-randomly) chosen values.

@@ -1,13 +1,17 @@
 file:
     (ignored_line %nl)*
-    (block / action / expression)?
+    (file_chunks / block / action / expression)?
     (%nl ignored_line)*
     (!. / (({} (.* -> "Parse error") %userdata) => error))
+
+file_chunks (FileChunks):
+    {| (block/action/expression) (nodent chunk_delimeter nodent (block/action/expression))+ |}
+chunk_delimeter: "~~~" (("~")*)
 
 inline_block (Block):
     {| inline_statement (%ws* ";" %ws*  inline_statement)+ |}
 block (Block):
-    {| statement (nodent (statement / (({} ([^%nl]* -> "Unexpected character while parsing block line") %userdata) => error)))+ |}
+    {| statement (nodent !("~") (statement / (({} ([^%nl]* -> "Unexpected character while parsing block line") %userdata) => error)))+ |}
 
 statement: (action / expression) (eol / (({} ([^%nl]* -> "Unexpected character while parsing line") %userdata) => error))
 inline_statement: inline_action / inline_expression
@@ -49,6 +53,7 @@ index_chain (IndexChain):
 
 -- Actions need either at least 1 word, or at least 2 tokens
 inline_action (Action):
+    !chunk_delimeter
     {|
     (   (inline_expression (%ws* (inline_expression / word))+)
       / (word              (%ws* (inline_expression / word))*))
@@ -56,6 +61,7 @@ inline_action (Action):
         / (({} ('' -> "Missing expression after the ':'") %userdata) => error)))?
     |}
 action (Action):
+    !chunk_delimeter
     {|
        (expression ((nodent "..")? %ws* (expression / word))+)
      / (word       ((nodent "..")? %ws* (expression / word))*)

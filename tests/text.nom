@@ -12,8 +12,9 @@ assume ("\n" = (newline)) or barf "Text literals failed."
 assume (("x" + "y") = "xy")
 assume ((lines in "one\ntwo") = ["one", "two"])
 
-immediately
-    parse [アクション %spec %body] as: action %spec %body
+parse [アクション %spec %body] as: action %spec %body
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 %こんにちは <- "こんにちは"
 アクション [% と言う]

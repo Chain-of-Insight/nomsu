@@ -7,6 +7,7 @@ do
 end
 local Source
 Source = require("code_obj").Source
+local unpack = unpack or table.unpack
 local AST = { }
 AST.is_syntax_tree = function(n)
   return type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
@@ -21,7 +22,8 @@ local types = {
   "Dict",
   "DictEntry",
   "IndexChain",
-  "Action"
+  "Action",
+  "FileChunks"
 }
 for _index_0 = 1, #types do
   local name = types[_index_0]

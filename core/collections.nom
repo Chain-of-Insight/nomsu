@@ -9,162 +9,158 @@ use "core/operators.nom"
 # List/dict functions:
 
 # Indexing
-immediately
-    compile [..]
-        %index st to last in %list, %index nd to last in %list, %index rd to last in %list
-        %index th to last in %list
-    ..to: Lua value "utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))"
+compile [..]
+    %index st to last in %list, %index nd to last in %list, %index rd to last in %list
+    %index th to last in %list
+..to: Lua value "utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))"
 
-immediately
-    parse [last in %list] as: 1st to last in %list
-    parse [first in %list] as: %list.1
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+parse [last in %list] as: 1st to last in %list
+parse [first in %list] as: %list.1
 
 # Membership testing
-immediately
-    action [%item is in %list, %list contains %item, %list has %item]
-        for %key = %value in %list
-            if (%key is %item): return (yes)
-        return (no)
+action [%item is in %list, %list contains %item, %list has %item]
+    for %key = %value in %list
+        if (%key is %item): return (yes)
+    return (no)
 
-    action [..]
-        %item isn't in %list, %item is not in %list
-        %list doesn't contain %item, %list does not contain %item
-        %list doesn't have %item, %list does not have %item
-    ..
-        for %key = %value in %list
-            if (%key is %item): return (no)
-        return (yes)
+action [..]
+    %item isn't in %list, %item is not in %list
+    %list doesn't contain %item, %list does not contain %item
+    %list doesn't have %item, %list does not have %item
+..
+    for %key = %value in %list
+        if (%key is %item): return (no)
+    return (yes)
 
-immediately
-    parse [%list has key %index, %list has index %index] as
-        %list.%index != (nil)
+parse [%list has key %index, %list has index %index] as
+    %list.%index != (nil)
 
-    parse [..]
-        %list doesn't have key %index, %list does not have key %index
-        %list doesn't have index %index, %list does not have index %index
-    ..as
-        %list.%index = (nil)
+parse [..]
+    %list doesn't have key %index, %list does not have key %index
+    %list doesn't have index %index, %list does not have index %index
+..as
+    %list.%index = (nil)
 
-    compile [number of keys in %list] to
-        Lua value "utils.size(\(%list as lua expr))"
+compile [number of keys in %list] to
+    Lua value "utils.size(\(%list as lua expr))"
 
-    compile [append %item to %list, add %item to %list, to %list add %item, to %list append %item] to
-        Lua "table.insert(\(%list as lua expr), \(%item as lua expr))"
+compile [append %item to %list, add %item to %list, to %list add %item, to %list append %item] to
+    Lua "table.insert(\(%list as lua expr), \(%item as lua expr))"
 
-    compile [pop from %list, remove last from %list] to
-        Lua "table.remove(\(%list as lua expr))"
+compile [pop from %list, remove last from %list] to
+    Lua "table.remove(\(%list as lua expr))"
 
-    compile [remove index %index from %list] to
-        Lua "table.remove(\(%list as lua expr), \(%index as lua expr))"
+compile [remove index %index from %list] to
+    Lua "table.remove(\(%list as lua expr), \(%index as lua expr))"
 
 # List Comprehension
-immediately
-    parse [%expression for %item in %iterable] as
-        result of
-            %comprehension <- []
-            for %item in %iterable
-                add %expression to %comprehension
-            return %comprehension
+parse [%expression for %item in %iterable] as
+    result of
+        %comprehension <- []
+        for %item in %iterable
+            add %expression to %comprehension
+        return %comprehension
 
-    parse [..]
-        %expression for %index in %start to %stop via %step
-        %expression for %index in %start to %stop by %step
-    ..as
-        result of
-            %comprehension <- []
-            for %index in %start to %stop via %step
-                add %expression to %comprehension
-            return %comprehension
+parse [..]
+    %expression for %index in %start to %stop via %step
+    %expression for %index in %start to %stop by %step
+..as
+    result of
+        %comprehension <- []
+        for %index in %start to %stop via %step
+            add %expression to %comprehension
+        return %comprehension
 
-    parse [%expression for %var in %start to %stop] as
-        %expression for %var in %start to %stop via 1
+parse [%expression for %var in %start to %stop] as
+    %expression for %var in %start to %stop via 1
 
-    parse [..]
-        %expression for %key = %value in %iterable
-        %expression for (%key,%value) in %iterable
-    ..as
-        result of
-            %comprehension <- []
-            for %key = %value in %iterable
-                add %expression to %comprehension
-            return %comprehension
+parse [..]
+    %expression for %key = %value in %iterable
+    %expression for (%key,%value) in %iterable
+..as
+    result of
+        %comprehension <- []
+        for %key = %value in %iterable
+            add %expression to %comprehension
+        return %comprehension
 
-    # Dict comprehensions
-    parse [..]
-        %key = %value for %item in %iterable
-        (%key,%value) for %item in %iterable
-    ..as
-        result of
-            %comprehension <- {}
-            for %item in %iterable
-                %comprehension.%key <- %value
-            return %comprehension
+# Dict comprehensions
+parse [..]
+    %key = %value for %item in %iterable
+    (%key,%value) for %item in %iterable
+..as
+    result of
+        %comprehension <- {}
+        for %item in %iterable
+            %comprehension.%key <- %value
+        return %comprehension
 
-    parse [..]
-        %key = %value for %src_key = %src_value in %iterable
-        (%key,%value) for (%src_key,%src_value) in %iterable
-    ..as
-        result of
-            %comprehension <- {}
-            for %src_key = %src_value in %iterable
-                %comprehension.%key <- %value
-            return %comprehension
+parse [..]
+    %key = %value for %src_key = %src_value in %iterable
+    (%key,%value) for (%src_key,%src_value) in %iterable
+..as
+    result of
+        %comprehension <- {}
+        for %src_key = %src_value in %iterable
+            %comprehension.%key <- %value
+        return %comprehension
 
-immediately
-    action [%lists flattened]
-        %flat <- []
-        for %list in %lists
-            for %item in %list
-                add %item to %flat
-        return %flat
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action [%lists flattened]
+    %flat <- []
+    for %list in %lists
+        for %item in %list
+            add %item to %flat
+    return %flat
 
-    parse [entries in %dict] as: {key:%k, value:%v} for %k = %v in %dict
-    parse [keys in %dict, keys of %dict] as: %k for %k = %v in %dict
-    parse [values in %dict, values of %dict] as: %v for %k = %v in %dict
+parse [entries in %dict] as: {key:%k, value:%v} for %k = %v in %dict
+parse [keys in %dict, keys of %dict] as: %k for %k = %v in %dict
+parse [values in %dict, values of %dict] as: %v for %k = %v in %dict
 
 # Metatable stuff
-immediately
-    compile [set %dict's metatable to %metatable] to
-        Lua "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
-    
-    compile [%dict with fallback %key -> %value] to
-        Lua value ".."
-            setmetatable(\(%dict as lua expr), {__index=function(self, \(%key as lua expr))
-                local value = \(%value as lua expr)
-                self[\(%key as lua expr)] = value
-                return value
-            end})
+compile [set %dict's metatable to %metatable] to
+    Lua "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
+
+compile [%dict with fallback %key -> %value] to
+    Lua value ".."
+        setmetatable(\(%dict as lua expr), {__index=function(self, \(%key as lua expr))
+            local value = \(%value as lua expr)
+            self[\(%key as lua expr)] = value
+            return value
+        end})
 
 # Sorting
-immediately
-    compile [sort %items] to: Lua "table.sort(\(%items as lua expr));"
-    parse [..]
-        sort %items by %item = %key_expr
-        sort %items by %item -> %key_expr
-    ..as
-        do
-            %keys <- ({} with fallback %item -> %key_expr)
-            lua> "table.sort(\%items, function(x,y) return \%keys[x] < \%keys[y] end)"
+compile [sort %items] to: Lua "table.sort(\(%items as lua expr));"
+parse [..]
+    sort %items by %item = %key_expr
+    sort %items by %item -> %key_expr
+..as
+    do
+        %keys <- ({} with fallback %item -> %key_expr)
+        lua> "table.sort(\%items, function(x,y) return \%keys[x] < \%keys[y] end)"
 
-immediately
-    action [%items sorted, sorted %items]
-        %copy <- (% for % in %items)
-        sort %copy
-        return %copy
-    action [..]
-        %items sorted by %item = %key
-        %items sorted by %item -> %key
-    ..
-        %copy <- (% for % in %items)
-        sort %copy by %item = %key
-        return %copy
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    action [unique %items]
-        %unique <- []
-        %seen <- {}
-        for % in %items
-            unless: %seen.%
-                add % to %unique
-                %seen.% <- (yes)
-        return %unique
+action [%items sorted, sorted %items]
+    %copy <- (% for % in %items)
+    sort %copy
+    return %copy
+action [..]
+    %items sorted by %item = %key
+    %items sorted by %item -> %key
+..
+    %copy <- (% for % in %items)
+    sort %copy by %item = %key
+    return %copy
+
+action [unique %items]
+    %unique <- []
+    %seen <- {}
+    for % in %items
+        unless: %seen.%
+            add % to %unique
+            %seen.% <- (yes)
+    return %unique
 

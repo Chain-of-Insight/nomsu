@@ -3,7 +3,7 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local Lua, Source
+local LuaCode, NomsuCode, Source
 do
   local _class_0
   local _base_0 = {
@@ -242,7 +242,7 @@ do
       if not (self.is_value) then
         return self
       end
-      local statements = Lua(self.source)
+      local statements = LuaCode(self.source)
       if prefix ~= "" then
         statements:append(prefix)
       end
@@ -272,7 +272,7 @@ do
           local _list_1 = self.bits
           for _index_0 = 1, #_list_1 do
             local bit = _list_1[_index_0]
-            if bit.__class == Lua then
+            if bit.__class == LuaCode then
               gather_from(bit)
             end
           end
@@ -357,7 +357,7 @@ do
       self.__str = nil
     end,
     __base = _base_0,
-    __name = "Lua",
+    __name = "LuaCode",
     __parent = _parent_0
   }, {
     __index = function(cls, name)
@@ -380,16 +380,15 @@ do
   _base_0.__class = _class_0
   local self = _class_0
   self.Value = function(...)
-    local lua = Lua(...)
+    local lua = LuaCode(...)
     lua.is_value = true
     return lua
   end
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  Lua = _class_0
+  LuaCode = _class_0
 end
-local Nomsu
 do
   local _class_0
   local _parent_0 = Code
@@ -423,7 +422,7 @@ do
       return _class_0.__parent.__init(self, ...)
     end,
     __base = _base_0,
-    __name = "Nomsu",
+    __name = "NomsuCode",
     __parent = _parent_0
   }, {
     __index = function(cls, name)
@@ -447,11 +446,11 @@ do
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
-  Nomsu = _class_0
+  NomsuCode = _class_0
 end
 return {
   Code = Code,
-  Nomsu = Nomsu,
-  Lua = Lua,
+  NomsuCode = NomsuCode,
+  LuaCode = LuaCode,
   Source = Source
 }

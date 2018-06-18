@@ -3,57 +3,58 @@
 
 use "core"
 
-immediately
-    compile [@, me] to: Lua value "self"
-    compile [set methods %methods] to
-        %lua <- (Lua "")
-        for %m in %methods
-            to %lua write "\nclass.\(%m as lua id) = \(%m as lua id)"
-        return %lua
+compile [@, me] to: Lua value "self"
+compile [set methods %methods] to
+    %lua <- (Lua "")
+    for %m in %methods
+        to %lua write "\nclass.\(%m as lua id) = \(%m as lua id)"
+    return %lua
 
-immediately
-    parse [method %actions %body] as
-        with local %actions
-            action %actions %body
-            set methods %actions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-immediately
-    parse [as %instance %body] as
-        result of
-            %old_self <- (me)
-            (me) <- %instance
-            try
-                %body
-            ..and if it barfs %msg
-                (me) <- %old_self
-                barf %msg
-            ..or if it succeeds
-                (me) <- %old_self
+parse [method %actions %body] as
+    with local %actions
+        action %actions %body
+        set methods %actions
 
-    compile [object %classname extends %parent %class_body] to
-        Lua ".."
-            do
-                local class = {name=\(%classname as lua expr)}
-                setmetatable(class, {
-                    __index=\(%parent as lua expr),
-                    __tostring=function(cls) return cls.name end,
-                    __call=function(cls, inst)
-                        inst = setmetatable(inst or {}, cls)
-                        if cls.A_initialize_1 then
-                            cls.A_initialize_1(inst)
-                        end
-                        return inst
-                    end,
-                })
-                _ENV["A"..string.as_lua_id("new "..class.name)] = class
-                _ENV["A"..string.as_lua_id("new "..class.name.." 1")] = class
-                _ENV["A"..string.as_lua_id("class "..class.name)] = function() return class end
-                class.__index = class
-                class.class = class
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+parse [as %instance %body] as
+    result of
+        %old_self <- (me)
+        (me) <- %instance
+        try
+            %body
+        ..and if it barfs %msg
+            (me) <- %old_self
+            barf %msg
+        ..or if it succeeds
+            (me) <- %old_self
 
-                \(%class_body as lua statements)
+compile [object %classname extends %parent %class_body] to
+    Lua ".."
+        do
+            local class = {name=\(%classname as lua expr)}
+            setmetatable(class, {
+                __index=\(%parent as lua expr),
+                __tostring=function(cls) return cls.name end,
+                __call=function(cls, inst)
+                    inst = setmetatable(inst or {}, cls)
+                    if cls.A_initialize_1 then
+                        cls.A_initialize_1(inst)
+                    end
+                    return inst
+                end,
+            })
+            _ENV["A"..string.as_lua_id("new "..class.name)] = class
+            _ENV["A"..string.as_lua_id("new "..class.name.." 1")] = class
+            _ENV["A"..string.as_lua_id("class "..class.name)] = function() return class end
+            class.__index = class
+            class.class = class
 
-                class.__tostring = class["A"..string.as_lua_id("as text")]
-            end
+            \(%class_body as lua statements)
 
+            class.__tostring = class["A"..string.as_lua_id("as text")]
+        end
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 parse [object %classname %class_body] as: object %classname extends (nil) %class_body

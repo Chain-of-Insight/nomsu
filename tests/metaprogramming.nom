@@ -3,22 +3,22 @@
 
 use "core"
 
-immediately
-    compile [five] to: Lua value "5"
+compile [five] to: Lua value "5"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 assume ((five) = 5) or barf "Compile to expression failed."
 
-immediately
-    compile [loc x] to: Lua "local _x = 99;"
+compile [loc x] to: Lua "local _x = 99;"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 lua> "do"
 loc x
 assume (%x is 99) or barf "Compile to statements with locals failed."
 lua> "end"
 assume (%x is (nil)) or barf "Failed to properly localize a variable."
 
-immediately
-    compile [asdf] to
-        %tmp <- ""
-        return: Lua %tmp
+compile [asdf] to
+    %tmp <- ""
+    return: Lua %tmp
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 asdf
 assume (%tmp is (nil)) or barf "compile to is leaking variables"
 
@@ -28,20 +28,20 @@ action [foo %x]
 assume ((foo 10) = 11) or barf "Action didn't work."
 assume (%y is (nil)) or barf "Action leaked a local into globals."
 
-immediately
-    parse [baz %] as: foo %
+parse [baz %] as: foo %
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 assume ((baz 10) = 11) or barf "Parse as action failed."
 
-immediately
-    parse [V] as: five
+parse [V] as: five
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 assume ((V) = 5) or barf "Parse as compile action failed."
 
-immediately
-    parse [swap %x and %y] as
-        do
-            %tmp <- %x
-            %x <- %y
-            %y <- %tmp
+parse [swap %x and %y] as
+    do
+        %tmp <- %x
+        %x <- %y
+        %y <- %tmp
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 <- {%1:1, %2:2}
 swap %1 and %2
 assume ((%1 = 2) and (%2 = 1)) or barf "'parse % as %' failed on 'swap % and %'"

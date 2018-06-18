@@ -2,7 +2,7 @@
 -- build up generated code, while keeping track of where it came from, and managing
 -- indentation levels.
 {:insert, :remove, :concat} = table
-local Lua, Source
+local LuaCode, NomsuCode, Source
 export LINE_STARTS
 
 class Source
@@ -99,7 +99,7 @@ class Code
             else indents[i] = nil
         @__str = nil
 
-class Lua extends Code
+class LuaCode extends Code
     new: (...)=>
         super ...
         @free_vars = {}
@@ -107,7 +107,7 @@ class Lua extends Code
         @__str = nil
     
     @Value = (...)->
-        lua = Lua(...)
+        lua = LuaCode(...)
         lua.is_value = true
         return lua
 
@@ -140,7 +140,7 @@ class Lua extends Code
     as_statements: (prefix="", suffix=";")=>
         unless @is_value
             return self
-        statements = Lua(@source)
+        statements = LuaCode(@source)
         if prefix != ""
             statements\append prefix
         statements\append self
@@ -157,7 +157,7 @@ class Lua extends Code
                         seen[var] = true
                         to_declare[#to_declare+1] = var
                 for bit in *@bits
-                    if bit.__class == Lua
+                    if bit.__class == LuaCode
                         gather_from bit
             gather_from self
         if #to_declare > 0
@@ -205,7 +205,7 @@ class Lua extends Code
         else
             error "Cannot parenthesize lua statements"
 
-class Nomsu extends Code
+class NomsuCode extends Code
     __tostring: =>
         if @__str == nil
             buff, indents = {}, @indents
@@ -224,4 +224,4 @@ class Nomsu extends Code
         @prepend "("
         @append ")"
 
-return {:Code, :Nomsu, :Lua, :Source}
+return {:Code, :NomsuCode, :LuaCode, :Source}

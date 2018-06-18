@@ -35,7 +35,7 @@ lua> ".."
         };
         for name, e in pairs(escapes) do
             local lua = "'"..e.."'"
-            _ENV["A"..name:as_lua_id()] = compile_time(function(tree) return Lua.Value(tree.source, lua) end)
+            nomsu.COMPILE_ACTIONS[name] = (function(nomsu, tree) return LuaCode.Value(tree.source, lua) end)
         end
         local colors = {
             ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
@@ -50,9 +50,9 @@ lua> ".."
         for name, c in pairs(colors) do
             local color = "'"..c.."'";
             local reset = "'"..colors["reset color"].."'";
-            _ENV["A"..name:as_lua_id()] = compile_time(function(tree) return Lua.Value(tree.source, color) end)
-            _ENV["A"..name:as_lua_id().."_1"] = compile_time(function(tree, text)
-                return Lua.Value(tree.source, color, "..", nomsu:tree_to_lua(text), "..", reset);
+            nomsu.COMPILE_ACTIONS[name] = (function(nomsu, tree) return LuaCode.Value(tree.source, color) end)
+            nomsu.COMPILE_ACTIONS[name.." %"] = (function(nomsu, tree, text)
+                return LuaCode.Value(tree.source, color, "..", nomsu:tree_to_lua(text), "..", reset);
             end)
         end
     end

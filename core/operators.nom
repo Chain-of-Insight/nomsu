@@ -5,158 +5,175 @@ use "core/metaprogramming.nom"
 use "core/errors.nom"
 
 # Comparison Operators
-immediately
-    compile [%x < %y] to: Lua value "(\(%x as lua expr) < \(%y as lua expr))"
-    compile [%x > %y] to: Lua value "(\(%x as lua expr) > \(%y as lua expr))"
-    compile [%x <= %y] to: Lua value "(\(%x as lua expr) <= \(%y as lua expr))"
-    compile [%x >= %y] to: Lua value "(\(%x as lua expr) >= \(%y as lua expr))"
-    compile [%a is %b, %a = %b, %a == %b] to
-        Lua value "(\(%a as lua expr) == \(%b as lua expr))"
-    compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
-        Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
-    # For strict identity checking, use (%x's id) is (%y's id)
-    compile [%'s id, id of %] to: Lua value "nomsu.ids[\(% as lua expr)]"
+compile [%x < %y] to: Lua value "(\(%x as lua expr) < \(%y as lua expr))"
+compile [%x > %y] to: Lua value "(\(%x as lua expr) > \(%y as lua expr))"
+compile [%x <= %y] to: Lua value "(\(%x as lua expr) <= \(%y as lua expr))"
+compile [%x >= %y] to: Lua value "(\(%x as lua expr) >= \(%y as lua expr))"
+compile [%a is %b, %a = %b, %a == %b] to
+    Lua value "(\(%a as lua expr) == \(%b as lua expr))"
+compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
+    Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
+# For strict identity checking, use (%x's id) is (%y's id)
+lua> ".."
+    do
+        local new_uuid = require('uuid')
+        local NaN_surrogate = {}
+        local nil_surrogate = {}
+        IDS = setmetatable({}, {
+            __mode = "k",
+            __index = function(self, key)
+                if key == nil then return self[nil_surrogate]
+                elseif key ~= key then return self[NaN_surrogate] end
+                local id = new_uuid()
+                self[key] = id
+                return id
+            end
+        })
+    end
+compile [%'s id, id of %] to: Lua value "IDS[\(% as lua expr)]"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Variable assignment operator
-immediately
-    compile [%var <- %value] to
-        lua> "local \%var_lua = \(%var as lua)"
-        assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-        lua> ".."
+compile [%var <- %value] to
+    lua> "local \%var_lua = \(%var as lua)"
+    assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
+    lua> ".."
+        \%value = \%value:map(function(t)
+            if Action:is_instance(t) and t.stub == "?" then
+                return \%var
+            end
+        end)
+        local \%value_lua = \(%value as lua)
+
+    assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
+    lua> ".."
+        local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
+        if \%var.type == 'Var' then
+            lua:add_free_vars({\%var})
+        end
+        return lua
+
+# Simultaneous mutli-assignments like: x,y,z = 1,x,3;
+compile [<- %assignments, assign %assignments] to
+    assume (%assignments.type is "Dict") or barf ".."
+        Expected a Dict for the assignments part of '<- %' statement, not \%assignments
+    lua> ".."
+        local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
+        for i, item in ipairs(\%assignments) do
+            local \%target, \%value = item[1], item[2]
             \%value = \%value:map(function(t)
                 if Action:is_instance(t) and t.stub == "?" then
-                    return \%var
+                    return \%target
                 end
             end)
-            local \%value_lua = \(%value as lua)
-
-        assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
-        lua> ".."
-            local lua = Lua(tree.source, \%var_lua, ' = ', \%value_lua, ';')
-            if \%var.type == 'Var' then
-                lua:add_free_vars({\%var})
+            local target_lua = \(%target as lua)
+            if not target_lua.is_value then error("Invalid target for assignment: "..\(%target as text)) end
+            local value_lua = \(%value as lua)
+            if not value_lua.is_value then error("Invalid value for assignment: "..\(%value as text)) end
+            if \%target.type == "Var" then
+                lhs:add_free_vars({\%target})
             end
-            return lua;
-
-immediately
-    # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
-    compile [<- %assignments, assign %assignments] to
-        assume (%assignments.type is "Dict") or barf ".."
-            Expected a Dict for the assignments part of '<- %' statement, not \%assignments
-        lua> ".."
-            local lhs, rhs = Lua(tree.source), Lua(tree.source)
-            for i, item in ipairs(\%assignments) do
-                local \%target, \%value = item[1], item[2]
-                \%value = \%value:map(function(t)
-                    if Action:is_instance(t) and t.stub == "?" then
-                        return \%target
-                    end
-                end)
-                local target_lua = \(%target as lua)
-                if not target_lua.is_value then error("Invalid target for assignment: "..\(%target as text)) end
-                local value_lua = \(%value as lua)
-                if not value_lua.is_value then error("Invalid value for assignment: "..\(%value as text)) end
-                if \%target.type == "Var" then
-                    lhs:add_free_vars({\%target})
-                end
-                if i > 1 then
-                    lhs:append(", ")
-                    rhs:append(", ")
-                end
-                lhs:append(target_lua)
-                rhs:append(value_lua)
+            if i > 1 then
+                lhs:append(", ")
+                rhs:append(", ")
             end
-            return Lua(tree.source, lhs, " = ", rhs, ";")
+            lhs:append(target_lua)
+            rhs:append(value_lua)
+        end
+        return LuaCode(tree.source, lhs, " = ", rhs, ";")
 
-immediately
-    compile [external %var <- %value] to
-        %var_lua <- (%var as lua)
-        assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-        %value_lua <- (%value as lua)
-        assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
-        return: Lua "\%var_lua = \%value_lua;"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    compile [with external %externs %body] to
-        %body_lua <- (%body as lua statements)
-        lua> "\%body_lua:remove_free_vars(\%externs);"
-        return %body_lua
+compile [external %var <- %value] to
+    %var_lua <- (%var as lua)
+    assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
+    %value_lua <- (%value as lua)
+    assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
+    return: Lua "\%var_lua = \%value_lua;"
 
-    compile [with %assignments %body] to
-        %lua <- (%body as lua statements)
-        lua> ".."
-            local lhs, rhs = Lua(tree.source), Lua(tree.source)
-            local vars = {}
-            for i, item in ipairs(\%assignments) do
-                local \%target, \%value = item[1], item[2]
-                if not \%target.type == "Var" then
-                    error("Invalid target for 'with' assignment: "..tostring(\%target))
-                end
-                local target_lua = \(%target as lua)
-                local value_lua = \(%value as lua)
-                if not value_lua.is_value then
-                    error("Invalid value for assignment: "..tostring(\%value))
-                end
-                if \%target.type == "Var" then
-                    lhs:add_free_vars({\%target})
-                end
-                if i > 1 then
-                    lhs:append(", ")
-                    rhs:append(", ")
-                end
-                lhs:append(target_lua)
-                rhs:append(value_lua)
-                vars[i] = \%target
+compile [with external %externs %body] to
+    %body_lua <- (%body as lua statements)
+    lua> "\%body_lua:remove_free_vars(\%externs);"
+    return %body_lua
+
+compile [with %assignments %body] to
+    %lua <- (%body as lua statements)
+    lua> ".."
+        local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
+        local vars = {}
+        for i, item in ipairs(\%assignments) do
+            local \%target, \%value = item[1], item[2]
+            if not \%target.type == "Var" then
+                error("Invalid target for 'with' assignment: "..tostring(\%target))
             end
-            \%lua:remove_free_vars(vars)
-            \%lua:prepend("local ", lhs, " = ", rhs, ";\n")
-        return
-            Lua ".."
-                do
-                    \%lua
-                end -- 'with' block
+            local target_lua = \(%target as lua)
+            local value_lua = \(%value as lua)
+            if not value_lua.is_value then
+                error("Invalid value for assignment: "..tostring(\%value))
+            end
+            if \%target.type == "Var" then
+                lhs:add_free_vars({\%target})
+            end
+            if i > 1 then
+                lhs:append(", ")
+                rhs:append(", ")
+            end
+            lhs:append(target_lua)
+            rhs:append(value_lua)
+            vars[i] = \%target
+        end
+        \%lua:remove_free_vars(vars)
+        \%lua:prepend("local ", lhs, " = ", rhs, ";\n")
+    return
+        Lua ".."
+            do
+                \%lua
+            end -- 'with' block
 
-immediately
-    # Math Operators
-    compile [%x wrapped around %y, %x mod %y] to: Lua value "(\(%x as lua expr) % \(%y as lua expr))"
+# Math Operators
+compile [%x wrapped around %y, %x mod %y] to: Lua value "(\(%x as lua expr) % \(%y as lua expr))"
 
-    # 3-part chained comparisons
-    # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
-    parse [%x <  %y <  %z] as: =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"
-    parse [%x <= %y <  %z] as: =lua "(function(x,y,z) return x <= y and y <  z; end)(\%x,\%y,\%z)"
-    parse [%x <  %y <= %z] as: =lua "(function(x,y,z) return x <  y and y <= z; end)(\%x,\%y,\%z)"
-    parse [%x <= %y <= %z] as: =lua "(function(x,y,z) return x <= y and y <= z; end)(\%x,\%y,\%z)"
-    parse [%x >  %y >  %z] as: =lua "(function(x,y,z) return x >  y and y >  z; end)(\%x,\%y,\%z)"
-    parse [%x >= %y >  %z] as: =lua "(function(x,y,z) return x >= y and y >  z; end)(\%x,\%y,\%z)"
-    parse [%x >  %y >= %z] as: =lua "(function(x,y,z) return x >  y and y >= z; end)(\%x,\%y,\%z)"
-    parse [%x >= %y >= %z] as: =lua "(function(x,y,z) return x >= y and y >= z; end)(\%x,\%y,\%z)"
-    # TODO: optimize for common case where x,y,z are all either variables or number literals
+# 3-part chained comparisons
+# (uses a lambda to avoid re-evaluating middle value, while still being an expression)
+parse [%x <  %y <  %z] as: =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"
+parse [%x <= %y <  %z] as: =lua "(function(x,y,z) return x <= y and y <  z; end)(\%x,\%y,\%z)"
+parse [%x <  %y <= %z] as: =lua "(function(x,y,z) return x <  y and y <= z; end)(\%x,\%y,\%z)"
+parse [%x <= %y <= %z] as: =lua "(function(x,y,z) return x <= y and y <= z; end)(\%x,\%y,\%z)"
+parse [%x >  %y >  %z] as: =lua "(function(x,y,z) return x >  y and y >  z; end)(\%x,\%y,\%z)"
+parse [%x >= %y >  %z] as: =lua "(function(x,y,z) return x >= y and y >  z; end)(\%x,\%y,\%z)"
+parse [%x >  %y >= %z] as: =lua "(function(x,y,z) return x >  y and y >= z; end)(\%x,\%y,\%z)"
+parse [%x >= %y >= %z] as: =lua "(function(x,y,z) return x >= y and y >= z; end)(\%x,\%y,\%z)"
+# TODO: optimize for common case where x,y,z are all either variables or number literals
 
-    # Boolean Operators
-    compile [%x and %y] to: Lua value "(\(%x as lua expr) and \(%y as lua expr))"
-    compile [%x or %y] to: Lua value "(\(%x as lua expr) or \(%y as lua expr))"
+# Boolean Operators
+compile [%x and %y] to: Lua value "(\(%x as lua expr) and \(%y as lua expr))"
+compile [%x or %y] to: Lua value "(\(%x as lua expr) or \(%y as lua expr))"
 
-    # Bitwise Operators
-    compile [%a OR %b, %a | %b] to: Lua value "bit32.bor(\(%a as lua expr), \(%b as lua expr))"
-    compile [%a XOR %b] to: Lua value "bit32.bxor(\(%a as lua expr), \(%b as lua expr))"
-    compile [%a AND %b, %a & %b] to: Lua value "bit32.band(\(%a as lua expr), \(%b as lua expr))"
-    compile [NOT %, ~ %] to: Lua value "bit32.bnot(\(% as lua expr))"
-    compile [%x LSHIFT %shift, %x << %shift] to: Lua value "bit32.lshift(\(%x as lua expr), \(%shift as lua expr))"
-    compile [%x RSHIFT %shift, %x >>> %shift] to: Lua value "bit32.rshift(\(%x as lua expr), \(%shift as lua expr))"
-    compile [%x ARSHIFT %shift, %x >> %shift] to: Lua value "bit32.arshift(\(%x as lua expr), \(%shift as lua expr))"
-    # TODO: implement OR, XOR, AND for multiple operands?
+# Bitwise Operators
+# TODO: support bit.???() for luajit and bit32.??? for lua 5.2
+compile [%a OR %b, %a | %b] to: Lua value "(\(%a as lua expr) | \(%b as lua expr))"
+compile [%a XOR %b] to: Lua value "(\(%a as lua expr) ^ \(%b as lua expr))"
+compile [%a AND %b, %a & %b] to: Lua value "(\(%a as lua expr) & \(%b as lua expr))"
+compile [NOT %, ~ %] to: Lua value "~(\(% as lua expr))"
+compile [%x LSHIFT %shift, %x << %shift] to: Lua value "(\(%x as lua expr) << \(%shift as lua expr))"
+compile [%x RSHIFT %shift, %x >>> %shift] to: Lua value "(\(%x as lua expr) >>> \(%shift as lua expr))"
+compile [%x ARSHIFT %shift, %x >> %shift] to: Lua value "(\(%x as lua expr) >> \(%shift as lua expr))"
+# TODO: implement OR, XOR, AND for multiple operands?
 
-    # Unary operators
-    compile [- %] to: Lua value "(- \(% as lua expr))"
-    compile [not %] to: Lua value "(not \(% as lua expr))"
-    compile [length of %list] to: Lua value "(#\(%list as lua expr))"
+# Unary operators
+compile [- %] to: Lua value "(- \(% as lua expr))"
+compile [not %] to: Lua value "(not \(% as lua expr))"
+compile [length of %list] to: Lua value "(#\(%list as lua expr))"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Update operators
-immediately
-    parse [%var + <- %, %var +<- %] as: %var <- (%var + %)
-    parse [%var - <- %, %var -<- %] as: %var <- (%var - %)
-    parse [%var * <- %, %var *<- %] as: %var <- (%var * %)
-    parse [%var / <- %, %var /<- %] as: %var <- (%var / %)
-    parse [%var ^ <- %, %var ^<- %] as: %var <- (%var ^ %)
-    parse [%var and <- %] as: %var <- (%var and %)
-    parse [%var or <- %] as: %var <- (%var or %)
-    parse [wrap %var around %] as: %var <- (%var wrapped around %)
+parse [%var + <- %, %var +<- %] as: %var <- (%var + %)
+parse [%var - <- %, %var -<- %] as: %var <- (%var - %)
+parse [%var * <- %, %var *<- %] as: %var <- (%var * %)
+parse [%var / <- %, %var /<- %] as: %var <- (%var / %)
+parse [%var ^ <- %, %var ^<- %] as: %var <- (%var ^ %)
+parse [%var and <- %] as: %var <- (%var and %)
+parse [%var or <- %] as: %var <- (%var or %)
+parse [wrap %var around %] as: %var <- (%var wrapped around %)
