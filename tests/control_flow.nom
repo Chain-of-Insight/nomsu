@@ -115,6 +115,12 @@ for %key = %value in {x:1,y:2}
     stop %value
     barf "stopping value failed"
 
+for %key = %value in {x:1}
+    stop %key
+    stop %value
+    do next %key
+    do next %value
+
 for %key = %value in {x:1,y:2}
     do next %key
     barf "skipping key failed"
