@@ -162,7 +162,8 @@ parse = function(nomsu_code, source)
       end
       errors = _accum_0
     end
-    error(table.concat(errors, "\n\n"), 0)
+    io.stderr:write("Errors occurred while parsing:\n\n", table.concat(errors, "\n\n"), '\n')
+    os.exit(1)
   end
   return tree
 end

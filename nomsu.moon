@@ -157,4 +157,8 @@ run = ->
             elseif not ok
                 print_err_msg ret
 
-run_safely(run)
+has_ldt, ldt = pcall(require,'ldt')
+if has_ldt
+    ldt.guard(run)
+else
+    run_safely(run)

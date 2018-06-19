@@ -187,4 +187,9 @@ run = function()
     end
   end
 end
-return run_safely(run)
+local has_ldt, ldt = pcall(require, 'ldt')
+if has_ldt then
+  return ldt.guard(run)
+else
+  return run_safely(run)
+end

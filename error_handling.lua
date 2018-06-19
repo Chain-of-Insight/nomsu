@@ -3,16 +3,15 @@ local ok, to_lua = pcall(function()
   return require('moonscript.base').to_lua
 end)
 if not ok then
-  to_lua = nil
+  to_lua = function()
+    return nil
+  end
 end
-local moonscript_line_tables = setmetatable({ }, {
-  __index = function(self, filename)
-    if not (to_lua) then
-      return nil
-    end
-    local _, line_table = to_lua(FILE_CACHE[filename])
-    self[filename] = line_table
-    return line_table
+local MOON_SOURCE_MAP = setmetatable({ }, {
+  __index = function(self, file)
+    local _, line_table = to_lua(file)
+    self[file] = line_table or false
+    return line_table or false
   end
 })
 debug.getinfo = function(thread, f, what)
@@ -57,21 +56,6 @@ print_err_msg = function(error_message, stack_offset)
   end
   io.stderr:write(tostring(colored.red("ERROR:")) .. " " .. tostring(colored.bright(colored.red((error_message or "")))) .. "\n")
   io.stderr:write("stack traceback:\n")
-  ok, to_lua = pcall(function()
-    return require('moonscript.base').to_lua
-  end)
-  if not ok then
-    to_lua = function()
-      return nil
-    end
-  end
-  local LINE_TABLES = setmetatable({ }, {
-    __index = function(self, file)
-      local _, line_table = to_lua(file)
-      self[file] = line_table or false
-      return line_table or false
-    end
-  })
   local get_line
   get_line = function(file, line_no)
     local start = LINE_STARTS[file][line_no] or 1
@@ -116,7 +100,20 @@ print_err_msg = function(error_message, stack_offset)
           local file = FILE_CACHE[filename]:sub(tonumber(start), tonumber(stop))
           local err_line = get_line(file, calling_fn.currentline):sub(1, -2)
           local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)")))
-          name = "action '" .. tostring(calling_fn.name) .. "'"
+          if calling_fn.name then
+            do
+              local tmp = calling_fn.name:match("^A_([a-zA-Z0-9_]*)$")
+              if tmp then
+                name = "action '" .. tostring(tmp:gsub("_", " "):gsub("x([0-9A-F][0-9A-F])", function(self)
+                  return string.char(tonumber(self, 16))
+                end)) .. "'"
+              else
+                name = "action '" .. tostring(calling_fn.name) .. "'"
+              end
+            end
+          else
+            name = "main chunk"
+          end
           line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement))
         else
           local file
@@ -163,8 +160,8 @@ print_err_msg = function(error_message, stack_offset)
               end
             end
           end
-          if file and calling_fn.short_src:match(".moon$") and LINE_TABLES[file] then
-            local char = LINE_TABLES[file][calling_fn.currentline]
+          if file and calling_fn.short_src:match("%.moon$") and type(MOON_SOURCE_MAP[file]) == 'table' then
+            local char = MOON_SOURCE_MAP[file][calling_fn.currentline]
             line_num = 1
             for _ in file:sub(1, char):gmatch("\n") do
               line_num = line_num + 1
@@ -202,13 +199,8 @@ err_hand = function(error_message)
   print_err_msg(error_message)
   return os.exit(false, true)
 end
-local has_ldt, ldt = pcall(require, 'ldt')
 local safe_run
-if has_ldt then
-  safe_run = ldt.guard
-else
-  safe_run = function(fn)
-    return xpcall(fn, err_hand)
-  end
+safe_run = function(fn)
+  return xpcall(fn, err_hand)
 end
 return safe_run

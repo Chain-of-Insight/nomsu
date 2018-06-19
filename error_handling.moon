@@ -3,14 +3,12 @@ debug_getinfo = debug.getinfo
 export SOURCE_MAP
 
 ok, to_lua = pcall -> require('moonscript.base').to_lua
-if not ok then to_lua = nil
-moonscript_line_tables = setmetatable {}, {
-    __index: (filename)=>
-        return nil unless to_lua
-        _, line_table = to_lua(FILE_CACHE[filename])
-        self[filename] = line_table
-        return line_table
-}
+if not ok then to_lua = -> nil
+MOON_SOURCE_MAP = setmetatable {},
+    __index: (file)=>
+        _, line_table = to_lua(file)
+        self[file] = line_table or false
+        return line_table or false
 
 -- Make a better version of debug.getinfo that provides info about the original source
 -- where the error came from, even if that's in another language.
@@ -37,15 +35,6 @@ debug.getinfo = (thread,f,what)->
 print_err_msg = (error_message, stack_offset=3)->
     io.stderr\write("#{colored.red "ERROR:"} #{colored.bright colored.red (error_message or "")}\n")
     io.stderr\write("stack traceback:\n")
-
-    -- TODO: properly print out the calling site of nomsu code, not just the *called* code
-    ok, to_lua = pcall -> require('moonscript.base').to_lua
-    if not ok then to_lua = -> nil
-    LINE_TABLES = setmetatable {},
-        __index: (file)=>
-            _, line_table = to_lua(file)
-            self[file] = line_table or false
-            return line_table or false
 
     get_line = (file, line_no)->
         start = LINE_STARTS[file][line_no] or 1
@@ -77,7 +66,11 @@ print_err_msg = (error_message, stack_offset=3)->
             err_line = get_line(file, calling_fn.currentline)\sub(1,-2)
             offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)")))
             -- TODO: get name properly
-            name = "action '#{calling_fn.name}'"
+            name = if calling_fn.name
+                if tmp = calling_fn.name\match("^A_([a-zA-Z0-9_]*)$")
+                    "action '#{tmp\gsub("_"," ")\gsub("x([0-9A-F][0-9A-F])", => string.char(tonumber(@, 16)))}'"
+                else "action '#{calling_fn.name}'"
+            else "main chunk"
             line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}")
         else
             ok, file = pcall ->FILE_CACHE[calling_fn.short_src]
@@ -105,8 +98,8 @@ print_err_msg = (error_message, stack_offset=3)->
                                 name = "upvalue '#{varname}'"
                                 if not varname\match("%(")
                                     break
-            if file and calling_fn.short_src\match(".moon$") and LINE_TABLES[file]
-                char = LINE_TABLES[file][calling_fn.currentline]
+            if file and calling_fn.short_src\match("%.moon$") and type(MOON_SOURCE_MAP[file]) == 'table'
+                char = MOON_SOURCE_MAP[file][calling_fn.currentline]
                 line_num = 1
                 for _ in file\sub(1,char)\gmatch("\n") do line_num += 1
                 line = colored.cyan("#{calling_fn.short_src}:#{line_num} in #{name or '?'}")
@@ -131,13 +124,7 @@ err_hand = (error_message)->
     print_err_msg error_message
     os.exit(false, true)
 
--- Note: xpcall has a slightly different API in Lua <=5.1 vs. >=5.2, but this works
--- for both APIs
-has_ldt, ldt = pcall(require,'ldt')
-safe_run = if has_ldt
-    ldt.guard
-else
-    (fn)->
-        xpcall(fn, err_hand)
+safe_run = (fn)->
+    xpcall(fn, err_hand)
 
 return safe_run

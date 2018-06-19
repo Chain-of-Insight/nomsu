@@ -116,7 +116,8 @@ parse = (nomsu_code, source=nil)->
         keys = utils.keys(userdata.errors)
         table.sort(keys)
         errors = [userdata.errors[k] for k in *keys]
-        error(table.concat(errors, "\n\n"), 0)
+        io.stderr\write("Errors occurred while parsing:\n\n", table.concat(errors, "\n\n"), '\n')
+        os.exit(1)
     
     return tree
 
