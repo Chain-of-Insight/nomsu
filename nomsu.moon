@@ -19,7 +19,7 @@ OPTIONS
 
 lpeg = require 'lpeg'
 re = require 're'
-run_safely = require "error_handling"
+Errhand = require "error_handling"
 NomsuCompiler = require "nomsu_compiler"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
@@ -148,17 +148,18 @@ run = ->
                 break -- Exit
             
             buff = table.concat(buff)
-            FILE_CACHE["REPL#"..repl_line] = buff
+            pseudo_filename = "user input #"..repl_line
+            FILE_CACHE[pseudo_filename] = buff
             err_hand = (error_message)->
-                print_err_msg error_message
-            ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source("REPL#"..repl_line, 1, #buff))
+                Errhand.print_error error_message
+            ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))
             if ok and ret != nil
                 print "= "..repr(ret)
             elseif not ok
-                print_err_msg ret
+                Errhand.print_error ret
 
 has_ldt, ldt = pcall(require,'ldt')
 if has_ldt
     ldt.guard(run)
 else
-    run_safely(run)
+    Errhand.run_safely(run)

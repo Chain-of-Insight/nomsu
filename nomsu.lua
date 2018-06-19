@@ -15,7 +15,7 @@ OPTIONS
 ]=]
 local lpeg = require('lpeg')
 local re = require('re')
-local run_safely = require("error_handling")
+local Errhand = require("error_handling")
 local NomsuCompiler = require("nomsu_compiler")
 local NomsuCode, LuaCode, Source
 do
@@ -173,16 +173,17 @@ run = function()
         break
       end
       buff = table.concat(buff)
-      FILE_CACHE["REPL#" .. repl_line] = buff
+      local pseudo_filename = "user input #" .. repl_line
+      FILE_CACHE[pseudo_filename] = buff
       local err_hand
       err_hand = function(error_message)
-        return print_err_msg(error_message)
+        return Errhand.print_error(error_message)
       end
-      local ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source("REPL#" .. repl_line, 1, #buff))
+      local ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))
       if ok and ret ~= nil then
         print("= " .. repr(ret))
       elseif not ok then
-        print_err_msg(ret)
+        Errhand.print_error(ret)
       end
     end
   end
@@ -191,5 +192,5 @@ local has_ldt, ldt = pcall(require, 'ldt')
 if has_ldt then
   return ldt.guard(run)
 else
-  return run_safely(run)
+  return Errhand.run_safely(run)
 end

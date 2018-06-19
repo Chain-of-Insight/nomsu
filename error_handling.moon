@@ -32,7 +32,7 @@ debug.getinfo = (thread,f,what)->
             info.short_src = info.source\match('@([^[]*)') or info.short_src
     return info
 
-print_err_msg = (error_message, stack_offset=3)->
+print_error = (error_message, stack_offset=3)->
     io.stderr\write("#{colored.red "ERROR:"} #{colored.bright colored.red (error_message or "")}\n")
     io.stderr\write("stack traceback:\n")
 
@@ -120,11 +120,11 @@ print_err_msg = (error_message, stack_offset=3)->
 
     io.stderr\flush!
 
-err_hand = (error_message)->
-    print_err_msg error_message
+error_handler = (error_message)->
+    print_error error_message
     os.exit(false, true)
 
-safe_run = (fn)->
-    xpcall(fn, err_hand)
+run_safely = (fn)->
+    xpcall(fn, error_handler)
 
-return safe_run
+return {:run_safely, :print_error, :error_handler}

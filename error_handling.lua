@@ -49,8 +49,8 @@ debug.getinfo = function(thread, f, what)
   end
   return info
 end
-local print_err_msg
-print_err_msg = function(error_message, stack_offset)
+local print_error
+print_error = function(error_message, stack_offset)
   if stack_offset == nil then
     stack_offset = 3
   end
@@ -194,13 +194,17 @@ print_err_msg = function(error_message, stack_offset)
   end
   return io.stderr:flush()
 end
-local err_hand
-err_hand = function(error_message)
-  print_err_msg(error_message)
+local error_handler
+error_handler = function(error_message)
+  print_error(error_message)
   return os.exit(false, true)
 end
-local safe_run
-safe_run = function(fn)
-  return xpcall(fn, err_hand)
+local run_safely
+run_safely = function(fn)
+  return xpcall(fn, error_handler)
 end
-return safe_run
+return {
+  run_safely = run_safely,
+  print_error = print_error,
+  error_handler = error_handler
+}
