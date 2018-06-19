@@ -512,7 +512,6 @@ do
     if source == nil then
       source = nil
     end
-    assert(type(lua) ~= 'string', "Attempt to run lua string instead of Lua (object)")
     local lua_string = tostring(lua)
     local run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
     if not run_lua_fn then

@@ -345,7 +345,6 @@ with NomsuCompiler
         return ret
 
     .run_lua = (lua, source=nil)=>
-        assert(type(lua) != 'string', "Attempt to run lua string instead of Lua (object)")
         lua_string = tostring(lua)
         run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
         if not run_lua_fn

@@ -195,6 +195,7 @@ do
       end
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
+        assert(type(var) == 'string')
         if not (seen[var]) then
           self.free_vars[#self.free_vars + 1] = var
           seen[var] = true
@@ -209,7 +210,8 @@ do
       local removals = { }
       for _index_0 = 1, #vars do
         local var = vars[_index_0]
-        removals[var[1]] = true
+        assert(type(var) == 'string')
+        removals[var] = true
       end
       local stack = {
         self
@@ -218,7 +220,8 @@ do
         local lua
         lua, stack[#stack] = stack[#stack], nil
         for i = #lua.free_vars, 1, -1 do
-          if removals[lua.free_vars[i][1]] then
+          local free_var = lua.free_vars[i]
+          if removals[free_var] then
             remove(lua.free_vars, i)
           end
         end
@@ -231,26 +234,6 @@ do
         end
       end
       self.__str = nil
-    end,
-    as_statements = function(self, prefix, suffix)
-      if prefix == nil then
-        prefix = ""
-      end
-      if suffix == nil then
-        suffix = ";"
-      end
-      if not (self.is_value) then
-        return self
-      end
-      local statements = LuaCode(self.source)
-      if prefix ~= "" then
-        statements:append(prefix)
-      end
-      statements:append(self)
-      if suffix ~= "" then
-        statements:append(suffix)
-      end
-      return statements
     end,
     declare_locals = function(self, to_declare)
       if to_declare == nil then
@@ -281,18 +264,29 @@ do
       end
       if #to_declare > 0 then
         self:remove_free_vars(to_declare)
-        self:prepend("local " .. tostring(concat((function()
-          local _accum_0 = { }
-          local _len_0 = 1
-          for _index_0 = 1, #to_declare do
-            local v = to_declare[_index_0]
-            _accum_0[_len_0] = type(v) == 'string' and v or string.as_lua_id(v[1])
-            _len_0 = _len_0 + 1
-          end
-          return _accum_0
-        end)(), ", ")) .. ";\n")
+        self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")
       end
       return to_declare
+    end,
+    as_statements = function(self, prefix, suffix)
+      if prefix == nil then
+        prefix = ""
+      end
+      if suffix == nil then
+        suffix = ";"
+      end
+      if not (self.is_value) then
+        return self
+      end
+      local statements = LuaCode(self.source)
+      if prefix ~= "" then
+        statements:append(prefix)
+      end
+      statements:append(self)
+      if suffix ~= "" then
+        statements:append(suffix)
+      end
+      return statements
     end,
     __tostring = function(self)
       if self.__str == nil then

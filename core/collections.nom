@@ -55,6 +55,8 @@ compile [pop from %list, remove last from %list] to
 compile [remove index %index from %list] to
     Lua "table.remove(\(%list as lua expr), \(%index as lua expr))"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # List Comprehension
 parse [%expression for %item in %iterable] as
     result of
@@ -73,6 +75,7 @@ parse [..]
             add %expression to %comprehension
         return %comprehension
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 parse [%expression for %var in %start to %stop] as
     %expression for %var in %start to %stop via 1
 

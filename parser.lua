@@ -9,6 +9,11 @@ do
   local _obj_0 = string
   match, sub, rep, gsub, format, byte, match, find = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match, _obj_0.find
 end
+local NomsuCode, LuaCode, Source
+do
+  local _obj_0 = require("code_obj")
+  NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
+end
 local AST = require("nomsu_tree")
 local NOMSU_DEFS
 do

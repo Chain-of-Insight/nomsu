@@ -50,7 +50,7 @@ compile [%var <- %value] to
     lua> ".."
         local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
         if \%var.type == 'Var' then
-            lua:add_free_vars({\%var})
+            lua:add_free_vars({tostring(nomsu:compile(\%var))})
         end
         return lua
 
@@ -72,7 +72,7 @@ compile [<- %assignments, assign %assignments] to
             local value_lua = \(%value as lua)
             if not value_lua.is_value then error("Invalid value for assignment: "..\(%value as text)) end
             if \%target.type == "Var" then
-                lhs:add_free_vars({\%target})
+                lhs:add_free_vars({tostring(target_lua)})
             end
             if i > 1 then
                 lhs:append(", ")
@@ -94,7 +94,7 @@ compile [external %var <- %value] to
 
 compile [with external %externs %body] to
     %body_lua <- (%body as lua statements)
-    lua> "\%body_lua:remove_free_vars(\%externs);"
+    lua> "\%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))"
     return %body_lua
 
 compile [with %assignments %body] to
@@ -112,16 +112,15 @@ compile [with %assignments %body] to
             if not value_lua.is_value then
                 error("Invalid value for assignment: "..tostring(\%value))
             end
-            if \%target.type == "Var" then
-                lhs:add_free_vars({\%target})
-            end
             if i > 1 then
                 lhs:append(", ")
                 rhs:append(", ")
             end
             lhs:append(target_lua)
             rhs:append(value_lua)
-            vars[i] = \%target
+            if \%target.type == "Var" then
+                vars[i] = tostring(target_lua)
+            end
         end
         \%lua:remove_free_vars(vars)
         \%lua:prepend("local ", lhs, " = ", rhs, ";\n")

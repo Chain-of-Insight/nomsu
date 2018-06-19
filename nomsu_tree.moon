@@ -6,8 +6,8 @@
 unpack or= table.unpack
 
 AST = {}
-AST.is_syntax_tree = (n)->
-    type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
+AST.is_syntax_tree = (n, t=nil)->
+    type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
 
 types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
     "IndexChain", "Action", "FileChunks"}
@@ -19,7 +19,7 @@ for name in *types
         .__name = name
         .type = name
         .is_instance = (x)=> getmetatable(x) == @
-        .__tostring = => "#{@name}(#{concat([repr(v) for v in *@], ', ')})"
+        .__tostring = => "#{@type}(#{repr tostring(@source)}, #{concat([repr(v) for v in *@], ', ')})"
         .map = (fn)=>
             if replacement = fn(@) then return replacement
             replacements = [AST.is_syntax_tree(v) and v\map(fn) or nil for v in *@]

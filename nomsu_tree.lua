@@ -9,8 +9,11 @@ local Source
 Source = require("code_obj").Source
 local unpack = unpack or table.unpack
 local AST = { }
-AST.is_syntax_tree = function(n)
-  return type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n)
+AST.is_syntax_tree = function(n, t)
+  if t == nil then
+    t = nil
+  end
+  return type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
 end
 local types = {
   "Number",
@@ -37,7 +40,7 @@ for _index_0 = 1, #types do
       return getmetatable(x) == self
     end
     cls.__tostring = function(self)
-      return tostring(self.name) .. "(" .. tostring(concat((function()
+      return tostring(self.type) .. "(" .. tostring(repr(tostring(self.source))) .. ", " .. tostring(concat((function()
         local _accum_0 = { }
         local _len_0 = 1
         for _index_1 = 1, #self do

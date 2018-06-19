@@ -115,6 +115,7 @@ class LuaCode extends Code
         return unless #vars > 0
         seen = {[v]:true for v in *@free_vars}
         for var in *vars
+            assert type(var) == 'string'
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
@@ -124,29 +125,20 @@ class LuaCode extends Code
         return unless #vars > 0
         removals = {}
         for var in *vars
-            removals[var[1]] = true
+            assert type(var) == 'string'
+            removals[var] = true
         
         stack = {self}
         while #stack > 0
             lua, stack[#stack] = stack[#stack], nil
             for i=#lua.free_vars,1,-1
-                if removals[lua.free_vars[i][1]]
+                free_var = lua.free_vars[i]
+                if removals[free_var]
                     remove lua.free_vars, i
             for b in *lua.bits
                 if type(b) != 'string'
                     stack[#stack+1] = b
         @__str = nil
-
-    as_statements: (prefix="", suffix=";")=>
-        unless @is_value
-            return self
-        statements = LuaCode(@source)
-        if prefix != ""
-            statements\append prefix
-        statements\append self
-        if suffix != ""
-            statements\append suffix
-        return statements
 
     declare_locals: (to_declare=nil)=>
         if to_declare == nil
@@ -162,8 +154,19 @@ class LuaCode extends Code
             gather_from self
         if #to_declare > 0
             @remove_free_vars to_declare
-            @prepend "local #{concat [type(v) == 'string' and v or string.as_lua_id(v[1]) for v in *to_declare], ", "};\n"
+            @prepend "local #{concat to_declare, ", "};\n"
         return to_declare
+
+    as_statements: (prefix="", suffix=";")=>
+        unless @is_value
+            return self
+        statements = LuaCode(@source)
+        if prefix != ""
+            statements\append prefix
+        statements\append self
+        if suffix != ""
+            statements\append suffix
+        return statements
 
     __tostring: =>
         if @__str == nil

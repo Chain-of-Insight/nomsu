@@ -152,7 +152,7 @@ compile [..]
         %body has subtree % where
             (%.type = "Action") and
                 (%.stub is "do next %") and 
-                    %.3 = %var
+                    %.(3).1 = %var.1
     ..: to %lua write "\n    ::continue_\(%var as lua identifier)::"
     to %lua write "\nend --numeric for-loop"
 
@@ -160,7 +160,7 @@ compile [..]
         %body has subtree % where
             (%.type = "Action") and
                 (%.stub is "stop %") and
-                    %.2 = %var
+                    %.(2).1 = %var.1
     ..
         %lua <-
             Lua ".."
@@ -246,7 +246,7 @@ compile [..]
                     %.2.(1) = %value.(1)
     ..: to %stop_labels write "\n::stop_\(%value as lua identifier)::"
 
-    if: (length of %stop_labels) > 0
+    if: (length of "\%stop_labels") > 0
         %lua <-
             Lua ".."
                 do -- scope for stopping for % = % loop
@@ -300,7 +300,7 @@ compile [when %body] to
             %is_first <- (no)
 
     assume (%fallthroughs = []) or barf "Unfinished fallthrough conditions in 'when' block"
-    assume ((length of %code) > 0) or barf "Empty body for 'when' block"
+    assume ((length of "\%code") > 0) or barf "Empty body for 'when' block"
     to %code write "\nend --when"
     return %code
 
@@ -346,7 +346,7 @@ compile [when %branch_value = ? %body, when %branch_value is ? %body] to
         %is_first <- (no)
     
     assume (%fallthroughs = []) or barf "Unfinished fallthrough conditions in 'when' block"
-    assume ((length of %code) > 0) or barf "No body for 'when % = ?' block!"
+    assume ((length of "\%code") > 0) or barf "No body for 'when % = ?' block!"
     to %code write "\nend"
     %code <-
         Lua ".."
