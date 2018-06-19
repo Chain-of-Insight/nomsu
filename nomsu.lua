@@ -23,7 +23,6 @@ do
   local _obj_0 = string
   match, sub, rep, gsub, format, byte, match, find = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match, _obj_0.find
 end
-local debug_getinfo = debug.getinfo
 local NomsuCode, LuaCode, Source
 do
   local _obj_0 = require("code_obj")
@@ -32,6 +31,7 @@ end
 local AST = require("nomsu_tree")
 local parse = require("parser")
 local STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
+SOURCE_MAP = { }
 string.as_lua_id = function(str)
   local argnum = 0
   str = gsub(str, "x([0-9A-F][0-9A-F])", "x\0%1")
@@ -214,7 +214,6 @@ do
   NomsuCompiler.parse = function(self, ...)
     return parse(...)
   end
-  NomsuCompiler.source_map = { }
   local to_add = {
     repr = repr,
     stringify = stringify,
@@ -518,7 +517,7 @@ do
       error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(line_numbered_lua)))) .. "\n\n" .. tostring(err), 0)
     end
     local source_key = tostring(source or lua.source)
-    if not (self.source_map[source_key]) then
+    if not (SOURCE_MAP[source_key]) then
       local map = { }
       local offset = 1
       source = source or lua.source
@@ -547,7 +546,7 @@ do
       fn(lua)
       map[lua_line] = map[lua_line] or nomsu_line
       map[0] = 0
-      self.source_map[source_key] = map
+      SOURCE_MAP[source_key] = map
     end
     return run_lua_fn()
   end
@@ -1148,7 +1147,7 @@ do
     end
   end
 end
-if arg and debug_getinfo(2).func ~= require then
+if arg and debug.getinfo(2).func ~= require then
   local parser = re.compile([[        args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} {:nomsu_args: {| ("--;" ({[^;]*} ";")*)? |} :} ";"? |} !.
         flag <-
             {:interactive: ("-i" -> true) :}
@@ -1187,204 +1186,6 @@ OPTIONS
   end
   local nomsu = NomsuCompiler
   nomsu.arg = args.nomsu_args
-  local ok, to_lua = pcall(function()
-    return require('moonscript.base').to_lua
-  end)
-  if not ok then
-    to_lua = nil
-  end
-  local moonscript_line_tables = setmetatable({ }, {
-    __index = function(self, filename)
-      if not (to_lua) then
-        return nil
-      end
-      local _, line_table = to_lua(FILE_CACHE[filename])
-      self[filename] = line_table
-      return line_table
-    end
-  })
-  debug.getinfo = function(thread, f, what)
-    if what == nil then
-      f, what, thread = thread, f, nil
-    end
-    if type(f) == 'number' then
-      f = f + 1
-    end
-    local info
-    if thread == nil then
-      info = debug_getinfo(f, what)
-    else
-      info = debug_getinfo(thread, f, what)
-    end
-    if not info or not info.func then
-      return info
-    end
-    if info.short_src or info.source or info.linedefine or info.currentline then
-      do
-        local map = nomsu.source_map[info.source]
-        if map then
-          if info.currentline then
-            info.currentline = assert(map[info.currentline])
-          end
-          if info.linedefined then
-            info.linedefined = assert(map[info.linedefined])
-          end
-          if info.lastlinedefined then
-            info.lastlinedefined = assert(map[info.lastlinedefined])
-          end
-        end
-      end
-    end
-    return info
-  end
-  local print_err_msg
-  print_err_msg = function(error_message, stack_offset)
-    if stack_offset == nil then
-      stack_offset = 3
-    end
-    io.stderr:write(tostring(colored.red("ERROR:")) .. " " .. tostring(colored.bright(colored.red((error_message or "")))) .. "\n")
-    io.stderr:write("stack traceback:\n")
-    ok, to_lua = pcall(function()
-      return require('moonscript.base').to_lua
-    end)
-    if not ok then
-      to_lua = function()
-        return nil
-      end
-    end
-    local nomsu_source = FILE_CACHE["nomsu.moon"]
-    local LINE_TABLES = setmetatable({ }, {
-      __index = function(self, file)
-        local _, line_table = to_lua(file)
-        self[file] = line_table or false
-        return line_table or false
-      end
-    })
-    local get_line
-    get_line = function(file, line_no)
-      local start = LINE_STARTS[file][line_no] or 1
-      local stop = (LINE_STARTS[file][line_no + 1] or 0) - 1
-      return file:sub(start, stop)
-    end
-    local level = stack_offset
-    while true do
-      local _continue_0 = false
-      repeat
-        local calling_fn = debug_getinfo(level)
-        if not calling_fn then
-          break
-        end
-        if calling_fn.func == run then
-          break
-        end
-        level = level + 1
-        local name = calling_fn.name and "function '" .. tostring(calling_fn.name) .. "'" or nil
-        if calling_fn.linedefined == 0 then
-          name = "main chunk"
-        end
-        if name == "run_lua_fn" then
-          _continue_0 = true
-          break
-        end
-        local line = nil
-        do
-          local map = nomsu.source_map[calling_fn.source]
-          if map then
-            if calling_fn.currentline then
-              calling_fn.currentline = assert(map[calling_fn.currentline])
-            end
-            if calling_fn.linedefined then
-              calling_fn.linedefined = assert(map[calling_fn.linedefined])
-            end
-            if calling_fn.lastlinedefined then
-              calling_fn.lastlinedefined = assert(map[calling_fn.lastlinedefined])
-            end
-            local filename, start, stop = calling_fn.source:match('@([^[]*)%[([0-9]+):([0-9]+)]')
-            assert(filename)
-            local file = FILE_CACHE[filename]:sub(tonumber(start), tonumber(stop))
-            local err_line = get_line(file, calling_fn.currentline):sub(1, -2)
-            local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)")))
-            name = "action '" .. tostring(calling_fn.name) .. "'"
-            line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement))
-          else
-            local file
-            ok, file = pcall(function()
-              return FILE_CACHE[calling_fn.short_src]
-            end)
-            if not ok then
-              file = nil
-            end
-            local line_num
-            if name == nil then
-              local search_level = level
-              local _info = debug.getinfo(search_level)
-              while _info and (_info.func == pcall or _info.func == xpcall) do
-                search_level = search_level + 1
-                _info = debug.getinfo(search_level)
-              end
-              if _info then
-                for i = 1, 999 do
-                  local varname, val = debug.getlocal(search_level, i)
-                  if not varname then
-                    break
-                  end
-                  if val == calling_fn.func then
-                    name = "local '" .. tostring(varname) .. "'"
-                    if not varname:match("%(") then
-                      break
-                    end
-                  end
-                end
-                if not (name) then
-                  for i = 1, _info.nups do
-                    local varname, val = debug.getupvalue(_info.func, i)
-                    if not varname then
-                      break
-                    end
-                    if val == calling_fn.func then
-                      name = "upvalue '" .. tostring(varname) .. "'"
-                      if not varname:match("%(") then
-                        break
-                      end
-                    end
-                  end
-                end
-              end
-            end
-            if file and calling_fn.short_src:match(".moon$") and LINE_TABLES[file] then
-              local char = LINE_TABLES[file][calling_fn.currentline]
-              line_num = 1
-              for _ in file:sub(1, char):gmatch("\n") do
-                line_num = line_num + 1
-              end
-              line = colored.cyan(tostring(calling_fn.short_src) .. ":" .. tostring(line_num) .. " in " .. tostring(name or '?'))
-            else
-              line_num = calling_fn.currentline
-              if calling_fn.short_src == '[C]' then
-                line = colored.green(tostring(calling_fn.short_src) .. " in " .. tostring(name or '?'))
-              else
-                line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name or '?'))
-              end
-            end
-            if file then
-              local err_line = get_line(file, line_num):sub(1, -2)
-              local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)$")))
-              line = line .. ("\n        " .. offending_statement)
-            end
-          end
-        end
-        io.stderr:write("    " .. tostring(line) .. "\n")
-        if calling_fn.istailcall then
-          io.stderr:write("    " .. tostring(colored.dim(colored.white("  (...tail calls...)"))) .. "\n")
-        end
-        _continue_0 = true
-      until true
-      if not _continue_0 then
-        break
-      end
-    end
-    return io.stderr:flush()
-  end
   local run
   run = function()
     for i, input in ipairs(args.inputs) do
@@ -1456,8 +1257,7 @@ OPTIONS
       local filename = input_files[_index_0]
       if args.syntax then
         local file_contents = io.open(filename):read('*a')
-        local err
-        ok, err = pcall(nomsu.parse, nomsu, file_contents, Source(filename, 1, #file_contents))
+        local ok, err = pcall(nomsu.parse, nomsu, file_contents, Source(filename, 1, #file_contents))
         if not ok then
           insert(parse_errs, err)
         elseif print_file then
@@ -1515,8 +1315,7 @@ OPTIONS
         err_hand = function(error_message)
           return print_err_msg(error_message)
         end
-        local ret
-        ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source("REPL#" .. repl_line, 1, #buff))
+        local ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source("REPL#" .. repl_line, 1, #buff))
         if ok and ret ~= nil then
           print("= " .. repr(ret))
         elseif not ok then
@@ -1525,19 +1324,7 @@ OPTIONS
       end
     end
   end
-  local err_hand
-  err_hand = function(error_message)
-    print_err_msg(error_message)
-    return os.exit(false, true)
-  end
-  do
-    local ldt
-    ok, ldt = pcall(require, 'ldt')
-    if ok then
-      ldt.guard(run)
-    else
-      xpcall(run, err_hand)
-    end
-  end
+  local run_safely = require("error_handling")
+  run_safely(run)
 end
 return NomsuCompiler

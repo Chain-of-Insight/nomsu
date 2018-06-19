@@ -1,3 +1,4 @@
+-- This file contains the parser, which converts Nomsu text into abstract syntax trees
 lpeg = require 'lpeg'
 re = require 're'
 lpeg.setmaxstack 10000
