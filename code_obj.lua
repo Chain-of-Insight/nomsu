@@ -98,25 +98,34 @@ do
       end
       self.__str = nil
     end,
-    concat_append = function(self, values, joiner)
+    concat_append = function(self, values, joiner, wrapping_joiner)
+      wrapping_joiner = wrapping_joiner or joiner
       local bits, indents = self.bits, self.indents
       local match = string.match
+      local line_len = 0
       for i = 1, #values do
         local b = values[i]
-        assert(b)
         if i > 1 then
-          bits[#bits + 1] = joiner
+          if line_len > 80 then
+            bits[#bits + 1] = wrapping_joiner
+            line_len = 0
+          else
+            bits[#bits + 1] = joiner
+          end
         end
         bits[#bits + 1] = b
-        if type(b) == 'string' then
-          do
-            local spaces = match(b, "\n([ ]*)[^\n]*$")
-            if spaces then
-              self.current_indent = #spaces
-            end
-          end
-        elseif self.current_indent ~= 0 then
+        if type(b) ~= 'string' and self.current_indent ~= 0 then
           indents[#bits] = self.current_indent
+        end
+        local b_str = tostring(b)
+        local line, spaces = match(b_str, "\n(([ ]*)[^\n]*)$")
+        if spaces then
+          if type(b) == 'string' then
+            self.current_indent = #spaces
+          end
+          line_len = #line
+        else
+          line_len = line_len + #b
         end
       end
       self.__str = nil

@@ -67,7 +67,6 @@ NOMSU_DEFS = with {}
         err_line = colored.white(err_line\sub(1, i))..colored.bright(colored.red(err_line\sub(i+1,i+1)))..colored.dim(err_line\sub(i+2,-1))
         err_msg ..= "\n#{err_line}\n#{colored.red pointer}"
         if #next_line > 0 then err_msg ..= "\n"..colored.dim(next_line)
-        --error(err_msg)
         seen_errors[start_pos] = err_msg
         return true
 
@@ -98,7 +97,7 @@ NOMSU_PATTERN = do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]]
-    nomsu_peg = peg_tidier\match(FILE_CACHE["nomsu.peg"])
+    nomsu_peg = peg_tidier\match(io.open("nomsu.peg")\read('*a'))
     re.compile(nomsu_peg, NOMSU_DEFS)
 
 parse = (nomsu_code, source=nil)->

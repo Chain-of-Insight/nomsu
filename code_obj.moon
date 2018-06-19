@@ -66,20 +66,30 @@ class Code
                 indents[#bits] = @current_indent
         @__str = nil
             
-    concat_append: (values, joiner)=>
+    concat_append: (values, joiner, wrapping_joiner)=>
+        wrapping_joiner or= joiner
         bits, indents = @bits, @indents
         match = string.match
+        line_len = 0
         for i=1,#values
             b = values[i]
-            assert(b)
             if i > 1
-                bits[#bits+1] = joiner
+                if line_len > 80
+                    bits[#bits+1] = wrapping_joiner
+                    line_len = 0
+                else
+                    bits[#bits+1] = joiner
             bits[#bits+1] = b
-            if type(b) == 'string'
-                if spaces = match(b, "\n([ ]*)[^\n]*$")
-                    @current_indent = #spaces
-            elseif @current_indent != 0
+            if type(b) != 'string' and @current_indent != 0
                 indents[#bits] = @current_indent
+            b_str = tostring(b)
+            line, spaces = match(b_str, "\n(([ ]*)[^\n]*)$")
+            if spaces
+                if type(b) == 'string'
+                    @current_indent = #spaces
+                line_len = #line
+            else
+                line_len += #b
         @__str = nil
     
     prepend: (...)=>

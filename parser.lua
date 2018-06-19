@@ -127,7 +127,7 @@ do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]])
-  local nomsu_peg = peg_tidier:match(FILE_CACHE["nomsu.peg"])
+  local nomsu_peg = peg_tidier:match(io.open("nomsu.peg"):read('*a'))
   NOMSU_PATTERN = re.compile(nomsu_peg, NOMSU_DEFS)
 end
 local parse
