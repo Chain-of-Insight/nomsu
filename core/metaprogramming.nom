@@ -110,7 +110,7 @@ compile [parse %actions as %body] to
             "\nreturn nomsu:compile(tree)")
         return \(compile as: compile %actions to %new_body)
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 compile [remove action %action] to
     Lua ".."

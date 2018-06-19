@@ -188,7 +188,7 @@ compile [for %var in %iterable %body] to
             (%.type = "Action") and
                 (%.stub is "do next %") and
                     %.3.(1) = %var.(1)
-    ..: to %lua write (Lua "\n    ::continue_\(%var as lua identifier)::")
+    ..: to %lua write (Lua "\n::continue_\(%var as lua identifier)::")
     to %lua write "\nend --foreach-loop"
     if
         %body has subtree % where
@@ -221,14 +221,14 @@ compile [..]
             (%.type = "Action") and
                 (%.stub is "do next %") and
                     %.3.(1) = %key.(1)
-    ..: to %lua write (Lua "\n    ::continue_\(%key as lua identifier)::")
+    ..: to %lua write (Lua "\n::continue_\(%key as lua identifier)::")
 
     if
         %body has subtree % where
             (%.type = "Action") and
                 (%.stub is "do next %") and
                     %.3.(1) = %value.(1)
-    ..: to %lua write (Lua "\n    ::continue_\(%value as lua identifier)::")
+    ..: to %lua write (Lua "\n::continue_\(%value as lua identifier)::")
     to %lua write "\nend --foreach-loop"
     
     %stop_labels <- (Lua "")
@@ -250,8 +250,7 @@ compile [..]
         %lua <-
             Lua ".."
                 do -- scope for stopping for % = % loop
-                    \%lua
-                    \%stop_labels
+                    \%lua\%stop_labels
                 end
     return %lua
 
@@ -378,11 +377,4 @@ compile [do %action then always %final_action] to
 
 # Inline thunk:
 compile [result of %body] to
-    %body <- (%body as lua statements)
-    declare locals in %body
-    return
-        Lua value ".."
-            (function()
-                \%body
-            end)()
-
+    Lua value "(\(compile as: [] -> %body))()"
