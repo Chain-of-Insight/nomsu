@@ -4,7 +4,7 @@
 
 lua> ".."
     nomsu.COMPILE_ACTIONS["% -> %"] = function(nomsu, tree, \%args, \%body)
-        local lua = LuaCode(tree.source, "function(")
+        local lua = LuaCode.Value(tree.source, "function(")
         if AST.is_syntax_tree(\%args, "Action") then \%args = \%args:get_args() end
         local lua_args = table.map(\%args, function(a) return AST.is_syntax_tree(a) and tostring(nomsu:compile(a)) or a end)
         lua:concat_append(lua_args, ", ")
@@ -163,7 +163,7 @@ compile [declare locals %locals in %code] to
 compile [remove free vars %vars from %code] to
     Lua "\(%code as lua expr):remove_free_vars(\(%vars as lua expr));"
 
-parse [%lua <-write %code, to %lua write %code] as: lua> "\%lua:append(\%code);"
+compile [%lua <-write %code, to %lua write %code] to: Lua "\(%lua as lua expr):append(\(%code as lua expr));"
 
 compile [quote %s] to
     Lua value ".."

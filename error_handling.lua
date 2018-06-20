@@ -160,7 +160,7 @@ print_error = function(error_message, stack_offset)
               end
             end
           end
-          if file and calling_fn.short_src:match("%.moon$") and type(MOON_SOURCE_MAP[file]) == 'table' then
+          if file and (calling_fn.short_src:match("%.moon$") or file:match("^#![^\n]*moon\n")) and type(MOON_SOURCE_MAP[file]) == 'table' then
             local char = MOON_SOURCE_MAP[file][calling_fn.currentline]
             line_num = 1
             for _ in file:sub(1, char):gmatch("\n") do

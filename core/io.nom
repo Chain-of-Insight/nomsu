@@ -6,9 +6,9 @@ use "core/metaprogramming.nom"
 compile [say %message] to
     lua> ".."
         if \%message.type == "Text" then
-            return LuaCode(tree.source, "io.write(", \(%message as lua expr), ", '\\\\n');");
+            return LuaCode(tree.source, "print(", \(%message as lua expr), ");");
         else
-            return LuaCode(tree.source, "io.write(tostring(", \(%message as lua expr), "), '\\\\n');");
+            return LuaCode(tree.source, "print(tostring(", \(%message as lua expr), "));");
         end
 
 compile [ask %prompt] to

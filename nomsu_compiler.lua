@@ -501,7 +501,7 @@ do
       source = nil
     end
     local lua_string = tostring(lua)
-    local run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", self)
+    local run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
     if not run_lua_fn then
       local line_numbered_lua = concat((function()
         local _accum_0 = { }

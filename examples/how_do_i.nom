@@ -273,24 +273,26 @@ action [square root of %n]
     =lua "math.sqrt(\%n)"
 say "The square root of 2 is \(square root of 2)"
 
-# The "immediately %" macro forces the indented code below it to run before the rest of
-    the file finishes compiling, so it's often useful for writing your own macros.
-immediately
-    # Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
-    parse [if %condition is untrue %body] as
-        if (not %condition) %body
+# Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
+parse [if %condition is untrue %body] as
+    if (not %condition) %body
 
-    # Or to transform nomsu code into custom lua code using "compile % to %"
-    compile [if %condition on opposite day %body] to
-        Lua ".."
-            if not \(%condition as lua expr) then
-                \(%body as lua statements)
-            end
-    
-    # Constants can be defined as macros
-    parse [TWENTY] as: 20
-    # When they're invoked, they'll need parentheses just like a function call
-    parse [TWENTY ONE] as: 21
+# Or to transform nomsu code into custom lua code using "compile % to %"
+compile [if %condition on opposite day %body] to
+    Lua ".."
+        if not \(%condition as lua expr) then
+            \(%body as lua statements)
+        end
+
+# Constants can be defined as macros
+parse [TWENTY] as: 20
+# When they're invoked, they'll need parentheses just like a function call
+parse [TWENTY ONE] as: 21
+
+# If you need to use compile-time actions in the same file that they're defined in, you
+    can add a line of tildes (3 or more), and the file will be split into chunks, and each
+    chunk will run before the next one compiles. (note that each chunk has its own scope)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if (1 > (TWENTY)) is untrue
     say "Nomsu parsing macros work!"
@@ -305,55 +307,131 @@ if (1 > (TWENTY)) on opposite day
 # Well... it's always *possible* to fall back to Lua behavior for something like this:
 action [best of %items according to %key-fn]
     <- {%best:nil, %best-key:nil}
-    for % in %items
-        %key <- (=lua "\%key-fn(\%)")
+    for %item in %items
+        %key <- (=lua "\%key-fn(\%item)")
         if: (%best is (nil)) or (%key > %best-key)
-            <- {%best:%, %best-key:%key}
+            <- {%best:%item, %best-key:%key}
     return %best
 
-immediately
-    compile [function %var %body] to
-        Lua value ".."
-            (function(\(%var as lua expr))
-                return \(%body as lua expr)
-            end)
-
-say: best of [2,-3,4,-8] according to (function %: % * %)
+say: best of [2,-3,4,-8] according to ([%x] -> (%x * %x))
 
 # But nomsu was mostly designed so that you don't *need* to. Instead of creating a
     one-off function to pass to another function and get called a bunch of times, you
     could use a macro to generate a single block of code that inlines the expression you
     want to use:
-immediately
-    parse [best of %items according to %key-var in %key-expr] as
-        result of
-            <- {%best:nil, %best-key:nil}
-            for %key-var in %items
-                %key <- %key-expr
-                if: (%best is (nil)) or (%key > %best-key)
-                    <- {%best:%, %best-key:%key}
-            return %best
-# This results in generated code that is more efficient (no function calls in the
-    inner loop)
-say: best of [2,-3,4,-8] according to % in (% * %)
+parse [best of %items where %item-var has score %key-expr] as
+    result of
+        <- {%best:nil, %best-key:nil}
+        for %item-var in %items
+            %key <- %key-expr
+            if: (%best is (nil)) or (%key > %best-key)
+                <- {%best:%item-var, %best-key:%key}
+        return %best
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+say: best of [2,-3,4,-8] where %x has score (%x * %x)
 
-# In a functional programming language, you might do something like:
-        doubled = map(list, function(x) return 2 * x end)
-    to get a new list with every entry multiplied by 2, but it's *much* more readable to
-    do something like:
-%nums <- [1,2,3,4,5]
-%double-nums <- ((2 * %num) for %num in %nums)
+#   The first example generates code that looks like:
 
-# Nomsu comes with built-in list comprehensions, but the flexible macro system makes it
-    incredibly easy to make similar constructs.
-immediately
-    parse [%expr for %key in %list BACKWARDS!] as
-        result of
-            %result <- []
-            %N <- (length of %list)
-            for %i = %key in %list
-                %result.(%N - %i + 1) <- %expr
-            return %result
+        A_best_of_1_according_to_2 = function(items, key_fn)
+            local best, best_key = nil, nil
+            for _, item in ipairs(items) do
+                local key = key_fn(item)
+                if best == nil or key > best_key then
+                    best, best_key = item, key
+                end
+            end
+            return best
+        end
+        print(A_best_of_1_according_to_2({2,-3,4,-8}, function(x)
+            return x * x
+        end))
 
-%double-nums <- ((2 * %num) for %num in %nums BACKWARDS!)
-say %double-nums
+    But the second example produces something more like:
+
+        print((function()
+            local best, best_key = nil, nil
+            for _, x in ipairs({1,-2,3,-4}) do
+                local key = x * x
+                if best == nil or key > best_key then
+                    best, best_key = x, key
+                end
+            end
+            return best
+        end)())
+    
+    Notice that the second example has inlined the key function, so that in the inner loop,
+    the code only has to do a multiplication, instead of calling a function that does the
+    multiplication. In addition to being more efficient, it's also more powerful and
+    flexible for the language to allow you to define syntax that manipulates expressions.
+
+    For example, list comprehensions can (and are) easily defined in Nomsu as:
+
+parse [%expr for %key-var in %list] as
+    result of
+        %result <- []
+        for %key-var in %list
+            add %expr to %result
+        return %result
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%double-nums <- ((2 * %num) for %num in [1,2,3,4,5])
+
+
+# Naturally, Nomsu's macros are hygienic, so even though "%result" is used as a local
+    variable in the macro, there won't be any namespace collisions or confusion if you
+    use a different variable named "%result" as any (or all) of the arguments to the macro.
+
+%result <- [1,2,3,4]
+%result <- ((2*%result) for %result in %result)
+assume: %result = [2,4,6,8]
+
+# You'll find that in a lot places where a functional programmer would think to use a
+    lambda function, what they actually want to do is some metaprogramming. If you embrace
+    the metaprogramming from the start, then you can do a lot more powerful stuff.
+
+# For example, you can define a loop that operates on recursive datastructures, but still
+    has all of the normal imperative control structures:
+
+compile [stack for %var] to
+    Lua value "stack\(%var as lua id)"
+
+parse [recurse on %sub as %super] as
+    add %sub to (stack for %super)
+
+parse [for %var in recursive %iterable %body] as
+    with {(stack for %var): [%iterable]}
+        repeat while: (length of (stack for %var)) > 0
+            %var <- (remove index 1 from (stack for %var))
+            with {%val: %expr}
+                if: %val != (nil)
+                    add %val to %result
+                %body
+            === next %var ===
+        === stop %var ===
+
+~~~~~~~~~~~~~~~~
+
+# This action iterates over a recursive structure, but it's written imperatively and it
+    can return early without traversing the whole tree.
+action [tree %tree contains %val]
+    for %subtree in recursive %tree
+        if: %subtree = %val
+            return: yes
+        if: (type of %subtree) = "table"
+            for % in %subtree: recurse on % as %subtree
+    return: no
+
+%t <- [1,[2,[3,4,[]],5,[6]]]
+say: tree %t contains 3
+say: tree %t contains 99
+
+
+action [linked list from %list]
+    %head <- (nil)
+    for %i in (length of %list) to 1 via -1
+        %head <- {value:%list.%i, next:%head}
+    return %head
+
+for %node in recursive (linked list from [3,4,5,6,7])
+    say "NODE: \(%node.value)"
+    recurse on %node.next as %node

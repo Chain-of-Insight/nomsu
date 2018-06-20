@@ -130,6 +130,16 @@ compile [with %assignments %body] to
                 \%lua
             end -- 'with' block
 
+compile [local %var_or_vars] to
+    %lua <- (Lua "")
+    lua> ".."
+        if \%var_or_vars.type == "List" then
+            \%lua:add_free_vars(table.map(\%var_or_vars, function(v) return tostring(nomsu:compile(v)) end))
+        else
+            \%lua:add_free_vars({tostring(nomsu:compile(\%var_or_vars))})
+        end
+    return %lua
+
 # Math Operators
 compile [%x wrapped around %y, %x mod %y] to: Lua value "(\(%x as lua expr) % \(%y as lua expr))"
 

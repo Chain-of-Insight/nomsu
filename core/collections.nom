@@ -50,10 +50,10 @@ compile [append %item to %list, add %item to %list, to %list add %item, to %list
     Lua "table.insert(\(%list as lua expr), \(%item as lua expr))"
 
 compile [pop from %list, remove last from %list] to
-    Lua "table.remove(\(%list as lua expr))"
+    Lua value "table.remove(\(%list as lua expr))"
 
 compile [remove index %index from %list] to
-    Lua "table.remove(\(%list as lua expr), \(%index as lua expr))"
+    Lua value "table.remove(\(%list as lua expr), \(%index as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -98,7 +98,8 @@ print_error = (error_message, stack_offset=3)->
                                 name = "upvalue '#{varname}'"
                                 if not varname\match("%(")
                                     break
-            if file and calling_fn.short_src\match("%.moon$") and type(MOON_SOURCE_MAP[file]) == 'table'
+            
+            if file and (calling_fn.short_src\match("%.moon$") or file\match("^#![^\n]*moon\n")) and type(MOON_SOURCE_MAP[file]) == 'table'
                 char = MOON_SOURCE_MAP[file][calling_fn.currentline]
                 line_num = 1
                 for _ in file\sub(1,char)\gmatch("\n") do line_num += 1
