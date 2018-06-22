@@ -169,7 +169,6 @@ run = function()
   else
     print_file = io.stdout
   end
-  nomsu.skip_precompiled = not args.optimized
   if print_file == nil then
     nomsu.print = function() end
   elseif print_file ~= io.stdout then
@@ -195,6 +194,7 @@ run = function()
       to_run[f] = true
     end
   end
+  nomsu.skip_precompiled = to_run
   if args.compile or args.verbose then
     nomsu.on_compile = function(code, from_file)
       if not (to_run[from_file]) then

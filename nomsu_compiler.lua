@@ -465,7 +465,7 @@ do
           ret = self:run_lua(file, Source(filename, 1, #file))
         elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$") then
           local ran_lua
-          if not self.skip_precompiled then
+          if not self.skip_precompiled or not self.skip_precompiled[filename] then
             local lua_filename = gsub(filename, "%.nom$", ".lua")
             do
               local file = FILE_CACHE[lua_filename]

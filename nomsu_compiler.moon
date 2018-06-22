@@ -319,7 +319,7 @@ with NomsuCompiler
                 file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
                 ret = @run_lua file, Source(filename, 1, #file)
             elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$")
-                ran_lua = if not @skip_precompiled -- Look for precompiled version
+                ran_lua = if not @skip_precompiled or not @skip_precompiled[filename] -- Look for precompiled version
                     lua_filename = gsub(filename, "%.nom$", ".lua")
                     if file = FILE_CACHE[lua_filename]
                         ret = @run_lua file, Source(lua_filename, 1, #file)

@@ -127,7 +127,10 @@ do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]])
-  local nomsu_peg = peg_tidier:match(io.open((package.nomsupath or '.') .. "/nomsu.peg"):read('*a'))
+  local peg_file = io.open("nomsu.peg") or (package.nomsupath and io.open(package.nomsupath .. "/nomsu.peg"))
+  assert(peg_file, "could not find nomsu.peg file")
+  local nomsu_peg = peg_tidier:match(peg_file:read('*a'))
+  peg_file:close()
   NOMSU_PATTERN = re.compile(nomsu_peg, NOMSU_DEFS)
 end
 local parse

@@ -135,7 +135,6 @@ run = ->
     elseif args.print_file then io.open(args.print_file, 'w')
     else io.stdout
 
-    nomsu.skip_precompiled = not args.optimized
     if print_file == nil
         nomsu.print = ->
     elseif print_file != io.stdout
@@ -154,6 +153,8 @@ run = ->
         for f in all_files(input)
             input_files[#input_files+1] = f
             to_run[f] = true
+
+    nomsu.skip_precompiled = to_run
 
     if args.compile or args.verbose
         nomsu.on_compile = (code, from_file)->
