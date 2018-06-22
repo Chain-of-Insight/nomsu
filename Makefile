@@ -21,7 +21,7 @@ LIB_NOM_FILES= $(wildcard lib/*.nom)
 LIB_LUA_FILES= $(patsubst %.nom,%.lua,$(LIB_NOM_FILES))
 PEG_FILE= nomsu.peg
 
-NOMSU_HEADER=\#!$(LUA_BIN)\npackage.path = [[$(realpath $(NOMSU_LIB_DIR))/?.lua;]]..package.path\npackage.nomsupath = [[$(realpath $(NOMSU_LIB_DIR))]]
+NOMSU_HEADER=\#!$(LUA_BIN)\npackage.path = [[$(NOMSU_LIB_DIR)/?.lua;]]..package.path\npackage.nomsupath = [[$(NOMSU_LIB_DIR)]]
 
 all: build optimize
 
@@ -51,7 +51,7 @@ optimize: build $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
 .PHONY: clean
 clean:
-	rm -rf nomsu core/*.lua lib/*.lua $(NOMSU_BIN_DIR)/nomsu $(NOMSU_LIB_DIR)
+	rm -rf nomsu core/*.lua lib/*.lua
 
 .PHONY: install
 install: all
