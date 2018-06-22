@@ -4,11 +4,11 @@
 
 # ========= User-controlled variables ========
 LUA= lua
-LUA_BIN= /usr/local/bin/$(LUA)
+LUA_BIN= $(shell which $(LUA))
 
 PREFIX=/usr/local
-BIN_DIR= $(PREFIX)/bin
-NOMSU_DIR= $(PREFIX)/lib/nomsu
+NOMSU_BIN_DIR= $(PREFIX)/bin
+NOMSU_LIB_DIR= $(PREFIX)/lib/nomsu
 
 # ========= You shouldn't need to mess with any of these variables below ================
 
@@ -21,7 +21,7 @@ LIB_NOM_FILES= $(wildcard lib/*.nom)
 LIB_LUA_FILES= $(patsubst %.nom,%.lua,$(LIB_NOM_FILES))
 PEG_FILE= nomsu.peg
 
-NOMSU_HEADER=\#!$(LUA_BIN)\npackage.path = [[$(realpath $(NOMSU_DIR))/?.lua;]]..package.path\npackage.nomsupath = [[$(realpath $(NOMSU_DIR))]]
+NOMSU_HEADER=\#!$(LUA_BIN)\npackage.path = [[$(realpath $(NOMSU_LIB_DIR))/?.lua;]]..package.path\npackage.nomsupath = [[$(realpath $(NOMSU_LIB_DIR))]]
 
 all: build optimize
 
@@ -51,15 +51,15 @@ optimize: build $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
 .PHONY: clean
 clean:
-	rm -rf nomsu core/*.lua lib/*.lua $(BIN_DIR)/nomsu $(NOMSU_DIR)
+	rm -rf nomsu core/*.lua lib/*.lua $(NOMSU_BIN_DIR)/nomsu $(NOMSU_LIB_DIR)
 
 .PHONY: install
 install: all
-	mkdir -p $(BIN_DIR) && cp nomsu $(BIN_DIR)
-	mkdir -p $(NOMSU_DIR) && cp -r $(LUA_FILES) $(PEG_FILE) core lib $(NOMSU_DIR)
+	mkdir -p $(NOMSU_BIN_DIR) && cp nomsu $(NOMSU_BIN_DIR)
+	mkdir -p $(NOMSU_LIB_DIR) && cp -r $(LUA_FILES) $(PEG_FILE) core lib $(NOMSU_LIB_DIR)
 
 .PHONY: uninstall
 uninstall: all
-	rm -rf $(NOMSU_DIR) $(BIN_DIR)/nomsu
+	rm -rf $(NOMSU_LIB_DIR) $(NOMSU_BIN_DIR)/nomsu
 
 # eof
