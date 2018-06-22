@@ -52,6 +52,20 @@ lua> ".."
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+compile [using %defs compile %body] to
+    lua> ".."
+        local lua = LuaCode(tree.source)
+        lua:append(
+            "local old_nomsu = nomsu\n",
+            "local nomsu = table.fork(old_nomsu, {COMPILE_ACTIONS=table.fork(old_nomsu.COMPILE_ACTIONS)})")
+        lua:append(nomsu:compile(\%defs))
+        lua:append("\n")
+        lua:append("local ret = nomsu:compile(tree)\n")
+        lua:append("return ret")
+        nomsu = table.fork(nomsu, {tree=\%body})
+        local output = nomsu:run_lua(lua)
+        return output
+
 compile [local action %actions %body] to
     lua> ".."
         local fn_name = "A"..string.as_lua_id(\%actions[1].stub)
@@ -83,6 +97,9 @@ compile [action %actions %body] to
         local lua = \(compile as: local action %actions %body)
         lua:remove_free_vars(table.map(\%actions, function(a) return "A"..string.as_lua_id(a.stub) end))
         return lua
+
+compile [action %action] to
+    Lua value "A\(%action.stub as lua id)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -159,6 +176,9 @@ compile [declare locals in %code] to
 
 compile [declare locals %locals in %code] to
     Lua value "\(%code as lua expr):declare_locals(\(%locals as lua expr))"
+
+compile [add free vars %vars to %code] to
+    Lua "\(%code as lua expr):add_free_vars(\(%vars as lua expr));"
 
 compile [remove free vars %vars from %code] to
     Lua "\(%code as lua expr):remove_free_vars(\(%vars as lua expr));"

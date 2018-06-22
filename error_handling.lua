@@ -197,7 +197,8 @@ end
 local error_handler
 error_handler = function(error_message)
   print_error(error_message)
-  return os.exit(false, true)
+  local EXIT_FAILURE = 1
+  return os.exit(EXIT_FAILURE)
 end
 local run_safely
 run_safely = function(fn)

@@ -7,7 +7,7 @@ with local %x
 assume: %x = "outer"
 
 action [foo] "outer foo"
-with local (foo)
+with local [action: foo]
     action [foo] "inner foo"
     assume: (foo) = "inner foo"
 assume: (foo) = "outer foo"

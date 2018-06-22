@@ -98,7 +98,7 @@ NOMSU_PATTERN = do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]]
-    nomsu_peg = peg_tidier\match(io.open("nomsu.peg")\read('*a'))
+    nomsu_peg = peg_tidier\match(io.open((package.nomsupath or '.').."/nomsu.peg")\read('*a'))
     re.compile(nomsu_peg, NOMSU_DEFS)
 
 parse = (nomsu_code, source=nil)->
@@ -116,8 +116,7 @@ parse = (nomsu_code, source=nil)->
         keys = utils.keys(userdata.errors)
         table.sort(keys)
         errors = [userdata.errors[k] for k in *keys]
-        io.stderr\write("Errors occurred while parsing:\n\n", table.concat(errors, "\n\n"), '\n')
-        os.exit(1)
+        error("Errors occurred while parsing:\n\n"..table.concat(errors, "\n\n"), 0)
     
     return tree
 

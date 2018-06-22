@@ -9,18 +9,18 @@ compile [with local %locals %body, with local %locals do %body] to
         * "Dict"
             %body_lua <-
                 Lua ".."
-                    \(=lua "A_assign_1(\%locals, \%locals)")
+                    \(compile as: <- %locals)
                     \%body_lua
             declare locals
-                (%.1 as lua id) for % in %locals
+                "\(%.1 as lua)" for % in %locals
             .. in %body_lua
         * "List"
             declare locals
-                (% as lua id) for % in %locals
+                "\(% as lua)" for % in %locals
             .. in %body_lua
         * "Var"
         * "Action"
-            declare locals [%locals as lua id] in %body_lua
+            declare locals ["\(%locals as lua)"] in %body_lua
         * else
             barf "Unexpected local: \(%locals as nomsu)"
     return

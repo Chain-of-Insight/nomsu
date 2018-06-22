@@ -1,3 +1,4 @@
+local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 local usage = [=[Nomsu Compiler
 
 Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-v] [-c] [-f] [-s] [--help] [-p print_file] file1 file2... [-- nomsu args...]
@@ -13,8 +14,14 @@ OPTIONS
     -p <file> Print to the specified file instead of stdout.
     <input> Input file can be "-" to use stdin.
 ]=]
-local lpeg = require('lpeg')
-local re = require('re')
+local ok, _ = pcall(function()
+  lpeg = require('lpeg')
+  re = require('re')
+end)
+if not ok then
+  print("Error: unable to find the 'lpeg' Lua module. Please install LPEG either from http://www.inf.puc-rio.br/~roberto/lpeg/re.html or, if you use luarocks: `luarocks install lpeg`")
+  os.exit(EXIT_FAILURE)
+end
 local Errhand = require("error_handling")
 local NomsuCompiler = require("nomsu_compiler")
 local NomsuCode, LuaCode, Source
@@ -46,10 +53,101 @@ local args = table.concat(arg, ";") .. ";"
 args = parser:match(args)
 if not args or args.help then
   print(usage)
-  os.exit()
+  os.exit(EXIT_FAILURE)
 end
 local nomsu = NomsuCompiler
 nomsu.arg = args.nomsu_args
+FILE_CACHE = setmetatable({ }, {
+  __index = function(self, filename)
+    local file = io.open(filename)
+    if not (file) then
+      return nil
+    end
+    local contents = file:read("*a")
+    file:close()
+    self[filename] = contents
+    return contents
+  end
+})
+local match, sub, rep, gsub, format, byte, find
+do
+  local _obj_0 = string
+  match, sub, rep, gsub, format, byte, match, find = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match, _obj_0.find
+end
+local iterate_single
+iterate_single = function(item, prev)
+  if item == prev then
+    return nil
+  else
+    return item
+  end
+end
+local lfs
+ok, lfs = pcall(require, "lfs")
+if ok then
+  all_files = function(path)
+    local browse
+    browse = function(filename)
+      local file_type = lfs.attributes(filename, 'mode')
+      if file_type == 'file' then
+        if match(filename, "%.nom$") or match(filename, "%.lua$") then
+          coroutine.yield(filename)
+          return true
+        end
+      elseif file_type == 'directory' then
+        for subfile in lfs.dir(filename) do
+          if not (subfile == "." or subfile == "..") then
+            browse(filename .. "/" .. subfile)
+          end
+        end
+        return true
+      elseif file_type == 'char device' then
+        coroutine.yield(filename)
+        return true
+      end
+      return false
+    end
+    return coroutine.wrap(function()
+      if not browse(path) and package.nomsupath then
+        browse(package.nomsupath .. "/" .. path)
+      end
+      return nil
+    end)
+  end
+else
+  local ret = os.execute('find . -maxdepth 0')
+  if not (ret == true or ret == 0) then
+    error("Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0)
+  end
+  all_files = function(path)
+    if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$") then
+      return iterate_single, path
+    end
+    path = gsub(path, "\\", "\\\\")
+    path = gsub(path, "`", "")
+    path = gsub(path, '"', '\\"')
+    path = gsub(path, "$", "")
+    return coroutine.wrap(function()
+      local f = io.popen('find -L "' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
+      local found = false
+      for line in f:lines() do
+        found = true
+        coroutine.yield(line)
+      end
+      if not found and package.nomsupath then
+        f:close()
+        f = io.popen('find -L "' .. package.nomsupath .. '/' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
+        for line in f:lines() do
+          coroutine.yield(line)
+        end
+      end
+      local success = f:close()
+      if not (success) then
+        return error("Invalid file path: " .. tostring(path))
+      end
+    end)
+  end
+end
 local run
 run = function()
   for i, input in ipairs(args.inputs) do
@@ -120,7 +218,8 @@ run = function()
     local filename = input_files[_index_0]
     if args.syntax then
       local file_contents = io.open(filename):read('*a')
-      local ok, err = pcall(nomsu.parse, nomsu, file_contents, Source(filename, 1, #file_contents))
+      local err
+      ok, err = pcall(nomsu.parse, nomsu, file_contents, Source(filename, 1, #file_contents))
       if not ok then
         table.insert(parse_errs, err)
       elseif print_file then
@@ -149,9 +248,9 @@ run = function()
   if #parse_errs > 0 then
     io.stderr:write(table.concat(parse_errs, "\n\n"))
     io.stderr:flush()
-    os.exit(false, true)
+    os.exit(EXIT_FAILURE)
   elseif args.syntax then
-    os.exit(true, true)
+    os.exit(EXIT_SUCCESS)
   end
   if args.interactive then
     for repl_line = 1, math.huge do
@@ -179,7 +278,8 @@ run = function()
       err_hand = function(error_message)
         return Errhand.print_error(error_message)
       end
-      local ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))
+      local ret
+      ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))
       if ok and ret ~= nil then
         print("= " .. repr(ret))
       elseif not ok then

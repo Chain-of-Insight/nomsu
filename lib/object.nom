@@ -4,18 +4,18 @@
 use "core"
 
 compile [@, me] to: Lua value "self"
-compile [set methods %methods] to
-    %lua <- (Lua "")
-    for %m in %methods
-        to %lua write "\nclass.\(%m as lua id) = \(%m as lua id)"
-    return %lua
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-parse [method %actions %body] as
-    with local %actions
-        action %actions %body
-        set methods %actions
+compile [method %actions %body] to
+    %lua <- (compile as: action %actions %body)
+    add free vars ((% as lua id) for % in %actions) to %lua
+    declare locals in %lua
+    for % in %actions
+        to %lua write "\nclass.\(% as lua id) = \(% as lua id)"
+    return
+        Lua ".."
+            do -- Method: \(%actions.1.stub)
+                \%lua
+            end
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 parse [as %instance %body] as

@@ -383,3 +383,18 @@ compile [do %action then always %final_action] to
 # Inline thunk:
 compile [result of %body] to
     Lua value "(\(compile as: [] -> %body))()"
+
+# Recurion control flow
+using
+    compile [%var's stack] to: Lua value "stack\(%var as lua id)"
+..compile
+    parse [for %var in recursive %structure %body] as
+        with local {(%var's stack): [%structure], action: recurse % on %}
+            action [recurse %v on %x]
+                add %x to (%v's stack)
+            repeat while: (length of (%var's stack)) > 0
+                %var <- (remove 1 from (%var's stack))
+                %body
+                === next %var ==
+            === stop %var ===
+            

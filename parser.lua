@@ -127,7 +127,7 @@ do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]])
-  local nomsu_peg = peg_tidier:match(io.open("nomsu.peg"):read('*a'))
+  local nomsu_peg = peg_tidier:match(io.open((package.nomsupath or '.') .. "/nomsu.peg"):read('*a'))
   NOMSU_PATTERN = re.compile(nomsu_peg, NOMSU_DEFS)
 end
 local parse
@@ -162,8 +162,7 @@ parse = function(nomsu_code, source)
       end
       errors = _accum_0
     end
-    io.stderr:write("Errors occurred while parsing:\n\n", table.concat(errors, "\n\n"), '\n')
-    os.exit(1)
+    error("Errors occurred while parsing:\n\n" .. table.concat(errors, "\n\n"), 0)
   end
   return tree
 end

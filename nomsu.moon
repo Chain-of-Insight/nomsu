@@ -1,5 +1,6 @@
 #!/usr/bin/env moon
 -- This file contains the command-line Nomsu runner.
+EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 usage = [=[
 Nomsu Compiler
 
@@ -17,8 +18,13 @@ OPTIONS
     <input> Input file can be "-" to use stdin.
 ]=]
 
-lpeg = require 'lpeg'
-re = require 're'
+ok, _ = pcall ->
+    export lpeg, re
+    lpeg = require 'lpeg'
+    re = require 're'
+if not ok
+    print("Error: unable to find the 'lpeg' Lua module. Please install LPEG either from http://www.inf.puc-rio.br/~roberto/lpeg/re.html or, if you use luarocks: `luarocks install lpeg`")
+    os.exit(EXIT_FAILURE)
 Errhand = require "error_handling"
 NomsuCompiler = require "nomsu_compiler"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
@@ -45,10 +51,77 @@ args = table.concat(arg, ";")..";"
 args = parser\match(args)
 if not args or args.help
     print usage
-    os.exit!
+    os.exit(EXIT_FAILURE)
 
 nomsu = NomsuCompiler
 nomsu.arg = args.nomsu_args
+
+export FILE_CACHE
+-- FILE_CACHE is a map from filename (string) -> string of file contents
+FILE_CACHE = setmetatable {}, {
+    __index: (filename)=>
+        file = io.open(filename)
+        return nil unless file
+        contents = file\read("*a")
+        file\close!
+        self[filename] = contents
+        return contents
+}
+
+export all_files
+{:match, :sub, :rep, :gsub, :format, :byte, :match, :find} = string
+iterate_single = (item, prev) -> if item == prev then nil else item
+ok, lfs = pcall(require, "lfs")
+if ok
+    all_files = (path)->
+        browse = (filename)->
+            file_type = lfs.attributes(filename, 'mode')
+            if file_type == 'file'
+                if match(filename, "%.nom$") or match(filename, "%.lua$")
+                    coroutine.yield filename
+                    return true
+            elseif file_type == 'directory'
+                for subfile in lfs.dir(filename)
+                    unless subfile == "." or subfile == ".."
+                        browse(filename.."/"..subfile)
+                return true
+            elseif file_type == 'char device'
+                coroutine.yield(filename)
+                return true
+            return false
+        return coroutine.wrap ->
+            if not browse(path) and package.nomsupath
+                browse(package.nomsupath.."/"..path)
+            return nil
+else
+    ret = os.execute('find . -maxdepth 0')
+    unless ret == true or ret == 0
+        error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0
+
+    all_files = (path)->
+        -- Sanitize path
+        if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$")
+            return iterate_single, path
+        -- TODO: improve sanitization
+        path = gsub(path,"\\","\\\\")
+        path = gsub(path,"`","")
+        path = gsub(path,'"','\\"')
+        path = gsub(path,"$","")
+        return coroutine.wrap ->
+            f = io.popen('find -L "'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
+            found = false
+            for line in f\lines!
+                found = true
+                coroutine.yield(line)
+            if not found and package.nomsupath
+                f\close!
+                f = io.popen('find -L "'..package.nomsupath..'/'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
+                for line in f\lines!
+                    coroutine.yield(line)
+            success = f\close!
+            unless success
+                error("Invalid file path: "..tostring(path))
+
 
 run = ->
     for i,input in ipairs args.inputs
@@ -126,9 +199,9 @@ run = ->
     if #parse_errs > 0
         io.stderr\write table.concat(parse_errs, "\n\n")
         io.stderr\flush!
-        os.exit(false, true)
+        os.exit(EXIT_FAILURE)
     elseif args.syntax
-        os.exit(true, true)
+        os.exit(EXIT_SUCCESS)
 
     if args.interactive
         -- REPL

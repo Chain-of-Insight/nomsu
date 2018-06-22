@@ -123,7 +123,8 @@ print_error = (error_message, stack_offset=3)->
 
 error_handler = (error_message)->
     print_error error_message
-    os.exit(false, true)
+    EXIT_FAILURE = 1
+    os.exit(EXIT_FAILURE)
 
 run_safely = (fn)->
     xpcall(fn, error_handler)
