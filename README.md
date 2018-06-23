@@ -23,7 +23,8 @@ If you enjoy Nomsu so much that you'd like to tinker with it or have it in your 
 
 All `.moon` files have been precompiled into corresponding `.lua` files, so you don't need to have [Moonscript](http://moonscript.org/) installed to run the Nomsu compiler.
 
-* `nomsu.moon` - The Nomsu command line runner. This handles launching the compiler and running the REPL.
+* `nomsu` - A shell script that selects between different installed versions of Nomsu (using the `-V` flag). You can use this script to, for example, run `nomsu -V 1.2 your_script.nom` to run with the latest version of Nomsu that matches `1.2.?.?`. All flags and arguments are passed along to whichever Nomsu compiler is chosen.
+* `nomsu.moon` - The source code for the Nomsu command line runner. This handles launching the compiler and running the REPL.
 * `nomsu.peg` - The [Parsing Expression Grammar](https://en.wikipedia.org/wiki/Parsing_expression_grammar) used to define Nomsu's syntax. The format of this file is a slightly modified version of the format accepted by LPEG's `re` module.
 * `nomsu_compiler.moon` - **The actual Nomsu compiler**. This file can be imported and used without going through the regular command line interface (e.g. for applications that want to embed the compiler).
 * `parser.moon` - The Nomsu parser. This file can also be imported and used directly for applications that only need to *parse* Nomsu, not compile it.
@@ -40,6 +41,17 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * `Makefile` - Rules for building/installing the compiler.
 * `LICENSE` - The software license (MIT).
 * `README.md` - This file.
+
+## Versioning
+
+Nomsu uses the following versioning scheme: `[syntax version].[core library API version].[compiler internal API version].[lib/ API version]`. Which means:
+
+* Any code that parses on `Nomsu X.a.b.c.d` will also parse on Nomsu `X.p.w.r.s`
+* Any code that compiles on Nomsu `X.Y.a.b.c` will also compile on Nomsu `X.Y.p.q.r` and run without any differences, as long as it only depends on the behavior of the core library functions (i.e. stuff defined in `core/*.nom`), and doesn't mess with the compiler internals at all.
+* Any code that compiles on Nomsu `X.Y.Z.a.b` will also compile on Nomsu `X.Y.Z.p.q` and run without any differences, even if it messes with the compiler internals, as long as it doesn't use anything from `lib/*.nom`.
+* Any code that compiles on Nomsu `X.Y.Z.W` will also compile on any other Nomsu `X.Y.Z.W` and run without any differences, even if it uses stuff from `lib/*.nom`.
+
+When Nomsu is istalled via `make install`, all of Nomsu's lua files and `core/*.nom` and `lib/*.nom` files are stored in `$PREFIX/lib/nomsu/$NOMSU_VERSION` and the Nomsu executable is installed to `$PREFIX/bin/nomsu$NOMSU_VERSION`, along with the file `nomsu` (the version-selection script), which goes to `$PREFIX/bin/nomsu`. When `make uninstall` is run, all those files are deleted (except for `nomsu`, if there are other versions installed).
 
 ## Extra
 

@@ -56,7 +56,7 @@ NOMSU_DEFS = with {}
             return #src+1
         err_pos = start_pos
         line_no = pos_to_line(src, err_pos)
-        src = FILE_CACHE[userdata.source.filename]
+        --src = FILE_CACHE[userdata.source.filename]
         line_starts = LINE_STARTS[src]
         prev_line = line_no == 1 and "" or src\sub(line_starts[line_no-1] or 1, line_starts[line_no]-2)
         err_line = src\sub(line_starts[line_no], (line_starts[line_no+1] or 0)-2)
@@ -85,11 +85,13 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
     return make_node
 })
 
+Parser = {}
 NOMSU_PATTERN = do
     -- Just for cleanliness, I put the language spec in its own file using a slightly modified
     -- version of the lpeg.re syntax.
     peg_tidier = re.compile [[
-    file <- {~ %nl* (def/comment) (%nl+ (def/comment))* %nl* ~}
+    file <- %nl* version? %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
+    version <- "--" (!"version" [^%nl])* "version" ([ ])* (([0-9])+ -> set_version) ([^%nl])*
     def <- anon_def / captured_def
     anon_def <- ({ident} (" "*) ":"
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
@@ -97,14 +99,14 @@ NOMSU_PATTERN = do
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {} %%userdata) -> %2)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
-    ]]
+    ]], {set_version: (v) -> Parser.version = tonumber(v)}
     peg_file = io.open("nomsu.peg") or (package.nomsupath and io.open(package.nomsupath.."/nomsu.peg"))
     assert(peg_file, "could not find nomsu.peg file")
     nomsu_peg = peg_tidier\match(peg_file\read('*a'))
     peg_file\close!
     re.compile(nomsu_peg, NOMSU_DEFS)
 
-parse = (nomsu_code, source=nil)->
+Parser.parse = (nomsu_code, source=nil)->
     nomsu_code = tostring(nomsu_code)
     userdata = {
         indent: "", errors: {}, :source
@@ -123,4 +125,4 @@ parse = (nomsu_code, source=nil)->
     
     return tree
 
-return parse
+return Parser

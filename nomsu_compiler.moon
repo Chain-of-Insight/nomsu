@@ -22,7 +22,7 @@ unpack or= table.unpack
 {:match, :sub, :rep, :gsub, :format, :byte, :match, :find} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "nomsu_tree"
-parse = require("parser")
+Parser = require("parser")
 -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
 -- from lua line number to nomsu line number
 export SOURCE_MAP
@@ -134,6 +134,19 @@ _list_mt =
     -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
     __tostring: =>
         "["..concat([repr(b) for b in *@], ", ").."]"
+    __lt: (other)=>
+        assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
+        for i=1,math.max(#@, #other)
+            if @[i] < other[i] then return true
+            elseif @[i] > other[i] then return false
+        return false
+    __le: (other)=>
+        assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
+        for i=1,math.max(#@, #other)
+            if @[i] < other[i] then return true
+            elseif @[i] > other[i] then return false
+        return true
+
 list = (t)-> setmetatable(t, _list_mt)
 
 _dict_mt =
@@ -145,13 +158,16 @@ dict = (t)-> setmetatable(t, _dict_mt)
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable({}, {__index: (k)=> if _self = rawget(@, "self") then _self[k] else nil})
 with NomsuCompiler
+    .NOMSU_COMPILER_VERSION = 1
+    .NOMSU_SYNTAX_VERSION = Parser.version
     ._ENV = NomsuCompiler
     .nomsu = NomsuCompiler
-    .parse = (...)=> parse(...)
+    .parse = (...)=> Parser.parse(...)
+    .can_optimize = -> false
 
     -- Discretionary/convenience stuff
     to_add = {
-        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re,
+        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re, all_files:all_files,
         -- Lua stuff:
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
@@ -272,7 +288,9 @@ with NomsuCompiler
     }
 
     .run = (to_run, source=nil)=>
-        tree = if AST.is_syntax_tree(to_run) then tree else @parse(to_run, source or to_run.source)
+        source or= to_run.source or Source(to_run, 1, #to_run)
+        if not rawget(FILE_CACHE,source.filename) then FILE_CACHE[source.filename] = to_run
+        tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
         if tree.type == "FileChunks"
@@ -282,20 +300,20 @@ with NomsuCompiler
             ret = nil
             all_lua = {}
             for chunk in *tree
-                lua = @compile(chunk)\as_statements!
+                lua = @compile(chunk)\as_statements("return ")
                 lua\declare_locals!
-                lua\prepend "-- File: #{chunk.source or ""}\n"
+                lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
                 insert all_lua, tostring(lua)
                 ret = @run_lua(lua)
             if @on_compile
-                self.on_compile(concat(all_lua, "\n"), (source or to_run.source).filename)
+                self.on_compile(concat(all_lua, "\n"), source.filename)
             return ret
         else
-            lua = @compile(tree, compile_actions)\as_statements!
+            lua = @compile(tree, compile_actions)\as_statements("return ")
             lua\declare_locals!
-            lua\prepend "-- File: #{source or to_run.source or ""}\n"
+            lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
             if @on_compile
-                self.on_compile(lua, (source or to_run.source).filename)
+                self.on_compile(lua, source.filename)
             return @run_lua(lua)
 
     _running_files = {} -- For detecting circular imports
@@ -319,7 +337,7 @@ with NomsuCompiler
                 file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
                 ret = @run_lua file, Source(filename, 1, #file)
             elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$")
-                ran_lua = if not @skip_precompiled or not @skip_precompiled[filename] -- Look for precompiled version
+                ran_lua = if @.can_optimize(filename) -- Look for precompiled version
                     lua_filename = gsub(filename, "%.nom$", ".lua")
                     if file = FILE_CACHE[lua_filename]
                         ret = @run_lua file, Source(lua_filename, 1, #file)

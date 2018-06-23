@@ -4,7 +4,7 @@ EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 usage = [=[
 Nomsu Compiler
 
-Usage: (lua nomsu.lua | moon nomsu.moon) [-i] [-O] [-v] [-c] [-f] [-s] [--help] [-p print_file] file1 file2... [-- nomsu args...]
+Usage: (lua nomsu.lua | moon nomsu.moon) [-V version] [-i] [-O] [-v] [-c] [-f] [-s] [--help] [--version] [-p print_file] file1 file2... [-- nomsu args...]
 
 OPTIONS
     -i Run the compiler in interactive mode (REPL)
@@ -14,6 +14,8 @@ OPTIONS
     -f Auto-format the given Nomsu file and print the result.
     -s Check the program for syntax errors.
     -h/--help Print this message.
+    --version Print the version number and exit.
+    -V specify which Nomsu version is desired
     -p <file> Print to the specified file instead of stdout.
     <input> Input file can be "-" to use stdin.
 ]=]
@@ -28,6 +30,7 @@ if not ok
 Errhand = require "error_handling"
 NomsuCompiler = require "nomsu_compiler"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
+{:repr} = require "utils"
 STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 
 -- If this file was reached via require(), then just return the Nomsu compiler
@@ -45,16 +48,22 @@ parser = re.compile([[
       / {:compile: ("-c" -> true) :}
       / {:verbose: ("-v" -> true) :}
       / {:help: (("-h" / "--help") -> true) :}
+      / {:version: ("--version" -> true) :}
+      / {:requested_version: "-V" ((";")? {([0-9.])+})? :}
     file <- "-" / [^;]+
 ]], {true: -> true})
-args = table.concat(arg, ";")..";"
-args = parser\match(args)
+arg_string = table.concat(arg, ";")..";"
+args = parser\match(arg_string)
 if not args or args.help
     print usage
     os.exit(EXIT_FAILURE)
 
 nomsu = NomsuCompiler
 nomsu.arg = args.nomsu_args
+
+if args.version
+    nomsu\run 'use "core"\nsay (Nomsu version)' 
+    os.exit(EXIT_SUCCESS)
 
 export FILE_CACHE
 -- FILE_CACHE is a map from filename (string) -> string of file contents
@@ -154,7 +163,10 @@ run = ->
             input_files[#input_files+1] = f
             to_run[f] = true
 
-    nomsu.skip_precompiled = to_run
+    nomsu.can_optimize = (f)->
+        return false unless args.optimized
+        return false if to_run[f]
+        return true
 
     if args.compile or args.verbose
         nomsu.on_compile = (code, from_file)->
@@ -206,11 +218,24 @@ run = ->
 
     if args.interactive
         -- REPL
+        nomsu\run 'say "\\n\\(bright)\\(underscore)Welcome to the Nomsu v\\(Nomsu version) interactive console!\\(reset color)\\n     press \'enter\' twice to run a command\\n"'
+        ready_to_quit = false
+        nomsu.A_quit = ->
+            export ready_to_quit
+            ready_to_quit = true
+            print("Goodbye!")
+        nomsu.A_exit = nomsu.A_quit
+        nomsu.A_help = ->
+            print("This is the Nomsu v#{nomsu.A_Nomsu_version()} interactive console.")
+            print("You can type in Nomsu code here and hit 'enter' twice to run it.")
+            print("To exit, type 'exit' or 'quit' and hit enter twice")
         for repl_line=1,math.huge
             io.write(colored.bright colored.yellow ">> ")
             buff = {}
             while true
+                io.write(colors.bright)
                 line = io.read("*L")
+                io.write(colors.reset)
                 if line == "\n" or not line
                     if #buff > 0
                         io.write("\027[1A\027[2K")
@@ -231,6 +256,8 @@ run = ->
                 print "= "..repr(ret)
             elseif not ok
                 Errhand.print_error ret
+            if ready_to_quit
+                break
 
 has_ldt, ldt = pcall(require,'ldt')
 if has_ldt

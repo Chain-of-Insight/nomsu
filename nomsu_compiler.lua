@@ -29,7 +29,7 @@ do
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
 local AST = require("nomsu_tree")
-local parse = require("parser")
+local Parser = require("parser")
 SOURCE_MAP = { }
 string.as_lua_id = function(str)
   local argnum = 0
@@ -169,6 +169,28 @@ local _list_mt = {
       end
       return _accum_0
     end)(), ", ") .. "]"
+  end,
+  __lt = function(self, other)
+    assert(type(self) == 'table' and type(other) == 'table', "Incompatible types for comparison")
+    for i = 1, math.max(#self, #other) do
+      if self[i] < other[i] then
+        return true
+      elseif self[i] > other[i] then
+        return false
+      end
+    end
+    return false
+  end,
+  __le = function(self, other)
+    assert(type(self) == 'table' and type(other) == 'table', "Incompatible types for comparison")
+    for i = 1, math.max(#self, #other) do
+      if self[i] < other[i] then
+        return true
+      elseif self[i] > other[i] then
+        return false
+      end
+    end
+    return true
   end
 }
 local list
@@ -207,10 +229,15 @@ local NomsuCompiler = setmetatable({ }, {
   end
 })
 do
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 1
+  NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
   NomsuCompiler._ENV = NomsuCompiler
   NomsuCompiler.nomsu = NomsuCompiler
   NomsuCompiler.parse = function(self, ...)
-    return parse(...)
+    return Parser.parse(...)
+  end
+  NomsuCompiler.can_optimize = function()
+    return false
   end
   local to_add = {
     repr = repr,
@@ -218,6 +245,7 @@ do
     utils = utils,
     lpeg = lpeg,
     re = re,
+    all_files = all_files,
     next = next,
     unpack = unpack,
     setmetatable = setmetatable,
@@ -393,11 +421,15 @@ do
     if source == nil then
       source = nil
     end
+    source = source or (to_run.source or Source(to_run, 1, #to_run))
+    if not rawget(FILE_CACHE, source.filename) then
+      FILE_CACHE[source.filename] = to_run
+    end
     local tree
     if AST.is_syntax_tree(to_run) then
-      tree = tree
+      tree = to_run
     else
-      tree = self:parse(to_run, source or to_run.source)
+      tree = self:parse(to_run, source)
     end
     if tree == nil then
       return nil
@@ -407,22 +439,22 @@ do
       local all_lua = { }
       for _index_0 = 1, #tree do
         local chunk = tree[_index_0]
-        local lua = self:compile(chunk):as_statements()
+        local lua = self:compile(chunk):as_statements("return ")
         lua:declare_locals()
-        lua:prepend("-- File: " .. tostring(chunk.source or "") .. "\n")
+        lua:prepend("-- File: " .. tostring(source.filename:gsub("\n.*", "...")) .. "\n")
         insert(all_lua, tostring(lua))
         ret = self:run_lua(lua)
       end
       if self.on_compile then
-        self.on_compile(concat(all_lua, "\n"), (source or to_run.source).filename)
+        self.on_compile(concat(all_lua, "\n"), source.filename)
       end
       return ret
     else
-      local lua = self:compile(tree, compile_actions):as_statements()
+      local lua = self:compile(tree, compile_actions):as_statements("return ")
       lua:declare_locals()
-      lua:prepend("-- File: " .. tostring(source or to_run.source or "") .. "\n")
+      lua:prepend("-- File: " .. tostring(source.filename:gsub("\n.*", "...")) .. "\n")
       if self.on_compile then
-        self.on_compile(lua, (source or to_run.source).filename)
+        self.on_compile(lua, source.filename)
       end
       return self:run_lua(lua)
     end
@@ -465,7 +497,7 @@ do
           ret = self:run_lua(file, Source(filename, 1, #file))
         elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$") then
           local ran_lua
-          if not self.skip_precompiled or not self.skip_precompiled[filename] then
+          if self.can_optimize(filename) then
             local lua_filename = gsub(filename, "%.nom$", ".lua")
             do
               local file = FILE_CACHE[lua_filename]

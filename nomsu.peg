@@ -1,3 +1,4 @@
+-- Nomsu version 1
 file:
     (ignored_line %nl)*
     (file_chunks / block / action / expression)?

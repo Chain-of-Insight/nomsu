@@ -72,7 +72,6 @@ do
     end
     local err_pos = start_pos
     local line_no = pos_to_line(src, err_pos)
-    src = FILE_CACHE[userdata.source.filename]
     local line_starts = LINE_STARTS[src]
     local prev_line = line_no == 1 and "" or src:sub(line_starts[line_no - 1] or 1, line_starts[line_no] - 2)
     local err_line = src:sub(line_starts[line_no], (line_starts[line_no + 1] or 0) - 2)
@@ -116,9 +115,11 @@ setmetatable(NOMSU_DEFS, {
     return make_node
   end
 })
+local Parser = { }
 local NOMSU_PATTERN
 do
-  local peg_tidier = re.compile([[    file <- {~ %nl* (def/comment) (%nl+ (def/comment))* %nl* ~}
+  local peg_tidier = re.compile([[    file <- %nl* version? %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
+    version <- "--" (!"version" [^%nl])* "version" ([ ])* (([0-9])+ -> set_version) ([^%nl])*
     def <- anon_def / captured_def
     anon_def <- ({ident} (" "*) ":"
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
@@ -126,15 +127,18 @@ do
         {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {} %%userdata) -> %2)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
-    ]])
+    ]], {
+    set_version = function(v)
+      Parser.version = tonumber(v)
+    end
+  })
   local peg_file = io.open("nomsu.peg") or (package.nomsupath and io.open(package.nomsupath .. "/nomsu.peg"))
   assert(peg_file, "could not find nomsu.peg file")
   local nomsu_peg = peg_tidier:match(peg_file:read('*a'))
   peg_file:close()
   NOMSU_PATTERN = re.compile(nomsu_peg, NOMSU_DEFS)
 end
-local parse
-parse = function(nomsu_code, source)
+Parser.parse = function(nomsu_code, source)
   if source == nil then
     source = nil
   end
@@ -169,4 +173,4 @@ parse = function(nomsu_code, source)
   end
   return tree
 end
-return parse
+return Parser

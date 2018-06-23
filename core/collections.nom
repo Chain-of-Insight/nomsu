@@ -150,13 +150,14 @@ action [%items sorted, sorted %items]
     %copy <- (% for % in %items)
     sort %copy
     return %copy
-action [..]
+parse [..]
     %items sorted by %item = %key
     %items sorted by %item -> %key
-..
-    %copy <- (% for % in %items)
-    sort %copy by %item = %key
-    return %copy
+..as
+    result of
+        %copy <- (% for % in %items)
+        sort %copy by %item = %key
+        return %copy
 
 action [unique %items]
     %unique <- []
