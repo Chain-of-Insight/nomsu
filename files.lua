@@ -35,10 +35,10 @@ iterate_single = function(item, prev)
     return item
   end
 end
-local match, sub, rep, gsub, format, byte, find
+local match, gsub
 do
   local _obj_0 = string
-  match, sub, rep, gsub, format, byte, match, find = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match, _obj_0.find
+  match, gsub = _obj_0.match, _obj_0.gsub
 end
 iterate_single = function(item, prev)
   if item == prev then

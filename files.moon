@@ -25,7 +25,7 @@ files.read = (filename)->
 iterate_single = (item, prev) -> if item == prev then nil else item
 
 -- `walk` returns an iterator over all files matching a path.
-{:match, :sub, :rep, :gsub, :format, :byte, :match, :find} = string
+{:match, :gsub} = string
 iterate_single = (item, prev) -> if item == prev then nil else item
 ok, lfs = pcall(require, "lfs")
 if ok
