@@ -39,7 +39,8 @@ if ok
                     return true
             elseif file_type == 'directory'
                 for subfile in lfs.dir(filename)
-                    unless subfile == "." or subfile == ".."
+                    -- Only include .nom files unless directly specified
+                    unless subfile == "." or subfile == ".." or not subfile\match("%.nom$")
                         browse(filename.."/"..subfile)
                 return true
             elseif file_type == 'char device'

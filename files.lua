@@ -60,7 +60,7 @@ if ok then
         end
       elseif file_type == 'directory' then
         for subfile in lfs.dir(filename) do
-          if not (subfile == "." or subfile == "..") then
+          if not (subfile == "." or subfile == ".." or not subfile:match("%.nom$")) then
             browse(filename .. "/" .. subfile)
           end
         end

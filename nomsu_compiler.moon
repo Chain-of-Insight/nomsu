@@ -246,11 +246,11 @@ with NomsuCompiler
             return add_lua_bits(@, LuaCode.Value(tree.source), _code)
 
         ["use %"]: (tree, _path)=>
-            unless _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
-                return LuaCode(tree.source, "nomsu:run_file(#{@compile(_path)});")
-            path = _path[1]
-            @run_file(path)
-            return LuaCode(tree.source, "nomsu:run_file(#{repr path});")
+            if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
+                path = _path[1]
+                for f in files.walk(path)
+                    @run_file(f)
+            return LuaCode(tree.source, "for f in files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
     }, {
         __index: (stub)=>
             if math_expression\match(stub)
@@ -275,52 +275,45 @@ with NomsuCompiler
                 lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
                 insert all_lua, tostring(lua)
                 ret = @run_lua(lua)
-            if @on_compile
-                self.on_compile(concat(all_lua, "\n"), source.filename)
             return ret
         else
-            lua = @compile(tree, compile_actions)\as_statements("return ")
+            lua = @compile(tree)\as_statements("return ")
             lua\declare_locals!
             lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
-            if @on_compile
-                self.on_compile(lua, source.filename)
             return @run_lua(lua)
 
     _running_files = {} -- For detecting circular imports
     .run_file = (filename)=>
         if @LOADED[filename]
             return @LOADED[filename]
+        -- Check for circular import
+        -- TODO: optimize?
+        for i,running in ipairs _running_files
+            if running == filename
+                loop = [_running_files[j] for j=i,#_running_files]
+                insert loop, filename
+                error("Circular import, this loops forever: #{concat loop, " -> "}...")
+
+        insert _running_files, filename
         ret = nil
-        for filename in files.walk(filename)
-            if ret = @LOADED[filename]
-                continue
-
-            -- Check for circular import
-            for i,running in ipairs _running_files
-                if running == filename
-                    loop = [_running_files[j] for j=i,#_running_files]
-                    insert loop, filename
-                    error("Circular import, this loops forever: #{concat loop, " -> "}...")
-
-            insert _running_files, filename
-            if match(filename, "%.lua$")
-                file = assert(files.read(filename), "Could not find file: #{filename}")
-                ret = @run_lua file, Source(filename, 1, #file)
-            elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$")
-                ran_lua = if @.can_optimize(filename) -- Look for precompiled version
-                    lua_filename = gsub(filename, "%.nom$", ".lua")
-                    if file = files.read(lua_filename)
-                        ret = @run_lua file, Source(lua_filename, 1, #file)
-                        true
-                unless ran_lua
-                    file = file or files.read(filename)
-                    if not file
-                        error("File does not exist: #{filename}", 0)
-                    ret = @run file, Source(filename,1,#file)
-            else
-                error("Invalid filetype for #{filename}", 0)
-            @LOADED[filename] = ret or true
-            remove _running_files
+        if match(filename, "%.lua$")
+            file = assert(files.read(filename), "Could not find file: #{filename}")
+            ret = @run_lua file, Source(filename, 1, #file)
+        elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$")
+            ran_lua = if @.can_optimize(filename) -- Look for precompiled version
+                lua_filename = gsub(filename, "%.nom$", ".lua")
+                if file = files.read(lua_filename)
+                    ret = @run_lua file, Source(lua_filename, 1, #file)
+                    true
+            unless ran_lua
+                file = files.read(filename)
+                if not file
+                    error("File does not exist: #{filename}", 0)
+                ret = @run file, Source(filename,1,#file)
+        else
+            error("Invalid filetype for #{filename}", 0)
+        @LOADED[filename] = ret or true
+        remove _running_files
 
         @LOADED[filename] = ret or true
         return ret

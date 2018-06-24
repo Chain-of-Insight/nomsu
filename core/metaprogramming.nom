@@ -206,7 +206,7 @@ compile [%lua <-write %code, to %lua write %code] to: Lua "\(%lua as lua expr):a
 
 compile [quote %s] to
     Lua value ".."
-        ('"'..\(%s as lua expr):gsub("\\\\", "\\\\\\\\"):gsub("\n","\\\\n"):gsub('"', '\\\\"')..'"')
+        repr(\(%s as lua expr))
 compile [type of %obj] to: Lua value "type(\(%obj as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

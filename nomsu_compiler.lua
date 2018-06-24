@@ -365,12 +365,13 @@ do
       return add_lua_bits(self, LuaCode.Value(tree.source), _code)
     end,
     ["use %"] = function(self, tree, _path)
-      if not (_path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string') then
-        return LuaCode(tree.source, "nomsu:run_file(" .. tostring(self:compile(_path)) .. ");")
+      if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string' then
+        local path = _path[1]
+        for f in files.walk(path) do
+          self:run_file(f)
+        end
       end
-      local path = _path[1]
-      self:run_file(path)
-      return LuaCode(tree.source, "nomsu:run_file(" .. tostring(repr(path)) .. ");")
+      return LuaCode(tree.source, "for f in files.walk(", self:compile(_path), ") do nomsu:run_file(f) end")
     end
   }, {
     __index = function(self, stub)
@@ -407,17 +408,11 @@ do
         insert(all_lua, tostring(lua))
         ret = self:run_lua(lua)
       end
-      if self.on_compile then
-        self.on_compile(concat(all_lua, "\n"), source.filename)
-      end
       return ret
     else
-      local lua = self:compile(tree, compile_actions):as_statements("return ")
+      local lua = self:compile(tree):as_statements("return ")
       lua:declare_locals()
       lua:prepend("-- File: " .. tostring(source.filename:gsub("\n.*", "...")) .. "\n")
-      if self.on_compile then
-        self.on_compile(lua, source.filename)
-      end
       return self:run_lua(lua)
     end
   end
@@ -426,67 +421,51 @@ do
     if self.LOADED[filename] then
       return self.LOADED[filename]
     end
-    local ret = nil
-    for filename in files.walk(filename) do
-      local _continue_0 = false
-      repeat
+    for i, running in ipairs(_running_files) do
+      if running == filename then
+        local loop
         do
-          ret = self.LOADED[filename]
-          if ret then
-            _continue_0 = true
-            break
+          local _accum_0 = { }
+          local _len_0 = 1
+          for j = i, #_running_files do
+            _accum_0[_len_0] = _running_files[j]
+            _len_0 = _len_0 + 1
           end
+          loop = _accum_0
         end
-        for i, running in ipairs(_running_files) do
-          if running == filename then
-            local loop
-            do
-              local _accum_0 = { }
-              local _len_0 = 1
-              for j = i, #_running_files do
-                _accum_0[_len_0] = _running_files[j]
-                _len_0 = _len_0 + 1
-              end
-              loop = _accum_0
-            end
-            insert(loop, filename)
-            error("Circular import, this loops forever: " .. tostring(concat(loop, " -> ")) .. "...")
-          end
-        end
-        insert(_running_files, filename)
-        if match(filename, "%.lua$") then
-          local file = assert(files.read(filename), "Could not find file: " .. tostring(filename))
-          ret = self:run_lua(file, Source(filename, 1, #file))
-        elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$") then
-          local ran_lua
-          if self.can_optimize(filename) then
-            local lua_filename = gsub(filename, "%.nom$", ".lua")
-            do
-              local file = files.read(lua_filename)
-              if file then
-                ret = self:run_lua(file, Source(lua_filename, 1, #file))
-                ran_lua = true
-              end
-            end
-          end
-          if not (ran_lua) then
-            local file = file or files.read(filename)
-            if not file then
-              error("File does not exist: " .. tostring(filename), 0)
-            end
-            ret = self:run(file, Source(filename, 1, #file))
-          end
-        else
-          error("Invalid filetype for " .. tostring(filename), 0)
-        end
-        self.LOADED[filename] = ret or true
-        remove(_running_files)
-        _continue_0 = true
-      until true
-      if not _continue_0 then
-        break
+        insert(loop, filename)
+        error("Circular import, this loops forever: " .. tostring(concat(loop, " -> ")) .. "...")
       end
     end
+    insert(_running_files, filename)
+    local ret = nil
+    if match(filename, "%.lua$") then
+      local file = assert(files.read(filename), "Could not find file: " .. tostring(filename))
+      ret = self:run_lua(file, Source(filename, 1, #file))
+    elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$") then
+      local ran_lua
+      if self.can_optimize(filename) then
+        local lua_filename = gsub(filename, "%.nom$", ".lua")
+        do
+          local file = files.read(lua_filename)
+          if file then
+            ret = self:run_lua(file, Source(lua_filename, 1, #file))
+            ran_lua = true
+          end
+        end
+      end
+      if not (ran_lua) then
+        local file = files.read(filename)
+        if not file then
+          error("File does not exist: " .. tostring(filename), 0)
+        end
+        ret = self:run(file, Source(filename, 1, #file))
+      end
+    else
+      error("Invalid filetype for " .. tostring(filename), 0)
+    end
+    self.LOADED[filename] = ret or true
+    remove(_running_files)
     self.LOADED[filename] = ret or true
     return ret
   end

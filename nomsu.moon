@@ -70,7 +70,9 @@ nomsu = NomsuCompiler
 nomsu.arg = args.nomsu_args
 
 if args.version
-    nomsu\run 'use "core"\nsay (Nomsu version)'
+    nomsu\run [[
+use "core"
+say (Nomsu version)]]
     os.exit(EXIT_SUCCESS)
 
 export FILE_CACHE
@@ -125,46 +127,70 @@ run = ->
         return false if to_run[f]
         return true
 
-    if args.compile or args.verbose
-        nomsu.on_compile = (code, from_file)->
-            return unless to_run[from_file]
-            if args.verbose
-                io.write(tostring(code), "\n")
-            if args.compile and from_file\match("%.nom$")
-                output_filename = from_file\gsub("%.nom$", ".lua")
-                output_file = io.open(output_filename, 'w')
-                output_file\write(tostring(code))
-                output_file\flush!
-                print ("Compiled %-25s -> %s")\format(from_file, output_filename)
-                output_file\close!
-
     parse_errs = {}
-    for filename in *input_files
-        if args.syntax
-            -- Check syntax:
-            file_contents = io.open(filename)\read('*a')
-            ok,err = pcall nomsu.parse, nomsu, file_contents, Source(filename, 1, #file_contents)
-            if not ok
-                table.insert parse_errs, err
-            elseif print_file
-                print_file\write("Parse succeeded: #{filename}\n")
-                print_file\flush!
-        elseif args.format
-            -- Auto-format
-            file = files.read(filename)
-            if not file
-                error("File does not exist: #{filename}", 0)
-            tree = nomsu\parse(file, Source(filename,1,#file))
-            formatted = tostring(nomsu\tree_to_nomsu(tree))
-            if print_file
-                print_file\write(formatted, "\n")
-                print_file\flush!
-        elseif filename == STDIN
-            file = io.input!\read("*a")
-            files.spoof('stdin', file)
-            nomsu\run(file, Source('stdin',1,#file))
-        else
-            nomsu\run_file(filename)
+    for arg in *args.inputs
+        for filename in files.walk(arg)
+            local file, source
+            if filename == STDIN
+                file = io.input!\read("*a")
+                files.spoof('stdin', file)
+                source = Source('stdin', 1, #file)
+            elseif filename\match("%.nom$")
+                file = files.read(filename)
+                if not file
+                    error("File does not exist: #{filename}", 0)
+                source = Source(filename, 1, #file)
+            else continue
+            source = Source(filename,1,#file)
+
+            output = if args.compile then io.open(filename\gsub("%.nom$", ".lua"), "w") else nil
+
+            if args.syntax
+                -- Check syntax:
+                ok,err = pcall nomsu.parse, nomsu, file, source
+                if not ok
+                    table.insert parse_errs, err
+                elseif print_file
+                    print_file\write("Parse succeeded: #{filename}\n")
+                    print_file\flush!
+                continue
+
+            tree = nomsu\parse(file, source)
+
+            if args.format
+                -- Auto-format
+                formatted = tree and tostring(nomsu\tree_to_nomsu(tree)) or ""
+                if print_file
+                    print_file\write(formatted, "\n")
+                    print_file\flush!
+                continue
+
+            if tree
+                if tree.type == "FileChunks"
+                    -- Each chunk's compilation is affected by the code in the previous chunks
+                    -- (typically), so each chunk needs to compile and run before the next one
+                    -- compiles.
+                    for chunk in *tree
+                        lua = nomsu\compile(chunk)\as_statements("return ")
+                        lua\declare_locals!
+                        lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
+                        if args.compile
+                            output\write(tostring(lua), "\n")
+                        if args.verbose
+                            print(tostring(lua))
+                        nomsu\run_lua(lua)
+                else
+                    lua = nomsu\compile(tree)\as_statements("return ")
+                    lua\declare_locals!
+                    lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
+                    if args.compile
+                        output\write(tostring(lua), "\n")
+                    if args.verbose
+                        print(tostring(lua))
+                    nomsu\run_lua(lua)
+            if args.compile
+                print ("Compiled %-25s -> %s")\format(filename, filename\gsub("%.nom$", ".lua"))
+                output\close!
 
     if #parse_errs > 0
         io.stderr\write table.concat(parse_errs, "\n\n")

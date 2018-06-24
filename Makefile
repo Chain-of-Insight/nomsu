@@ -6,11 +6,7 @@
 LUA= lua
 LUA_BIN= $(shell which $(LUA))
 
-PREFIX=/usr/local
-NOMSU_BIN_DIR= $(PREFIX)/bin
-NOMSU_LIB_DIR= $(PREFIX)/lib/nomsu
-NOMSU_SHARE_DIR= $(PREFIX)/share/nomsu
-
+PREFIX=
 # ========= You shouldn't need to mess with any of these variables below ================
 
 MOON_FILES= code_obj.moon error_handling.moon files.moon nomsu.moon nomsu_compiler.moon nomsu_tree.moon parser.moon
@@ -36,25 +32,11 @@ test: build optimize
 %.lua: %.nom
 	@./nomsu_latest -c $<
 
-.PHONY: check_header
-check_header: $(PEG_FILE) nomsu.lua $(CORE_NOM_FILES) $(LIB_NOM_FILES)
-	@if [ -f nomsu_latest ]; then \
-		NOMSU_HEADER="#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_LIB, NOMSU_SHARE = [[`$(GET_VERSION)`]], [[$(NOMSU_LIB_DIR)]], [[$(NOMSU_SHARE_DIR)]]"; \
-		if [ "`head -n 3 nomsu_latest 2>/dev/null`" != "`echo $$NOMSU_HEADER`" ]; then \
-			rm -f nomsu_latest; \
-		fi; \
-	fi;
+.DELETE_ON_ERROR: version
+version: $(LUA_FILES) $(CORE_NOM_FILES) $(LIB_NOM_FILES) $(PEG_FILE)
+	@$(LUA_BIN) nomsu.lua --version > version || exit
 
-nomsu_latest: nomsu.lua
-	@rm -f nomsu_latest
-	@NOMSU_HEADER="#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_LIB, NOMSU_SHARE = [[`$(GET_VERSION)`]], [[$(NOMSU_LIB_DIR)]], [[$(NOMSU_SHARE_DIR)]]"; \
-	echo $$NOMSU_HEADER | cat - nomsu.lua > nomsu_latest
-	@chmod +x nomsu_latest
-	@mv -f nomsu_latest nomsu`$(GET_VERSION)`
-	@ln -s nomsu`$(GET_VERSION)` nomsu_latest
-	@echo "\033[1mBuilt nomsu binary\033[0m"
-
-build: $(LUA_FILES) check_header nomsu_latest
+build: $(LUA_FILES)
 
 .PHONY: optimize
 optimize: build $(CORE_LUA_FILES) $(LIB_LUA_FILES)
@@ -62,44 +44,71 @@ optimize: build $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 .PHONY: clean
 clean:
 	@echo "\033[1mDeleting...\033[0m"
-	@rm -rvf nomsu`$(GET_VERSION)` nomsu_latest core/*.lua lib/*.lua
+	@rm -rvf version core/*.lua lib/*.lua
 
 .PHONY: install
-install: all
-	@echo "\033[1mNomsu will be installed to:\033[0m"
-	@echo "    $(NOMSU_BIN_DIR)"
-	@echo "    $(NOMSU_LIB_DIR)"
-	@echo "    $(NOMSU_SHARE_DIR)"
-	@read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
-	if [[ ! $$ans =~ ^[Nn] ]]; then \
-		mkdir -pv $(NOMSU_BIN_DIR) $(NOMSU_LIB_DIR)/`$(GET_VERSION)` $(NOMSU_SHARE_DIR)/`$(GET_VERSION)` \
-		&& cp -v nomsu nomsu`$(GET_VERSION)` $(NOMSU_BIN_DIR) \
-		&& cp -rv $(LUA_FILES) $(PEG_FILE) core lib tests $(NOMSU_SHARE_DIR)/`$(GET_VERSION)`; \
-	fi
+install: build version optimize
+	@prefix="$(PREFIX)"; \
+	if [[ ! $$prefix ]]; then \
+		read -p $$'\033[1mWhere do you want to install Nomsu? (default: /usr/local) \033[0m' prefix; \
+	fi; \
+	if [[ $$prefix != "`realpath $$prefix`" ]]; then \
+		echo $$'\033[1;31mWarning: '$$prefix$$' is not an absolute path. This may cause problems.\033[0m'; \
+		read -p $$'\033[1mWould you rather use '`realpath $$prefix`$$' instead? (recommended)[Y/n]\033[0m ' use_real; \
+		if [[ ! $$use_real =~ ^[Nn] ]]; then \
+			prefix="`realpath $$prefix`"; \
+		fi; \
+	fi; \
+	version="`cat version`"; \
+	echo "#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_PREFIX = [[$$version]], [[$$prefix]]" | cat - nomsu.lua > nomsu$$version; \
+	mkdir -pv $$prefix/bin $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version \
+	&& cp -v nomsu nomsu$$version $$prefix/bin \
+	&& cp -rv $(LUA_FILES) $(PEG_FILE) core lib tests $$prefix/share/nomsu/$$version;
 
 .PHONY: uninstall
-uninstall: all
-	@echo "\033[1mNomsu will be uninstalled from:\033[0m"
-	@echo "    $(NOMSU_BIN_DIR)"
-	@echo "    $(NOMSU_LIB_DIR)"
-	@echo "    $(NOMSU_SHARE_DIR)"
-	@read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
-	if [[ ! $$ans =~ ^[Nn] ]]; then \
-		echo "\033[1mDeleting...\033[0m"; \
-		rm -rvf $(NOMSU_LIB_DIR)/`$(GET_VERSION)` $(NOMSU_SHARE_DIR)/`$(GET_VERSION)` $(NOMSU_BIN_DIR)/nomsu`$(GET_VERSION)`; \
-		if [ "`ls $(NOMSU_BIN_DIR)/nomsu* 2> /dev/null`" == "nomsu" ]; then \
-			rm -vf $(NOMSU_BIN_DIR)/nomsu; \
-		else \
-			if [ "`ls $(NOMSU_BIN_DIR)/nomsu* 2> /dev/null`" != "" ]; then \
-				read -p $$'\033[1mIt looks like there are other versions of Nomsu installed. Is it okay to leave the "nomsu" cross-version launcher in place? (recommended) [Y/n]\033[0m ' ans; \
-				if [[ $$ans =~ ^[Nn] ]]; then \
-					echo "\033[1mDeleting...\033[0m"; \
-					rm -vf $(NOMSU_BIN_DIR)/nomsu; \
-				fi; \
+uninstall: version
+	@prefix="$(PREFIX)"; \
+	if [[ ! $$prefix ]]; then \
+		read -p $$'\033[1mWhere do you want to uninstall Nomsu from? (default: /usr/local) \033[0m' prefix; \
+	fi; \
+	echo "\033[1mNomsu will be uninstalled from:\033[0m"; \
+	echo "    $$prefix/bin"; \
+	echo "    $$prefix/lib"; \
+	echo "    $$prefix/share"; \
+	read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
+	if [[ $$ans =~ ^[Nn] ]]; then exit; fi; \
+	echo "\033[1mDeleting...\033[0m"; \
+	version="`cat version`"; \
+	rm -rvf $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/bin/nomsu$$version; \
+	if [[ "`find -E $$prefix/bin -type f -regex '.*/nomsu[0-9.]+\$$'`" == "" ]]; then \
+		rm -vf $$prefix/bin/nomsu; \
+	else \
+		if [ -f $$prefix/bin/nomsu ]; then \
+			read -p $$'\033[1mIt looks like there are other versions of Nomsu installed. Is it okay to leave the "nomsu" cross-version launcher in place? (recommended) [Y/n]\033[0m ' ans; \
+			if [[ $$ans =~ ^[Nn] ]]; then \
+				echo "\033[1mDeleting...\033[0m"; \
+				rm -vf $$prefix/bin/nomsu; \
 			fi; \
 		fi; \
-		if [ "`ls $(NOMSU_LIB_DIR) 2>/dev/null`" == "" ]; then rm -rvf $(NOMSU_LIB_DIR); fi;\
-		if [ "`ls $(NOMSU_SHARE_DIR) 2>/dev/null`" == "" ]; then rm -rvf $(NOMSU_SHARE_DIR); fi;\
-	fi
+	fi; \
+	if [ "`ls $$prefix/lib/nomsu 2>/dev/null`" == "" ]; then rm -rvf $$prefix/lib/nomsu; fi;\
+	if [ "`ls $$prefix/share/nomsu 2>/dev/null`" == "" ]; then rm -rvf $$prefix/share/nomsu; fi;\
+	echo $$'\033[1mDone.\033[0m';
+
+.PHONY: uninstall-all
+uninstall-all:
+	@prefix="$(PREFIX)"; \
+	if [[ ! $$prefix ]]; then \
+		read -p $$'\033[1mWhere do you want to uninstall Nomsu from? (default: /usr/local) \033[0m' prefix; \
+	fi; \
+	echo "\033[1mEvery version of Nomsu will be uninstalled from:\033[0m"; \
+	echo "    $$prefix/bin"; \
+	echo "    $$prefix/lib"; \
+	echo "    $$prefix/share"; \
+	read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
+	if [[ ! $$ans =~ ^[Nn] ]]; then exit; fi; \
+	echo "\033[1mDeleting...\033[0m"; \
+	rm -rvf $$prefix/lib/nomsu $$prefix/share/nomsu $$prefix/bin/nomsu*;\
+	echo $$'\033[1mDone.\033[0m';
 
 # eof
