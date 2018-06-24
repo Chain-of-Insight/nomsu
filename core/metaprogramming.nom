@@ -242,4 +242,4 @@ compile [lib version] to: Lua value "NOMSU_LIB_VERSION"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 action [Nomsu version]
     use "lib/version.nom"
-    return "\(Nomsu syntax version).\(Nomsu compiler version).\(core version).\(lib version)"
+    return "\(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)"
