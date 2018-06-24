@@ -27,7 +27,8 @@ all: build optimize
 
 .PHONY: test
 test: build optimize
-	./nomsu_latest tests
+	@echo "\033[1mRunning tests...\033[0m"
+	@./nomsu_latest tests
 
 %.lua: %.moon
 	@moonc $<
@@ -51,7 +52,7 @@ nomsu_latest: nomsu.lua
 	@chmod +x nomsu_latest
 	@mv -f nomsu_latest nomsu`$(GET_VERSION)`
 	@ln -s nomsu`$(GET_VERSION)` nomsu_latest
-	@echo "Built nomsu binary"
+	@echo "\033[1mBuilt nomsu binary\033[0m"
 
 build: $(LUA_FILES) check_header nomsu_latest
 
@@ -60,16 +61,16 @@ optimize: build $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
 .PHONY: clean
 clean:
-	@echo "Deleting..."
+	@echo "\033[1mDeleting...\033[0m"
 	@rm -rvf nomsu`$(GET_VERSION)` nomsu_latest core/*.lua lib/*.lua
 
 .PHONY: install
 install: all
-	@echo "Nomsu will be installed to:"
+	@echo "\033[1mNomsu will be installed to:\033[0m"
 	@echo "    $(NOMSU_BIN_DIR)"
 	@echo "    $(NOMSU_LIB_DIR)"
 	@echo "    $(NOMSU_SHARE_DIR)"
-	@read -p "is that okay? [Y/n] " ans; \
+	@read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
 	if [[ ! $$ans =~ ^[Nn] ]]; then \
 		mkdir -pv $(NOMSU_BIN_DIR) $(NOMSU_LIB_DIR)/`$(GET_VERSION)` $(NOMSU_SHARE_DIR)/`$(GET_VERSION)` \
 		&& cp -v nomsu nomsu`$(GET_VERSION)` $(NOMSU_BIN_DIR) \
@@ -78,33 +79,27 @@ install: all
 
 .PHONY: uninstall
 uninstall: all
-	@echo "Nomsu will be uninstalled from:"
+	@echo "\033[1mNomsu will be uninstalled from:\033[0m"
 	@echo "    $(NOMSU_BIN_DIR)"
 	@echo "    $(NOMSU_LIB_DIR)"
 	@echo "    $(NOMSU_SHARE_DIR)"
-	@read -p "is that okay? [Y/n] " ans; \
+	@read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
 	if [[ ! $$ans =~ ^[Nn] ]]; then \
-		echo "Deleting..."; \
+		echo "\033[1mDeleting...\033[0m"; \
 		rm -rvf $(NOMSU_LIB_DIR)/`$(GET_VERSION)` $(NOMSU_SHARE_DIR)/`$(GET_VERSION)` $(NOMSU_BIN_DIR)/nomsu`$(GET_VERSION)`; \
 		if [ "`ls $(NOMSU_BIN_DIR)/nomsu* 2> /dev/null`" == "nomsu" ]; then \
 			rm -vf $(NOMSU_BIN_DIR)/nomsu; \
 		else \
 			if [ "`ls $(NOMSU_BIN_DIR)/nomsu* 2> /dev/null`" != "" ]; then \
-				read -p "It looks like there are other versions of Nomsu installed. Is it okay to leave the 'nomsu' cross-version launcher in place? (recommended) [Y/n]" ans; \
+				read -p $$'\033[1mIt looks like there are other versions of Nomsu installed. Is it okay to leave the "nomsu" cross-version launcher in place? (recommended) [Y/n]\033[0m ' ans; \
 				if [[ $$ans =~ ^[Nn] ]]; then \
-					echo "Deleting..."; \
+					echo "\033[1mDeleting...\033[0m"; \
 					rm -vf $(NOMSU_BIN_DIR)/nomsu; \
 				fi; \
 			fi; \
 		fi; \
-		if [ "`ls $(NOMSU_LIB_DIR) 2>/dev/null`" == "" ]; then rm -rvf $(NOMSU_LIB_DIR);\
-		else \
-			echo "Retaining $(NOMSU_LIB_DIR), since there are other files there."; \
-		fi; \
-		if [ "`ls $(NOMSU_SHARE_DIR) 2>/dev/null`" == "" ]; then rm -rvf $(NOMSU_SHARE_DIR);\
-		else \
-			echo "Retaining $(NOMSU_SHARE_DIR), since there are other files there."; \
-		fi; \
+		if [ "`ls $(NOMSU_LIB_DIR) 2>/dev/null`" == "" ]; then rm -rvf $(NOMSU_LIB_DIR); fi;\
+		if [ "`ls $(NOMSU_SHARE_DIR) 2>/dev/null`" == "" ]; then rm -rvf $(NOMSU_SHARE_DIR); fi;\
 	fi
 
 # eof

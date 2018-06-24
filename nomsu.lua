@@ -250,7 +250,14 @@ run = function()
     os.exit(EXIT_SUCCESS)
   end
   if args.interactive then
-    nomsu:run('say "\\n\\(bright)\\(underscore)Welcome to the Nomsu v\\(Nomsu version) interactive console!\\(reset color)\\n     press \'enter\' twice to run a command\\n"')
+    nomsu:run([[use "core"
+use "lib/consolecolor.nom"
+say ".."
+
+    \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
+    
+        press \'enter\' twice to run a command
+    \("")]])
     local ready_to_quit = false
     nomsu.A_quit = function()
       ready_to_quit = true

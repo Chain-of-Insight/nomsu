@@ -175,7 +175,15 @@ run = ->
 
     if args.interactive
         -- REPL
-        nomsu\run 'say "\\n\\(bright)\\(underscore)Welcome to the Nomsu v\\(Nomsu version) interactive console!\\(reset color)\\n     press \'enter\' twice to run a command\\n"'
+        nomsu\run [[
+use "core"
+use "lib/consolecolor.nom"
+say ".."
+
+    \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
+    
+        press \'enter\' twice to run a command
+    \("")]]
         ready_to_quit = false
         nomsu.A_quit = ->
             export ready_to_quit
