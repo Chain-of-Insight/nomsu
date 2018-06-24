@@ -1,0 +1,2 @@
+use "lib/consolecolor.nom"
+say: bright: green "Color test passed."

@@ -8,7 +8,6 @@ assume ((["x","y"] joined) = "xy") or barf "joined failed"
 assume (("asdf" capitalized) = "Asdf") or barf "capitalized failed"
 assume (("asdf" with "X" instead of "s") = "aXdf") or barf "substitution failed"
 assume ("\n" = (newline)) or barf "Text literals failed."
-%x <- "\(green)hello\(reset color)"
 assume (("x" + "y") = "xy")
 assume ((lines in "one\ntwo") = ["one", "two"])
 

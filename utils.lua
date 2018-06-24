@@ -1,5 +1,6 @@
 -- A collection of helper utility functions
 --
+local match, gmatch, gsub = string.match, string.gmatch, string.gsub
 local function is_list(t)
     if type(t) ~= 'table' then
         return false
@@ -40,7 +41,7 @@ local function repr(x, depth)
                 if k == i then
                     ret[#ret+1] = repr(x[i], depth)
                     i = i + 1
-                elseif type(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
+                elseif type(k) == 'string' and match(k,"[_a-zA-Z][_a-zA-Z0-9]*") then
                     ret[#ret+1] = k.."= "..repr(v,depth)
                 else
                     ret[#ret+1] = "["..repr(k,depth).."]= "..repr(v,depth)
@@ -49,7 +50,10 @@ local function repr(x, depth)
             return "{"..table.concat(ret, ", ").."}"
         end
     elseif x_type == 'string' then
-        local escaped = x:gsub("\\", "\\\\"):gsub("\n","\\n"):gsub('"', '\\"')
+        local escaped = gsub(x, "\\", "\\\\")
+        escaped = gsub(escaped, "\n", "\\n")
+        escaped = gsub(escaped, '"', '\\"')
+        escaped = gsub(escaped, "[%c%z]", function(c) return "\\"..c:byte() end)
         return '"'..escaped..'"'
     else
         return tostring(x)
@@ -69,7 +73,7 @@ local function split(str, sep)
         sep = "%s"
     end
     local ret = {}
-    for chunk in str:gmatch("[^"..sep.."]+") do
+    for chunk in gmatch(str, "[^"..sep.."]+") do
         ret[#ret+1] = chunk
     end
     return ret

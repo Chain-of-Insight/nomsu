@@ -37,23 +37,5 @@ lua> ".."
             local lua = "'"..e.."'"
             nomsu.COMPILE_ACTIONS[name] = (function(nomsu, tree) return LuaCode.Value(tree.source, lua) end)
         end
-        local colors = {
-            ["reset color"]="\\\\27[0m", bright="\\\\27[1m", dim="\\\\27[2m", underscore="\\\\27[4m",
-            blink="\\\\27[5m", inverse="\\\\27[7m", hidden="\\\\27[8m",
-
-            black="\\\\27[30m", red="\\\\27[31m", green="\\\\27[32m", yellow="\\\\27[33m", blue="\\\\27[34m",
-            magenta="\\\\27[35m", cyan="\\\\27[36m", white="\\\\27[37m",
-
-            ["on black"]="\\\\27[40m", ["on red"]="\\\\27[41m", ["on green"]="\\\\27[42m", ["on yellow"]="\\\\27[43m",
-            ["on blue"]="\\\\27[44m", ["on magenta"]="\\\\27[45m", ["on cyan"]="\\\\27[46m", ["on white"]="\\\\27[47m",
-        };
-        for name, c in pairs(colors) do
-            local color = "'"..c.."'";
-            local reset = "'"..colors["reset color"].."'";
-            nomsu.COMPILE_ACTIONS[name] = (function(nomsu, tree) return LuaCode.Value(tree.source, color) end)
-            nomsu.COMPILE_ACTIONS[name.." %"] = (function(nomsu, tree, text)
-                return LuaCode.Value(tree.source, color, "..", nomsu:tree_to_lua(text), "..", reset);
-            end)
-        end
     end
 

@@ -112,9 +112,13 @@ run = ->
     input_files = {}
     to_run = {}
     for input in *args.inputs
+        found = false
         for f in files.walk(input)
             input_files[#input_files+1] = f
             to_run[f] = true
+            found = true
+        if not found
+            error("Could not find: #{input}")
 
     nomsu.can_optimize = (f)->
         return false unless args.optimized

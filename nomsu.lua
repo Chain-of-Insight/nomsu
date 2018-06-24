@@ -173,9 +173,14 @@ run = function()
   local _list_0 = args.inputs
   for _index_0 = 1, #_list_0 do
     local input = _list_0[_index_0]
+    local found = false
     for f in files.walk(input) do
       input_files[#input_files + 1] = f
       to_run[f] = true
+      found = true
+    end
+    if not found then
+      error("Could not find: " .. tostring(input))
     end
   end
   nomsu.can_optimize = function(f)
