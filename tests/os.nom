@@ -7,7 +7,9 @@ use "lib/os.nom"
 %lines <-: lines in: read file "tests/os.nom"
 assume: %lines.2 = "    Tests for the stuff defined in lib/os.nom"
 
+%n <- 0
 for file %f in "core"
-    say "\%f"
+    %n +<- 1
+assume (%n > 0) or barf "Failed to walk the 'core' directory"
 
 say "OS test passed."
