@@ -2,6 +2,7 @@ local lpeg = require('lpeg')
 local re = require('re')
 lpeg.setmaxstack(10000)
 local utils = require('utils')
+local files = require('files')
 local repr, stringify, equivalent
 repr, stringify, equivalent = utils.repr, utils.stringify, utils.equivalent
 colors = require('consolecolors')
@@ -59,45 +60,6 @@ table.fork = function(t, values)
   return setmetatable(values or { }, {
     __index = t
   })
-end
-FILE_CACHE = setmetatable({ }, {
-  __index = function(self, filename)
-    local file = io.open(filename)
-    if not (file) then
-      return nil
-    end
-    local contents = file:read("*a")
-    file:close()
-    self[filename] = contents
-    return contents
-  end
-})
-local iterate_single
-iterate_single = function(item, prev)
-  if item == prev then
-    return nil
-  else
-    return item
-  end
-end
-all_files = function(path)
-  if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$") then
-    return iterate_single, path
-  end
-  path = gsub(path, "\\", "\\\\")
-  path = gsub(path, "`", "")
-  path = gsub(path, '"', '\\"')
-  path = gsub(path, "$", "")
-  return coroutine.wrap(function()
-    local f = io.popen('find -L "' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
-    for line in f:lines() do
-      coroutine.yield(line)
-    end
-    local success = f:close()
-    if not (success) then
-      return error("Invalid file path: " .. tostring(path))
-    end
-  end)
 end
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*
@@ -229,7 +191,7 @@ local NomsuCompiler = setmetatable({ }, {
   end
 })
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 1
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 2
   NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
   NomsuCompiler._ENV = NomsuCompiler
   NomsuCompiler.nomsu = NomsuCompiler
@@ -245,7 +207,7 @@ do
     utils = utils,
     lpeg = lpeg,
     re = re,
-    all_files = all_files,
+    files = files,
     next = next,
     unpack = unpack,
     setmetatable = setmetatable,
@@ -299,7 +261,7 @@ do
   NomsuCompiler.LOADED = { }
   NomsuCompiler.AST = AST
   NomsuCompiler.compile_error = function(self, tok, err_format_string, ...)
-    local file = FILE_CACHE[tok.source.filename]
+    local file = files.read(tok.source.filename)
     local line_no = pos_to_line(file, tok.source.start)
     local line_start = LINE_STARTS[file][line_no]
     local src = colored.dim(file:sub(line_start, tok.source.start - 1))
@@ -422,8 +384,8 @@ do
       source = nil
     end
     source = source or (to_run.source or Source(to_run, 1, #to_run))
-    if not rawget(FILE_CACHE, source.filename) then
-      FILE_CACHE[source.filename] = to_run
+    if not files.read(source.filename) then
+      files.spoof(source.filename, to_run)
     end
     local tree
     if AST.is_syntax_tree(to_run) then
@@ -465,7 +427,7 @@ do
       return self.LOADED[filename]
     end
     local ret = nil
-    for filename in all_files(filename) do
+    for filename in files.walk(filename) do
       local _continue_0 = false
       repeat
         do
@@ -493,14 +455,14 @@ do
         end
         insert(_running_files, filename)
         if match(filename, "%.lua$") then
-          local file = assert(FILE_CACHE[filename], "Could not find file: " .. tostring(filename))
+          local file = assert(files.read(filename), "Could not find file: " .. tostring(filename))
           ret = self:run_lua(file, Source(filename, 1, #file))
         elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$") then
           local ran_lua
           if self.can_optimize(filename) then
             local lua_filename = gsub(filename, "%.nom$", ".lua")
             do
-              local file = FILE_CACHE[lua_filename]
+              local file = files.read(lua_filename)
               if file then
                 ret = self:run_lua(file, Source(lua_filename, 1, #file))
                 ran_lua = true
@@ -508,7 +470,7 @@ do
             end
           end
           if not (ran_lua) then
-            local file = file or FILE_CACHE[filename]
+            local file = file or files.read(filename)
             if not file then
               error("File does not exist: " .. tostring(filename), 0)
             end
@@ -551,7 +513,11 @@ do
       local map = { }
       local offset = 1
       source = source or lua.source
-      local nomsu_str = tostring(FILE_CACHE[source.filename]:sub(source.start, source.stop))
+      local file = files.read(source.filename)
+      if not file then
+        error("Failed to find file: " .. tostring(source.filename))
+      end
+      local nomsu_str = tostring(file:sub(source.start, source.stop))
       local lua_line = 1
       local nomsu_line = pos_to_line(nomsu_str, source.start)
       local fn
@@ -684,7 +650,7 @@ do
           local bit_lua = self:compile(bit)
           if not (bit_lua.is_value) then
             local src = '    ' .. gsub(tostring(self:tree_to_nomsu(bit)), '\n', '\n    ')
-            local line = tostring(bit.source.filename) .. ":" .. tostring(pos_to_line(FILE_CACHE[bit.source.filename], bit.source.start))
+            local line = tostring(bit.source.filename) .. ":" .. tostring(pos_to_line(files.read(bit.source.filename), bit.source.start))
             self:compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
           if #lua.bits > 0 then

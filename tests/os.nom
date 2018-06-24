@@ -7,4 +7,7 @@ use "lib/os.nom"
 %lines <-: lines in: read file "tests/os.nom"
 assume: %lines.2 = "    Tests for the stuff defined in lib/os.nom"
 
+for file %f in "core"
+    say "\%f"
+
 say "OS test passed."

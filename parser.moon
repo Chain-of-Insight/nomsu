@@ -56,7 +56,7 @@ NOMSU_DEFS = with {}
             return #src+1
         err_pos = start_pos
         line_no = pos_to_line(src, err_pos)
-        --src = FILE_CACHE[userdata.source.filename]
+        --src = files.read(userdata.source.filename)
         line_starts = LINE_STARTS[src]
         prev_line = line_no == 1 and "" or src\sub(line_starts[line_no-1] or 1, line_starts[line_no]-2)
         err_line = src\sub(line_starts[line_no], (line_starts[line_no+1] or 0)-2)
@@ -100,7 +100,11 @@ NOMSU_PATTERN = do
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]], {set_version: (v) -> Parser.version = tonumber(v)}
-    peg_file = io.open("nomsu.peg") or (package.nomsupath and io.open(package.nomsupath.."/nomsu.peg"))
+    peg_file = io.open("nomsu.peg")
+    if not peg_file and package.nomsupath
+        for path in package.nomsupath\gmatch("[^;]+")
+            peg_file = io.open(path.."/nomsu.peg")
+            break if peg_file
     assert(peg_file, "could not find nomsu.peg file")
     nomsu_peg = peg_tidier\match(peg_file\read('*a'))
     peg_file\close!

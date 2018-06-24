@@ -132,7 +132,15 @@ do
       Parser.version = tonumber(v)
     end
   })
-  local peg_file = io.open("nomsu.peg") or (package.nomsupath and io.open(package.nomsupath .. "/nomsu.peg"))
+  local peg_file = io.open("nomsu.peg")
+  if not peg_file and package.nomsupath then
+    for path in package.nomsupath:gmatch("[^;]+") do
+      peg_file = io.open(path .. "/nomsu.peg")
+      if peg_file then
+        break
+      end
+    end
+  end
   assert(peg_file, "could not find nomsu.peg file")
   local nomsu_peg = peg_tidier:match(peg_file:read('*a'))
   peg_file:close()

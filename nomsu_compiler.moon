@@ -13,6 +13,7 @@ lpeg = require 'lpeg'
 re = require 're'
 lpeg.setmaxstack 10000
 utils = require 'utils'
+files = require 'files'
 {:repr, :stringify, :equivalent} = utils
 export colors, colored
 colors = require 'consolecolors'
@@ -48,37 +49,6 @@ table.fork = (t, values)-> setmetatable(values or {}, {__index:t})
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
 -- Re-implement nomsu-to-lua comment translation?
-
-export FILE_CACHE
--- FILE_CACHE is a map from filename (string) -> string of file contents
-FILE_CACHE = setmetatable {}, {
-    __index: (filename)=>
-        file = io.open(filename)
-        return nil unless file
-        contents = file\read("*a")
-        file\close!
-        self[filename] = contents
-        return contents
-}
-
-export all_files
-iterate_single = (item, prev) -> if item == prev then nil else item
-all_files = (path)->
-    -- Sanitize path
-    if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$")
-        return iterate_single, path
-    -- TODO: improve sanitization
-    path = gsub(path,"\\","\\\\")
-    path = gsub(path,"`","")
-    path = gsub(path,'"','\\"')
-    path = gsub(path,"$","")
-    return coroutine.wrap ->
-        f = io.popen('find -L "'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
-        for line in f\lines!
-            coroutine.yield(line)
-        success = f\close!
-        unless success
-            error("Invalid file path: "..tostring(path))
 
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}
@@ -158,7 +128,7 @@ dict = (t)-> setmetatable(t, _dict_mt)
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable({}, {__index: (k)=> if _self = rawget(@, "self") then _self[k] else nil})
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 1
+    .NOMSU_COMPILER_VERSION = 2
     .NOMSU_SYNTAX_VERSION = Parser.version
     ._ENV = NomsuCompiler
     .nomsu = NomsuCompiler
@@ -167,7 +137,7 @@ with NomsuCompiler
 
     -- Discretionary/convenience stuff
     to_add = {
-        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re, all_files:all_files,
+        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re, files:files,
         -- Lua stuff:
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
@@ -187,7 +157,7 @@ with NomsuCompiler
     .AST = AST
 
     .compile_error = (tok, err_format_string, ...)=>
-        file = FILE_CACHE[tok.source.filename]
+        file = files.read(tok.source.filename)
         line_no = pos_to_line(file, tok.source.start)
         line_start = LINE_STARTS[file][line_no]
         src = colored.dim(file\sub(line_start, tok.source.start-1))
@@ -289,7 +259,7 @@ with NomsuCompiler
 
     .run = (to_run, source=nil)=>
         source or= to_run.source or Source(to_run, 1, #to_run)
-        if not rawget(FILE_CACHE,source.filename) then FILE_CACHE[source.filename] = to_run
+        if not files.read(source.filename) then files.spoof(source.filename, to_run)
         tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
@@ -321,7 +291,7 @@ with NomsuCompiler
         if @LOADED[filename]
             return @LOADED[filename]
         ret = nil
-        for filename in all_files(filename)
+        for filename in files.walk(filename)
             if ret = @LOADED[filename]
                 continue
 
@@ -334,16 +304,16 @@ with NomsuCompiler
 
             insert _running_files, filename
             if match(filename, "%.lua$")
-                file = assert(FILE_CACHE[filename], "Could not find file: #{filename}")
+                file = assert(files.read(filename), "Could not find file: #{filename}")
                 ret = @run_lua file, Source(filename, 1, #file)
             elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$")
                 ran_lua = if @.can_optimize(filename) -- Look for precompiled version
                     lua_filename = gsub(filename, "%.nom$", ".lua")
-                    if file = FILE_CACHE[lua_filename]
+                    if file = files.read(lua_filename)
                         ret = @run_lua file, Source(lua_filename, 1, #file)
                         true
                 unless ran_lua
-                    file = file or FILE_CACHE[filename]
+                    file = file or files.read(filename)
                     if not file
                         error("File does not exist: #{filename}", 0)
                     ret = @run file, Source(filename,1,#file)
@@ -368,7 +338,10 @@ with NomsuCompiler
             map = {}
             offset = 1
             source or= lua.source
-            nomsu_str = tostring(FILE_CACHE[source.filename]\sub(source.start, source.stop))
+            file = files.read(source.filename)
+            if not file
+                error "Failed to find file: #{source.filename}"
+            nomsu_str = tostring(file\sub(source.start, source.stop))
             lua_line = 1
             nomsu_line = pos_to_line(nomsu_str, source.start)
             fn = (s)->
@@ -444,7 +417,7 @@ with NomsuCompiler
                     bit_lua = @compile(bit)
                     unless bit_lua.is_value
                         src = '    '..gsub(tostring(@tree_to_nomsu(bit)), '\n','\n    ')
-                        line = "#{bit.source.filename}:#{pos_to_line(FILE_CACHE[bit.source.filename], bit.source.start)}"
+                        line = "#{bit.source.filename}:#{pos_to_line(files.read(bit.source.filename), bit.source.start)}"
                         @compile_error bit,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     if #lua.bits > 0 then lua\append ".."

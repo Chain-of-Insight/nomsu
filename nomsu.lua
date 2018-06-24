@@ -1,3 +1,55 @@
+if NOMSU_VERSION and NOMSU_LIB and NOMSU_SHARE then
+  local ver_bits
+  do
+    local _accum_0 = { }
+    local _len_0 = 1
+    for ver_bit in NOMSU_VERSION:gmatch("[0-9]+") do
+      _accum_0[_len_0] = ver_bit
+      _len_0 = _len_0 + 1
+    end
+    ver_bits = _accum_0
+  end
+  local partial_vers
+  do
+    local _accum_0 = { }
+    local _len_0 = 1
+    for i = #ver_bits, 1, -1 do
+      _accum_0[_len_0] = table.concat(ver_bits, '.', 1, i)
+      _len_0 = _len_0 + 1
+    end
+    partial_vers = _accum_0
+  end
+  package.path = table.concat((function()
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _index_0 = 1, #partial_vers do
+      local v = partial_vers[_index_0]
+      _accum_0[_len_0] = tostring(NOMSU_SHARE) .. "/" .. tostring(v) .. "/?.lua"
+      _len_0 = _len_0 + 1
+    end
+    return _accum_0
+  end)(), ";") .. ";" .. package.path
+  package.cpath = table.concat((function()
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _index_0 = 1, #partial_vers do
+      local v = partial_vers[_index_0]
+      _accum_0[_len_0] = tostring(NOMSU_LIB) .. "/" .. tostring(v) .. "/?.so"
+      _len_0 = _len_0 + 1
+    end
+    return _accum_0
+  end)(), ";") .. ";" .. package.cpath
+  package.nomsupath = table.concat((function()
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _index_0 = 1, #partial_vers do
+      local v = partial_vers[_index_0]
+      _accum_0[_len_0] = tostring(NOMSU_SHARE) .. "/" .. tostring(v)
+      _len_0 = _len_0 + 1
+    end
+    return _accum_0
+  end)(), ";")
+end
 local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 local usage = [=[Nomsu Compiler
 
@@ -61,6 +113,7 @@ if not args or args.help then
   print(usage)
   os.exit(EXIT_FAILURE)
 end
+local files = require("files")
 local nomsu = NomsuCompiler
 nomsu.arg = args.nomsu_args
 if args.version then
@@ -79,85 +132,6 @@ FILE_CACHE = setmetatable({ }, {
     return contents
   end
 })
-local match, sub, rep, gsub, format, byte, find
-do
-  local _obj_0 = string
-  match, sub, rep, gsub, format, byte, match, find = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match, _obj_0.find
-end
-local iterate_single
-iterate_single = function(item, prev)
-  if item == prev then
-    return nil
-  else
-    return item
-  end
-end
-local lfs
-ok, lfs = pcall(require, "lfs")
-if ok then
-  all_files = function(path)
-    local browse
-    browse = function(filename)
-      local file_type = lfs.attributes(filename, 'mode')
-      if file_type == 'file' then
-        if match(filename, "%.nom$") or match(filename, "%.lua$") then
-          coroutine.yield(filename)
-          return true
-        end
-      elseif file_type == 'directory' then
-        for subfile in lfs.dir(filename) do
-          if not (subfile == "." or subfile == "..") then
-            browse(filename .. "/" .. subfile)
-          end
-        end
-        return true
-      elseif file_type == 'char device' then
-        coroutine.yield(filename)
-        return true
-      end
-      return false
-    end
-    return coroutine.wrap(function()
-      if not browse(path) and package.nomsupath then
-        browse(package.nomsupath .. "/" .. path)
-      end
-      return nil
-    end)
-  end
-else
-  local ret = os.execute('find . -maxdepth 0')
-  if not (ret == true or ret == 0) then
-    error("Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0)
-  end
-  all_files = function(path)
-    if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$") then
-      return iterate_single, path
-    end
-    path = gsub(path, "\\", "\\\\")
-    path = gsub(path, "`", "")
-    path = gsub(path, '"', '\\"')
-    path = gsub(path, "$", "")
-    return coroutine.wrap(function()
-      local f = io.popen('find -L "' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
-      local found = false
-      for line in f:lines() do
-        found = true
-        coroutine.yield(line)
-      end
-      if not found and package.nomsupath then
-        f:close()
-        f = io.popen('find -L "' .. package.nomsupath .. '/' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
-        for line in f:lines() do
-          coroutine.yield(line)
-        end
-      end
-      local success = f:close()
-      if not (success) then
-        return error("Invalid file path: " .. tostring(path))
-      end
-    end)
-  end
-end
 local run
 run = function()
   for i, input in ipairs(args.inputs) do
@@ -199,7 +173,7 @@ run = function()
   local _list_0 = args.inputs
   for _index_0 = 1, #_list_0 do
     local input = _list_0[_index_0]
-    for f in all_files(input) do
+    for f in files.walk(input) do
       input_files[#input_files + 1] = f
       to_run[f] = true
     end
@@ -245,7 +219,7 @@ run = function()
         print_file:flush()
       end
     elseif args.format then
-      local file = FILE_CACHE[filename]
+      local file = files.read(filename)
       if not file then
         error("File does not exist: " .. tostring(filename), 0)
       end
@@ -257,7 +231,7 @@ run = function()
       end
     elseif filename == STDIN then
       local file = io.input():read("*a")
-      FILE_CACHE.stdin = file
+      files.spoof('stdin', file)
       nomsu:run(file, Source('stdin', 1, #file))
     else
       nomsu:run_file(filename)
@@ -305,7 +279,7 @@ run = function()
       end
       buff = table.concat(buff)
       local pseudo_filename = "user input #" .. repl_line
-      FILE_CACHE[pseudo_filename] = buff
+      files.spoof(pseudo_filename, buff)
       local err_hand
       err_hand = function(error_message)
         return Errhand.print_error(error_message)

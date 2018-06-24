@@ -1,5 +1,12 @@
 #!/usr/bin/env moon
 -- This file contains the command-line Nomsu runner.
+if NOMSU_VERSION and NOMSU_LIB and NOMSU_SHARE
+    ver_bits = [ver_bit for ver_bit in NOMSU_VERSION\gmatch("[0-9]+")]
+    partial_vers = [table.concat(ver_bits,'.',1,i) for i=#ver_bits,1,-1]
+    package.path = table.concat(["#{NOMSU_SHARE}/#{v}/?.lua" for v in *partial_vers],";")..";"..package.path
+    package.cpath = table.concat(["#{NOMSU_LIB}/#{v}/?.so" for v in *partial_vers],";")..";"..package.cpath
+    package.nomsupath = table.concat(["#{NOMSU_SHARE}/#{v}" for v in *partial_vers],";")
+
 EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 usage = [=[
 Nomsu Compiler
@@ -58,11 +65,12 @@ if not args or args.help
     print usage
     os.exit(EXIT_FAILURE)
 
+files = require "files"
 nomsu = NomsuCompiler
 nomsu.arg = args.nomsu_args
 
 if args.version
-    nomsu\run 'use "core"\nsay (Nomsu version)' 
+    nomsu\run 'use "core"\nsay (Nomsu version)'
     os.exit(EXIT_SUCCESS)
 
 export FILE_CACHE
@@ -76,61 +84,6 @@ FILE_CACHE = setmetatable {}, {
         self[filename] = contents
         return contents
 }
-
-export all_files
-{:match, :sub, :rep, :gsub, :format, :byte, :match, :find} = string
-iterate_single = (item, prev) -> if item == prev then nil else item
-ok, lfs = pcall(require, "lfs")
-if ok
-    all_files = (path)->
-        browse = (filename)->
-            file_type = lfs.attributes(filename, 'mode')
-            if file_type == 'file'
-                if match(filename, "%.nom$") or match(filename, "%.lua$")
-                    coroutine.yield filename
-                    return true
-            elseif file_type == 'directory'
-                for subfile in lfs.dir(filename)
-                    unless subfile == "." or subfile == ".."
-                        browse(filename.."/"..subfile)
-                return true
-            elseif file_type == 'char device'
-                coroutine.yield(filename)
-                return true
-            return false
-        return coroutine.wrap ->
-            if not browse(path) and package.nomsupath
-                browse(package.nomsupath.."/"..path)
-            return nil
-else
-    ret = os.execute('find . -maxdepth 0')
-    unless ret == true or ret == 0
-        error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0
-
-    all_files = (path)->
-        -- Sanitize path
-        if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$")
-            return iterate_single, path
-        -- TODO: improve sanitization
-        path = gsub(path,"\\","\\\\")
-        path = gsub(path,"`","")
-        path = gsub(path,'"','\\"')
-        path = gsub(path,"$","")
-        return coroutine.wrap ->
-            f = io.popen('find -L "'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
-            found = false
-            for line in f\lines!
-                found = true
-                coroutine.yield(line)
-            if not found and package.nomsupath
-                f\close!
-                f = io.popen('find -L "'..package.nomsupath..'/'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
-                for line in f\lines!
-                    coroutine.yield(line)
-            success = f\close!
-            unless success
-                error("Invalid file path: "..tostring(path))
-
 
 run = ->
     for i,input in ipairs args.inputs
@@ -159,7 +112,7 @@ run = ->
     input_files = {}
     to_run = {}
     for input in *args.inputs
-        for f in all_files(input)
+        for f in files.walk(input)
             input_files[#input_files+1] = f
             to_run[f] = true
 
@@ -194,7 +147,7 @@ run = ->
                 print_file\flush!
         elseif args.format
             -- Auto-format
-            file = FILE_CACHE[filename]
+            file = files.read(filename)
             if not file
                 error("File does not exist: #{filename}", 0)
             tree = nomsu\parse(file, Source(filename,1,#file))
@@ -204,7 +157,7 @@ run = ->
                 print_file\flush!
         elseif filename == STDIN
             file = io.input!\read("*a")
-            FILE_CACHE.stdin = file
+            files.spoof('stdin', file)
             nomsu\run(file, Source('stdin',1,#file))
         else
             nomsu\run_file(filename)
@@ -248,7 +201,7 @@ run = ->
             
             buff = table.concat(buff)
             pseudo_filename = "user input #"..repl_line
-            FILE_CACHE[pseudo_filename] = buff
+            files.spoof(pseudo_filename, buff)
             err_hand = (error_message)->
                 Errhand.print_error error_message
             ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))

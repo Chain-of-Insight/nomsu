@@ -1,3 +1,4 @@
+local files = require("files")
 local debug_getinfo = debug.getinfo
 local ok, to_lua = pcall(function()
   return require('moonscript.base').to_lua
@@ -97,7 +98,7 @@ print_error = function(error_message, stack_offset)
           end
           local filename, start, stop = calling_fn.source:match('@([^[]*)%[([0-9]+):([0-9]+)]')
           assert(filename)
-          local file = FILE_CACHE[filename]:sub(tonumber(start), tonumber(stop))
+          local file = read_file(filename):sub(tonumber(start), tonumber(stop))
           local err_line = get_line(file, calling_fn.currentline):sub(1, -2)
           local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)")))
           if calling_fn.name then
@@ -118,7 +119,7 @@ print_error = function(error_message, stack_offset)
         else
           local file
           ok, file = pcall(function()
-            return FILE_CACHE[calling_fn.short_src]
+            return read_file(calling_fn.short_src)
           end)
           if not ok then
             file = nil

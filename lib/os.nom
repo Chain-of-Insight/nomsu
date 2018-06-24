@@ -1,5 +1,10 @@
 use "core"
 
+action [path of Nomsu file %filename]
+    lua> ".."
+        for f in files.walk(\%filename) do return f end
+    barf "Could not find file: \%filename"
+
 action [sh> %cmd]
     lua> ".."
         local result = io.popen(\%cmd)
@@ -8,11 +13,15 @@ action [sh> %cmd]
         return contents
 
 action [read file %filename]
-    lua> ".."
-        local file = io.open(\%filename)
-        local contents = file:read("*a")
-        file:close()
-        return contents
+    =lua "files.read(\%filename)"
+
+compile [for file %f in %path %body] to
+    Lua ".."
+        for \(%f as lua expr) in files.walk(\(%path as lua expr)) do
+            \(%body as lua statements)
+            \(compile as: === next %f ===)
+        end
+        \(compile as: === stop %f ===)
 
 action [write to file %filename %text, to file %filename write %text]
     lua> ".."

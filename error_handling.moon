@@ -1,4 +1,5 @@
 -- This file contains the logic for making nicer error messages
+files = require "files"
 debug_getinfo = debug.getinfo
 export SOURCE_MAP
 
@@ -62,7 +63,7 @@ print_error = (error_message, stack_offset=3)->
             --calling_fn.short_src = calling_fn.source\match('"([^[]*)')
             filename,start,stop = calling_fn.source\match('@([^[]*)%[([0-9]+):([0-9]+)]')
             assert(filename)
-            file = FILE_CACHE[filename]\sub(tonumber(start),tonumber(stop))
+            file = read_file(filename)\sub(tonumber(start),tonumber(stop))
             err_line = get_line(file, calling_fn.currentline)\sub(1,-2)
             offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)")))
             -- TODO: get name properly
@@ -73,7 +74,7 @@ print_error = (error_message, stack_offset=3)->
             else "main chunk"
             line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}")
         else
-            ok, file = pcall ->FILE_CACHE[calling_fn.short_src]
+            ok, file = pcall ->read_file(calling_fn.short_src)
             if not ok then file = nil
             local line_num
             if name == nil
