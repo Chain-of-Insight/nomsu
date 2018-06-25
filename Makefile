@@ -7,6 +7,7 @@ LUA= lua
 LUA_BIN= $(shell which $(LUA))
 
 PREFIX=
+UNINSTALL_VERSION=
 # ========= You shouldn't need to mess with any of these variables below ================
 
 MOON_FILES= code_obj.moon error_handling.moon files.moon nomsu.moon nomsu_compiler.moon nomsu_tree.moon parser.moon
@@ -66,7 +67,7 @@ install: build version optimize
 	&& echo "#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_PREFIX = [[$$version]], [[$$prefix]]" | cat - nomsu.lua > $$prefix/bin/nomsu$$version \
 	&& chmod +x $$prefix/bin/nomsu$$version \
 	&& cp -v nomsu $$prefix/bin \
-	&& install -v -g 0 -o 0 -m 644 doc/nomsu.1 $$prefix/share/man/man1 \
+	&& cp -v doc/nomsu.1 $$prefix/share/man/man1 \
 	&& cp -rv $(LUA_FILES) $(PEG_FILE) core lib tests $$prefix/share/nomsu/$$version;
 
 .PHONY: uninstall
@@ -82,7 +83,8 @@ uninstall: version
 	read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
 	if [[ $$ans =~ ^[Nn] ]]; then exit; fi; \
 	echo "\033[1mDeleting...\033[0m"; \
-	version="`cat version`"; \
+	version="$(UNINSTALL_VERSION)"; \
+	if [[ ! $$version ]]; then version="`cat version`"; fi;\
 	rm -rvf $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/bin/nomsu$$version; \
 	if [[ "`find -E $$prefix/bin -type f -regex '.*/nomsu[0-9.]+\$$'`" == "" ]]; then \
 		rm -vf $$prefix/bin/nomsu $$prefix/share/man/man1/nomsu.1; \
@@ -97,22 +99,6 @@ uninstall: version
 	fi; \
 	if [ "`ls $$prefix/lib/nomsu 2>/dev/null`" == "" ]; then rm -rvf $$prefix/lib/nomsu; fi;\
 	if [ "`ls $$prefix/share/nomsu 2>/dev/null`" == "" ]; then rm -rvf $$prefix/share/nomsu; fi;\
-	echo $$'\033[1mDone.\033[0m';
-
-.PHONY: uninstall-all
-uninstall-all:
-	@prefix="$(PREFIX)"; \
-	if [[ ! $$prefix ]]; then \
-		read -p $$'\033[1mWhere do you want to uninstall Nomsu from? (default: /usr/local) \033[0m' prefix; \
-	fi; \
-	echo "\033[1mEvery version of Nomsu will be uninstalled from:\033[0m"; \
-	echo "    $$prefix/bin"; \
-	echo "    $$prefix/lib"; \
-	echo "    $$prefix/share"; \
-	read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
-	if [[ ! $$ans =~ ^[Nn] ]]; then exit; fi; \
-	echo "\033[1mDeleting...\033[0m"; \
-	rm -rvf $$prefix/lib/nomsu $$prefix/share/nomsu $$prefix/bin/nomsu*;\
 	echo $$'\033[1mDone.\033[0m';
 
 # eof
