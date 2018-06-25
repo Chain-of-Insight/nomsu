@@ -24,13 +24,13 @@ all: build optimize
 .PHONY: test
 test: build optimize
 	@echo "\033[1mRunning tests...\033[0m"
-	@./nomsu_latest tests
+	@$(LUA_BIN) nomsu.lua tests
 
 %.lua: %.moon
 	@moonc $<
 
 %.lua: %.nom
-	@./nomsu_latest -c $<
+	@$(LUA_BIN) nomsu.lua -c $<
 
 .DELETE_ON_ERROR: version
 version: $(LUA_FILES) $(CORE_NOM_FILES) $(LIB_NOM_FILES) $(PEG_FILE)
