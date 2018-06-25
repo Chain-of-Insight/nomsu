@@ -4,10 +4,10 @@ lpeg.setmaxstack(10000)
 local P, R, V, S, Cg, C, Cp, B, Cmt, Carg
 P, R, V, S, Cg, C, Cp, B, Cmt, Carg = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt, lpeg.Carg
 local utils = require('utils')
-local match, sub, rep, gsub, format, byte, find
+local match, sub
 do
   local _obj_0 = string
-  match, sub, rep, gsub, format, byte, match, find = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match, _obj_0.find
+  match, sub = _obj_0.match, _obj_0.sub
 end
 local NomsuCode, LuaCode, Source
 do

@@ -1,6 +1,5 @@
 local lpeg = require('lpeg')
 local re = require('re')
-lpeg.setmaxstack(10000)
 local utils = require('utils')
 local files = require('files')
 local repr, stringify, equivalent
@@ -19,10 +18,10 @@ do
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
 local unpack = unpack or table.unpack
-local match, sub, rep, gsub, format, byte, find
+local match, sub, gsub, format, byte, find
 do
   local _obj_0 = string
-  match, sub, rep, gsub, format, byte, match, find = _obj_0.match, _obj_0.sub, _obj_0.rep, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.match, _obj_0.find
+  match, sub, gsub, format, byte, find = _obj_0.match, _obj_0.sub, _obj_0.gsub, _obj_0.format, _obj_0.byte, _obj_0.find
 end
 local NomsuCode, LuaCode, Source
 do
@@ -60,46 +59,6 @@ table.fork = function(t, values)
   return setmetatable(values or { }, {
     __index = t
   })
-end
-local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
-    line <- {} (!%nl .)*
-]], {
-  nl = lpeg.P("\r") ^ -1 * lpeg.P("\n")
-})
-local get_lines = re.compile([[    lines <- {| line (%nl line)* |}
-    line <- {[^%nl]*}
-]], {
-  nl = lpeg.P("\r") ^ -1 * lpeg.P("\n")
-})
-LINE_STARTS = setmetatable({ }, {
-  __mode = "k",
-  __index = function(self, k)
-    if type(k) ~= 'string' then
-      k = tostring(k)
-      do
-        local v = rawget(self, k)
-        if v then
-          return v
-        end
-      end
-    end
-    local line_starts = line_counter:match(k)
-    self[k] = line_starts
-    return line_starts
-  end
-})
-pos_to_line = function(str, pos)
-  local line_starts = LINE_STARTS[str]
-  local lo, hi = 1, #line_starts
-  while lo <= hi do
-    local mid = math.floor((lo + hi) / 2)
-    if line_starts[mid] > pos then
-      hi = mid - 1
-    else
-      lo = mid + 1
-    end
-  end
-  return hi
 end
 do
   local STRING_METATABLE = getmetatable("")
@@ -262,11 +221,12 @@ do
   NomsuCompiler.AST = AST
   NomsuCompiler.compile_error = function(self, tok, err_format_string, ...)
     local file = files.read(tok.source.filename)
-    local line_no = pos_to_line(file, tok.source.start)
-    local line_start = LINE_STARTS[file][line_no]
+    local line_starts = files.get_line_starts(file)
+    local line_no = files.get_line_number(file, tok.source.start)
+    local line_start = line_starts[line_no]
     local src = colored.dim(file:sub(line_start, tok.source.start - 1))
     src = src .. colored.underscore(colored.bright(colored.red(file:sub(tok.source.start, tok.source.stop - 1))))
-    local end_of_line = (LINE_STARTS[file][pos_to_line(file, tok.source.stop) + 1] or 0) - 1
+    local end_of_line = (line_starts[files.get_line_number(file, tok.source.stop) + 1] or 0) - 1
     src = src .. colored.dim(file:sub(tok.source.stop, end_of_line - 1))
     src = '    ' .. src:gsub('\n', '\n    ')
     local err_msg = err_format_string:format(src, ...)
@@ -498,7 +458,7 @@ do
       end
       local nomsu_str = tostring(file:sub(source.start, source.stop))
       local lua_line = 1
-      local nomsu_line = pos_to_line(nomsu_str, source.start)
+      local nomsu_line = files.get_line_number(nomsu_str, source.start)
       local fn
       fn = function(s)
         if type(s) == 'string' then
@@ -509,7 +469,7 @@ do
         else
           local old_line = nomsu_line
           if s.source then
-            nomsu_line = pos_to_line(nomsu_str, s.source.start)
+            nomsu_line = files.get_line_number(nomsu_str, s.source.start)
           end
           local _list_0 = s.bits
           for _index_0 = 1, #_list_0 do
@@ -629,7 +589,7 @@ do
           local bit_lua = self:compile(bit)
           if not (bit_lua.is_value) then
             local src = '    ' .. gsub(tostring(self:tree_to_nomsu(bit)), '\n', '\n    ')
-            local line = tostring(bit.source.filename) .. ":" .. tostring(pos_to_line(files.read(bit.source.filename), bit.source.start))
+            local line = tostring(bit.source.filename) .. ":" .. tostring(files.get_line_number(files.read(bit.source.filename), bit.source.start))
             self:compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
           if #lua.bits > 0 then

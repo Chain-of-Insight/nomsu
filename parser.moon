@@ -4,7 +4,7 @@ re = require 're'
 lpeg.setmaxstack 10000
 {:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt,:Carg} = lpeg
 utils = require 'utils'
-{:match, :sub, :rep, :gsub, :format, :byte, :match, :find} = string
+{:match, :sub} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "nomsu_tree"
 

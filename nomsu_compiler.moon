@@ -11,7 +11,6 @@
 --        lua nomsu.lua your_file.nom
 lpeg = require 'lpeg'
 re = require 're'
-lpeg.setmaxstack 10000
 utils = require 'utils'
 files = require 'files'
 {:repr, :stringify, :equivalent} = utils
@@ -20,7 +19,7 @@ colors = require 'consolecolors'
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
 {:insert, :remove, :concat} = table
 unpack or= table.unpack
-{:match, :sub, :rep, :gsub, :format, :byte, :match, :find} = string
+{:match, :sub, :gsub, :format, :byte, :find} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "nomsu_tree"
 Parser = require("parser")
@@ -49,41 +48,6 @@ table.fork = (t, values)-> setmetatable(values or {}, {__index:t})
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
 -- Re-implement nomsu-to-lua comment translation?
-
-line_counter = re.compile([[
-    lines <- {| line (%nl line)* |}
-    line <- {} (!%nl .)*
-]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
-get_lines = re.compile([[
-    lines <- {| line (%nl line)* |}
-    line <- {[^%nl]*}
-]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
--- Mapping from line number -> character offset
-export LINE_STARTS
--- LINE_STARTS is a mapping from strings to a table that maps line number to character positions
-LINE_STARTS = setmetatable {}, {
-    __mode:"k"
-    __index: (k)=>
-        -- Implicitly convert Lua and Nomsu objects to strings
-        if type(k) != 'string'
-            k = tostring(k)
-            if v = rawget(self, k)
-                return v
-        line_starts = line_counter\match(k)
-        self[k] = line_starts
-        return line_starts
-}
-export pos_to_line
-pos_to_line = (str, pos)->
-    line_starts = LINE_STARTS[str]
-    -- Binary search for line number of position
-    lo, hi = 1, #line_starts
-    while lo <= hi
-        mid = math.floor((lo+hi)/2)
-        if line_starts[mid] > pos
-            hi = mid-1
-        else lo = mid+1
-    return hi
 
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
 -- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
@@ -158,11 +122,12 @@ with NomsuCompiler
 
     .compile_error = (tok, err_format_string, ...)=>
         file = files.read(tok.source.filename)
-        line_no = pos_to_line(file, tok.source.start)
-        line_start = LINE_STARTS[file][line_no]
+        line_starts = files.get_line_starts(file)
+        line_no = files.get_line_number(file, tok.source.start)
+        line_start = line_starts[line_no]
         src = colored.dim(file\sub(line_start, tok.source.start-1))
         src ..= colored.underscore colored.bright colored.red(file\sub(tok.source.start, tok.source.stop-1))
-        end_of_line = (LINE_STARTS[file][pos_to_line(file, tok.source.stop) + 1] or 0) - 1
+        end_of_line = (line_starts[files.get_line_number(file, tok.source.stop) + 1] or 0) - 1
         src ..= colored.dim(file\sub(tok.source.stop, end_of_line-1))
         src = '    '..src\gsub('\n', '\n    ')
         err_msg = err_format_string\format(src, ...)
@@ -336,7 +301,7 @@ with NomsuCompiler
                 error "Failed to find file: #{source.filename}"
             nomsu_str = tostring(file\sub(source.start, source.stop))
             lua_line = 1
-            nomsu_line = pos_to_line(nomsu_str, source.start)
+            nomsu_line = files.get_line_number(nomsu_str, source.start)
             fn = (s)->
                 if type(s) == 'string'
                     for nl in s\gmatch("\n")
@@ -345,7 +310,7 @@ with NomsuCompiler
                 else
                     old_line = nomsu_line
                     if s.source
-                        nomsu_line = pos_to_line(nomsu_str, s.source.start)
+                        nomsu_line = files.get_line_number(nomsu_str, s.source.start)
                     for b in *s.bits do fn(b)
             fn(lua)
             map[lua_line] or= nomsu_line
@@ -410,7 +375,7 @@ with NomsuCompiler
                     bit_lua = @compile(bit)
                     unless bit_lua.is_value
                         src = '    '..gsub(tostring(@tree_to_nomsu(bit)), '\n','\n    ')
-                        line = "#{bit.source.filename}:#{pos_to_line(files.read(bit.source.filename), bit.source.start)}"
+                        line = "#{bit.source.filename}:#{files.get_line_number(files.read(bit.source.filename), bit.source.start)}"
                         @compile_error bit,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     if #lua.bits > 0 then lua\append ".."

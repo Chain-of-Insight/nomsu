@@ -1,4 +1,6 @@
 -- Some file utilities for searching for files recursively and using package.nomsupath
+lpeg = require 'lpeg'
+re = require 're'
 files = {}
 
 _FILE_CACHE = {}
@@ -82,5 +84,37 @@ else
                     break if found
             unless found
                 error("Invalid file path: "..tostring(path))
+
+line_counter = re.compile([[
+    lines <- {| line (%nl line)* |}
+    line <- {} (!%nl .)*
+]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
+
+get_lines = re.compile([[
+    lines <- {| line (%nl line)* |}
+    line <- {[^%nl]*}
+]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
+
+-- LINE_STARTS is a mapping from strings to a table that maps line number to character positions
+_LINE_STARTS = {}
+files.get_line_starts = (str)->
+    if type(str) != 'string'
+        str = tostring(str)
+    if starts = _LINE_STARTS[str]
+        return starts
+    line_starts = line_counter\match(str)
+    _LINE_STARTS[str] = line_starts
+    return line_starts
+
+files.get_line_number = (str, pos)->
+    line_starts = files.get_line_starts(str)
+    -- Binary search for line number of position
+    lo, hi = 1, #line_starts
+    while lo <= hi
+        mid = math.floor((lo+hi)/2)
+        if line_starts[mid] > pos
+            hi = mid-1
+        else lo = mid+1
+    return hi
 
 return files

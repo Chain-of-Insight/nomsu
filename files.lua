@@ -1,3 +1,5 @@
+local lpeg = require('lpeg')
+local re = require('re')
 local files = { }
 local _FILE_CACHE = { }
 files.spoof = function(filename, contents)
@@ -48,7 +50,7 @@ iterate_single = function(item, prev)
   end
 end
 local ok, lfs = pcall(require, "lfs")
-if ok and false then
+if ok then
   files.walk = function(path)
     local browse
     browse = function(filename)
@@ -120,5 +122,43 @@ else
       end
     end)
   end
+end
+local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
+    line <- {} (!%nl .)*
+]], {
+  nl = lpeg.P("\r") ^ -1 * lpeg.P("\n")
+})
+local get_lines = re.compile([[    lines <- {| line (%nl line)* |}
+    line <- {[^%nl]*}
+]], {
+  nl = lpeg.P("\r") ^ -1 * lpeg.P("\n")
+})
+local _LINE_STARTS = { }
+files.get_line_starts = function(str)
+  if type(str) ~= 'string' then
+    str = tostring(str)
+  end
+  do
+    local starts = _LINE_STARTS[str]
+    if starts then
+      return starts
+    end
+  end
+  local line_starts = line_counter:match(str)
+  _LINE_STARTS[str] = line_starts
+  return line_starts
+end
+files.get_line_number = function(str, pos)
+  local line_starts = files.get_line_starts(str)
+  local lo, hi = 1, #line_starts
+  while lo <= hi do
+    local mid = math.floor((lo + hi) / 2)
+    if line_starts[mid] > pos then
+      hi = mid - 1
+    else
+      lo = mid + 1
+    end
+  end
+  return hi
 end
 return files
