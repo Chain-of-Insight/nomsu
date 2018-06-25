@@ -23,8 +23,10 @@ all: build optimize
 
 .PHONY: test
 test: build optimize
-	@echo "\033[1mRunning tests...\033[0m"
+	@echo "\033[1;4mRunning unoptimized tests...\033[0m"
 	@$(LUA_BIN) nomsu.lua tests
+	@echo "\n\033[1;4mRunning optimized tests...\033[0m"
+	@$(LUA_BIN) nomsu.lua -O tests
 
 %.lua: %.moon
 	@moonc $<
