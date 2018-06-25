@@ -2,8 +2,7 @@
 lpeg = require 'lpeg'
 re = require 're'
 lpeg.setmaxstack 10000
-{:P,:R,:V,:S,:Cg,:C,:Cp,:B,:Cmt,:Carg} = lpeg
-utils = require 'utils'
+{:P,:R,:S,:C,:Cmt,:Carg} = lpeg
 {:match, :sub} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "nomsu_tree"
@@ -51,7 +50,9 @@ NOMSU_DEFS = with {}
         seen_errors = userdata.errors
         if seen_errors[start_pos]
             return true
-        if utils.size(seen_errors) >= 10
+        num_errors = 0
+        for _ in pairs(seen_errors) do num_errors += 1
+        if num_errors >= 10
             seen_errors[start_pos+1] = colored.bright colored.yellow colored.onred "Too many errors, canceling parsing..."
             return #src+1
         err_pos = start_pos
@@ -122,7 +123,7 @@ Parser.parse = (nomsu_code, source=nil)->
         tree = nil
 
     if next(userdata.errors)
-        keys = utils.keys(userdata.errors)
+        keys = [k for k,v in pairs(userdata.errors)]
         table.sort(keys)
         errors = [userdata.errors[k] for k in *keys]
         error("Errors occurred while parsing:\n\n"..table.concat(errors, "\n\n"), 0)

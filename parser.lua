@@ -1,9 +1,8 @@
 local lpeg = require('lpeg')
 local re = require('re')
 lpeg.setmaxstack(10000)
-local P, R, V, S, Cg, C, Cp, B, Cmt, Carg
-P, R, V, S, Cg, C, Cp, B, Cmt, Carg = lpeg.P, lpeg.R, lpeg.V, lpeg.S, lpeg.Cg, lpeg.C, lpeg.Cp, lpeg.B, lpeg.Cmt, lpeg.Carg
-local utils = require('utils')
+local P, R, S, C, Cmt, Carg
+P, R, S, C, Cmt, Carg = lpeg.P, lpeg.R, lpeg.S, lpeg.C, lpeg.Cmt, lpeg.Carg
 local match, sub
 do
   local _obj_0 = string
@@ -66,7 +65,11 @@ do
     if seen_errors[start_pos] then
       return true
     end
-    if utils.size(seen_errors) >= 10 then
+    local num_errors = 0
+    for _ in pairs(seen_errors) do
+      num_errors = num_errors + 1
+    end
+    if num_errors >= 10 then
       seen_errors[start_pos + 1] = colored.bright(colored.yellow(colored.onred("Too many errors, canceling parsing...")))
       return #src + 1
     end
@@ -164,7 +167,16 @@ Parser.parse = function(nomsu_code, source)
     tree = nil
   end
   if next(userdata.errors) then
-    local keys = utils.keys(userdata.errors)
+    local keys
+    do
+      local _accum_0 = { }
+      local _len_0 = 1
+      for k, v in pairs(userdata.errors) do
+        _accum_0[_len_0] = k
+        _len_0 = _len_0 + 1
+      end
+      keys = _accum_0
+    end
     table.sort(keys)
     local errors
     do
