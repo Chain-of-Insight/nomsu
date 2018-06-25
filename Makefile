@@ -60,9 +60,10 @@ install: build version optimize
 		fi; \
 	fi; \
 	version="`cat version`"; \
-	echo "#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_PREFIX = [[$$version]], [[$$prefix]]" | cat - nomsu.lua > nomsu$$version; \
 	mkdir -pv $$prefix/bin $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version \
-	&& cp -v nomsu nomsu$$version $$prefix/bin \
+	&& echo "#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_PREFIX = [[$$version]], [[$$prefix]]" | cat - nomsu.lua > $$prefix/bin/nomsu$$version \
+	&& chmod +x $$prefix/bin/nomsu$$version \
+	&& cp -v nomsu $$prefix/bin \
 	&& cp -rv $(LUA_FILES) $(PEG_FILE) core lib tests $$prefix/share/nomsu/$$version;
 
 .PHONY: uninstall
