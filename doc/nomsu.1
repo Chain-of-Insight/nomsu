@@ -1,0 +1,81 @@
+.\" Manpage for nomsu.
+.\" Contact bruce@bruce-hill.com to correct errors or typos.
+.TH man 8 "24 June 2018" "1.0" "nomsu man page"
+.SH NAME
+nomsu \- run a Nomsu program
+.SH SYNOPSIS
+.B nomsu
+[
+.I options
+]
+[
+.I scripts
+[ --
+.I args
+]
+]
+.SH DESCRIPTION
+.B
+nomsu
+is the compiler/interpreter for the Nomsu programming language.
+.SH OPTIONS
+.TP
+.BI \-V " version"
+Specify the desired Nomsu version (defaults to the latest installed version). E.g.
+.B
+nomsu -V 1.2
+or
+.B
+nomsu -V 1.2.5.9
+.TP
+.B \-i
+Enter interactive mode after the input files are executed.
+.TP
+.B \-O
+Run the compiler in optimized mode (use precompiled .lua versions of .nom files, when available)
+.TP
+.B \-v
+Verbose: print compiled lua code as it's generated for the input files.
+.TP
+.B \-c
+Compile input files into .lua files
+.TP
+.B \-f
+Auto-format the given Nomsu file and print the result.
+.TP
+.B \-s
+Check the program for syntax errors.
+.TP
+.B \--version
+Print the version number and exit.
+.TP
+.B \--help
+Print the command line usage.
+.SH EXAMPLES
+.TP
+.B
+nomsu
+Runs nomsu in interactive mode (a read-evaluate-print loop)
+
+.TP
+.B
+nomsu my_file.nom
+Runs the Nomsu file 'my_file.nom'
+
+.TP
+.B
+nomsu -c my_file.nom
+Compiles the Nomsu file 'my_file.nom' into a Lua file called 'my_file.lua'
+
+.TP
+.B
+nomsu my_directory
+Runs every '.nom' file in 'my_directory' or its subdirectories.
+
+.TP
+.B
+nomsu -V 2.3 my_file.nom
+Runs my_file.nom using the latest installed version of Nomsu whose version matches 2.3.*
+
+.SH AUTHOR
+Bruce Hill (bruce@bruce-hill.com)

@@ -1,4 +1,4 @@
-if NOMSU_VERSION and NOMSU_LIB and NOMSU_SHARE then
+if NOMSU_VERSION and NOMSU_PREFIX then
   local ver_bits
   do
     local _accum_0 = { }
@@ -24,7 +24,7 @@ if NOMSU_VERSION and NOMSU_LIB and NOMSU_SHARE then
     local _len_0 = 1
     for _index_0 = 1, #partial_vers do
       local v = partial_vers[_index_0]
-      _accum_0[_len_0] = tostring(NOMSU_SHARE) .. "/" .. tostring(v) .. "/?.lua"
+      _accum_0[_len_0] = tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(v) .. "/?.lua"
       _len_0 = _len_0 + 1
     end
     return _accum_0
@@ -34,7 +34,7 @@ if NOMSU_VERSION and NOMSU_LIB and NOMSU_SHARE then
     local _len_0 = 1
     for _index_0 = 1, #partial_vers do
       local v = partial_vers[_index_0]
-      _accum_0[_len_0] = tostring(NOMSU_LIB) .. "/" .. tostring(v) .. "/?.so"
+      _accum_0[_len_0] = tostring(NOMSU_PREFIX) .. "/lib/nomsu/" .. tostring(v) .. "/?.so"
       _len_0 = _len_0 + 1
     end
     return _accum_0
@@ -44,7 +44,7 @@ if NOMSU_VERSION and NOMSU_LIB and NOMSU_SHARE then
     local _len_0 = 1
     for _index_0 = 1, #partial_vers do
       local v = partial_vers[_index_0]
-      _accum_0[_len_0] = tostring(NOMSU_SHARE) .. "/" .. tostring(v)
+      _accum_0[_len_0] = tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(v)
       _len_0 = _len_0 + 1
     end
     return _accum_0
@@ -293,23 +293,19 @@ run = function()
   if args.interactive then
     nomsu:run([[use "core"
 use "lib/consolecolor.nom"
+action [quit, exit]: lua> "os.exit(0)"
+action [help]
+    say ".."
+        This is the Nomsu v\(Nomsu version) interactive console.
+        You can type in Nomsu code here and hit 'enter' twice to run it.
+        To exit, type 'exit' or 'quit' and hit enter twice.
+
 say ".."
 
     \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
     
-        press \'enter\' twice to run a command
+        press 'enter' twice to run a command
     \("")]])
-    local ready_to_quit = false
-    nomsu.A_quit = function()
-      ready_to_quit = true
-      return print("Goodbye!")
-    end
-    nomsu.A_exit = nomsu.A_quit
-    nomsu.A_help = function()
-      print("This is the Nomsu v" .. tostring(nomsu.A_Nomsu_version()) .. " interactive console.")
-      print("You can type in Nomsu code here and hit 'enter' twice to run it.")
-      return print("To exit, type 'exit' or 'quit' and hit enter twice")
-    end
     for repl_line = 1, math.huge do
       io.write(colored.bright(colored.yellow(">> ")))
       local buff = { }
@@ -343,9 +339,6 @@ say ".."
         print("= " .. repr(ret))
       elseif not ok then
         Errhand.print_error(ret)
-      end
-      if ready_to_quit then
-        break
       end
     end
   end

@@ -60,10 +60,11 @@ install: build version optimize
 		fi; \
 	fi; \
 	version="`cat version`"; \
-	mkdir -pv $$prefix/bin $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version \
+	mkdir -pv $$prefix/bin $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/share/man/man1 \
 	&& echo "#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_PREFIX = [[$$version]], [[$$prefix]]" | cat - nomsu.lua > $$prefix/bin/nomsu$$version \
 	&& chmod +x $$prefix/bin/nomsu$$version \
 	&& cp -v nomsu $$prefix/bin \
+	&& install -v -g 0 -o 0 -m 644 doc/nomsu.1 $$prefix/share/man/man1 \
 	&& cp -rv $(LUA_FILES) $(PEG_FILE) core lib tests $$prefix/share/nomsu/$$version;
 
 .PHONY: uninstall
@@ -82,13 +83,13 @@ uninstall: version
 	version="`cat version`"; \
 	rm -rvf $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/bin/nomsu$$version; \
 	if [[ "`find -E $$prefix/bin -type f -regex '.*/nomsu[0-9.]+\$$'`" == "" ]]; then \
-		rm -vf $$prefix/bin/nomsu; \
+		rm -vf $$prefix/bin/nomsu $$prefix/share/man/man1/nomsu.1; \
 	else \
 		if [ -f $$prefix/bin/nomsu ]; then \
 			read -p $$'\033[1mIt looks like there are other versions of Nomsu installed. Is it okay to leave the "nomsu" cross-version launcher in place? (recommended) [Y/n]\033[0m ' ans; \
 			if [[ $$ans =~ ^[Nn] ]]; then \
 				echo "\033[1mDeleting...\033[0m"; \
-				rm -vf $$prefix/bin/nomsu; \
+				rm -vf $$prefix/bin/nomsu $$prefix/share/man/man1/nomsu.1; \
 			fi; \
 		fi; \
 	fi; \

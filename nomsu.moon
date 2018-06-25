@@ -1,11 +1,11 @@
 #!/usr/bin/env moon
 -- This file contains the command-line Nomsu runner.
-if NOMSU_VERSION and NOMSU_LIB and NOMSU_SHARE
+if NOMSU_VERSION and NOMSU_PREFIX
     ver_bits = [ver_bit for ver_bit in NOMSU_VERSION\gmatch("[0-9]+")]
     partial_vers = [table.concat(ver_bits,'.',1,i) for i=#ver_bits,1,-1]
-    package.path = table.concat(["#{NOMSU_SHARE}/#{v}/?.lua" for v in *partial_vers],";")..";"..package.path
-    package.cpath = table.concat(["#{NOMSU_LIB}/#{v}/?.so" for v in *partial_vers],";")..";"..package.cpath
-    package.nomsupath = table.concat(["#{NOMSU_SHARE}/#{v}" for v in *partial_vers],";")
+    package.path = table.concat(["#{NOMSU_PREFIX}/share/nomsu/#{v}/?.lua" for v in *partial_vers],";")..";"..package.path
+    package.cpath = table.concat(["#{NOMSU_PREFIX}/lib/nomsu/#{v}/?.so" for v in *partial_vers],";")..";"..package.cpath
+    package.nomsupath = table.concat(["#{NOMSU_PREFIX}/share/nomsu/#{v}" for v in *partial_vers],";")
 
 EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 usage = [=[
@@ -204,22 +204,19 @@ run = ->
         nomsu\run [[
 use "core"
 use "lib/consolecolor.nom"
+action [quit, exit]: lua> "os.exit(0)"
+action [help]
+    say ".."
+        This is the Nomsu v\(Nomsu version) interactive console.
+        You can type in Nomsu code here and hit 'enter' twice to run it.
+        To exit, type 'exit' or 'quit' and hit enter twice.
+
 say ".."
 
     \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
     
-        press \'enter\' twice to run a command
+        press 'enter' twice to run a command
     \("")]]
-        ready_to_quit = false
-        nomsu.A_quit = ->
-            export ready_to_quit
-            ready_to_quit = true
-            print("Goodbye!")
-        nomsu.A_exit = nomsu.A_quit
-        nomsu.A_help = ->
-            print("This is the Nomsu v#{nomsu.A_Nomsu_version()} interactive console.")
-            print("You can type in Nomsu code here and hit 'enter' twice to run it.")
-            print("To exit, type 'exit' or 'quit' and hit enter twice")
         for repl_line=1,math.huge
             io.write(colored.bright colored.yellow ">> ")
             buff = {}
@@ -247,8 +244,6 @@ say ".."
                 print "= "..repr(ret)
             elseif not ok
                 Errhand.print_error ret
-            if ready_to_quit
-                break
 
 has_ldt, ldt = pcall(require,'ldt')
 if has_ldt
