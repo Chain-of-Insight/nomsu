@@ -354,7 +354,7 @@ with NomsuCompiler
                         return repr(t)
                     bits = [make_tree(bit) for bit in *t]
                     return t.type.."("..repr(tostring t.source)..", "..table.concat(bits, ", ")..")"
-                LuaCode.Value tree.source, make_tree(tree[1])
+                return LuaCode.Value tree.source, make_tree(tree[1])
             
             when "Block"
                 lua = LuaCode(tree.source)
@@ -460,10 +460,10 @@ with NomsuCompiler
                 return lua
 
             when "Number"
-                LuaCode.Value(tree.source, tostring(tree[1]))
+                return LuaCode.Value(tree.source, tostring(tree[1]))
 
             when "Var"
-                LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
+                return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
 
             when "FileChunks"
                 error("Cannot convert FileChunks to a single block of lua, since each chunk's "..
