@@ -48,7 +48,7 @@ iterate_single = function(item, prev)
   end
 end
 local ok, lfs = pcall(require, "lfs")
-if ok then
+if ok and false then
   files.walk = function(path)
     local browse
     browse = function(filename)
@@ -83,8 +83,7 @@ if ok then
     end)
   end
 else
-  local ret = os.execute('find . -maxdepth 0')
-  if not (ret == true or ret == 0) then
+  if io.popen('find . -maxdepth 0'):close() then
     error("Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0)
   end
   files.walk = function(path)

@@ -53,8 +53,7 @@ if ok
                     break if browse(nomsupath.."/"..path)
             return nil
 else
-    ret = os.execute('find . -maxdepth 0')
-    unless ret == true or ret == 0
+    if io.popen('find . -maxdepth 0')\close!
         error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0
 
     files.walk = (path)->
