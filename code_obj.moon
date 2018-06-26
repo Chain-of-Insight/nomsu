@@ -177,6 +177,11 @@ class LuaCode extends Code
         if suffix != ""
             statements\append suffix
         return statements
+    
+    as_expr: =>
+        if @is_value
+            return self
+        error("Cannot convert to expression: #{tostring self}")
 
     __tostring: =>
         if @__str == nil

@@ -288,7 +288,7 @@ with NomsuCompiler
         run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
         if not run_lua_fn
             line_numbered_lua = concat(
-                [format("%3d|%s",i,line) for i, line in ipairs get_lines\match(lua_string)],
+                [format("%3d|%s",i,line) for i, line in ipairs files.get_lines(lua_string)],
                 "\n")
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack line_numbered_lua}\n\n#{err}", 0)
         source_key = tostring(source or lua.source)
@@ -596,7 +596,7 @@ with NomsuCompiler
                     nomsu = NomsuCode(tree.source, '".."\n    ')
                     for i, bit in ipairs tree
                         if type(bit) == 'string'
-                            bit_lines = get_lines\match(bit)
+                            bit_lines = files.get_lines(bit)
                             for j, line in ipairs bit_lines
                                 if j > 1 then nomsu\append "\n    "
                                 if #line > 1.25*MAX_LINE

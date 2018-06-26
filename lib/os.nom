@@ -29,3 +29,8 @@ action [write to file %filename %text, to file %filename write %text]
         file:write(\%text)
         file:close()
 
+action [line number of %pos in %str]
+    =lua "files.get_line_number(\%str, \%pos)"
+    
+action [line %line_num in %str]
+    =lua "files.get_line(\%str, \%line_num)"

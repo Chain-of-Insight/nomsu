@@ -439,7 +439,7 @@ do
       local line_numbered_lua = concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        for i, line in ipairs(get_lines:match(lua_string)) do
+        for i, line in ipairs(files.get_lines(lua_string)) do
           _accum_0[_len_0] = format("%3d|%s", i, line)
           _len_0 = _len_0 + 1
         end
@@ -870,7 +870,7 @@ do
         local nomsu = NomsuCode(tree.source, '".."\n    ')
         for i, bit in ipairs(tree) do
           if type(bit) == 'string' then
-            local bit_lines = get_lines:match(bit)
+            local bit_lines = files.get_lines(bit)
             for j, line in ipairs(bit_lines) do
               if j > 1 then
                 nomsu:append("\n    ")

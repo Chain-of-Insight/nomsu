@@ -61,20 +61,6 @@ compile [call %fn with %args] to
         lua:append(")")
         return lua
 
-compile [using %defs compile %body] to
-    lua> ".."
-        local lua = LuaCode(tree.source)
-        lua:append(
-            "local old_nomsu = nomsu\n",
-            "local nomsu = table.fork(old_nomsu, {COMPILE_ACTIONS=table.fork(old_nomsu.COMPILE_ACTIONS)})")
-        lua:append(nomsu:compile(\%defs))
-        lua:append("\n")
-        lua:append("local ret = nomsu:compile(tree)\n")
-        lua:append("return ret")
-        nomsu = table.fork(nomsu, {tree=\%body})
-        local output = nomsu:run_lua(lua)
-        return output
-
 compile [local action %actions %body] to
     lua> ".."
         local fn_name = "A"..string.as_lua_id(\%actions[1].stub)
@@ -138,33 +124,28 @@ compile [parse %actions as %body] to
         return ret
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+compile [%tree as lua expr] to
+    Lua value "nomsu:compile(\(=lua "nomsu:compile(\%tree):as_expr()")):as_expr()"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+compile [%tree as lua] to
+    Lua value "nomsu:compile(\(%tree as lua expr))"
+
+compile [%tree as lua statements] to
+    Lua value "nomsu:compile(\(%tree as lua expr)):as_statements()"
+
+compile [%tree as lua return] to
+    Lua value "nomsu:compile(\(%tree as lua expr)):as_statements('return ')"
 
 compile [remove action %action] to
     Lua ".."
         A\(=lua "string.as_lua_id(\(%action.stub))") = nil
 
-action [%tree as nomsu]
-    =lua "nomsu:tree_to_nomsu(\%tree)"
+compile [%tree as nomsu] to
+    Lua value "nomsu:tree_to_nomsu(\(%tree as lua expr))"
 
-action [%tree as inline nomsu]
-    =lua "nomsu:tree_to_nomsu(\%tree, true)"
-
-action [%tree as lua]
-    =lua "nomsu:compile(\%tree)"
-
-action [%tree as lua expr]
-    lua> ".."
-        local lua = nomsu:compile(\%tree)
-        if not lua.is_value then
-            nomsu:compile_error(\%tree, "Invalid thing to convert to lua expr:\n%s")
-        end
-        return lua
-
-action [%tree as lua statements]
-    =lua "nomsu:compile(\%tree):as_statements()"
-
-action [%tree as lua return]
-    =lua "nomsu:compile(\%tree):as_statements('return ')"
+compile [%tree as inline nomsu] to
+    Lua value "nomsu:tree_to_nomsu(\(%tree as lua expr), true)"
 
 action [%var as lua identifier, %var as lua id]
     lua> ".."
@@ -174,6 +155,12 @@ action [%var as lua identifier, %var as lua id]
         end
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+compile [% is syntax tree] to
+    Lua value "AST.is_syntax_tree(\(% as lua expr))"
+
+compile [% is %kind syntax tree] to
+    Lua value "AST.is_syntax_tree(\(% as lua expr), \(%kind as lua expr))"
     
 compile [%tree with %t -> %replacement] to
     Lua value ".."
@@ -215,6 +202,10 @@ compile [parse %text] to
     Lua value ".."
         nomsu:parse(NomsuCode("\("\(%text.source)")", \(%text as lua expr)))
 
+compile [parse %text from %filename] to
+    Lua value ".."
+        nomsu:parse(NomsuCode(Source(\(%filename as lua expr), 1, #\(%text as lua expr)), \(%text as lua expr)))
+
 compile [run %nomsu_code] to
     Lua value "nomsu:run(NomsuCode(\(quote "\(%nomsu_code.source)"), \(%nomsu_code as lua expr)))"
 
@@ -238,8 +229,19 @@ compile [Nomsu syntax version] to: Lua value "NOMSU_SYNTAX_VERSION"
 compile [Nomsu compiler version] to: Lua value "NOMSU_COMPILER_VERSION"
 compile [core version] to: Lua value "NOMSU_CORE_VERSION"
 compile [lib version] to: Lua value "NOMSU_LIB_VERSION"
+compile [command line args] to: Lua value "arg"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+compile [with local compile actions %body] to
+    Lua ".."
+        do
+            local nomsu = table.fork(nomsu, {COMPILE_ACTIONS=table.fork(nomsu.COMPILE_ACTIONS)})
+            \(%body as lua statements)
+        end
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 action [Nomsu version]
     use "lib/version.nom"
     return "\(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)"

@@ -163,7 +163,7 @@ compile [%x ARSHIFT %shift, %x >> %shift] to: Lua value "(\(%x as lua expr) >> \
 # Unary operators
 compile [- %] to: Lua value "(- \(% as lua expr))"
 compile [not %] to: Lua value "(not \(% as lua expr))"
-compile [length of %list] to: Lua value "(#\(%list as lua expr))"
+compile [length of %list, || %list ||] to: Lua value "(#\(%list as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -117,4 +117,10 @@ files.get_line_number = (str, pos)->
         else lo = mid+1
     return hi
 
+files.get_line = (str, line_no)->
+    line_starts = files.get_line_starts(str)
+    return str\sub(line_starts[line_no] or 1, line_starts[line_no+1] or -1)
+
+files.get_lines = (str)-> get_lines\match(str)
+
 return files

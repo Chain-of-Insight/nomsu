@@ -385,16 +385,18 @@ compile [result of %body] to
     Lua value "(\(compile as: [] -> %body))()"
 
 # Recurion control flow
-using
-    compile [%var's stack] to: Lua value "stack\(%var as lua id)"
-..compile
-    parse [for %var in recursive %structure %body] as
-        with local {(%var's stack): [%structure], action: recurse % on %}
-            action [recurse %v on %x]
-                add %x to (%v's stack)
-            repeat while: (length of (%var's stack)) > 0
-                %var <- (remove 1 from (%var's stack))
-                %body
-                === next %var ==
-            === stop %var ===
-            
+compile [for %var in recursive %structure %body] to
+    with local compile actions
+        compile [recurse %v on %x] to
+            Lua "table.insert(stack\(%v as lua id), \(%x as lua expr))"
+        return
+            Lua ".."
+                do
+                    local stack\(%var as lua id) = list{\(%structure as lua expr)}
+                    while #stack\(%var as lua id) > 0 do
+                        \(%var as lua expr) = table.remove(stack\(%var as lua id), 1)
+                        \(%body as lua statements)
+                        \(compile as: === next %var ===)
+                    end
+                    \(compile as: === stop %var ===)
+                end

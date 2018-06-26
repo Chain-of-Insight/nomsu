@@ -179,4 +179,13 @@ assume
     ..= 6
 ..or barf "'result of %' failed"
 
+
+%t <- [1,[2,[[3],4],5,[[[6]]]]]
+%flat <- []
+for % in recursive %t
+    if: (type of %) is "table"
+        for %2 in %: recurse % on %2
+    ..else: add % to %flat
+assume: (sorted %flat) = [1,2,3,4,5,6]
+
 say "Control flow test passed."
