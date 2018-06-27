@@ -153,6 +153,7 @@ Parser.parse = function(nomsu_code, source)
   if source == nil then
     source = nil
   end
+  source = source or nomsu_code.source
   nomsu_code = tostring(nomsu_code)
   local userdata = {
     indent = "",

@@ -112,6 +112,7 @@ NOMSU_PATTERN = do
     re.compile(nomsu_peg, NOMSU_DEFS)
 
 Parser.parse = (nomsu_code, source=nil)->
+    source or= nomsu_code.source
     nomsu_code = tostring(nomsu_code)
     userdata = {
         indent: "", errors: {}, :source
