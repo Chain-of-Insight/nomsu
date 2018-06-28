@@ -4,6 +4,7 @@ re = require 're'
 lpeg.setmaxstack 10000
 {:P,:R,:S,:C,:Cmt,:Carg} = lpeg
 {:match, :sub} = string
+files = require 'files'
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "nomsu_tree"
 
@@ -56,13 +57,12 @@ NOMSU_DEFS = with {}
             seen_errors[start_pos+1] = colored.bright colored.yellow colored.onred "Too many errors, canceling parsing..."
             return #src+1
         err_pos = start_pos
-        line_no = pos_to_line(src, err_pos)
+        line_no = files.get_line_number(src, err_pos)
         --src = files.read(userdata.source.filename)
-        line_starts = LINE_STARTS[src]
-        prev_line = line_no == 1 and "" or src\sub(line_starts[line_no-1] or 1, line_starts[line_no]-2)
-        err_line = src\sub(line_starts[line_no], (line_starts[line_no+1] or 0)-2)
-        next_line = src\sub(line_starts[line_no+1] or -1, (line_starts[line_no+2] or 0)-2)
-        i = err_pos-line_starts[line_no]
+        prev_line = line_no == 1 and "" or files.get_line(src, line_no-1)
+        err_line = files.get_line(src, line_no)
+        next_line = files.get_line(src, line_no+1)
+        i = err_pos-files.get_line_starts(src)[line_no]
         pointer = ("-")\rep(i) .. "^"
         err_msg = colored.bright colored.yellow colored.onred (err_msg or "Parse error").." at #{userdata.source.filename}:#{line_no}:"
         if #prev_line > 0 then err_msg ..= "\n"..colored.dim(prev_line)
@@ -72,6 +72,10 @@ NOMSU_DEFS = with {}
         seen_errors[start_pos] = err_msg
         return true
 
+    .Comment = (src,end_pos,start_pos,value,userdata)->
+        userdata.comments[start_pos] = value
+        return true
+
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop, userdata)->
         if userdata.source
@@ -79,7 +83,6 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
                 value.source = Source(.filename, .start + start-1, .start + stop-1)
         setmetatable(value, AST[key])
         if value.__init then value\__init!
-        for i=1,#value do assert(value[i])
         return value
 
     self[key] = make_node
@@ -115,13 +118,13 @@ Parser.parse = (nomsu_code, source=nil)->
     source or= nomsu_code.source
     nomsu_code = tostring(nomsu_code)
     userdata = {
-        indent: "", errors: {}, :source
+        indent: "", errors: {}, :source, comments: {},
     }
     tree = NOMSU_PATTERN\match(nomsu_code, nil, userdata)
     unless tree
         error "In file #{colored.blue tostring(source or "<unknown>")} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
     if type(tree) == 'number'
-        tree = nil
+        return nil
 
     if next(userdata.errors)
         keys = [k for k,v in pairs(userdata.errors)]
@@ -129,6 +132,7 @@ Parser.parse = (nomsu_code, source=nil)->
         errors = [userdata.errors[k] for k in *keys]
         error("Errors occurred while parsing:\n\n"..table.concat(errors, "\n\n"), 0)
     
+    tree.comments = userdata.comments
     return tree
 
 return Parser

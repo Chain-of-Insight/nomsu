@@ -588,7 +588,7 @@ do
           end
           local bit_lua = self:compile(bit)
           if not (bit_lua.is_value) then
-            local src = '    ' .. gsub(tostring(self:tree_to_nomsu(bit)), '\n', '\n    ')
+            local src = '    ' .. gsub(tostring(recurse(bit)), '\n', '\n    ')
             local line = tostring(bit.source.filename) .. ":" .. tostring(files.get_line_number(files.read(bit.source.filename), bit.source.start))
             self:compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
@@ -698,29 +698,61 @@ do
       return error("Unknown type: " .. tostring(tree.type))
     end
   end
-  NomsuCompiler.tree_to_nomsu = function(self, tree, inline, can_use_colon)
-    if inline == nil then
-      inline = false
+  NomsuCompiler.tree_to_nomsu = function(self, tree, options)
+    options = options or { }
+    local comments = options.comments
+    if comments == nil and tree.comments then
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for p, c in pairs(tree.comments) do
+          _accum_0[_len_0] = {
+            comment = c,
+            pos = p
+          }
+          _len_0 = _len_0 + 1
+        end
+        comments = _accum_0
+      end
+      table.sort(comments, function(a, b)
+        return a.pos > b.pos
+      end)
     end
-    if can_use_colon == nil then
-      can_use_colon = false
+    local recurse
+    recurse = function(t, opts)
+      opts = opts or { }
+      opts.comments = comments
+      return self:tree_to_nomsu(t, opts)
     end
+    local pop_comments
+    pop_comments = function(pos)
+      if not (comments) then
+        return ''
+      end
+      local nomsu = NomsuCode(tree.source)
+      while #comments > 0 and comments[#comments].pos <= pos do
+        local comment = table.remove(comments)
+        nomsu:append("#" .. (gsub(comment.comment, "\n", "\n    ")) .. "\n")
+      end
+      if #nomsu.bits == 0 then
+        return ''
+      end
+      return nomsu
+    end
+    local inline, can_use_colon = options.inline, options.can_use_colon
     local _exp_0 = tree.type
     if "FileChunks" == _exp_0 then
       if inline then
         return nil
       end
       local nomsu = NomsuCode(tree.source)
-      nomsu:concat_append((function()
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #tree do
-          local c = tree[_index_0]
-          _accum_0[_len_0] = self:tree_to_nomsu(c)
-          _len_0 = _len_0 + 1
+      for i, chunk in ipairs(tree) do
+        if i > 1 then
+          nomsu:append("\n\n" .. tostring(("~"):rep(80)) .. "\n\n")
         end
-        return _accum_0
-      end)(), "\n" .. tostring(("~"):rep(80)) .. "\n")
+        nomsu:append(pop_comments(chunk.source.start))
+        nomsu:append(recurse(chunk))
+      end
       return nomsu
     elseif "Action" == _exp_0 then
       if inline then
@@ -732,7 +764,9 @@ do
             end
             nomsu:append(bit)
           else
-            local arg_nomsu = self:tree_to_nomsu(bit, true)
+            local arg_nomsu = recurse(bit, {
+              inline = true
+            })
             if not (arg_nomsu) then
               return nil
             end
@@ -762,7 +796,9 @@ do
             elseif bit.type == "Block" then
               arg_nomsu = nil
             else
-              arg_nomsu = self:tree_to_nomsu(bit, true)
+              arg_nomsu = recurse(bit, {
+                inline = true
+              })
             end
             if arg_nomsu and line_len + #tostring(arg_nomsu) < MAX_LINE then
               if bit.type == "Action" then
@@ -782,15 +818,17 @@ do
                 next_space = " "
               end
             else
-              arg_nomsu = self:tree_to_nomsu(bit, nil, true)
-              if not (nomsu) then
+              arg_nomsu = recurse(bit, {
+                can_use_colon = true
+              })
+              if not (arg_nomsu) then
                 return nil
               end
               if bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
                 if i == 1 then
-                  arg_nomsu = NomsuCode(bit.source, "(..)\n    ", arg_nomsu)
+                  arg_nomsu = NomsuCode(bit.source, "(..)\n    ", pop_comments(bit.source.start), arg_nomsu)
                 else
-                  arg_nomsu = NomsuCode(bit.source, "\n    ", arg_nomsu)
+                  arg_nomsu = NomsuCode(bit.source, "\n    ", pop_comments(bit.source.start), arg_nomsu)
                 end
               end
               if last_colon == i - 1 and (bit.type == "Action" or bit.type == "Block") then
@@ -808,10 +846,12 @@ do
         return nomsu
       end
     elseif "EscapedNomsu" == _exp_0 then
-      local nomsu = self:tree_to_nomsu(tree[1], true)
+      local nomsu = recurse(tree[1], {
+        inline = true
+      })
       if nomsu == nil and not inline then
-        nomsu = self:tree_to_nomsu(tree[1])
-        return nomsu and NomsuCode(tree.source, "\\:\n    ", nomsu)
+        nomsu = recurse(tree[1])
+        return nomsu and NomsuCode(tree.source, "\\:\n    ", pop_comments(tree.source.start), nomsu)
       end
       return nomsu and NomsuCode(tree.source, "\\(", nomsu, ")")
     elseif "Block" == _exp_0 then
@@ -821,7 +861,9 @@ do
           if i > 1 then
             nomsu:append("; ")
           end
-          local line_nomsu = self:tree_to_nomsu(line, true)
+          local line_nomsu = recurse(line, {
+            inline = true
+          })
           if not (line_nomsu) then
             return nil
           end
@@ -831,7 +873,10 @@ do
       end
       local nomsu = NomsuCode(tree.source)
       for i, line in ipairs(tree) do
-        line = assert(self:tree_to_nomsu(line, nil, true), "Could not convert line to nomsu")
+        nomsu:append(pop_comments(line.source.start))
+        line = assert(recurse(line, {
+          can_use_colon = true
+        }), "Could not convert line to nomsu")
         nomsu:append(line)
         if i < #tree then
           nomsu:append("\n")
@@ -849,7 +894,9 @@ do
           if type(bit) == 'string' then
             nomsu:append((gsub(gsub(gsub(bit, "\\", "\\\\"), "\n", "\\n"), '"', '\\"')))
           else
-            local interp_nomsu = self:tree_to_nomsu(bit, true)
+            local interp_nomsu = recurse(bit, {
+              inline = true
+            })
             if interp_nomsu then
               if bit.type ~= "Var" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
                 interp_nomsu:parenthesize()
@@ -863,7 +910,9 @@ do
         nomsu:append('"')
         return nomsu
       else
-        local inline_version = self:tree_to_nomsu(tree, true)
+        local inline_version = recurse(tree, {
+          inline = true
+        })
         if inline_version and #inline_version <= MAX_LINE then
           return inline_version
         end
@@ -901,14 +950,16 @@ do
               end
             end
           else
-            local interp_nomsu = self:tree_to_nomsu(bit, true)
+            local interp_nomsu = recurse(bit, {
+              inline = true
+            })
             if interp_nomsu then
               if bit.type ~= "Var" and bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" then
                 interp_nomsu:parenthesize()
               end
               nomsu:append("\\", interp_nomsu)
             else
-              interp_nomsu = assert(self:tree_to_nomsu(bit))
+              interp_nomsu = assert(recurse(bit))
               if not (interp_nomsu) then
                 return nil
               end
@@ -925,7 +976,9 @@ do
       if inline then
         local nomsu = NomsuCode(tree.source, "[")
         for i, item in ipairs(tree) do
-          local item_nomsu = self:tree_to_nomsu(item, true)
+          local item_nomsu = recurse(item, {
+            inline = true
+          })
           if not (item_nomsu) then
             return nil
           end
@@ -937,30 +990,47 @@ do
         nomsu:append("]")
         return nomsu
       else
-        local inline_version = self:tree_to_nomsu(tree, true)
+        local inline_version = recurse(tree, {
+          inline = true
+        })
         if inline_version and #inline_version <= MAX_LINE then
           return inline_version
         end
         local nomsu = NomsuCode(tree.source, "[..]")
         local line = NomsuCode(tree.source, "\n    ")
-        for _index_0 = 1, #tree do
-          local item = tree[_index_0]
-          local item_nomsu = self:tree_to_nomsu(item, true)
-          if item_nomsu and #line + #", " + #item_nomsu <= MAX_LINE then
+        local line_comments
+        if #tree > 0 then
+          line_comments = pop_comments(tree[1].source.start)
+        else
+          line_comments = ''
+        end
+        for i, item in ipairs(tree) do
+          local item_nomsu = recurse(item, {
+            inline = true
+          })
+          if item_nomsu and #tostring(line) + #", " + #item_nomsu <= MAX_LINE then
             if #line.bits > 1 then
               line:append(", ")
             end
             line:append(item_nomsu)
           else
             if not (item_nomsu) then
-              item_nomsu = self:tree_to_nomsu(item)
+              item_nomsu = recurse(item)
               if not (item_nomsu) then
                 return nil
               end
             end
             if #line.bits > 1 then
+              if #tostring(line_comments) > 0 then
+                nomsu:append('\n    ', line_comments)
+              end
               nomsu:append(line)
               line = NomsuCode(line.source, "\n    ")
+              if i < #tree then
+                line_comments = pop_comments(tree[i + 1].source.start)
+              else
+                line_comments = ''
+              end
             end
             line:append(item_nomsu)
           end
@@ -974,7 +1044,9 @@ do
       if inline then
         local nomsu = NomsuCode(tree.source, "{")
         for i, entry in ipairs(tree) do
-          local entry_nomsu = self:tree_to_nomsu(entry, true)
+          local entry_nomsu = recurse(entry, {
+            inline = true
+          })
           if not (entry_nomsu) then
             return nil
           end
@@ -986,15 +1058,22 @@ do
         nomsu:append("}")
         return nomsu
       else
-        local inline_version = self:tree_to_nomsu(tree, true)
+        local inline_version = recurse(tree, {
+          inline = true
+        })
         if inline_version then
           return inline_version
         end
         local nomsu = NomsuCode(tree.source, "{..}")
         local line = NomsuCode(tree.source, "\n    ")
-        for _index_0 = 1, #tree do
-          local entry = tree[_index_0]
-          local entry_nomsu = self:tree_to_nomsu(entry)
+        local line_comments
+        if #tree > 0 then
+          line_comments = pop_comments(tree[1].source.start)
+        else
+          line_comments = ''
+        end
+        for i, entry in ipairs(tree) do
+          local entry_nomsu = recurse(entry)
           if not (entry_nomsu) then
             return nil
           end
@@ -1005,8 +1084,16 @@ do
             line:append(entry_nomsu)
           else
             if #line.bits > 1 then
+              if #tostring(line_comments) > 0 then
+                nomsu:append("\n    ", line_comments)
+              end
               nomsu:append(line)
               line = NomsuCode(line.source, "\n    ")
+              if i < #tree then
+                line_comments = pop_comments(tree[1].source.start)
+              else
+                line_comments = ''
+              end
             end
             line:append(entry_nomsu)
           end
@@ -1018,7 +1105,9 @@ do
       end
     elseif "DictEntry" == _exp_0 then
       local key, value = tree[1], tree[2]
-      local key_nomsu = self:tree_to_nomsu(key, true)
+      local key_nomsu = recurse(key, {
+        inline = true
+      })
       if not (key_nomsu) then
         return nil
       end
@@ -1027,7 +1116,9 @@ do
       end
       local value_nomsu
       if value then
-        value_nomsu = self:tree_to_nomsu(value, true)
+        value_nomsu = recurse(value, {
+          inline = true
+        })
       else
         value_nomsu = NomsuCode(tree.source, "")
       end
@@ -1038,7 +1129,7 @@ do
         if inline then
           return nil
         end
-        value_nomsu = self:tree_to_nomsu(value)
+        value_nomsu = recurse(value)
         if not (value_nomsu) then
           return nil
         end
@@ -1057,7 +1148,9 @@ do
           end
         end
         if not (bit_nomsu) then
-          bit_nomsu = self:tree_to_nomsu(bit, true)
+          bit_nomsu = recurse(bit, {
+            inline = true
+          })
         end
         if not (bit_nomsu) then
           return nil

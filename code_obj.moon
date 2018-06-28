@@ -58,6 +58,7 @@ class Code
         for i=1,n
             b = select(i, ...)
             assert(b)
+            if b == '' then continue
             bits[#bits+1] = b
             if type(b) == 'string'
                 if spaces = match(b, "\n([ ]*)[^\n]*$")

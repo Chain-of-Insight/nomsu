@@ -8,6 +8,7 @@ do
   local _obj_0 = string
   match, sub = _obj_0.match, _obj_0.sub
 end
+local files = require('files')
 local NomsuCode, LuaCode, Source
 do
   local _obj_0 = require("code_obj")
@@ -74,12 +75,11 @@ do
       return #src + 1
     end
     local err_pos = start_pos
-    local line_no = pos_to_line(src, err_pos)
-    local line_starts = LINE_STARTS[src]
-    local prev_line = line_no == 1 and "" or src:sub(line_starts[line_no - 1] or 1, line_starts[line_no] - 2)
-    local err_line = src:sub(line_starts[line_no], (line_starts[line_no + 1] or 0) - 2)
-    local next_line = src:sub(line_starts[line_no + 1] or -1, (line_starts[line_no + 2] or 0) - 2)
-    local i = err_pos - line_starts[line_no]
+    local line_no = files.get_line_number(src, err_pos)
+    local prev_line = line_no == 1 and "" or files.get_line(src, line_no - 1)
+    local err_line = files.get_line(src, line_no)
+    local next_line = files.get_line(src, line_no + 1)
+    local i = err_pos - files.get_line_starts(src)[line_no]
     local pointer = ("-"):rep(i) .. "^"
     err_msg = colored.bright(colored.yellow(colored.onred((err_msg or "Parse error") .. " at " .. tostring(userdata.source.filename) .. ":" .. tostring(line_no) .. ":")))
     if #prev_line > 0 then
@@ -91,6 +91,10 @@ do
       err_msg = err_msg .. ("\n" .. colored.dim(next_line))
     end
     seen_errors[start_pos] = err_msg
+    return true
+  end
+  _with_0.Comment = function(src, end_pos, start_pos, value, userdata)
+    userdata.comments[start_pos] = value
     return true
   end
   NOMSU_DEFS = _with_0
@@ -108,9 +112,6 @@ setmetatable(NOMSU_DEFS, {
       setmetatable(value, AST[key])
       if value.__init then
         value:__init()
-      end
-      for i = 1, #value do
-        assert(value[i])
       end
       return value
     end
@@ -158,14 +159,15 @@ Parser.parse = function(nomsu_code, source)
   local userdata = {
     indent = "",
     errors = { },
-    source = source
+    source = source,
+    comments = { }
   }
   local tree = NOMSU_PATTERN:match(nomsu_code, nil, userdata)
   if not (tree) then
     error("In file " .. tostring(colored.blue(tostring(source or "<unknown>"))) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
   end
   if type(tree) == 'number' then
-    tree = nil
+    return nil
   end
   if next(userdata.errors) then
     local keys
@@ -192,6 +194,7 @@ Parser.parse = function(nomsu_code, source)
     end
     error("Errors occurred while parsing:\n\n" .. table.concat(errors, "\n\n"), 0)
   end
+  tree.comments = userdata.comments
   return tree
 end
 return Parser

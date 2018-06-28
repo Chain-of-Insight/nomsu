@@ -38,7 +38,6 @@ Errhand = require "error_handling"
 NomsuCompiler = require "nomsu_compiler"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 {:repr} = require "utils"
-STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 
 -- If this file was reached via require(), then just return the Nomsu compiler
 if not arg or debug.getinfo(2).func == require
@@ -89,7 +88,7 @@ FILE_CACHE = setmetatable {}, {
 
 run = ->
     for i,input in ipairs args.inputs
-        if input == "-" then args.inputs[i] = STDIN
+        if input == "-" then args.inputs[i] = 'stdin'
 
     if #args.inputs == 0 and not args.interactive
         args.inputs = {"core"}
@@ -114,6 +113,10 @@ run = ->
     input_files = {}
     to_run = {}
     for input in *args.inputs
+        if input == 'stdin'
+            input_files[#input_files+1] = 'stdin'
+            to_run['stdin'] = true
+            continue
         found = false
         for f in files.walk(input)
             input_files[#input_files+1] = f
@@ -131,8 +134,8 @@ run = ->
     for arg in *args.inputs
         for filename in files.walk(arg)
             local file, source
-            if filename == STDIN
-                file = io.input!\read("*a")
+            if filename == 'stdin'
+                file = io.read("*a")
                 files.spoof('stdin', file)
                 source = Source('stdin', 1, #file)
             elseif filename\match("%.nom$")

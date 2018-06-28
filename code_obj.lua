@@ -82,18 +82,29 @@ do
       local bits, indents = self.bits, self.indents
       local match = string.match
       for i = 1, n do
-        local b = select(i, ...)
-        assert(b)
-        bits[#bits + 1] = b
-        if type(b) == 'string' then
-          do
-            local spaces = match(b, "\n([ ]*)[^\n]*$")
-            if spaces then
-              self.current_indent = #spaces
-            end
+        local _continue_0 = false
+        repeat
+          local b = select(i, ...)
+          assert(b)
+          if b == '' then
+            _continue_0 = true
+            break
           end
-        elseif self.current_indent ~= 0 then
-          indents[#bits] = self.current_indent
+          bits[#bits + 1] = b
+          if type(b) == 'string' then
+            do
+              local spaces = match(b, "\n([ ]*)[^\n]*$")
+              if spaces then
+                self.current_indent = #spaces
+              end
+            end
+          elseif self.current_indent ~= 0 then
+            indents[#bits] = self.current_indent
+          end
+          _continue_0 = true
+        until true
+        if not _continue_0 then
+          break
         end
       end
       self.__str = nil

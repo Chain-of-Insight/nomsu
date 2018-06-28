@@ -12,6 +12,11 @@ files.read = function(filename)
       return file_contents
     end
   end
+  if filename == 'stdin' then
+    local contents = io.read('*a')
+    _FILE_CACHE['stdin'] = contents
+    return contents
+  end
   local file = io.open(filename)
   if package.nomsupath and not file then
     for nomsupath in package.nomsupath:gmatch("[^;]+") do
@@ -52,6 +57,9 @@ end
 local ok, lfs = pcall(require, "lfs")
 if ok then
   files.walk = function(path)
+    if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin' then
+      return iterate_single, path
+    end
     local browse
     browse = function(filename)
       local file_type = lfs.attributes(filename, 'mode')
@@ -89,7 +97,7 @@ else
     error("Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0)
   end
   files.walk = function(path)
-    if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$") then
+    if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin' then
       return iterate_single, path
     end
     path = gsub(path, "\\", "\\\\")
@@ -163,7 +171,7 @@ files.get_line_number = function(str, pos)
 end
 files.get_line = function(str, line_no)
   local line_starts = files.get_line_starts(str)
-  return str:sub(line_starts[line_no] or 1, line_starts[line_no + 1] or -1)
+  return str:sub(line_starts[line_no] or 1, (line_starts[line_no + 1] or 1) - 2)
 end
 files.get_lines = function(str)
   return get_lines:match(str)

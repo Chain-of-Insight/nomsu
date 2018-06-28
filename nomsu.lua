@@ -85,7 +85,6 @@ do
 end
 local repr
 repr = require("utils").repr
-local STDIN, STDOUT, STDERR = "/dev/fd/0", "/dev/fd/1", "/dev/fd/2"
 if not arg or debug.getinfo(2).func == require then
   return NomsuCompiler
 end
@@ -137,7 +136,7 @@ local run
 run = function()
   for i, input in ipairs(args.inputs) do
     if input == "-" then
-      args.inputs[i] = STDIN
+      args.inputs[i] = 'stdin'
     end
   end
   if #args.inputs == 0 and not args.interactive then
@@ -173,15 +172,28 @@ run = function()
   local to_run = { }
   local _list_0 = args.inputs
   for _index_0 = 1, #_list_0 do
-    local input = _list_0[_index_0]
-    local found = false
-    for f in files.walk(input) do
-      input_files[#input_files + 1] = f
-      to_run[f] = true
-      found = true
-    end
-    if not found then
-      error("Could not find: " .. tostring(input))
+    local _continue_0 = false
+    repeat
+      local input = _list_0[_index_0]
+      if input == 'stdin' then
+        input_files[#input_files + 1] = 'stdin'
+        to_run['stdin'] = true
+        _continue_0 = true
+        break
+      end
+      local found = false
+      for f in files.walk(input) do
+        input_files[#input_files + 1] = f
+        to_run[f] = true
+        found = true
+      end
+      if not found then
+        error("Could not find: " .. tostring(input))
+      end
+      _continue_0 = true
+    until true
+    if not _continue_0 then
+      break
     end
   end
   nomsu.can_optimize = function(f)
@@ -201,8 +213,8 @@ run = function()
       local _continue_0 = false
       repeat
         local file, source
-        if filename == STDIN then
-          file = io.input():read("*a")
+        if filename == 'stdin' then
+          file = io.read("*a")
           files.spoof('stdin', file)
           source = Source('stdin', 1, #file)
         elseif filename:match("%.nom$") then

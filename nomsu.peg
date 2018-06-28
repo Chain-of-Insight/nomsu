@@ -149,8 +149,8 @@ inline_dict_entry(DictEntry):
 dict_key:
     text_word / inline_expression
 
-comment: "#" [^%nl]* (%nl+ %indent [^%nl]* (%nl+ %nodent [^%nl]*)* %dedent)?
-eol_comment: "#" [^%nl]*
+comment: ("#" {} {~[^%nl]* (%nl+ (%indent -> '') [^%nl]* (%nl+ (%nodent -> '') [^%nl]*)* %dedent)?~} %userdata) => Comment
+eol_comment: ("#" {} {[^%nl]*} %userdata) => Comment
 
 eol: %ws* eol_comment? (!. / &%nl)
 ignored_line: (%nodent comment) / (%ws* (!. / &%nl))

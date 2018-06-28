@@ -13,6 +13,10 @@ files.spoof = (filename, contents)->
 files.read = (filename)->
     if file_contents = _FILE_CACHE[filename]
         return file_contents
+    if filename == 'stdin'
+        contents = io.read('*a')
+        _FILE_CACHE['stdin'] = contents
+        return contents
     file = io.open(filename)
     if package.nomsupath and not file
         for nomsupath in package.nomsupath\gmatch("[^;]+")
@@ -32,6 +36,8 @@ iterate_single = (item, prev) -> if item == prev then nil else item
 ok, lfs = pcall(require, "lfs")
 if ok
     files.walk = (path)->
+        if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin'
+            return iterate_single, path
         -- Return 'true' if any files or directories are found, otherwise 'false'
         browse = (filename)->
             file_type = lfs.attributes(filename, 'mode')
@@ -59,9 +65,9 @@ else
         error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0
 
     files.walk = (path)->
-        -- Sanitize path
-        if match(path, "%.nom$") or match(path, "%.lua$") or match(path, "^/dev/fd/[012]$")
+        if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin'
             return iterate_single, path
+        -- Sanitize path
         -- TODO: improve sanitization
         path = gsub(path,"\\","\\\\")
         path = gsub(path,"`","")
@@ -119,7 +125,7 @@ files.get_line_number = (str, pos)->
 
 files.get_line = (str, line_no)->
     line_starts = files.get_line_starts(str)
-    return str\sub(line_starts[line_no] or 1, line_starts[line_no+1] or -1)
+    return str\sub(line_starts[line_no] or 1, (line_starts[line_no+1] or 1) - 2)
 
 files.get_lines = (str)-> get_lines\match(str)
 
