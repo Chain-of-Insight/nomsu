@@ -53,20 +53,18 @@ end
 local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 local usage = [=[Nomsu Compiler
 
-Usage: (lua nomsu.lua | moon nomsu.moon) [-V version] [-i] [-O] [-v] [-c] [-f] [-s] [--help] [--version] [-p print_file] file1 file2... [-- nomsu args...]
+Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O] [-v] [-c] [-s] [-I file] [--help | -h] [--version] [file [nomsu args...]]
 
 OPTIONS
-    -i Run the compiler in interactive mode (REPL)
-    -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available)
-    -v Verbose: print compiled lua code
-    -c Compile .nom files into .lua files
-    -f Auto-format the given Nomsu file and print the result.
-    -s Check the program for syntax errors.
+    -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available).
+    -v Verbose: print compiled lua code.
+    -c Compile the input files into a .lua files.
+    -s Check the input files for syntax errors.
+    -I <file> Add an additional input file or directory.
     -h/--help Print this message.
     --version Print the version number and exit.
-    -V specify which Nomsu version is desired
-    -p <file> Print to the specified file instead of stdout.
-    <input> Input file can be "-" to use stdin.
+    -V specify which Nomsu version is desired.
+    <file> The Nomsu file to run (can be "-" to use stdin).
 ]=]
 local ok, _ = pcall(function()
   lpeg = require('lpeg')
@@ -88,22 +86,24 @@ repr = require("utils").repr
 if not arg or debug.getinfo(2).func == require then
   return NomsuCompiler
 end
-local parser = re.compile([[    args <- {| (flag ";")* {:inputs: {| ({file} ";")* |} :} {:nomsu_args: {| ("--;" ({[^;]*} ";")*)? |} :} ";"? |} !.
+local file_queue = { }
+local parser = re.compile([[    args <- {| (flag ";")* (({~ file ~} -> add_file) ";")? {:nomsu_args: {| ({[^;]*} ";")* |} :} ";"? |} !.
     flag <-
-        {:interactive: ("-i" -> true) :}
-      / {:optimized: ("-O" -> true) :}
-      / {:format: ("-f" -> true) :}
-      / {:syntax: ("-s" -> true) :}
-      / {:print_file: "-p" ";" {file} :}
-      / {:compile: ("-c" -> true) :}
+        {:optimized: ("-O" -> true) :}
+      / ("-I" (";")? ({~ file ~} -> add_file))
+      / ({:check_syntax: ("-s" -> true):})
+      / ({:compile: ("-c" -> true):})
       / {:verbose: ("-v" -> true) :}
       / {:help: (("-h" / "--help") -> true) :}
       / {:version: ("--version" -> true) :}
       / {:requested_version: "-V" ((";")? {([0-9.])+})? :}
-    file <- "-" / [^;]+
+    file <- ("-" -> "stdin") / {[^;]+}
 ]], {
   ["true"] = function()
     return true
+  end,
+  add_file = function(f)
+    return table.insert(file_queue, f)
   end
 })
 local arg_string = table.concat(arg, ";") .. ";"
@@ -134,159 +134,105 @@ FILE_CACHE = setmetatable({ }, {
 })
 local run
 run = function()
-  for i, input in ipairs(args.inputs) do
-    if input == "-" then
-      args.inputs[i] = 'stdin'
-    end
-  end
-  if #args.inputs == 0 and not args.interactive then
-    args.inputs = {
-      "core"
-    }
-    args.interactive = true
-  end
-  local print_file
-  if args.print_file == "-" then
-    print_file = io.stdout
-  elseif args.print_file then
-    print_file = io.open(args.print_file, 'w')
-  else
-    print_file = io.stdout
-  end
-  if print_file == nil then
-    nomsu.print = function() end
-  elseif print_file ~= io.stdout then
-    nomsu.print = function(...)
-      local N = select("#", ...)
-      if N > 0 then
-        print_file:write(tostring(select(1, ...)))
-        for i = 2, N do
-          print_file:write('\t', tostring(select(1, ...)))
-        end
-      end
-      print_file:write('\n')
-      return print_file:flush()
-    end
-  end
   local input_files = { }
-  local to_run = { }
-  local _list_0 = args.inputs
-  for _index_0 = 1, #_list_0 do
-    local _continue_0 = false
-    repeat
-      local input = _list_0[_index_0]
-      if input == 'stdin' then
-        input_files[#input_files + 1] = 'stdin'
-        to_run['stdin'] = true
-        _continue_0 = true
-        break
-      end
-      local found = false
-      for f in files.walk(input) do
-        input_files[#input_files + 1] = f
-        to_run[f] = true
-        found = true
-      end
-      if not found then
-        error("Could not find: " .. tostring(input))
-      end
-      _continue_0 = true
-    until true
-    if not _continue_0 then
-      break
+  for _index_0 = 1, #file_queue do
+    local f = file_queue[_index_0]
+    if not (files.exists(f)) then
+      error("Could not find: " .. tostring(f))
+    end
+    for filename in files.walk(f) do
+      input_files[filename] = true
     end
   end
   nomsu.can_optimize = function(f)
     if not (args.optimized) then
       return false
     end
-    if to_run[f] then
+    if args.compile and input_files[f] then
       return false
     end
     return true
   end
+  local get_file_and_source
+  get_file_and_source = function(filename)
+    local file, source
+    if filename == 'stdin' then
+      file = io.read("*a")
+      files.spoof('stdin', file)
+      source = Source('stdin', 1, #file)
+    elseif filename:match("%.nom$") then
+      file = files.read(filename)
+      if not file then
+        error("File does not exist: " .. tostring(filename), 0)
+      end
+      source = Source(filename, 1, #file)
+    else
+      return nil
+    end
+    source = Source(filename, 1, #file)
+    return file, source
+  end
+  local run_file
+  run_file = function(filename, lua_handler)
+    if lua_handler == nil then
+      lua_handler = nil
+    end
+    local file, source = get_file_and_source(filename)
+    if not (file) then
+      return nil
+    end
+    local tree = nomsu:parse(file, source)
+    if tree then
+      if tree.type ~= "FileChunks" then
+        tree = {
+          tree
+        }
+      end
+      for _index_0 = 1, #tree do
+        local chunk = tree[_index_0]
+        local lua = nomsu:compile(chunk):as_statements("return ")
+        lua:declare_locals()
+        lua:prepend("-- File: " .. tostring(source.filename:gsub("\n.*", "...")) .. "\n")
+        if lua_handler then
+          lua_handler(tostring(lua))
+        end
+        nomsu:run_lua(lua)
+      end
+    end
+  end
   local parse_errs = { }
-  local _list_1 = args.inputs
-  for _index_0 = 1, #_list_1 do
-    local arg = _list_1[_index_0]
-    for filename in files.walk(arg) do
+  for _index_0 = 1, #file_queue do
+    local f = file_queue[_index_0]
+    for filename in files.walk(f) do
       local _continue_0 = false
       repeat
-        local file, source
-        if filename == 'stdin' then
-          file = io.read("*a")
-          files.spoof('stdin', file)
-          source = Source('stdin', 1, #file)
-        elseif filename:match("%.nom$") then
-          file = files.read(filename)
-          if not file then
-            error("File does not exist: " .. tostring(filename), 0)
+        if args.check_syntax then
+          local file, source = get_file_and_source(filename)
+          if not (file) then
+            _continue_0 = true
+            break
           end
-          source = Source(filename, 1, #file)
-        else
-          _continue_0 = true
-          break
+          nomsu:parse(file, source)
+          print("Parse succeeded: " .. tostring(filename))
         end
-        source = Source(filename, 1, #file)
-        local output
         if args.compile then
-          output = io.open(filename:gsub("%.nom$", ".lua"), "w")
-        else
-          output = nil
-        end
-        if args.syntax then
-          local err
-          ok, err = pcall(nomsu.parse, nomsu, file, source)
-          if not ok then
-            table.insert(parse_errs, err)
-          elseif print_file then
-            print_file:write("Parse succeeded: " .. tostring(filename) .. "\n")
-            print_file:flush()
-          end
-          _continue_0 = true
-          break
-        end
-        local tree = nomsu:parse(file, source)
-        if args.format then
-          local formatted = tree and tostring(nomsu:tree_to_nomsu(tree)) or ""
-          if print_file then
-            print_file:write(formatted, "\n")
-            print_file:flush()
-          end
-          _continue_0 = true
-          break
-        end
-        if tree then
-          if tree.type == "FileChunks" then
-            for _index_1 = 1, #tree do
-              local chunk = tree[_index_1]
-              local lua = nomsu:compile(chunk):as_statements("return ")
-              lua:declare_locals()
-              lua:prepend("-- File: " .. tostring(source.filename:gsub("\n.*", "...")) .. "\n")
-              if args.compile then
-                output:write(tostring(lua), "\n")
-              end
-              if args.verbose then
-                print(tostring(lua))
-              end
-              nomsu:run_lua(lua)
-            end
+          local output
+          if filename == 'stdin' then
+            output = io.output()
           else
-            local lua = nomsu:compile(tree):as_statements("return ")
-            lua:declare_locals()
-            lua:prepend("-- File: " .. tostring(source.filename:gsub("\n.*", "...")) .. "\n")
-            if args.compile then
-              output:write(tostring(lua), "\n")
-            end
-            if args.verbose then
-              print(tostring(lua))
-            end
-            nomsu:run_lua(lua)
+            output = io.open(filename:gsub("%.nom$", ".lua"), "w")
           end
-        end
-        if args.compile then
+          run_file(filename, function(lua)
+            output:write(tostring(lua), "\n")
+            if args.verbose then
+              return print(tostring(lua))
+            end
+          end)
           print(("Compiled %-25s -> %s"):format(filename, filename:gsub("%.nom$", ".lua")))
           output:close()
+        end
+        if not args.check_syntax and not args.compile then
+          run_file(filename, (args.verbose and print or nil))
         end
         _continue_0 = true
       until true
@@ -295,14 +241,7 @@ run = function()
       end
     end
   end
-  if #parse_errs > 0 then
-    io.stderr:write(table.concat(parse_errs, "\n\n"))
-    io.stderr:flush()
-    os.exit(EXIT_FAILURE)
-  elseif args.syntax then
-    os.exit(EXIT_SUCCESS)
-  end
-  if args.interactive then
+  if #file_queue == 0 then
     nomsu:run([[use "core"
 use "lib/consolecolor.nom"
 action [quit, exit]: lua> "os.exit(0)"

@@ -150,7 +150,7 @@ local NomsuCompiler = setmetatable({ }, {
   end
 })
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 2
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 3
   NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
   NomsuCompiler._ENV = NomsuCompiler
   NomsuCompiler.nomsu = NomsuCompiler

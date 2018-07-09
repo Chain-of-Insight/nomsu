@@ -92,7 +92,7 @@ dict = (t)-> setmetatable(t, _dict_mt)
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable({}, {__index: (k)=> if _self = rawget(@, "self") then _self[k] else nil})
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 2
+    .NOMSU_COMPILER_VERSION = 3
     .NOMSU_SYNTAX_VERSION = Parser.version
     ._ENV = NomsuCompiler
     .nomsu = NomsuCompiler

@@ -56,30 +56,52 @@ iterate_single = function(item, prev)
 end
 local ok, lfs = pcall(require, "lfs")
 if ok then
-  files.walk = function(path)
-    if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin' then
-      return iterate_single, path
+  local raw_file_exists
+  raw_file_exists = function(filename)
+    local mode = lfs.attributes(filename, 'mode')
+    if mode == 'file' or mode == 'directory' then
+      return true
+    else
+      return false
     end
-    local browse
-    browse = function(filename)
-      local file_type = lfs.attributes(filename, 'mode')
-      if file_type == 'file' then
-        if match(filename, "%.nom$") or match(filename, "%.lua$") then
-          coroutine.yield(filename)
+  end
+  files.exists = function(path)
+    if path == 'stdin' or raw_file_exists(path) then
+      return true
+    end
+    if package.nomsupath then
+      for nomsupath in package.nomsupath:gmatch("[^;]+") do
+        if raw_file_exists(nomsupath .. "/" .. path) then
           return true
         end
-      elseif file_type == 'directory' then
-        for subfile in lfs.dir(filename) do
-          if not (subfile == "." or subfile == ".." or not subfile:match("%.nom$")) then
-            browse(filename .. "/" .. subfile)
-          end
-        end
-        return true
-      elseif file_type == 'char device' then
+      end
+    end
+    return false
+  end
+  local browse
+  browse = function(filename)
+    local file_type = lfs.attributes(filename, 'mode')
+    if file_type == 'file' then
+      if match(filename, "%.nom$") or match(filename, "%.lua$") then
         coroutine.yield(filename)
         return true
       end
-      return false
+    elseif file_type == 'directory' then
+      for subfile in lfs.dir(filename) do
+        if not (subfile == "." or subfile == ".." or not subfile:match("%.nom$")) then
+          browse(filename .. "/" .. subfile)
+        end
+      end
+      return true
+    elseif file_type == 'char device' then
+      coroutine.yield(filename)
+      return true
+    end
+    return false
+  end
+  files.walk = function(path)
+    if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin' then
+      return iterate_single, path
     end
     return coroutine.wrap(function()
       if not browse(path) and package.nomsupath then
@@ -96,14 +118,32 @@ else
   if io.popen('find . -maxdepth 0'):close() then
     error("Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0)
   end
-  files.walk = function(path)
-    if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin' then
-      return iterate_single, path
-    end
+  local sanitize
+  sanitize = function(path)
     path = gsub(path, "\\", "\\\\")
     path = gsub(path, "`", "")
     path = gsub(path, '"', '\\"')
     path = gsub(path, "$", "")
+    return path
+  end
+  files.exists = function(path)
+    if not (io.popen("ls " .. tostring(sanitize(path))):close()) then
+      return true
+    end
+    if package.nomsupath then
+      for nomsupath in package.nomsupath:gmatch("[^;]+") do
+        if not (io.popen("ls " .. tostring(nomsupath) .. "/" .. tostring(sanitize(path))):close()) then
+          return true
+        end
+      end
+    end
+    return false
+  end
+  files.walk = function(path)
+    if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin' then
+      return iterate_single, path
+    end
+    path = sanitize(path)
     return coroutine.wrap(function()
       local f = io.popen('find -L "' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
       local found = false

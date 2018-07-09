@@ -1,6 +1,6 @@
 .\" Manpage for nomsu.
 .\" Contact bruce@bruce-hill.com to correct errors or typos.
-.TH man 8 "24 June 2018" "1.0" "nomsu man page"
+.TH man 8 "9 July 2018" "1.1" "nomsu man page"
 .SH NAME
 nomsu \- run a Nomsu program
 .SH SYNOPSIS
@@ -9,27 +9,26 @@ nomsu \- run a Nomsu program
 .I options
 ]
 [
-.I scripts
-[ --
+.I nomsu_file
+[
 .I args
 ]
 ]
 .SH DESCRIPTION
-.B
-nomsu
-is the compiler/interpreter for the Nomsu programming language.
+\fBnomsu\fR is the compiler/interpreter for the Nomsu programming language.
+.SH INPUT
+.TP
+If an input file is provided, \fBnomsu\fR will run that file.
+.TP
+If an input directory is provided, \fBnomsu\fR will run every .nom file in the directory and its subdirectories.
+.TP
+If "-" is used, \fBnomsu\fR will read from standard input
+.TP
+If no input files are provided, \fBnomsu\fR will run in interactive mode.
 .SH OPTIONS
 .TP
 .BI \-V " version"
-Specify the desired Nomsu version (defaults to the latest installed version). E.g.
-.B
-nomsu -V 1.2
-or
-.B
-nomsu -V 1.2.5.9
-.TP
-.B \-i
-Enter interactive mode after the input files are executed.
+Specify the desired Nomsu version (defaults to the latest installed version). E.g. \fBnomsu -V 1.2\fR or \fBnomsu -V 1.2.5.9\fR
 .TP
 .B \-O
 Run the compiler in optimized mode (use precompiled .lua versions of .nom files, when available)
@@ -38,13 +37,13 @@ Run the compiler in optimized mode (use precompiled .lua versions of .nom files,
 Verbose: print compiled lua code as it's generated for the input files.
 .TP
 .B \-c
-Compile input files into .lua files
+Compile the input files into .lua files.
 .TP
-.B \-f
-Auto-format the given Nomsu file and print the result.
+.B \-s " file"
+Check the input files for syntax errors without running them.
 .TP
-.B \-s
-Check the program for syntax errors.
+.B \-I " file"
+Include the specified file (or all .nom files in a directory and its subdirectories) in the input files.
 .TP
 .B \--version
 Print the version number and exit.
@@ -69,8 +68,8 @@ Compiles the Nomsu file 'my_file.nom' into a Lua file called 'my_file.lua'
 
 .TP
 .B
-nomsu my_directory
-Runs every '.nom' file in 'my_directory' or its subdirectories.
+nomsu -I one.nom -I two.nom three.nom
+Runs 'one.nom', then 'two.nom', then 'three.nom'.
 
 .TP
 .B
