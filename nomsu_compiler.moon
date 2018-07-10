@@ -321,6 +321,9 @@ with NomsuCompiler
         return run_lua_fn!
 
     .compile = (tree)=>
+        if tree.version
+            if upgrade = @['A'..string.as_lua_id("upgrade 1 from 2")]
+                tree = upgrade(tree, tree.version)
         switch tree.type
             when "Action"
                 stub = tree.stub

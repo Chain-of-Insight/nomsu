@@ -59,7 +59,7 @@ if ok then
   local raw_file_exists
   raw_file_exists = function(filename)
     local mode = lfs.attributes(filename, 'mode')
-    if mode == 'file' or mode == 'directory' then
+    if mode == 'file' or mode == 'directory' or mode == 'link' then
       return true
     else
       return false
@@ -80,15 +80,15 @@ if ok then
   end
   local browse
   browse = function(filename)
-    local file_type = lfs.attributes(filename, 'mode')
+    local file_type, err = lfs.attributes(filename, 'mode')
     if file_type == 'file' then
       if match(filename, "%.nom$") or match(filename, "%.lua$") then
         coroutine.yield(filename)
         return true
       end
-    elseif file_type == 'directory' then
+    elseif file_type == 'directory' or file_type == 'link' then
       for subfile in lfs.dir(filename) do
-        if not (subfile == "." or subfile == ".." or not subfile:match("%.nom$")) then
+        if not (subfile == "." or subfile == "..") then
           browse(filename .. "/" .. subfile)
         end
       end

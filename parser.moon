@@ -76,6 +76,10 @@ NOMSU_DEFS = with {}
         userdata.comments[start_pos] = value
         return true
 
+    .Version = (src,end_pos,version,userdata)->
+        userdata.version = version
+        return true
+
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop, userdata)->
         if userdata.source
@@ -133,6 +137,7 @@ Parser.parse = (nomsu_code, source=nil)->
         error("Errors occurred while parsing:\n\n"..table.concat(errors, "\n\n"), 0)
     
     tree.comments = userdata.comments
+    tree.version = userdata.version
     return tree
 
 return Parser

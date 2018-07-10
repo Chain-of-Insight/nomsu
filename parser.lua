@@ -97,6 +97,10 @@ do
     userdata.comments[start_pos] = value
     return true
   end
+  _with_0.Version = function(src, end_pos, version, userdata)
+    userdata.version = version
+    return true
+  end
   NOMSU_DEFS = _with_0
 end
 setmetatable(NOMSU_DEFS, {
@@ -195,6 +199,7 @@ Parser.parse = function(nomsu_code, source)
     error("Errors occurred while parsing:\n\n" .. table.concat(errors, "\n\n"), 0)
   end
   tree.comments = userdata.comments
+  tree.version = userdata.version
   return tree
 end
 return Parser

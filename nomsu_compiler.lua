@@ -486,6 +486,14 @@ do
     return run_lua_fn()
   end
   NomsuCompiler.compile = function(self, tree)
+    if tree.version then
+      do
+        local upgrade = self['A' .. string.as_lua_id("upgrade 1 from 2")]
+        if upgrade then
+          tree = upgrade(tree, tree.version)
+        end
+      end
+    end
     local _exp_0 = tree.type
     if "Action" == _exp_0 then
       local stub = tree.stub

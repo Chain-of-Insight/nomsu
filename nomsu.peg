@@ -1,9 +1,13 @@
 -- Nomsu version 1
 file:
+    shebang?
     (ignored_line %nl)*
     (file_chunks / block / action / expression)?
     (%nl ignored_line)*
     (!. / (({} (.* -> "Parse error") %userdata) => error))
+
+shebang:
+    ("#!" (!"nomsu" !%nl .)* "nomsu" ((%ws* "-V" %ws* {[0-9]+ ("." [0-9]+)*}) / {''}) %ws* (%nl / !.) %userdata) => Version
 
 file_chunks (FileChunks):
     {| (block/action/expression) (nodent chunk_delimeter nodent (block/action/expression))+ |}

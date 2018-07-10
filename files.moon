@@ -37,7 +37,7 @@ ok, lfs = pcall(require, "lfs")
 if ok
     raw_file_exists = (filename)->
         mode = lfs.attributes(filename, 'mode')
-        return if mode == 'file' or mode == 'directory' then true else false
+        return if mode == 'file' or mode == 'directory' or mode == 'link' then true else false
     files.exists = (path)->
         return true if path == 'stdin' or raw_file_exists(path)
         if package.nomsupath
@@ -46,20 +46,20 @@ if ok
         return false
     -- Return 'true' if any files or directories are found, otherwise 'false', and yield every filename
     browse = (filename)->
-        file_type = lfs.attributes(filename, 'mode')
+        file_type, err = lfs.attributes(filename, 'mode')
         if file_type == 'file'
             if match(filename, "%.nom$") or match(filename, "%.lua$")
                 coroutine.yield filename
                 return true
-        elseif file_type == 'directory'
+        elseif file_type == 'directory' or file_type == 'link'
             for subfile in lfs.dir(filename)
-                -- Only include .nom files unless directly specified
-                unless subfile == "." or subfile == ".." or not subfile\match("%.nom$")
+                unless subfile == "." or subfile == ".."
                     browse(filename.."/"..subfile)
             return true
         elseif file_type == 'char device'
             coroutine.yield(filename)
             return true
+
         return false
     files.walk = (path)->
         if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin'
