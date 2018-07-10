@@ -26,6 +26,24 @@ action [lines in %text, lines of %text]
         end
         return result
 
+compile [for %match where %text matches %patt %body] to
+    Lua ".."
+        for \(%match as lua expr) in \(%text as lua expr):gmatch(\(%patt as lua expr)) do
+            \(%body as lua statements)
+            \(compile as: === next %match ===)
+        end
+        \(compile as: === stop %match ===)
+
+compile [%expr for %match where %text matches %patt] to
+    Lua value ".."
+        (function()
+            local ret = list{}
+            for \(%match as lua expr) in \(%text as lua expr):gmatch(\(%patt as lua expr)) do
+                ret[#ret+1] = \(%expr as lua statements)
+            end
+            return ret
+        end)()
+
 # Text literals
 lua> ".."
     do
