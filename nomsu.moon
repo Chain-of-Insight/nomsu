@@ -66,7 +66,7 @@ if not args or args.help
 
 files = require "files"
 nomsu = NomsuCompiler
-nomsu.arg = args.nomsu_args
+nomsu.arg = NomsuCompiler.list(args.nomsu_args)
 
 if args.version
     nomsu\run [[

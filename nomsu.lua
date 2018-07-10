@@ -114,7 +114,7 @@ if not args or args.help then
 end
 local files = require("files")
 local nomsu = NomsuCompiler
-nomsu.arg = args.nomsu_args
+nomsu.arg = NomsuCompiler.list(args.nomsu_args)
 if args.version then
   nomsu:run([[use "core"
 say (Nomsu version)]])
