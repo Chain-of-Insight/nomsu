@@ -10,14 +10,13 @@ Nomsu's only dependencies are [Lua 5.1 or later](https://www.lua.org/) or [Luaji
 
 ## Usage
 
-* To get a Nomsu [REPL](https://en.wikipedia.org/wiki/Read-eval-print_loop), simply run `lua nomsu.lua` (or `luajit nomsu.lua`).
+* To run Nomsu interactively (a [REPL](https://en.wikipedia.org/wiki/Read-eval-print_loop)), simply run `lua nomsu.lua` (or `luajit nomsu.lua`).
 * To run a .nom file with Nomsu code, run `lua nomsu.lua your_file.nom`.
-* (Advanced/optional) To precompile a .nom file into lua, run `lua nomsu.lua -c <input_file>` to precompile your file into lua (by default, saved in the same location, but with a `.lua` extension instead of `.nom`). If you run the compiler with the "-O" (for Optimized) flag, the compiler will run the precompiled lua files directly, instead of parsing and compiling the .nom files before running them. This is not necessary, but it can speed things up if you precompile a bunch of code that involves macros or compile-time activity.
-* More usage options are avilable via `lua nomsu.lua --help`.
+* The full usage options are avilable via `lua nomsu.lua --help`.
 
 ## Compiling/installing
 
-If you enjoy Nomsu so much that you'd like to tinker with it or have it in your system path, there is an included Makefile. This is entirely optional, but you can run `make` to compile any modified .moon or .nom files into .lua files and produce an executable file called `nomsu` that can be run directly. `make test` will run the suite of tests. `make install` will install the compiler on your system. By default, the `nomsu` executable will be put in `/usr/local/bin` and all the necessary support files will be put into `/usr/local/share/nomsu/*`, but you can change the location with `make PREFIX=/your/path/here install` (or `NOMSU_BIN_DIR` and `NOMSU_LIB_DIR` to specify them separately). The default build options use the system default `lua`, but this can be changed via `make LUA=luajit` or `make LUA_BIN=/path/to/lua`. To uninstall, simply `make uninstall` with the same flags you used to install.
+If you enjoy Nomsu so much that you'd like to tinker with it or have it in your system path, there is an included Makefile. This is entirely optional, but you can run `make` to compile any modified .moon or .nom files into .lua files and produce an executable file called `nomsu` that can be run directly. `make test` will run the suite of tests. `sudo make install` will install the compiler on your system. By default, the `nomsu` executable will be put in `/usr/local/bin` and all the necessary support files will be put into `/usr/local/share/nomsu/*` and `/usr/local/lib/nomsu/*`, but you can change the location during installation or via the `PREFIX=/your/path/here` flag. The default build options use the system default `lua`, but this can be changed via `make LUA=luajit` or `make LUA_BIN=/path/to/lua`. To uninstall, simply `make uninstall` and provide the same installation path you did during installation.
 
 ## File Layout
 
@@ -52,6 +51,8 @@ Nomsu uses the following versioning scheme: `[syntax version].[core library API 
 * Any code that compiles on Nomsu `X.Y.Z.W` will also compile on any other Nomsu `X.Y.Z.W` and run without any differences, even if it uses stuff from `lib/*.nom`.
 
 When Nomsu is istalled via `make install`, all of Nomsu's lua files and `core/*.nom` and `lib/*.nom` files are stored in `$PREFIX/lib/nomsu/$NOMSU_VERSION` and the Nomsu executable is installed to `$PREFIX/bin/nomsu$NOMSU_VERSION`, along with the file `nomsu` (the version-selection script), which goes to `$PREFIX/bin/nomsu`. When `make uninstall` is run, all those files are deleted (except for `nomsu`, if there are other versions installed).
+
+To run different versions, use the `-V` flag, which will select the latest version matching the specified pattern. For example, if you have v1.0.0.0, v1.0.2.1, and 1.1.0.0 installed, then `nomsu` will run v1.1.0.0, `nomsu -V 1.0` will run v1.0.2.1, and `nomsu -V 1.0.0.0` will run v1.0.0.0.
 
 ## Extra
 
