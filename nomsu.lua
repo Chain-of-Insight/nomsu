@@ -62,6 +62,7 @@ OPTIONS
     -s Check the input files for syntax errors.
     -t Run tests.
     -I <file> Add an additional input file or directory.
+    -d <debugger> Attempt to use the specified debugger to wrap the main body of execution.
     -h/--help Print this message.
     --version Print the version number and exit.
     -V specify which Nomsu version is desired.
