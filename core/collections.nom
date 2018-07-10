@@ -9,6 +9,7 @@ use "core/operators.nom"
 # List/dict functions:
 
 # Indexing
+test: assume: (2nd to last in [1,2,3,4,5]) is 4
 compile [..]
     %index st to last in %list, %index nd to last in %list, %index rd to last in %list
     %index th to last in %list
@@ -20,11 +21,13 @@ parse [last in %list] as: 1st to last in %list
 parse [first in %list] as: %list.1
 
 # Membership testing
+test: assume: 3 is in [1,2,3,4,5]
 action [%item is in %list, %list contains %item, %list has %item]
     for %key = %value in %list
         if (%key is %item): return (yes)
     return (no)
 
+test: assume: 99 isn't in [1,2,3]
 action [..]
     %item isn't in %list, %item is not in %list
     %list doesn't contain %item, %list does not contain %item
@@ -34,9 +37,13 @@ action [..]
         if (%key is %item): return (no)
     return (yes)
 
+test: assume: {x:no} has key "x"
 parse [%list has key %index, %list has index %index] as
     %list.%index != (nil)
 
+test
+    assume: {x:no} doesn't have key "y"
+    assume: not: {x:no} doesn't have key "x"
 parse [..]
     %list doesn't have key %index, %list does not have key %index
     %list doesn't have index %index, %list does not have index %index
@@ -45,6 +52,15 @@ parse [..]
 
 compile [number of keys in %list] to
     Lua value "utils.size(\(%list as lua expr))"
+
+test
+    %list <- [1,2,3,4,5]
+    append 6 to %list
+    assume: (last in %list) is 6
+    pop from %list
+    assume: (last in %list) is 5
+    remove index 1 from %list
+    assume: (first in %list) is 2
 
 compile [append %item to %list, add %item to %list, to %list add %item, to %list append %item] to
     Lua "table.insert(\(%list as lua expr), \(%item as lua expr))"
@@ -58,6 +74,7 @@ compile [remove index %index from %list] to
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # List Comprehension
+test: assume: ((% * %) for % in [1,2,3]) = [1,4,9]
 parse [%expression for %item in %iterable] as
     result of
         %comprehension <- []
@@ -76,9 +93,11 @@ parse [..]
         return %comprehension
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test: assume: ((% * %) for % in 1 to 3) = [1,4,9]
 parse [%expression for %var in %start to %stop] as
     %expression for %var in %start to %stop via 1
 
+test: assume: ("\%k,\%v" for %k = %v in {x:1}) = ["x,1"]
 parse [..]
     %expression for %key = %value in %iterable
     %expression for (%key,%value) in %iterable
@@ -90,6 +109,7 @@ parse [..]
         return %comprehension
 
 # Dict comprehensions
+test: assume: ((% * %) = % for % in [1,2,3]) = {1:1,4:2,9:3}
 parse [..]
     %key = %value for %item in %iterable
     (%key,%value) for %item in %iterable
@@ -100,6 +120,7 @@ parse [..]
             %comprehension.%key <- %value
         return %comprehension
 
+test: assume: (%k = (%v * %v) for %k = %v in {x:1,y:2,z:3}) = {x:1,y:4,z:9}
 parse [..]
     %key = %value for %src_key = %src_value in %iterable
     (%key,%value) for (%src_key,%src_value) in %iterable
@@ -110,7 +131,23 @@ parse [..]
             %comprehension.%key <- %value
         return %comprehension
 
+parse [..]
+    %key = %value for %item in %start to %stop via %step
+    (%key,%value) for %item in %start to %stop via %step
+..as
+    result of
+        %comprehension <- {}
+        for %item in %start to %stop via %step
+            %comprehension.%key <- %value
+        return %comprehension
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test: assume: ((% * %) = % for % in 1 to 3) = {1:1,4:2,9:3}
+parse [..]
+    %key = %value for %item in %start to %stop
+    (%key,%value) for %item in %start to %stop
+..as: %key = %value for %item in %start to %stop via 1
+
+test: assume: ([[1,2],[3,4]] flattened) = [1,2,3,4]
 action [%lists flattened]
     %flat <- []
     for %list in %lists
@@ -118,14 +155,24 @@ action [%lists flattened]
             add %item to %flat
     return %flat
 
+test: assume: (entries in {x:1}) = [{key:"x",value:1}]
 parse [entries in %dict] as: {key:%k, value:%v} for %k = %v in %dict
+
+test: assume: (keys in {x:1}) = ["x"]
 parse [keys in %dict, keys of %dict] as: %k for %k = %v in %dict
+
+test: assume: (values in {x:1}) = [1]
 parse [values in %dict, values of %dict] as: %v for %k = %v in %dict
 
 # Metatable stuff
+test
+    %t <- {}
+    set %t's metatable to {__tostring:[%]->"XXX"}
+    assume: "\%t" = "XXX"
 compile [set %dict's metatable to %metatable] to
     Lua "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
 
+test: assume: ({} with fallback % -> (% + 1)).10 = 11
 compile [%dict with fallback %key -> %value] to
     Lua value ".."
         setmetatable(\(%dict as lua expr), {__index=function(self, \(%key as lua expr))
@@ -133,6 +180,8 @@ compile [%dict with fallback %key -> %value] to
             self[\(%key as lua expr)] = value
             return value
         end})
+
+test: assume: 1 is 2
 
 # Sorting
 compile [sort %items] to: Lua "table.sort(\(%items as lua expr));"

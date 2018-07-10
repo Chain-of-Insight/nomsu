@@ -53,13 +53,14 @@ end
 local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 local usage = [=[Nomsu Compiler
 
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O] [-v] [-c] [-s] [-I file] [--help | -h] [--version] [file [nomsu args...]]
+Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O] [-v] [-c] [-s] [-t] [-I file] [--help | -h] [--version] [file [nomsu args...]]
 
 OPTIONS
     -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available).
     -v Verbose: print compiled lua code.
     -c Compile the input files into a .lua files.
     -s Check the input files for syntax errors.
+    -t Run tests.
     -I <file> Add an additional input file or directory.
     -h/--help Print this message.
     --version Print the version number and exit.
@@ -93,9 +94,11 @@ local parser = re.compile([[    args <- {| (flag ";")* (({~ file ~} -> add_file)
       / ("-I" (";")? ({~ file ~} -> add_file))
       / ({:check_syntax: ("-s" -> true):})
       / ({:compile: ("-c" -> true):})
+      / {:run_tests: ("-t" -> true) :}
       / {:verbose: ("-v" -> true) :}
       / {:help: (("-h" / "--help") -> true) :}
       / {:version: ("--version" -> true) :}
+      / {:debugger: ("-d" (";")? {([^;])*}) :}
       / {:requested_version: "-V" ((";")? {([0-9.])+})? :}
     file <- ("-" -> "stdin") / {[^;]+}
 ]], {
@@ -153,6 +156,13 @@ run = function()
     end
     return true
   end
+  local tests = { }
+  if args.run_tests then
+    nomsu.COMPILE_ACTIONS["test %"] = function(self, tree, _body)
+      table.insert(tests, _body)
+      return LuaCode("")
+    end
+  end
   local get_file_and_source
   get_file_and_source = function(filename)
     local file, source
@@ -188,6 +198,7 @@ run = function()
           tree
         }
       end
+      tests = { }
       for _index_0 = 1, #tree do
         local chunk = tree[_index_0]
         local lua = nomsu:compile(chunk):as_statements("return ")
@@ -197,6 +208,16 @@ run = function()
           lua_handler(tostring(lua))
         end
         nomsu:run_lua(lua)
+      end
+      if args.run_tests and #tests > 0 then
+        for _index_0 = 1, #tests do
+          local t = tests[_index_0]
+          local lua = nomsu:compile(t)
+          if lua_handler then
+            lua_handler(tostring(lua))
+          end
+          nomsu:run_lua(lua)
+        end
       end
     end
   end
@@ -294,9 +315,11 @@ say ".."
     end
   end
 end
-local has_ldt, ldt = pcall(require, 'ldt')
-if has_ldt then
-  return ldt.guard(run)
+local debugger = require(args.debugger or 'error_handling')
+local guard
+if type(debugger) == 'function' then
+  guard = debugger
 else
-  return Errhand.run_safely(run)
+  guard = debugger.guard or debugger.call or debugger.wrap or debugger.run
 end
+return guard(run)

@@ -45,25 +45,31 @@ debug.getinfo = function(thread, f, what)
           info.lastlinedefined = assert(map[info.lastlinedefined])
         end
         info.short_src = info.source:match('@([^[]*)') or info.short_src
+        if info.name then
+          do
+            local tmp = info.name:match("^A_([a-zA-Z0-9_]*)$")
+            if tmp then
+              info.name = tmp:gsub("_", " "):gsub("x([0-9A-F][0-9A-F])", function(self)
+                return string.char(tonumber(self, 16))
+              end)
+            else
+              info.name = info.name
+            end
+          end
+        else
+          info.name = "main chunk"
+        end
       end
     end
   end
   return info
 end
 local print_error
-print_error = function(error_message, stack_offset)
-  if stack_offset == nil then
-    stack_offset = 3
-  end
+print_error = function(error_message, start_fn, stop_fn)
   io.stderr:write(tostring(colored.red("ERROR:")) .. " " .. tostring(colored.bright(colored.red((error_message or "")))) .. "\n")
   io.stderr:write("stack traceback:\n")
-  local get_line
-  get_line = function(file, line_no)
-    local start = LINE_STARTS[file][line_no] or 1
-    local stop = (LINE_STARTS[file][line_no + 1] or 0) - 1
-    return file:sub(start, stop)
-  end
-  local level = stack_offset
+  local level = 1
+  local found_start = false
   while true do
     local _continue_0 = false
     repeat
@@ -71,10 +77,14 @@ print_error = function(error_message, stack_offset)
       if not calling_fn then
         break
       end
-      if calling_fn.func == run then
+      level = level + 1
+      if not (found_start) then
+        if calling_fn.func == start_fn then
+          found_start = true
+        end
+        _continue_0 = true
         break
       end
-      level = level + 1
       local name = calling_fn.name and "function '" .. tostring(calling_fn.name) .. "'" or nil
       if calling_fn.linedefined == 0 then
         name = "main chunk"
@@ -98,8 +108,8 @@ print_error = function(error_message, stack_offset)
           end
           local filename, start, stop = calling_fn.source:match('@([^[]*)%[([0-9]+):([0-9]+)]')
           assert(filename)
-          local file = read_file(filename):sub(tonumber(start), tonumber(stop))
-          local err_line = get_line(file, calling_fn.currentline):sub(1, -2)
+          local file = files.read(filename)
+          local err_line = files.get_line(file, calling_fn.currentline)
           local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)")))
           if calling_fn.name then
             do
@@ -119,7 +129,7 @@ print_error = function(error_message, stack_offset)
         else
           local file
           ok, file = pcall(function()
-            return read_file(calling_fn.short_src)
+            return files.read(calling_fn.short_src)
           end)
           if not ok then
             file = nil
@@ -128,11 +138,12 @@ print_error = function(error_message, stack_offset)
           if name == nil then
             local search_level = level
             local _info = debug.getinfo(search_level)
-            while _info and (_info.func == pcall or _info.func == xpcall) do
+            while true do
               search_level = search_level + 1
               _info = debug.getinfo(search_level)
-            end
-            if _info then
+              if not (_info) then
+                break
+              end
               for i = 1, 999 do
                 local varname, val = debug.getlocal(search_level, i)
                 if not varname then
@@ -177,15 +188,18 @@ print_error = function(error_message, stack_offset)
             end
           end
           if file then
-            local err_line = get_line(file, line_num):sub(1, -2)
+            local err_line = files.get_line(file, line_num)
             local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)$")))
             line = line .. ("\n        " .. offending_statement)
           end
         end
       end
-      io.stderr:write("    " .. tostring(line) .. "\n")
+      io.stderr:write(line, "\n")
       if calling_fn.istailcall then
         io.stderr:write("    " .. tostring(colored.dim(colored.white("  (...tail calls...)"))) .. "\n")
+      end
+      if calling_fn.func == stop_fn then
+        break
       end
       _continue_0 = true
     until true
@@ -195,18 +209,17 @@ print_error = function(error_message, stack_offset)
   end
   return io.stderr:flush()
 end
-local error_handler
-error_handler = function(error_message)
-  print_error(error_message)
-  local EXIT_FAILURE = 1
-  return os.exit(EXIT_FAILURE)
-end
-local run_safely
-run_safely = function(fn)
+local guard
+guard = function(fn)
+  local error_handler
+  error_handler = function(error_message)
+    print_error(error_message, error_handler, fn)
+    local EXIT_FAILURE = 1
+    return os.exit(EXIT_FAILURE)
+  end
   return xpcall(fn, error_handler)
 end
 return {
-  run_safely = run_safely,
-  print_error = print_error,
-  error_handler = error_handler
+  guard = guard,
+  print_error = print_error
 }

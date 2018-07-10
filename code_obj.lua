@@ -173,11 +173,11 @@ do
     __init = function(self, source, ...)
       self.source = source
       self.bits, self.indents, self.current_indent = { }, { }, 0
-      self:append(...)
       if type(self.source) == 'string' then
         self.source = Source:from_string(self.source)
       end
-      return assert(self.source and Source:is_instance(self.source))
+      assert(self.source and Source:is_instance(self.source))
+      return self:append(...)
     end,
     __base = _base_0,
     __name = "Code"

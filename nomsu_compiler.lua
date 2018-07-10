@@ -301,13 +301,13 @@ do
       return lua
     end,
     ["Lua %"] = function(self, tree, _code)
-      local lua = LuaCode.Value(_code.source, "LuaCode(", repr(tostring(_code.source)))
+      local lua = LuaCode.Value(tree.source, "LuaCode(", repr(tostring(_code.source)))
       add_lua_string_bits(self, lua, _code)
       lua:append(")")
       return lua
     end,
     ["Lua value %"] = function(self, tree, _code)
-      local lua = LuaCode.Value(_code.source, "LuaCode.Value(", repr(tostring(_code.source)))
+      local lua = LuaCode.Value(tree.source, "LuaCode.Value(", repr(tostring(_code.source)))
       add_lua_string_bits(self, lua, _code)
       lua:append(")")
       return lua
@@ -332,6 +332,9 @@ do
         end
       end
       return LuaCode(tree.source, "for f in files.walk(", self:compile(_path), ") do nomsu:run_file(f) end")
+    end,
+    ["test %"] = function(self, tree, _body)
+      return LuaCode("")
     end
   }, {
     __index = function(self, stub)
@@ -434,7 +437,7 @@ do
       source = nil
     end
     local lua_string = tostring(lua)
-    local run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
+    local run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", self)
     if not run_lua_fn then
       local line_numbered_lua = concat((function()
         local _accum_0 = { }
@@ -447,39 +450,36 @@ do
       end)(), "\n")
       error("Failed to compile generated code:\n" .. tostring(colored.bright(colored.blue(colored.onblack(line_numbered_lua)))) .. "\n\n" .. tostring(err), 0)
     end
-    local source_key = tostring(source or lua.source)
+    source = source or lua.source
+    local source_key = tostring(source)
     if not (SOURCE_MAP[source_key]) then
       local map = { }
-      local offset = 1
-      source = source or lua.source
       local file = files.read(source.filename)
       if not file then
         error("Failed to find file: " .. tostring(source.filename))
       end
       local nomsu_str = tostring(file:sub(source.start, source.stop))
       local lua_line = 1
-      local nomsu_line = files.get_line_number(nomsu_str, source.start)
-      local fn
-      fn = function(s)
+      local nomsu_line = files.get_line_number(file, source.start)
+      local map_sources
+      map_sources = function(s)
         if type(s) == 'string' then
           for nl in s:gmatch("\n") do
             map[lua_line] = map[lua_line] or nomsu_line
             lua_line = lua_line + 1
           end
         else
-          local old_line = nomsu_line
-          if s.source then
-            nomsu_line = files.get_line_number(nomsu_str, s.source.start)
+          if s.source and s.source.filename == source.filename then
+            nomsu_line = files.get_line_number(file, s.source.start)
           end
           local _list_0 = s.bits
           for _index_0 = 1, #_list_0 do
             local b = _list_0[_index_0]
-            fn(b)
+            map_sources(b)
           end
         end
       end
-      fn(lua)
-      map[lua_line] = map[lua_line] or nomsu_line
+      map_sources(lua)
       map[0] = 0
       SOURCE_MAP[source_key] = map
     end

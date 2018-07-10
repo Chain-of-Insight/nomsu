@@ -124,8 +124,13 @@ compile [parse %actions as %body] to
         return ret
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-compile [%tree as lua expr] to
-    Lua value "nomsu:compile(\(=lua "nomsu:compile(\%tree):as_expr()")):as_expr()"
+lua> ".."
+    COMPILE_ACTIONS["% as lua expr"] = function(nomsu, tree, _t)
+        return LuaCode.Value(tree.source, "nomsu:compile(", nomsu:compile(_t):as_expr(), "):as_expr()")
+    end
+#
+    compile [%tree as lua expr] to
+        Lua value "nomsu:compile(\(=lua "nomsu:compile(\%tree):as_expr()")):as_expr()"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 compile [%tree as lua] to

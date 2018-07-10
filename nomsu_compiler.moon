@@ -189,13 +189,13 @@ with NomsuCompiler
             return lua
 
         ["Lua %"]: (tree, _code)=>
-            lua = LuaCode.Value(_code.source, "LuaCode(", repr(tostring _code.source))
+            lua = LuaCode.Value(tree.source, "LuaCode(", repr(tostring _code.source))
             add_lua_string_bits(@, lua, _code)
             lua\append ")"
             return lua
     
         ["Lua value %"]: (tree, _code)=>
-            lua = LuaCode.Value(_code.source, "LuaCode.Value(", repr(tostring _code.source))
+            lua = LuaCode.Value(tree.source, "LuaCode.Value(", repr(tostring _code.source))
             add_lua_string_bits(@, lua, _code)
             lua\append ")"
             return lua
@@ -216,6 +216,9 @@ with NomsuCompiler
                 for f in files.walk(path)
                     @run_file(f)
             return LuaCode(tree.source, "for f in files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
+
+        ["test %"]: (tree, _body)=>
+            return LuaCode ""
     }, {
         __index: (stub)=>
             if math_expression\match(stub)
@@ -285,35 +288,33 @@ with NomsuCompiler
 
     .run_lua = (lua, source=nil)=>
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
+        run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", self)
         if not run_lua_fn
             line_numbered_lua = concat(
                 [format("%3d|%s",i,line) for i, line in ipairs files.get_lines(lua_string)],
                 "\n")
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack line_numbered_lua}\n\n#{err}", 0)
-        source_key = tostring(source or lua.source)
+        source or= lua.source
+        source_key = tostring(source)
         unless SOURCE_MAP[source_key]
             map = {}
-            offset = 1
-            source or= lua.source
             file = files.read(source.filename)
             if not file
                 error "Failed to find file: #{source.filename}"
             nomsu_str = tostring(file\sub(source.start, source.stop))
             lua_line = 1
-            nomsu_line = files.get_line_number(nomsu_str, source.start)
-            fn = (s)->
+            nomsu_line = files.get_line_number(file, source.start)
+            map_sources = (s)->
                 if type(s) == 'string'
                     for nl in s\gmatch("\n")
                         map[lua_line] or= nomsu_line
                         lua_line += 1
                 else
-                    old_line = nomsu_line
-                    if s.source
-                        nomsu_line = files.get_line_number(nomsu_str, s.source.start)
-                    for b in *s.bits do fn(b)
-            fn(lua)
-            map[lua_line] or= nomsu_line
+                    if s.source and s.source.filename == source.filename
+                        nomsu_line = files.get_line_number(file, s.source.start)
+                    for b in *s.bits do map_sources(b)
+            map_sources(lua)
+            --map[lua_line] or= nomsu_line
             map[0] = 0
             -- Mapping from lua line number to nomsu line numbers
             SOURCE_MAP[source_key] = map

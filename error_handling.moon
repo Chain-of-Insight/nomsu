@@ -31,24 +31,28 @@ debug.getinfo = (thread,f,what)->
             if info.lastlinedefined
                 info.lastlinedefined = assert(map[info.lastlinedefined])
             info.short_src = info.source\match('@([^[]*)') or info.short_src
+            -- TODO: get name properly
+            info.name = if info.name
+                if tmp = info.name\match("^A_([a-zA-Z0-9_]*)$")
+                    tmp\gsub("_"," ")\gsub("x([0-9A-F][0-9A-F])", => string.char(tonumber(@, 16)))
+                else info.name
+            else "main chunk"
     return info
 
-print_error = (error_message, stack_offset=3)->
+print_error = (error_message, start_fn, stop_fn)->
     io.stderr\write("#{colored.red "ERROR:"} #{colored.bright colored.red (error_message or "")}\n")
     io.stderr\write("stack traceback:\n")
 
-    get_line = (file, line_no)->
-        start = LINE_STARTS[file][line_no] or 1
-        stop = (LINE_STARTS[file][line_no+1] or 0) - 1
-        return file\sub(start, stop)
-
-    level = stack_offset
+    level = 1
+    found_start = false
     while true
         -- TODO: reduce duplicate code
         calling_fn = debug_getinfo(level)
         if not calling_fn then break
-        if calling_fn.func == run then break
         level += 1
+        unless found_start
+            if calling_fn.func == start_fn then found_start = true
+            continue
         name = calling_fn.name and "function '#{calling_fn.name}'" or nil
         if calling_fn.linedefined == 0 then name = "main chunk"
         if name == "run_lua_fn" then continue
@@ -63,8 +67,8 @@ print_error = (error_message, stack_offset=3)->
             --calling_fn.short_src = calling_fn.source\match('"([^[]*)')
             filename,start,stop = calling_fn.source\match('@([^[]*)%[([0-9]+):([0-9]+)]')
             assert(filename)
-            file = read_file(filename)\sub(tonumber(start),tonumber(stop))
-            err_line = get_line(file, calling_fn.currentline)\sub(1,-2)
+            file = files.read(filename)
+            err_line = files.get_line(file, calling_fn.currentline)
             offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)")))
             -- TODO: get name properly
             name = if calling_fn.name
@@ -74,16 +78,16 @@ print_error = (error_message, stack_offset=3)->
             else "main chunk"
             line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}")
         else
-            ok, file = pcall ->read_file(calling_fn.short_src)
+            ok, file = pcall ->files.read(calling_fn.short_src)
             if not ok then file = nil
             local line_num
             if name == nil
                 search_level = level
                 _info = debug.getinfo(search_level)
-                while _info and (_info.func == pcall or _info.func == xpcall)
+                while true
                     search_level += 1
                     _info = debug.getinfo(search_level)
-                if _info
+                    break unless _info
                     for i=1,999
                         varname, val = debug.getlocal(search_level, i)
                         if not varname then break
@@ -113,21 +117,21 @@ print_error = (error_message, stack_offset=3)->
                     line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline} in #{name or '?'}")
 
             if file
-                err_line = get_line(file, line_num)\sub(1,-2)
+                err_line = files.get_line(file, line_num)
                 offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)$")))
                 line ..= "\n        "..offending_statement
-        io.stderr\write("    #{line}\n")
+        io.stderr\write(line,"\n")
         if calling_fn.istailcall
             io.stderr\write("    #{colored.dim colored.white "  (...tail calls...)"}\n")
+        if calling_fn.func == stop_fn then break
 
     io.stderr\flush!
 
-error_handler = (error_message)->
-    print_error error_message
-    EXIT_FAILURE = 1
-    os.exit(EXIT_FAILURE)
-
-run_safely = (fn)->
+guard = (fn)->
+    error_handler = (error_message)->
+        print_error error_message, error_handler, fn
+        EXIT_FAILURE = 1
+        os.exit(EXIT_FAILURE)
     xpcall(fn, error_handler)
 
-return {:run_safely, :print_error, :error_handler}
+return {:guard, :print_error}

@@ -11,13 +11,14 @@ EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 usage = [=[
 Nomsu Compiler
 
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O] [-v] [-c] [-s] [-I file] [--help | -h] [--version] [file [nomsu args...]]
+Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O] [-v] [-c] [-s] [-t] [-I file] [--help | -h] [--version] [file [nomsu args...]]
 
 OPTIONS
     -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available).
     -v Verbose: print compiled lua code.
     -c Compile the input files into a .lua files.
     -s Check the input files for syntax errors.
+    -t Run tests.
     -I <file> Add an additional input file or directory.
     -h/--help Print this message.
     --version Print the version number and exit.
@@ -49,9 +50,11 @@ parser = re.compile([[
       / ("-I" (";")? ({~ file ~} -> add_file))
       / ({:check_syntax: ("-s" -> true):})
       / ({:compile: ("-c" -> true):})
+      / {:run_tests: ("-t" -> true) :}
       / {:verbose: ("-v" -> true) :}
       / {:help: (("-h" / "--help") -> true) :}
       / {:version: ("--version" -> true) :}
+      / {:debugger: ("-d" (";")? {([^;])*}) :}
       / {:requested_version: "-V" ((";")? {([0-9.])+})? :}
     file <- ("-" -> "stdin") / {[^;]+}
 ]], {
@@ -99,6 +102,12 @@ run = ->
         return false if args.compile and input_files[f]
         return true
 
+    tests = {}
+    if args.run_tests
+        nomsu.COMPILE_ACTIONS["test %"] = (tree, _body)=>
+            table.insert tests, _body
+            return LuaCode ""
+
     get_file_and_source = (filename)->
         local file, source
         if filename == 'stdin'
@@ -124,12 +133,18 @@ run = ->
             -- Each chunk's compilation is affected by the code in the previous chunks
             -- (typically), so each chunk needs to compile and run before the next one
             -- compiles.
+            tests = {}
             for chunk in *tree
                 lua = nomsu\compile(chunk)\as_statements("return ")
                 lua\declare_locals!
                 lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
                 if lua_handler then lua_handler(tostring(lua))
                 nomsu\run_lua(lua)
+            if args.run_tests and #tests > 0
+                for t in *tests
+                    lua = nomsu\compile(t)
+                    if lua_handler then lua_handler(tostring(lua))
+                    nomsu\run_lua(lua)
 
     parse_errs = {}
     for f in *file_queue
@@ -201,8 +216,7 @@ say ".."
             elseif not ok
                 Errhand.print_error ret
 
-has_ldt, ldt = pcall(require,'ldt')
-if has_ldt
-    ldt.guard(run)
-else
-    Errhand.run_safely(run)
+debugger = require(args.debugger or 'error_handling')
+guard = if type(debugger) == 'function' then debugger
+else debugger.guard or debugger.call or debugger.wrap or debugger.run
+guard(run)

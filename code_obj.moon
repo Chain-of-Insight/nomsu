@@ -46,10 +46,10 @@ class Source
 class Code
     new: (@source, ...)=>
         @bits, @indents, @current_indent = {}, {}, 0
-        @append(...)
         if type(@source) == 'string'
             @source = Source\from_string(@source)
         assert(@source and Source\is_instance(@source))
+        @append(...)
             
     append: (...)=>
         n = select("#",...)
