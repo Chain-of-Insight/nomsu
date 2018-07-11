@@ -323,7 +323,7 @@ with NomsuCompiler
                         nomsu_line = files.get_line_number(file, s.source.start)
                     for b in *s.bits do map_sources(b)
             map_sources(lua)
-            --map[lua_line] or= nomsu_line
+            map[lua_line] or= nomsu_line
             map[0] = 0
             -- Mapping from lua line number to nomsu line numbers
             SOURCE_MAP[source_key] = map

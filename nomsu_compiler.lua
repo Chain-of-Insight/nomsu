@@ -493,6 +493,7 @@ do
         end
       end
       map_sources(lua)
+      map[lua_line] = map[lua_line] or nomsu_line
       map[0] = 0
       SOURCE_MAP[source_key] = map
     end
