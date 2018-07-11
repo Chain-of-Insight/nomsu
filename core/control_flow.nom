@@ -8,14 +8,17 @@ use "core/operators.nom"
 use "core/errors.nom"
 
 # No-Op
+test: do nothing
 compile [do nothing] to: Lua ""
 
 # Conditionals
+test: if (no): barf "conditional fail"
 compile [if %condition %if_body] to
     Lua ".."
         if \(%condition as lua expr) then
             \(%if_body as lua statements)
         end
+test: unless (yes): barf "conditional fail"
 parse [unless %condition %unless_body] as: if (not %condition) %unless_body
 
 compile [if %condition %if_body else %else_body, unless %condition %else_body else %if_body] to

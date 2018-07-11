@@ -182,6 +182,15 @@ compile [%dict with fallback %key -> %value] to
         end})
 
 # Sorting
+test
+    %x <- [3,1,2]
+    sort %x
+    assume: %x = [1,2,3]
+    sort %x by % = (-%)
+    assume: %x = [3,2,1]
+    %keys <- {1:999,2:0,3:50}
+    sort %x by % = %keys.%
+    assume: %x = [2,3,1]
 compile [sort %items] to: Lua "table.sort(\(%items as lua expr));"
 parse [..]
     sort %items by %item = %key_expr
@@ -193,6 +202,7 @@ parse [..]
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+test: assume: (sorted [3,1,2]) = [1,2,3]
 action [%items sorted, sorted %items]
     %copy <- (% for % in %items)
     sort %copy
@@ -206,6 +216,7 @@ parse [..]
         sort %copy by %item = %key
         return %copy
 
+test: assume: (unique [1,2,1,3,2,3]) = [1,2,3]
 action [unique %items]
     %unique <- []
     %seen <- {}

@@ -1,5 +1,6 @@
 use "core"
 
+test: bright: "\(green)Color test passed."
 %colors <- {..}
     normal:0, "reset color":0, bright:1, bold:1, dim:2, italic:3, underscore:4
     "slow blink":5, "fast blink": 6, reverse:7, inverse:7, inverted:7, hidden:8
@@ -14,4 +15,4 @@ for %name = %colornum in %colors
             compile [\%name] to: Lua value (quote \(quote %escapecode))
             compile [\%name %text] to
                 Lua value ".."
-                    (\\(quote \(quote %escapecode))..\\(%text as lua expr)..\(quote "\27[0m"))
+                    (\\(quote \(quote %escapecode))..\\(%text as lua expr).."\\27[0m")

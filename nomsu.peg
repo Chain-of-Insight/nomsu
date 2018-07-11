@@ -101,11 +101,11 @@ inline_text_interpolation:
 indented_text (Text):
     '".."' eol %nl {|
         {~ (%nl*) (%indent -> "") ~}
-        (indented_plain_text / text_interpolation / {~ ("\" nodent "..") -> "" ~} / {~ %nl+ (%nodent -> "") ~})*
+        (indented_plain_text / text_interpolation / {~ %nl+ (%nodent -> "") ~})*
     |} (((!.) %dedent) / (&(%nl %dedent)) / (({} (non_dedent_error -> "Unexpected character while parsing Text") %userdata) => error))
 indented_plain_text (Text):
-    {| ({~ "\\" -> "\" ~} / {[^%nl\]+} / {!(text_interpolation / "\" nodent "..") "\"})+
-       {~ (%nl+ (%nodent -> "")) / (("\" nodent "..") -> "") ~}* |}
+    {| {~ (("\\" -> "\") / (("\" nodent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
+        (%nl+ (%nodent -> ""))* ~} |}
 text_interpolation:
     inline_text_interpolation / ("\" indented_expression nodent "..")
 

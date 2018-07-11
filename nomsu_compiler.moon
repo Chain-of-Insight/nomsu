@@ -522,10 +522,13 @@ with NomsuCompiler
                         else
                             arg_nomsu = recurse(bit,inline:true)
                             return nil unless arg_nomsu
+                            if bit.type == "Action" or bit.type == "Block"
+                                if bit.type == "Action" and i == #tree
+                                    nomsu\append ":"
+                                else
+                                    arg_nomsu\parenthesize!
                             unless i == 1
                                 nomsu\append " "
-                            if bit.type == "Action" or bit.type == "Block"
-                                arg_nomsu\parenthesize!
                             nomsu\append arg_nomsu
                     return nomsu
                 else
@@ -607,60 +610,65 @@ with NomsuCompiler
 
             when "Text"
                 if inline
-                    nomsu = NomsuCode(tree.source, '"')
-                    for bit in *tree
-                        if type(bit) == 'string'
-                            -- TODO: unescape better?
-                            nomsu\append (gsub(gsub(gsub(bit,"\\","\\\\"),"\n","\\n"),'"','\\"'))
-                        else
-                            interp_nomsu = recurse(bit, inline:true)
-                            if interp_nomsu
+                    make_text = (tree)->
+                        nomsu = NomsuCode(tree.source)
+                        for bit in *tree
+                            if type(bit) == 'string'
+                                -- TODO: unescape better?
+                                nomsu\append (gsub(gsub(gsub(bit,"\\","\\\\"),"\n","\\n"),'"','\\"'))
+                            elseif bit.type == "Text"
+                                nomsu\append(make_text(bit))
+                            else
+                                interp_nomsu = assert recurse(bit, inline:true)
                                 if bit.type != "Var" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
                                     interp_nomsu\parenthesize!
                                 nomsu\append "\\", interp_nomsu
-                            else return nil
-                    nomsu\append '"'
-                    return nomsu
+                        return nomsu
+                    return NomsuCode(tree.source, '"', make_text(tree), '"')
                 else
                     inline_version = recurse(tree, inline:true)
                     if inline_version and #inline_version <= MAX_LINE
                         return inline_version
-                    nomsu = NomsuCode(tree.source, '".."\n    ')
-                    for i, bit in ipairs tree
-                        if type(bit) == 'string'
-                            bit_lines = files.get_lines(bit)
-                            for j, line in ipairs bit_lines
-                                if j > 1 then nomsu\append "\n    "
-                                if #line > 1.25*MAX_LINE
-                                    remainder = line
-                                    while #remainder > 0
-                                        split = find(remainder, " ", MAX_LINE, true)
-                                        if split
-                                            chunk, remainder = sub(remainder, 1, split), sub(remainder, split+1, -1)
-                                            nomsu\append chunk
-                                        elseif #remainder > 1.75*MAX_LINE
-                                            split = math.floor(1.5*MAX_LINE)
-                                            chunk, remainder = sub(remainder, 1, split), sub(remainder, split+1, -1)
-                                            nomsu\append chunk
-                                        else
-                                            nomsu\append remainder
-                                            break
-                                        if #remainder > 0 then nomsu\append "\\\n    .."
-                                else
-                                    nomsu\append line
-                        else
-                            interp_nomsu = recurse(bit, inline:true)
-                            if interp_nomsu
-                                if bit.type != "Var" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
-                                    interp_nomsu\parenthesize!
-                                nomsu\append "\\", interp_nomsu
+                    make_text = (tree)->
+                        nomsu = NomsuCode(tree.source)
+                        for i, bit in ipairs tree
+                            if type(bit) == 'string'
+                                bit_lines = files.get_lines(bit)
+                                for j, line in ipairs bit_lines
+                                    if j > 1 then nomsu\append "\n"
+                                    if #line > 1.25*MAX_LINE
+                                        remainder = line
+                                        while #remainder > 0
+                                            split = find(remainder, " ", MAX_LINE, true)
+                                            if split
+                                                chunk, remainder = sub(remainder, 1, split), sub(remainder, split+1, -1)
+                                                nomsu\append chunk
+                                            elseif #remainder > 1.75*MAX_LINE
+                                                split = math.floor(1.5*MAX_LINE)
+                                                chunk, remainder = sub(remainder, 1, split), sub(remainder, split+1, -1)
+                                                nomsu\append chunk
+                                            else
+                                                nomsu\append remainder
+                                                break
+                                            if #remainder > 0 then nomsu\append "\\\n.."
+                                    else
+                                        nomsu\append line
+                            elseif bit.type == "Text"
+                                nomsu\append make_text(bit)
                             else
-                                interp_nomsu = assert(recurse(bit))
-                                return nil unless interp_nomsu
-                                nomsu\append "\\\n        ", interp_nomsu
-                                if i < #tree
-                                    nomsu\append "\n    .."
-                    return nomsu
+                                interp_nomsu = recurse(bit, inline:true)
+                                if interp_nomsu
+                                    if bit.type != "Var" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
+                                        interp_nomsu\parenthesize!
+                                    nomsu\append "\\", interp_nomsu
+                                else
+                                    interp_nomsu = assert(recurse(bit))
+                                    return nil unless interp_nomsu
+                                    nomsu\append "\\\n    ", interp_nomsu
+                                    if i < #tree
+                                        nomsu\append "\n.."
+                        return nomsu
+                    return NomsuCode(tree.source, '".."\n    ', make_text(tree))
 
             when "List"
                 if inline
