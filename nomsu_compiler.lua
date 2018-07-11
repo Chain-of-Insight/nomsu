@@ -261,7 +261,7 @@ do
   add_lua_string_bits = function(self, val_or_stmt, code)
     local cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
     if code.type ~= "Text" then
-      return LuaCode(code.source, cls_str, repr(tostring(code.source)), ", ", self:compile(code), ")")
+      return LuaCode.Value(code.source, cls_str, repr(tostring(code.source)), ", ", self:compile(code), ")")
     end
     local add_bit_lua
     add_bit_lua = function(lua, bit_lua)

@@ -159,7 +159,7 @@ with NomsuCompiler
     add_lua_string_bits = (val_or_stmt, code)=>
         cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
         if code.type != "Text"
-            return LuaCode(code.source, cls_str, repr(tostring(code.source)), ", ", @compile(code), ")")
+            return LuaCode.Value(code.source, cls_str, repr(tostring(code.source)), ", ", @compile(code), ")")
         add_bit_lua = (lua, bit_lua)->
             bit_leading_len = #(tostring(bit_lua)\match("^[^\n]*"))
             lua\append(lua.trailing_line_len + bit_leading_len > MAX_LINE and ",\n    " or ", ")
