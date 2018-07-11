@@ -45,7 +45,9 @@ class Source
 
 class Code
     new: (@source, ...)=>
-        @bits, @indents, @current_indent = {}, {}, 0
+        @bits = {}
+        @indents, @current_indent = {}, 0
+        @trailing_line_len = 0
         if type(@source) == 'string'
             @source = Source\from_string(@source)
         assert(@source and Source\is_instance(@source), "Source has the wrong type")
@@ -57,14 +59,21 @@ class Code
         match = string.match
         for i=1,n
             b = select(i, ...)
-            assert(b, "bit is nil")
+            assert(b, "code bit is nil")
             if b == '' then continue
             bits[#bits+1] = b
             if type(b) == 'string'
-                if spaces = match(b, "\n([ ]*)[^\n]*$")
+                trailing_text, spaces = match(b, "\n(([ ]*)[^\n]*)$")
+                if trailing_text
                     @current_indent = #spaces
-            elseif @current_indent != 0
-                indents[#bits] = @current_indent
+                    @trailing_line_len = #trailing_text
+            else
+                if #b.indents > 1
+                    @trailing_line_len = b.trailing_line_len
+                else
+                    @trailing_line_len += #tostring(b)
+                if @current_indent != 0
+                    indents[#bits] = @current_indent
         @__str = nil
             
     concat_append: (values, joiner, wrapping_joiner)=>

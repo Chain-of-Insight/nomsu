@@ -92,7 +92,7 @@ dict = (t)-> setmetatable(t, _dict_mt)
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable({}, {__index: (k)=> if _self = rawget(@, "self") then _self[k] else nil})
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 3
+    .NOMSU_COMPILER_VERSION = 4
     .NOMSU_SYNTAX_VERSION = Parser.version
     ._ENV = NomsuCompiler
     .nomsu = NomsuCompiler
@@ -157,18 +157,13 @@ with NomsuCompiler
         return operate_on_text code
 
     add_lua_string_bits = (val_or_stmt, code)=>
-        line_len = 0
         cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
         if code.type != "Text"
             return LuaCode(code.source, cls_str, repr(tostring(code.source)), ", ", @compile(code), ")")
         add_bit_lua = (lua, bit_lua)->
-            line_len += #tostring(bit_lua)
-            if line_len > MAX_LINE
-                lua\append ",\n    "
-                line_len = 4
-            else
-                lua\append ", "
-            lua\append bit_lua
+            bit_leading_len = #(tostring(bit_lua)\match("^[^\n]*"))
+            lua\append(lua.trailing_line_len + bit_leading_len > MAX_LINE and ",\n    " or ", ")
+            lua\append(bit_lua)
         operate_on_text = (text)->
             lua = LuaCode.Value(text.source, cls_str, repr(tostring(text.source)))
             for bit in *text

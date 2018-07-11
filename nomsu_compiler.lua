@@ -150,7 +150,7 @@ local NomsuCompiler = setmetatable({ }, {
   end
 })
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 3
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 4
   NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
   NomsuCompiler._ENV = NomsuCompiler
   NomsuCompiler.nomsu = NomsuCompiler
@@ -259,20 +259,14 @@ do
   end
   local add_lua_string_bits
   add_lua_string_bits = function(self, val_or_stmt, code)
-    local line_len = 0
     local cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
     if code.type ~= "Text" then
       return LuaCode(code.source, cls_str, repr(tostring(code.source)), ", ", self:compile(code), ")")
     end
     local add_bit_lua
     add_bit_lua = function(lua, bit_lua)
-      line_len = line_len + #tostring(bit_lua)
-      if line_len > MAX_LINE then
-        lua:append(",\n    ")
-        line_len = 4
-      else
-        lua:append(", ")
-      end
+      local bit_leading_len = #(tostring(bit_lua):match("^[^\n]*"))
+      lua:append(lua.trailing_line_len + bit_leading_len > MAX_LINE and ",\n    " or ", ")
       return lua:append(bit_lua)
     end
     local operate_on_text

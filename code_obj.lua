@@ -85,21 +85,27 @@ do
         local _continue_0 = false
         repeat
           local b = select(i, ...)
-          assert(b, "bit is nil")
+          assert(b, "code bit is nil")
           if b == '' then
             _continue_0 = true
             break
           end
           bits[#bits + 1] = b
           if type(b) == 'string' then
-            do
-              local spaces = match(b, "\n([ ]*)[^\n]*$")
-              if spaces then
-                self.current_indent = #spaces
-              end
+            local trailing_text, spaces = match(b, "\n(([ ]*)[^\n]*)$")
+            if trailing_text then
+              self.current_indent = #spaces
+              self.trailing_line_len = #trailing_text
             end
-          elseif self.current_indent ~= 0 then
-            indents[#bits] = self.current_indent
+          else
+            if #b.indents > 1 then
+              self.trailing_line_len = b.trailing_line_len
+            else
+              self.trailing_line_len = self.trailing_line_len + #tostring(b)
+            end
+            if self.current_indent ~= 0 then
+              indents[#bits] = self.current_indent
+            end
           end
           _continue_0 = true
         until true
@@ -172,7 +178,9 @@ do
   _class_0 = setmetatable({
     __init = function(self, source, ...)
       self.source = source
-      self.bits, self.indents, self.current_indent = { }, { }, 0
+      self.bits = { }
+      self.indents, self.current_indent = { }, 0
+      self.trailing_line_len = 0
       if type(self.source) == 'string' then
         self.source = Source:from_string(self.source)
       end
