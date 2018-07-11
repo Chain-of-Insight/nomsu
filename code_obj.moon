@@ -48,7 +48,7 @@ class Code
         @bits, @indents, @current_indent = {}, {}, 0
         if type(@source) == 'string'
             @source = Source\from_string(@source)
-        assert(@source and Source\is_instance(@source))
+        assert(@source and Source\is_instance(@source), "Source has the wrong type")
         @append(...)
             
     append: (...)=>
@@ -57,7 +57,7 @@ class Code
         match = string.match
         for i=1,n
             b = select(i, ...)
-            assert(b)
+            assert(b, "bit is nil")
             if b == '' then continue
             bits[#bits+1] = b
             if type(b) == 'string'

@@ -160,7 +160,10 @@ run = function()
   local tests = { }
   if args.run_tests then
     nomsu.COMPILE_ACTIONS["test %"] = function(self, tree, _body)
-      table.insert(tests, _body)
+      if not (tests[tree.source.filename]) then
+        tests[tree.source.filename] = { }
+      end
+      table.insert(tests[tree.source.filename], _body)
       return LuaCode("")
     end
   end
@@ -190,7 +193,7 @@ run = function()
     end
     local file, source = get_file_and_source(filename)
     if not (file) then
-      return nil
+      return 
     end
     local tree = nomsu:parse(file, source)
     if tree then
@@ -199,25 +202,25 @@ run = function()
           tree
         }
       end
-      tests = { }
       for _index_0 = 1, #tree do
         local chunk = tree[_index_0]
         local lua = nomsu:compile(chunk):as_statements("return ")
         lua:declare_locals()
         lua:prepend("-- File: " .. tostring(source.filename:gsub("\n.*", "...")) .. "\n")
-        if lua_handler then
+        if lua_handler and input_files[filename] then
           lua_handler(tostring(lua))
         end
         nomsu:run_lua(lua)
       end
-      if args.run_tests and #tests > 0 then
-        for _index_0 = 1, #tests do
-          local t = tests[_index_0]
+      if args.run_tests and tests[filename] and input_files[filename] then
+        local _list_0 = tests[filename]
+        for _index_0 = 1, #_list_0 do
+          local t = _list_0[_index_0]
           local lua = nomsu:compile(t)
           if lua_handler then
             lua_handler(tostring(lua))
           end
-          nomsu:run_lua(lua)
+          nomsu:run_lua(lua, t.source)
         end
       end
     end
@@ -228,6 +231,10 @@ run = function()
     for filename in files.walk(f) do
       local _continue_0 = false
       repeat
+        if not (filename == "stdin" or filename:match("%.nom$")) then
+          _continue_0 = true
+          break
+        end
         if args.check_syntax then
           local file, source = get_file_and_source(filename)
           if not (file) then
@@ -276,7 +283,6 @@ action [help]
 say ".."
 
     \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
-    
         press 'enter' twice to run a command
     \("")]])
     for repl_line = 1, math.huge do
@@ -316,11 +322,18 @@ say ".."
     end
   end
 end
-local debugger = require(args.debugger or 'error_handling')
+local debugger
+if args.debugger == "nil" then
+  debugger = { }
+else
+  debugger = require(args.debugger or 'error_handling')
+end
 local guard
 if type(debugger) == 'function' then
   guard = debugger
 else
-  guard = debugger.guard or debugger.call or debugger.wrap or debugger.run
+  guard = debugger.guard or debugger.call or debugger.wrap or debugger.run or (function(fn)
+    return fn()
+  end)
 end
 return guard(run)

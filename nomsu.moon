@@ -106,7 +106,8 @@ run = ->
     tests = {}
     if args.run_tests
         nomsu.COMPILE_ACTIONS["test %"] = (tree, _body)=>
-            table.insert tests, _body
+            unless tests[tree.source.filename] then tests[tree.source.filename] = {}
+            table.insert tests[tree.source.filename], _body
             return LuaCode ""
 
     get_file_and_source = (filename)->
@@ -126,7 +127,7 @@ run = ->
 
     run_file = (filename, lua_handler=nil)->
         file, source = get_file_and_source(filename)
-        return nil unless file
+        return unless file
         tree = nomsu\parse(file, source)
         if tree
             if tree.type != "FileChunks"
@@ -134,22 +135,22 @@ run = ->
             -- Each chunk's compilation is affected by the code in the previous chunks
             -- (typically), so each chunk needs to compile and run before the next one
             -- compiles.
-            tests = {}
             for chunk in *tree
                 lua = nomsu\compile(chunk)\as_statements("return ")
                 lua\declare_locals!
                 lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
-                if lua_handler then lua_handler(tostring(lua))
+                if lua_handler and input_files[filename] then lua_handler(tostring(lua))
                 nomsu\run_lua(lua)
-            if args.run_tests and #tests > 0
-                for t in *tests
+            if args.run_tests and tests[filename] and input_files[filename]
+                for t in *tests[filename]
                     lua = nomsu\compile(t)
                     if lua_handler then lua_handler(tostring(lua))
-                    nomsu\run_lua(lua)
+                    nomsu\run_lua(lua, t.source)
 
     parse_errs = {}
     for f in *file_queue
         for filename in files.walk(f)
+            continue unless filename == "stdin" or filename\match("%.nom$")
             if args.check_syntax
                 -- Check syntax
                 file, source = get_file_and_source(filename)
@@ -186,7 +187,6 @@ action [help]
 say ".."
 
     \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
-    
         press 'enter' twice to run a command
     \("")]]
         for repl_line=1,math.huge
@@ -217,7 +217,8 @@ say ".."
             elseif not ok
                 Errhand.print_error ret
 
-debugger = require(args.debugger or 'error_handling')
+debugger = if args.debugger == "nil" then {}
+else require(args.debugger or 'error_handling')
 guard = if type(debugger) == 'function' then debugger
-else debugger.guard or debugger.call or debugger.wrap or debugger.run
+else debugger.guard or debugger.call or debugger.wrap or debugger.run or ((fn)->fn())
 guard(run)

@@ -137,32 +137,31 @@ with NomsuCompiler
     -- math expressions like 2*x + 3^2 without having to define a single
     -- action for every possibility.
     math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
-    add_lua_bits = (lua, code)=>
-        for bit in *code
-            if type(bit) == "string"
-                lua\append bit
-            else
-                bit_lua = @compile(bit)
-                unless bit_lua.is_value
-                    @compile_error bit,
-                        "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
-                lua\append bit_lua
-        return lua
 
-    add_lua_string_bits = (lua, code)=>
+    add_lua_bits = (val_or_stmt, code)=>
+        cls = val_or_stmt == "value" and LuaCode.Value or LuaCode
+        operate_on_text = (text)->
+            lua = cls(text.source)
+            for bit in *text
+                if type(bit) == "string"
+                    lua\append bit
+                elseif bit.type == "Text"
+                    lua\append(operate_on_text(bit))
+                else
+                    bit_lua = @compile(bit)
+                    unless bit_lua.is_value
+                        @compile_error bit,
+                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                    lua\append bit_lua
+            return lua
+        return operate_on_text code
+
+    add_lua_string_bits = (val_or_stmt, code)=>
         line_len = 0
+        cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
         if code.type != "Text"
-            lua\append ", ", @compile(code)
-            return
-        for bit in *code
-            bit_lua = if type(bit) == "string"
-                repr(bit)
-            else
-                bit_lua = @compile(bit)
-                unless bit_lua.is_value
-                    @compile_error bit,
-                        "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
-                bit_lua
+            return LuaCode(code.source, cls_str, repr(tostring(code.source)), ", ", @compile(code), ")")
+        add_bit_lua = (lua, bit_lua)->
             line_len += #tostring(bit_lua)
             if line_len > MAX_LINE
                 lua\append ",\n    "
@@ -170,6 +169,22 @@ with NomsuCompiler
             else
                 lua\append ", "
             lua\append bit_lua
+        operate_on_text = (text)->
+            lua = LuaCode.Value(text.source, cls_str, repr(tostring(text.source)))
+            for bit in *text
+                if type(bit) == "string"
+                    add_bit_lua(lua, repr(bit))
+                elseif bit.type == "Text"
+                    add_bit_lua(lua, operate_on_text(bit))
+                else
+                    bit_lua = @compile(bit)
+                    unless bit_lua.is_value
+                        @compile_error bit,
+                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                    add_bit_lua(lua, bit_lua)
+            lua\append ")"
+            return lua
+        return operate_on_text code
 
     .COMPILE_ACTIONS = setmetatable {
         ["# compile math expr #"]: (tree, ...)=>
@@ -189,26 +204,20 @@ with NomsuCompiler
             return lua
 
         ["Lua %"]: (tree, _code)=>
-            lua = LuaCode.Value(tree.source, "LuaCode(", repr(tostring _code.source))
-            add_lua_string_bits(@, lua, _code)
-            lua\append ")"
-            return lua
+            return add_lua_string_bits(@, 'statements', _code)
     
         ["Lua value %"]: (tree, _code)=>
-            lua = LuaCode.Value(tree.source, "LuaCode.Value(", repr(tostring _code.source))
-            add_lua_string_bits(@, lua, _code)
-            lua\append ")"
-            return lua
+            return add_lua_string_bits(@, 'value', _code)
 
         ["lua > %"]: (tree, _code)=>
             if _code.type != "Text"
                 return LuaCode tree.source, "nomsu:run_lua(", @compile(_code), ");"
-            return add_lua_bits(@, LuaCode(tree.source), _code)
+            return add_lua_bits(@, "statements", _code)
 
         ["= lua %"]: (tree, _code)=>
             if _code.type != "Text"
                 return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(_code), ":as_statements('return '))"
-            return add_lua_bits(@, LuaCode.Value(tree.source), _code)
+            return add_lua_bits(@, "value", _code)
 
         ["use %"]: (tree, _path)=>
             if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'

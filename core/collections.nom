@@ -181,8 +181,6 @@ compile [%dict with fallback %key -> %value] to
             return value
         end})
 
-test: assume: 1 is 2
-
 # Sorting
 compile [sort %items] to: Lua "table.sort(\(%items as lua expr));"
 parse [..]

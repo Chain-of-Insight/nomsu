@@ -85,7 +85,7 @@ do
         local _continue_0 = false
         repeat
           local b = select(i, ...)
-          assert(b)
+          assert(b, "bit is nil")
           if b == '' then
             _continue_0 = true
             break
@@ -176,7 +176,7 @@ do
       if type(self.source) == 'string' then
         self.source = Source:from_string(self.source)
       end
-      assert(self.source and Source:is_instance(self.source))
+      assert(self.source and Source:is_instance(self.source), "Source has the wrong type")
       return self:append(...)
     end,
     __base = _base_0,

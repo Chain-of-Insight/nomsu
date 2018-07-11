@@ -24,7 +24,7 @@ assume ((%こんにちは と言う) = "こんにちは世界") or barf "Unicode
 %s <- ".."
     one two\nthree\
     ..four
-assume (%s = "one two\\nthreefour")
+assume (%s = "one two\\nthreefour") or barf "%s = \(quote %s), not \(quote "one two\\nthreefour")"
 %s <- ".."
     list:\[..]
         1,2,3
