@@ -1,24 +1,37 @@
--- Nomsu version 1
-file:
-    shebang?
-    (ignored_line %nl)*
-    (file_chunks / block / action / expression)?
-    (%nl ignored_line)*
-    (!. / (({} (.* -> "Parse error") %userdata) => error))
+-- Nomsu version 2
+file (File):
+    {:curr_indent: '' :}
+    blank_line*
+    (chunk (nl_nodent chunk_delimeter nl_nodent chunk)*)?
+    blank_line*
+    (!. / (!! .* -> "Parse error" !!))
 
-shebang:
-    ("#!" (!"nomsu" !%nl .)* "nomsu" ((%ws* "-V" %ws* {[0-9]+ ("." [0-9]+)*}) / {''}) %ws* (%nl / !.) %userdata) => Version
+nodent: =curr_indent !(" ")
+indent: =curr_indent "    " !(" ")
+dedent: !(=curr_indent) (" ")*
+eol: %ws* (!. / &%nl)
 
-file_chunks (FileChunks):
-    {| (block/action/expression) (nodent chunk_delimeter nodent (block/action/expression))+ |}
-chunk_delimeter: "~~~" (("~")*)
+comment (Comment):
+    "#" {~ [^%nl]* (%nl+ ({:curr_indent: indent :} -> '') [^%nl]* (%nl+ (=curr_indent -> '') [^%nl]*)* (!. / nl_dedent))? ~}
+inline_comment (Comment):
+    "(#" {~ (inline_comment / [^%nl])* ~} "#)"
+
+blank_line: %nl eol
+nl_nodent: blank_line* %nl nodent
+nl_indent: blank_line* %nl {:curr_indent: indent :}
+nl_dedent: blank_line* %nl &dedent
+
+chunk: !chunk_delimeter (block/action/expression)
+chunk_delimeter: ("~")^+3
 
 inline_block (Block):
-    {| inline_statement (%ws* ";" %ws*  inline_statement)+ |}
+    (inline_comment / inline_statement) (%ws* ";" %ws* (inline_comment / inline_statement))+
 block (Block):
-    {| statement (nodent !("~") (statement / (({} ([^%nl]* -> "Unexpected character while parsing block line") %userdata) => error)))+ |}
+    block_line (nl_nodent block_line)+
+block_line:
+    comment / inline_comment / statement / (!! [^%nl]* -> "Unexpected character while parsing block line" !!)
 
-statement: (action / expression) (eol / (({} ([^%nl]* -> "Unexpected character while parsing line") %userdata) => error))
+statement: (action / expression) (eol / (!! [^%nl]* -> "Unexpected character while parsing line" !!))
 inline_statement: inline_action / inline_expression
 
 noindex_inline_expression:
@@ -27,64 +40,56 @@ noindex_inline_expression:
             %ws* (inline_block / inline_action / inline_expression) %ws*
             (%ws* ',' %ws* (inline_block / inline_action / inline_expression) %ws*)*
         (")"
-            / (({} ((!. / &%nl) -> 'Line ended without finding a closing )-parenthesis') %userdata) => error)
-            / (({} ([^%nl]* -> 'Unexpected character while parsing subexpression') %userdata) => error)
+            / (!! eol -> 'Line ended without finding a closing )-parenthesis' !!)
+            / (!! [^%nl]+ -> 'Unexpected character while parsing subexpression' !!)
         )
       )
-inline_expression:
-    index_chain / noindex_inline_expression 
+inline_expression: index_chain / noindex_inline_expression 
 indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict
-    / ("(..)"? indent
+    / (("(..)" / ":")? nl_indent
         (block / action / expression)
-        (dedent / (({} (non_dedent_error -> "Unexpected character while parsing indented expression") %userdata) => error))
+        (!. / &nl_dedent / (!! (!nl_dedent .)* -> "Unexpected character while parsing indented expression" !!))
       )
 expression:
     inline_expression
     / (":" %ws* ((inline_block / inline_action / inline_expression) eol
-        / (({} (eol -> "Missing expression after the ':'") %userdata) => error)))
+        / (!! eol -> "Missing expression after the ':'" !!)))
     / indented_expression
 
-inline_nomsu (EscapedNomsu): "\" {| inline_expression |}
+inline_nomsu (EscapedNomsu): "\" inline_expression
 indented_nomsu (EscapedNomsu):
-    "\" {|
+    "\" (
         noindex_inline_expression
         / (":" %ws* ((inline_block / inline_action / inline_expression) eol
-             / (({} (eol -> "Missing expression after the ':'") %userdata) => error)))
-        / indented_expression |}
+             / (!! eol -> "Missing expression after the ':'" !!)))
+        / indented_expression)
 
 index_chain (IndexChain):
-    {| noindex_inline_expression ("." (text_word / noindex_inline_expression))+ |}
+    noindex_inline_expression ("." (text_word / noindex_inline_expression))+
 
 -- Actions need either at least 1 word, or at least 2 tokens
 inline_action (Action):
-    !chunk_delimeter
-    {|
     (   (inline_expression (%ws* (inline_expression / word))+)
       / (word              (%ws* (inline_expression / word))*))
     (%ws* ":" %ws* (inline_block / inline_action / inline_expression
-        / (({} ('' -> "Missing expression after the ':'") %userdata) => error)))?
-    |}
+        / (!! '' -> "Missing expression after the ':'" !!)))?
 action (Action):
-    !chunk_delimeter
-    {|
-       (expression ((nodent "..")? %ws* (expression / word))+)
-     / (word       ((nodent "..")? %ws* (expression / word))*)
-    |}
+       (expression ((nl_nodent "..")? %ws* (expression / word))+)
+     / (word       ((nl_nodent "..")? %ws* (expression / word))*)
 
-word: !number { %operator_char+ / %ident_char+ }
+word: !number ( %operator_char+ / %ident_char+ )
 
-text_word (Text): {| word |}
+text_word (Text): word
 
 inline_text (Text):
     !('".."' eol)
-    '"' {|
+    '"'
         ({~ (('\"' -> '"') / ('\\' -> '\') / %escaped_char / [^%nl\"])+ ~}
         / inline_text_interpolation)*
-    |} ('"' / (
-        (({} (eol->'Line ended before finding a closing double quotation mark') %userdata) => error)
-       /(({} ([^%nl]*->'Unexpected character while parsing Text') %userdata) => error)
-    ))
+    ('"'
+     / (!! eol -> 'Line ended before finding a closing double quotation mark' !!)
+     / (!! [^%nl]* -> 'Unexpected character while parsing Text' !!))
 inline_text_interpolation:
     "\" (
         variable / inline_list / inline_dict / inline_text
@@ -92,73 +97,63 @@ inline_text_interpolation:
             %ws* (inline_block / inline_action / inline_expression) %ws*
             (%ws* ',' %ws* (inline_block / inline_action / inline_expression) %ws*)*
         (")"
-            / (({} (&%nl -> 'Line ended without finding a closing )-parenthesis') %userdata) => error)
-            / (({} ([^%nl]* -> 'Unexpected character while parsing Text interpolation') %userdata) => error))
-        )
+         / (!! &%nl -> 'Line ended without finding a closing )-parenthesis' !!)
+         / (!! [^%nl]* -> 'Unexpected character while parsing Text interpolation' !!)))
     )
 
 -- Have to use "%indent" instead of "indent" etc. to avoid messing up text lines that start with "#"
 indented_text (Text):
-    '".."' eol %nl {|
-        {~ (%nl*) (%indent -> "") ~}
-        (indented_plain_text / text_interpolation / {~ %nl+ (%nodent -> "") ~})*
-    |} (((!.) %dedent) / (&(%nl %dedent)) / (({} (non_dedent_error -> "Unexpected character while parsing Text") %userdata) => error))
+    '".."' eol %nl
+        {~ (%nl*) ({:curr_indent: indent :} -> "") ~}
+        (indented_plain_text / text_interpolation / {~ %nl+ (nodent -> "") ~})*
+    (!. / &nl_dedent / (!! (!nl_dedent .)* -> "Unexpected character while parsing Text" !!))
 indented_plain_text (Text):
-    {| {~ (("\\" -> "\") / (("\" nodent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
-        (%nl+ (%nodent -> ""))* ~} |}
+    {~ (("\\" -> "\") / (("\" nl_nodent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
+        (%nl+ (nodent -> ""))* ~}
 text_interpolation:
-    inline_text_interpolation / ("\" indented_expression nodent "..")
+    inline_text_interpolation / ("\" indented_expression nl_nodent "..")
 
-number (Number): {| (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber) |}
+number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
 -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
 -- which is a hack to allow %'s to parse as "%" and "' s" separately
-variable (Var): "%" {| {(%ident_char+ ((!"'" %operator_char+) / %ident_char+)*)?} |}
+variable (Var): "%" {(%ident_char+ ((!"'" %operator_char+) / %ident_char+)*)?}
 
 inline_list (List):
     !('[..]')
     "[" %ws*
-        {| (inline_list_item (%ws* ',' %ws* inline_list_item)* (%ws* ',')?)? |} %ws*
+        (inline_list_item (%ws* ',' %ws* inline_list_item)* (%ws* ',')?)? %ws*
     ("]" / (","? (
-        (({} (eol->"Line ended before finding a closing ]-bracket") %userdata) => error)
-       /(({} ([^%nl]*->"Unexpected character while parsing List") %userdata) => error)
+        (!! eol -> "Line ended before finding a closing ]-bracket" !!)
+       /(!! [^%nl]* -> "Unexpected character while parsing List" !!)
     )))
 indented_list (List):
-    "[..]" indent
-        {| list_line (nodent list_line)* |}
-    (dedent / ((","? {} (non_dedent_error -> "Unexpected character while parsing List") %userdata) => error))
+    "[..]" nl_indent
+        list_line (nl_nodent list_line)*
+    (&nl_dedent / (","? (!! (!nl_dedent .)* -> "Unexpected character while parsing List" !!)))
 list_line:
-     ((action / expression) !(%ws* ','))
-     / (inline_list_item ((%ws* ',' %ws*) list_line?)?)
+      (inline_list_item %ws* "," %ws*)+ eol
+    / (inline_list_item %ws* "," %ws*)* (action / expression)
 inline_list_item: inline_block / inline_action / inline_expression
 
 inline_dict (Dict):
     !('{..}')
     "{" %ws*
-        {| (inline_dict_entry (%ws* ',' %ws* inline_dict_entry)*)? |} %ws*
+        (inline_dict_entry (%ws* ',' %ws* inline_dict_entry)*)? %ws*
     ("}" / (","? (
-        (({} (%ws* eol->"Line ended before finding a closing }-brace") %userdata) => error)
-      / (({} ([^%nl]*->"Unexpected character while parsing Dictionary") %userdata) => error)
+        (!! %ws* eol -> "Line ended before finding a closing }-brace" !!)
+      / (!! [^%nl]* -> "Unexpected character while parsing Dictionary" !!)
     )))
 indented_dict (Dict):
-    "{..}" indent
-        {| dict_line (nodent dict_line)* |}
-    (dedent / ((","? {} (non_dedent_error -> "Unexpected character while parsing Dictionary") %userdata) => error))
+    "{..}" nl_indent
+        dict_line (nl_nodent dict_line)*
+    (&nl_dedent / (","? (!! (!nl_dedent .)* -> "Unexpected character while parsing Dictionary" !!)))
 dict_line:
-    (dict_entry !(%ws* ',')) / (inline_dict_entry (%ws* ',' %ws dict_line?)?)
+      (inline_dict_entry %ws* "," %ws*)+ eol
+    / (inline_dict_entry %ws* "," %ws*)* dict_entry
 dict_entry(DictEntry):
-    {| dict_key (%ws* ":" %ws* (action / expression))? |}
+    dict_key (%ws* ":" %ws* (action / expression))?
 inline_dict_entry(DictEntry):
-    {| dict_key (%ws* ":" %ws* (inline_block / inline_action / inline_expression)?)? |}
+    dict_key (%ws* ":" %ws* (inline_block / inline_action / inline_expression)?)?
 dict_key:
     text_word / inline_expression
-
-comment: ("#" {} {~[^%nl]* (%nl+ (%indent -> '') [^%nl]* (%nl+ (%nodent -> '') [^%nl]*)* %dedent)?~} %userdata) => Comment
-eol_comment: ("#" {} {[^%nl]*} %userdata) => Comment
-
-eol: %ws* eol_comment? (!. / &%nl)
-ignored_line: (%nodent comment) / (%ws* (!. / &%nl))
-indent: eol (%nl ignored_line)* %nl %indent (comment (%nl ignored_line)* nodent)?
-nodent: eol (%nl ignored_line)* %nl %nodent
-dedent: eol (%nl ignored_line)* (((!.) %dedent) / (&(%nl %dedent)))
-non_dedent_error: (!dedent .)* eol (%nl ignored_line)* (!. / &%nl)

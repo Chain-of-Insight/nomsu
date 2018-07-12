@@ -4,6 +4,7 @@ re = require 're'
 lpeg.setmaxstack 10000
 {:P,:R,:S,:C,:Cmt,:Carg} = lpeg
 {:match, :sub} = string
+{:insert, :remove} = table
 files = require 'files'
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "nomsu_tree"
@@ -24,26 +25,6 @@ NOMSU_DEFS = with {}
         R("\224\239")*R("\128\191")*R("\128\191") +
         R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
     .ident_char = R("az","AZ","09") + P("_") + .utf8_char
-
-    -- If the line begins with #indent+4 spaces, the pattern matches *those* spaces
-    -- and adds them to the current indent (not any more).
-    .indent = Cmt Carg(1), (start, userdata)=>
-        indented = userdata.indent..'    '
-        if sub(@, start, start+#indented-1) == indented
-            userdata.indent = indented
-            return start + #indented
-    -- If the number of leading space characters is <= the number of spaces in the current
-    -- indent minus 4, this pattern matches and decrements the current indent exactly once.
-    .dedent = Cmt Carg(1), (start, userdata)=>
-        dedented = sub(userdata.indent, 1, -5)
-        if #match(@, "^[ ]*", start) <= #dedented
-            userdata.indent = dedented
-            return start
-    -- If the number of leading space characters is >= the number of spaces in the current
-    -- indent, this pattern matches and does not modify the indent.
-    .nodent = Cmt Carg(1), (start, userdata)=>
-        if sub(@, start, start+#userdata.indent-1) == userdata.indent
-            return start + #userdata.indent
 
     .userdata = Carg(1)
 
@@ -72,19 +53,20 @@ NOMSU_DEFS = with {}
         seen_errors[start_pos] = err_msg
         return true
 
-    .Comment = (src,end_pos,start_pos,value,userdata)->
-        userdata.comments[start_pos] = value
-        return true
-
-    .Version = (src,end_pos,version,userdata)->
-        userdata.version = version
-        return true
-
 setmetatable(NOMSU_DEFS, {__index:(key)=>
     make_node = (start, value, stop, userdata)->
         if userdata.source
             with userdata.source
                 value.source = Source(.filename, .start + start-1, .start + stop-1)
+        if key == "Comment"
+            value = value[1]
+        else
+            comments = {}
+            for i=#value,1,-1
+                if type(value[i]) == 'table' and value[i].type == "Comment"
+                    insert comments, remove(value, i)
+            if #comments > 0
+                value.comments = comments
         setmetatable(value, AST[key])
         if value.__init then value\__init!
         return value
@@ -98,16 +80,18 @@ NOMSU_PATTERN = do
     -- Just for cleanliness, I put the language spec in its own file using a slightly modified
     -- version of the lpeg.re syntax.
     peg_tidier = re.compile [[
-    file <- %nl* version? %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
-    version <- "--" (!"version" [^%nl])* "version" ([ ])* (([0-9])+ -> set_version) ([^%nl])*
+    file <- %nl* version %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
+    version <- "--" (!"version" [^%nl])* "version" (" ")* (([0-9])+ -> set_version) ([^%nl])*
     def <- anon_def / captured_def
     anon_def <- ({ident} (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
+        {~ ((%nl " "+ def_line?)+) / def_line ~}) -> "%1 <- %2"
     captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {} %%userdata) -> %2)"
+        {~ ((%nl " "+ def_line?)+) / def_line ~}) -> "%1 <- (({} {| %3 |} {} %%userdata) -> %2)"
+    def_line <- (err / [^%nl])+
+    err <- ("(!!" { (!("!!)") .)* } "!!)") -> "(({} (%1) %%userdata) => error)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
-    ]], {set_version: (v) -> Parser.version = tonumber(v)}
+    ]], {set_version: (v) -> Parser.version = tonumber(v), nl:NOMSU_DEFS.nl}
     peg_file = io.open("nomsu.peg")
     if not peg_file and package.nomsupath
         for path in package.nomsupath\gmatch("[^;]+")

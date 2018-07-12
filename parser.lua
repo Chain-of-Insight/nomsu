@@ -8,6 +8,11 @@ do
   local _obj_0 = string
   match, sub = _obj_0.match, _obj_0.sub
 end
+local insert, remove
+do
+  local _obj_0 = table
+  insert, remove = _obj_0.insert, _obj_0.remove
+end
 local files = require('files')
 local NomsuCode, LuaCode, Source
 do
@@ -41,25 +46,6 @@ do
   _with_0.operator_char = S("'`~!@$^&*-+=|<>?/")
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
-  _with_0.indent = Cmt(Carg(1), function(self, start, userdata)
-    local indented = userdata.indent .. '    '
-    if sub(self, start, start + #indented - 1) == indented then
-      userdata.indent = indented
-      return start + #indented
-    end
-  end)
-  _with_0.dedent = Cmt(Carg(1), function(self, start, userdata)
-    local dedented = sub(userdata.indent, 1, -5)
-    if #match(self, "^[ ]*", start) <= #dedented then
-      userdata.indent = dedented
-      return start
-    end
-  end)
-  _with_0.nodent = Cmt(Carg(1), function(self, start, userdata)
-    if sub(self, start, start + #userdata.indent - 1) == userdata.indent then
-      return start + #userdata.indent
-    end
-  end)
   _with_0.userdata = Carg(1)
   _with_0.error = function(src, end_pos, start_pos, err_msg, userdata)
     local seen_errors = userdata.errors
@@ -93,14 +79,6 @@ do
     seen_errors[start_pos] = err_msg
     return true
   end
-  _with_0.Comment = function(src, end_pos, start_pos, value, userdata)
-    userdata.comments[start_pos] = value
-    return true
-  end
-  _with_0.Version = function(src, end_pos, version, userdata)
-    userdata.version = version
-    return true
-  end
   NOMSU_DEFS = _with_0
 end
 setmetatable(NOMSU_DEFS, {
@@ -111,6 +89,19 @@ setmetatable(NOMSU_DEFS, {
         do
           local _with_0 = userdata.source
           value.source = Source(_with_0.filename, _with_0.start + start - 1, _with_0.start + stop - 1)
+        end
+      end
+      if key == "Comment" then
+        value = value[1]
+      else
+        local comments = { }
+        for i = #value, 1, -1 do
+          if type(value[i]) == 'table' and value[i].type == "Comment" then
+            insert(comments, remove(value, i))
+          end
+        end
+        if #comments > 0 then
+          value.comments = comments
         end
       end
       setmetatable(value, AST[key])
@@ -126,18 +117,22 @@ setmetatable(NOMSU_DEFS, {
 local Parser = { }
 local NOMSU_PATTERN
 do
-  local peg_tidier = re.compile([[    file <- %nl* version? %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
-    version <- "--" (!"version" [^%nl])* "version" ([ ])* (([0-9])+ -> set_version) ([^%nl])*
+  local peg_tidier = re.compile([[    file <- %nl* version %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
+    version <- "--" (!"version" [^%nl])* "version" (" ")* (([0-9])+ -> set_version) ([^%nl])*
     def <- anon_def / captured_def
     anon_def <- ({ident} (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- %2"
+        {~ ((%nl " "+ def_line?)+) / def_line ~}) -> "%1 <- %2"
     captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {((%nl " "+ [^%nl]*)+) / ([^%nl]*)}) -> "%1 <- (({} %3 {} %%userdata) -> %2)"
+        {~ ((%nl " "+ def_line?)+) / def_line ~}) -> "%1 <- (({} {| %3 |} {} %%userdata) -> %2)"
+    def_line <- (err / [^%nl])+
+    err <- ("(!!" { (!("!!)") .)* } "!!)") -> "(({} (%1) %%userdata) => error)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
     ]], {
     set_version = function(v)
-      Parser.version = tonumber(v)
+      Parser.version = tonumber(v), {
+        nl = NOMSU_DEFS.nl
+      }
     end
   })
   local peg_file = io.open("nomsu.peg")
