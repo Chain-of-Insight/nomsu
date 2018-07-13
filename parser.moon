@@ -14,6 +14,7 @@ NOMSU_DEFS = with {}
     .nl = P("\r")^-1 * P("\n")
     .ws = S(" \t")
     .tonumber = tonumber
+    .unpack = unpack or table.unpack
     string_escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
     digit, hex = R('09'), R('09','af','AF')
     .escaped_char = (P("\\")*S("xX")*C(hex*hex)) / => string.char(tonumber(@, 16))
@@ -58,17 +59,6 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
         if userdata.source
             with userdata.source
                 value.source = Source(.filename, .start + start-1, .start + stop-1)
-        while true
-            found = false
-            for i=#value,1,-1
-                continue unless type(value[i]) == 'table'
-                if value[i].is_halfblock
-                    found = true
-                    hb = remove(value, i)
-                    for v in *hb
-                        insert value, i, v
-                        i += 1
-            break unless found
         comments = {}
         for i=#value,1,-1
             continue unless type(value[i]) == 'table'

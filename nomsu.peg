@@ -45,12 +45,11 @@ noindex_inline_expression:
       )
 inline_expression: index_chain / noindex_inline_expression 
 indented_expression:
-    indented_text / indented_nomsu / indented_list / indented_dict / {|
+    indented_text / indented_nomsu / indented_list / indented_dict / ({|
         ("(..)" / ":")? nl_indent (comment nl_nodent)*
             (block / action / expression)
             (!! [^%nl]+ -> "Unexpected character while parsing indented expression" !!)?
-            {:is_halfblock: ''->'yep' :}
-    |}
+    |} -> unpack)
 expression:
     inline_expression
     / (":" %ws*

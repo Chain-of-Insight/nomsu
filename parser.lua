@@ -26,6 +26,7 @@ do
   _with_0.nl = P("\r") ^ -1 * P("\n")
   _with_0.ws = S(" \t")
   _with_0.tonumber = tonumber
+  _with_0.unpack = unpack or table.unpack
   local string_escapes = {
     n = "\n",
     t = "\t",
@@ -89,34 +90,6 @@ setmetatable(NOMSU_DEFS, {
         do
           local _with_0 = userdata.source
           value.source = Source(_with_0.filename, _with_0.start + start - 1, _with_0.start + stop - 1)
-        end
-      end
-      while true do
-        local found = false
-        for i = #value, 1, -1 do
-          local _continue_0 = false
-          repeat
-            if not (type(value[i]) == 'table') then
-              _continue_0 = true
-              break
-            end
-            if value[i].is_halfblock then
-              found = true
-              local hb = remove(value, i)
-              for _index_0 = 1, #hb do
-                local v = hb[_index_0]
-                insert(value, i, v)
-                i = i + 1
-              end
-            end
-            _continue_0 = true
-          until true
-          if not _continue_0 then
-            break
-          end
-        end
-        if not (found) then
-          break
         end
       end
       local comments = { }
