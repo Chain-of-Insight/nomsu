@@ -60,6 +60,7 @@ class Code
         for i=1,n
             b = select(i, ...)
             assert(b, "code bit is nil")
+            if Source\is_instance(b) then require('ldt').breakpoint!
             if b == '' then continue
             bits[#bits+1] = b
             if type(b) == 'string'

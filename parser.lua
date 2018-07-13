@@ -193,8 +193,7 @@ Parser.parse = function(nomsu_code, source)
   local userdata = {
     indent = "",
     errors = { },
-    source = source,
-    comments = { }
+    source = source
   }
   local tree = NOMSU_PATTERN:match(nomsu_code, nil, userdata)
   if not (tree) then
@@ -228,7 +227,6 @@ Parser.parse = function(nomsu_code, source)
     end
     error("Errors occurred while parsing:\n\n" .. table.concat(errors, "\n\n"), 0)
   end
-  tree.comments = userdata.comments
   tree.version = userdata.version
   return tree
 end

@@ -115,7 +115,7 @@ Parser.parse = (nomsu_code, source=nil)->
     source or= nomsu_code.source
     nomsu_code = tostring(nomsu_code)
     userdata = {
-        indent: "", errors: {}, :source, comments: {},
+        indent: "", errors: {}, :source
     }
     tree = NOMSU_PATTERN\match(nomsu_code, nil, userdata)
     unless tree
@@ -129,7 +129,6 @@ Parser.parse = (nomsu_code, source=nil)->
         errors = [userdata.errors[k] for k in *keys]
         error("Errors occurred while parsing:\n\n"..table.concat(errors, "\n\n"), 0)
     
-    tree.comments = userdata.comments
     tree.version = userdata.version
     return tree
 

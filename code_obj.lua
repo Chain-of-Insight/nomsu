@@ -86,6 +86,9 @@ do
         repeat
           local b = select(i, ...)
           assert(b, "code bit is nil")
+          if Source:is_instance(b) then
+            require('ldt').breakpoint()
+          end
           if b == '' then
             _continue_0 = true
             break
