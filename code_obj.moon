@@ -2,6 +2,7 @@
 -- build up generated code, while keeping track of where it came from, and managing
 -- indentation levels.
 {:insert, :remove, :concat} = table
+{:repr} = require 'utils'
 local LuaCode, NomsuCode, Source
 export LINE_STARTS
 
@@ -44,6 +45,7 @@ class Source
         return Source(@filename, @start+offset, @stop)
 
 class Code
+    is_code: true
     new: (@source, ...)=>
         @bits = {}
         @indents, @current_indent = {}, 0
@@ -60,9 +62,11 @@ class Code
         for i=1,n
             b = select(i, ...)
             assert(b, "code bit is nil")
-            if Source\is_instance(b) then require('ldt').breakpoint!
+            assert(not Source\is_instance(b), "code bit is a Source")
             if b == '' then continue
             bits[#bits+1] = b
+            if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
+                b = repr(b)
             if type(b) == 'string'
                 trailing_text, spaces = match(b, "\n(([ ]*)[^\n]*)$")
                 if trailing_text
@@ -130,6 +134,11 @@ class LuaCode extends Code
     @Value = (...)->
         lua = LuaCode(...)
         lua.is_value = true
+        return lua
+    
+    @Comment = (...)->
+        lua = LuaCode(...)
+        lua.is_comment = true
         return lua
 
     add_free_vars: (vars)=>

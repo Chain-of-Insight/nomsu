@@ -3,6 +3,8 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
+local repr
+repr = require('utils').repr
 local LuaCode, NomsuCode, Source
 do
   local _class_0
@@ -77,6 +79,7 @@ local Code
 do
   local _class_0
   local _base_0 = {
+    is_code = true,
     append = function(self, ...)
       local n = select("#", ...)
       local bits, indents = self.bits, self.indents
@@ -86,14 +89,15 @@ do
         repeat
           local b = select(i, ...)
           assert(b, "code bit is nil")
-          if Source:is_instance(b) then
-            require('ldt').breakpoint()
-          end
+          assert(not Source:is_instance(b), "code bit is a Source")
           if b == '' then
             _continue_0 = true
             break
           end
           bits[#bits + 1] = b
+          if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
+            b = repr(b)
+          end
           if type(b) == 'string' then
             local trailing_text, spaces = match(b, "\n(([ ]*)[^\n]*)$")
             if trailing_text then
@@ -413,6 +417,11 @@ do
   self.Value = function(...)
     local lua = LuaCode(...)
     lua.is_value = true
+    return lua
+  end
+  self.Comment = function(...)
+    local lua = LuaCode(...)
+    lua.is_comment = true
     return lua
   end
   if _parent_0.__inherited then

@@ -231,6 +231,7 @@ with NomsuCompiler
 
     .run = (to_run, source=nil)=>
         source or= to_run.source or Source(to_run, 1, #to_run)
+        if type(source) == 'string' then source = Source\from_string(source)
         if not files.read(source.filename) then files.spoof(source.filename, to_run)
         tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string

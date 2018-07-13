@@ -355,6 +355,9 @@ do
       source = nil
     end
     source = source or (to_run.source or Source(to_run, 1, #to_run))
+    if type(source) == 'string' then
+      source = Source:from_string(source)
+    end
     if not files.read(source.filename) then
       files.spoof(source.filename, to_run)
     end
