@@ -95,7 +95,7 @@ compile [repeat while %condition %body] to
                 \(%body as lua statements)
     if
         %body has subtree % where: (%.type = "Action") and (%.stub is "do next repeat")
-    ..: to %lua write "\n    ::continue_repeat::"
+    ..to %lua write "\n    ::continue_repeat::"
     to %lua write "\nend --while-loop"
     if
         %body has subtree % where: (%.type = "Action") and (%.stub is "stop repeating")

@@ -45,9 +45,9 @@ assume
 
 assume
     ".."
-        no\ # Comment
+        no\
         #comment
-        #..
+        #
             block comment
         ..gap
     ..= "nogap"

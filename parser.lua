@@ -91,18 +91,53 @@ setmetatable(NOMSU_DEFS, {
           value.source = Source(_with_0.filename, _with_0.start + start - 1, _with_0.start + stop - 1)
         end
       end
-      if key == "Comment" then
-        value = value[1]
-      else
-        local comments = { }
+      while true do
+        local found = false
         for i = #value, 1, -1 do
-          if type(value[i]) == 'table' and value[i].type == "Comment" then
-            insert(comments, remove(value, i))
+          local _continue_0 = false
+          repeat
+            if not (type(value[i]) == 'table') then
+              _continue_0 = true
+              break
+            end
+            if value[i].is_halfblock then
+              found = true
+              local hb = remove(value, i)
+              for _index_0 = 1, #hb do
+                local v = hb[_index_0]
+                insert(value, i, v)
+                i = i + 1
+              end
+            end
+            _continue_0 = true
+          until true
+          if not _continue_0 then
+            break
           end
         end
-        if #comments > 0 then
-          value.comments = comments
+        if not (found) then
+          break
         end
+      end
+      local comments = { }
+      for i = #value, 1, -1 do
+        local _continue_0 = false
+        repeat
+          if not (type(value[i]) == 'table') then
+            _continue_0 = true
+            break
+          end
+          if value[i].type == "Comment" then
+            insert(comments, remove(value, i))
+          end
+          _continue_0 = true
+        until true
+        if not _continue_0 then
+          break
+        end
+      end
+      if #comments > 0 then
+        value.comments = comments
       end
       setmetatable(value, AST[key])
       if value.__init then

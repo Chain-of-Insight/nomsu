@@ -197,7 +197,7 @@ run = function()
     end
     local tree = nomsu:parse(file, source)
     if tree then
-      if tree.type ~= "FileChunks" then
+      if tree.type ~= "File" then
         tree = {
           tree
         }

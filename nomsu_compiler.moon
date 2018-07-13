@@ -235,7 +235,7 @@ with NomsuCompiler
         tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
-        if tree.type == "FileChunks"
+        if tree.type == "File"
             -- Each chunk's compilation is affected by the code in the previous chunks
             -- (typically), so each chunk needs to compile and run before the next one
             -- compiles.
@@ -473,8 +473,8 @@ with NomsuCompiler
             when "Var"
                 return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
 
-            when "FileChunks"
-                error("Cannot convert FileChunks to a single block of lua, since each chunk's "..
+            when "File"
+                error("Cannot convert File to a single block of lua, since each chunk's "..
                     "compilation depends on the earlier chunks")
 
             else
@@ -501,7 +501,7 @@ with NomsuCompiler
 
         inline, can_use_colon = options.inline, options.can_use_colon
         switch tree.type
-            when "FileChunks"
+            when "File"
                 return nil if inline
                 nomsu = NomsuCode(tree.source)
                 for i, chunk in ipairs tree

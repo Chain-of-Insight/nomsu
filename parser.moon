@@ -58,15 +58,24 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
         if userdata.source
             with userdata.source
                 value.source = Source(.filename, .start + start-1, .start + stop-1)
-        if key == "Comment"
-            value = value[1]
-        else
-            comments = {}
+        while true
+            found = false
             for i=#value,1,-1
-                if type(value[i]) == 'table' and value[i].type == "Comment"
-                    insert comments, remove(value, i)
-            if #comments > 0
-                value.comments = comments
+                continue unless type(value[i]) == 'table'
+                if value[i].is_halfblock
+                    found = true
+                    hb = remove(value, i)
+                    for v in *hb
+                        insert value, i, v
+                        i += 1
+            break unless found
+        comments = {}
+        for i=#value,1,-1
+            continue unless type(value[i]) == 'table'
+            if value[i].type == "Comment"
+                insert comments, remove(value, i)
+        if #comments > 0
+            value.comments = comments
         setmetatable(value, AST[key])
         if value.__init then value\__init!
         return value

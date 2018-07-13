@@ -367,7 +367,7 @@ do
     if tree == nil then
       return nil
     end
-    if tree.type == "FileChunks" then
+    if tree.type == "File" then
       local ret = nil
       local all_lua = { }
       for _index_0 = 1, #tree do
@@ -708,8 +708,8 @@ do
       return LuaCode.Value(tree.source, tostring(tree[1]))
     elseif "Var" == _exp_0 then
       return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
-    elseif "FileChunks" == _exp_0 then
-      return error("Cannot convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
+    elseif "File" == _exp_0 then
+      return error("Cannot convert File to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     else
       return error("Unknown type: " .. tostring(tree.type))
     end
@@ -757,7 +757,7 @@ do
     end
     local inline, can_use_colon = options.inline, options.can_use_colon
     local _exp_0 = tree.type
-    if "FileChunks" == _exp_0 then
+    if "File" == _exp_0 then
       if inline then
         return nil
       end

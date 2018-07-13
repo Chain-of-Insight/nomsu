@@ -130,7 +130,7 @@ run = ->
         return unless file
         tree = nomsu\parse(file, source)
         if tree
-            if tree.type != "FileChunks"
+            if tree.type != "File"
                 tree = {tree}
             -- Each chunk's compilation is affected by the code in the previous chunks
             -- (typically), so each chunk needs to compile and run before the next one
