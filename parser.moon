@@ -14,6 +14,7 @@ NOMSU_DEFS = with {}
     .nl = P("\r")^-1 * P("\n")
     .ws = S(" \t")
     .tonumber = tonumber
+    .table = -> {}
     .unpack = unpack or table.unpack
     string_escapes = n:"\n", t:"\t", b:"\b", a:"\a", v:"\v", f:"\f", r:"\r"
     digit, hex = R('09'), R('09','af','AF')
@@ -28,6 +29,10 @@ NOMSU_DEFS = with {}
     .ident_char = R("az","AZ","09") + P("_") + .utf8_char
 
     .userdata = Carg(1)
+
+    .add_comment = (src,end_pos,start_pos,comment,userdata)->
+        userdata.comments[start_pos] = comment
+        return true
 
     .error = (src,end_pos,start_pos,err_msg,userdata)->
         seen_errors = userdata.errors
@@ -59,14 +64,8 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
         if userdata.source
             with userdata.source
                 value.source = Source(.filename, .start + start-1, .start + stop-1)
-        comments = {}
-        for i=#value,1,-1
-            continue unless type(value[i]) == 'table'
-            if value[i].type == "Comment"
-                insert comments, remove(value, i)
-        if #comments > 0
-            value.comments = comments
         setmetatable(value, AST[key])
+        value.comments = userdata.comments
         if value.__init then value\__init!
         return value
 
@@ -105,7 +104,7 @@ Parser.parse = (nomsu_code, source=nil)->
     source or= nomsu_code.source
     nomsu_code = tostring(nomsu_code)
     userdata = {
-        indent: "", errors: {}, :source
+        errors: {}, :source, comments: {}
     }
     tree = NOMSU_PATTERN\match(nomsu_code, nil, userdata)
     unless tree

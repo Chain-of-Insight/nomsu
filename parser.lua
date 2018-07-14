@@ -26,6 +26,9 @@ do
   _with_0.nl = P("\r") ^ -1 * P("\n")
   _with_0.ws = S(" \t")
   _with_0.tonumber = tonumber
+  _with_0.table = function()
+    return { }
+  end
   _with_0.unpack = unpack or table.unpack
   local string_escapes = {
     n = "\n",
@@ -48,6 +51,10 @@ do
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
   _with_0.userdata = Carg(1)
+  _with_0.add_comment = function(src, end_pos, start_pos, comment, userdata)
+    userdata.comments[start_pos] = comment
+    return true
+  end
   _with_0.error = function(src, end_pos, start_pos, err_msg, userdata)
     local seen_errors = userdata.errors
     if seen_errors[start_pos] then
@@ -92,27 +99,8 @@ setmetatable(NOMSU_DEFS, {
           value.source = Source(_with_0.filename, _with_0.start + start - 1, _with_0.start + stop - 1)
         end
       end
-      local comments = { }
-      for i = #value, 1, -1 do
-        local _continue_0 = false
-        repeat
-          if not (type(value[i]) == 'table') then
-            _continue_0 = true
-            break
-          end
-          if value[i].type == "Comment" then
-            insert(comments, remove(value, i))
-          end
-          _continue_0 = true
-        until true
-        if not _continue_0 then
-          break
-        end
-      end
-      if #comments > 0 then
-        value.comments = comments
-      end
       setmetatable(value, AST[key])
+      value.comments = userdata.comments
       if value.__init then
         value:__init()
       end
@@ -164,9 +152,9 @@ Parser.parse = function(nomsu_code, source)
   source = source or nomsu_code.source
   nomsu_code = tostring(nomsu_code)
   local userdata = {
-    indent = "",
     errors = { },
-    source = source
+    source = source,
+    comments = { }
   }
   local tree = NOMSU_PATTERN:match(nomsu_code, nil, userdata)
   if not (tree) then

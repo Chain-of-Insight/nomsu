@@ -26,8 +26,7 @@ local types = {
   "DictEntry",
   "IndexChain",
   "Action",
-  "File",
-  "Comment"
+  "File"
 }
 for _index_0 = 1, #types do
   local name = types[_index_0]
