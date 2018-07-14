@@ -484,7 +484,7 @@ with NomsuCompiler
     .tree_to_nomsu = (tree, options)=>
         options or= {}
         unless options.pop_comments
-            comments = [{comment:c, pos:p} for p,c in pairs(tree.comments or {})]
+            comments = [{comment:c, pos:p} for p,c in pairs(tree.comments or {}) when tree.source.start <= p and p <= tree.source.stop]
             table.sort comments, (a,b)-> a.pos < b.pos
             comment_i = 1
             options.pop_comments = (pos)->

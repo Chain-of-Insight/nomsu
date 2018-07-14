@@ -148,13 +148,15 @@ action [%var as lua identifier, %var as lua id]
         elseif \%var.type == 'Var' then return string.as_lua_id(\%var[1])
         elseif \%var.type == 'Action' then return "A"..string.as_lua_id(\%var.stub)
         end
+    
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 compile [% is syntax tree] to
     Lua value "AST.is_syntax_tree(\(% as lua expr))"
 
 compile [% is %kind syntax tree] to
     Lua value "AST.is_syntax_tree(\(% as lua expr), \(%kind as lua expr))"
-    
+
 compile [%tree with %t -> %replacement] to
     Lua value ".."
         \(%tree as lua expr):map(function(\(%t as lua expr))

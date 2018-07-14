@@ -4,7 +4,7 @@ file (File):
     comment? blank_lines?
     (chunk (nl_nodent chunk_delimeter nl_nodent chunk)*)?
     blank_lines?
-    (!! .+ -> "Parse error" !!)?
+    %ws* (!! .+ -> "Parse error" !!)?
 
 nodent: =curr_indent !(" ")
 indent: =curr_indent "    "
@@ -45,7 +45,7 @@ indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict / ({|
         ("(..)")? nl_indent
             (block / action / expression) (nl_nodent comment)*
-            (!! [^%nl]+ -> "Unexpected character while parsing indented expression" !!)?
+            (eol / (!! [^%nl]+ -> "Unexpected character while parsing indented expression" !!))
     |} -> unpack)
 expression:
     inline_expression
@@ -121,7 +121,7 @@ inline_list (List):
         (inline_list_item (%ws* ',' %ws* inline_list_item)* (%ws* ',')?)? %ws*
     ("]" / (","? (
         (!! eol -> "Line ended before finding a closing ]-bracket" !!)
-       /(!! [^%nl]+ -> "Unexpected character while parsing List" !!)?
+       /(!! [^%nl]+ -> "Unexpected character while parsing List" !!)
     )))
 indented_list (List):
     "[..]" eol nl_indent

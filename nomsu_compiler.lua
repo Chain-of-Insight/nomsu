@@ -725,11 +725,13 @@ do
         local _accum_0 = { }
         local _len_0 = 1
         for p, c in pairs(tree.comments or { }) do
-          _accum_0[_len_0] = {
-            comment = c,
-            pos = p
-          }
-          _len_0 = _len_0 + 1
+          if tree.source.start <= p and p <= tree.source.stop then
+            _accum_0[_len_0] = {
+              comment = c,
+              pos = p
+            }
+            _len_0 = _len_0 + 1
+          end
         end
         comments = _accum_0
       end
