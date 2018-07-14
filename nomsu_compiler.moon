@@ -481,6 +481,7 @@ with NomsuCompiler
             else
                 error("Unknown type: #{tree.type}")
 
+    MIN_COLON_LEN = 25 -- For beautification purposes, don't bother using colon syntax for short bits
     .tree_to_nomsu = (tree, options)=>
         options or= {}
         unless options.pop_comments
@@ -526,7 +527,7 @@ with NomsuCompiler
                             arg_nomsu = recurse(bit,inline:true)
                             return nil unless arg_nomsu
                             if bit.type == "Action" or bit.type == "Block"
-                                if bit.type == "Action" and i == #tree
+                                if bit.type == "Action" and i == #tree and #tostring(arg_nomsu) >= MIN_COLON_LEN
                                     nomsu\append ":"
                                 else
                                     arg_nomsu\parenthesize!
@@ -550,7 +551,7 @@ with NomsuCompiler
 
                             if arg_nomsu and line_len + #tostring(arg_nomsu) < MAX_LINE
                                 if bit.type == "Action"
-                                    if can_use_colon and i > 1
+                                    if can_use_colon and i > 1 and #tostring(arg_nomsu) >= MIN_COLON_LEN
                                         nomsu\append match(next_space,"[^ ]*"), ": ", arg_nomsu
                                         next_space = "\n.."
                                         line_len = 2

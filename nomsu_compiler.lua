@@ -717,6 +717,7 @@ do
       return error("Unknown type: " .. tostring(tree.type))
     end
   end
+  local MIN_COLON_LEN = 25
   NomsuCompiler.tree_to_nomsu = function(self, tree, options)
     options = options or { }
     if not (options.pop_comments) then
@@ -792,7 +793,7 @@ do
               return nil
             end
             if bit.type == "Action" or bit.type == "Block" then
-              if bit.type == "Action" and i == #tree then
+              if bit.type == "Action" and i == #tree and #tostring(arg_nomsu) >= MIN_COLON_LEN then
                 nomsu:append(":")
               else
                 arg_nomsu:parenthesize()
@@ -827,7 +828,7 @@ do
             end
             if arg_nomsu and line_len + #tostring(arg_nomsu) < MAX_LINE then
               if bit.type == "Action" then
-                if can_use_colon and i > 1 then
+                if can_use_colon and i > 1 and #tostring(arg_nomsu) >= MIN_COLON_LEN then
                   nomsu:append(match(next_space, "[^ ]*"), ": ", arg_nomsu)
                   next_space = "\n.."
                   line_len = 2
