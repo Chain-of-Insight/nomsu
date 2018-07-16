@@ -229,31 +229,27 @@ with NomsuCompiler
                 return @["# compile math expr #"]
     }
 
-    .run = (to_run, source=nil)=>
+    .run = (to_run, source=nil, version=nil)=>
         source or= to_run.source or Source(to_run, 1, #to_run)
         if type(source) == 'string' then source = Source\from_string(source)
         if not files.read(source.filename) then files.spoof(source.filename, to_run)
-        tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source)
+        tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source, version)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
-        if tree.type == "File"
-            -- Each chunk's compilation is affected by the code in the previous chunks
-            -- (typically), so each chunk needs to compile and run before the next one
-            -- compiles.
-            ret = nil
-            all_lua = {}
-            for chunk in *tree
-                lua = @compile(chunk)\as_statements("return ")
-                lua\declare_locals!
-                lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
-                insert all_lua, tostring(lua)
-                ret = @run_lua(lua)
-            return ret
-        else
-            lua = @compile(tree)\as_statements("return ")
+        if tree.type != "FileChunks"
+            tree = {tree}
+        -- Each chunk's compilation is affected by the code in the previous chunks
+        -- (typically), so each chunk needs to compile and run before the next one
+        -- compiles.
+        ret = nil
+        all_lua = {}
+        for chunk in *tree
+            lua = @compile(chunk)\as_statements("return ")
             lua\declare_locals!
             lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
-            return @run_lua(lua)
+            insert all_lua, tostring(lua)
+            ret = @run_lua(lua)
+        return ret
 
     _running_files = {} -- For detecting circular imports
     .run_file = (filename)=>
@@ -362,7 +358,8 @@ with NomsuCompiler
                     unless AST.is_syntax_tree(t)
                         return repr(t)
                     bits = [make_tree(bit) for bit in *t]
-                    return t.type.."("..repr(tostring t.source)..", "..table.concat(bits, ", ")..")"
+                    insert bits, 1, repr(tostring t.source)
+                    return t.type.."("..concat(bits, ", ")..")"
                 return LuaCode.Value tree.source, make_tree(tree[1])
             
             when "Block"
@@ -474,44 +471,45 @@ with NomsuCompiler
             when "Var"
                 return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
 
-            when "File"
-                error("Cannot convert File to a single block of lua, since each chunk's "..
+            when "FileChunks"
+                error("Cannot convert FileChunks to a single block of lua, since each chunk's "..
                     "compilation depends on the earlier chunks")
 
             else
                 error("Unknown type: #{tree.type}")
 
-    MIN_COLON_LEN = 25 -- For beautification purposes, don't bother using colon syntax for short bits
+    MIN_COLON_LEN = 20 -- For beautification purposes, don't bother using colon syntax for short bits
     .tree_to_nomsu = (tree, options)=>
         options or= {}
         unless options.pop_comments
             comments = [{comment:c, pos:p} for p,c in pairs(tree.comments or {}) when tree.source.start <= p and p <= tree.source.stop]
             table.sort comments, (a,b)-> a.pos < b.pos
             comment_i = 1
-            options.pop_comments = (pos)->
+            options.pop_comments = (pos, prefix='')->
                 nomsu = NomsuCode(tree.source)
                 while comments[comment_i] and comments[comment_i].pos <= pos
                     comment = comments[comment_i].comment
                     nomsu\append("#"..(gsub(comment, "\n", "\n    ")).."\n")
                     if comment\match("^\n.") then nomsu\append("\n") -- for aesthetics
                     comment_i += 1
-                return #nomsu.bits == 0 and '' or nomsu
+                return '' if #nomsu.bits == 0
+                nomsu\prepend prefix
+                return nomsu
 
         recurse = (t, opts)->
             opts or= {}
             opts.pop_comments = options.pop_comments
             return @tree_to_nomsu(t, opts)
 
-        {:inline, :can_use_colon, :pop_comments} = options
+        {:inline, :pop_comments} = options
         switch tree.type
-            when "File"
-                return nil if inline
+            when "FileChunks"
+                error("Cannot inline a FileChunks") if inline
                 nomsu = NomsuCode(tree.source)
                 for i, chunk in ipairs tree
-                    if i > 1
-                        nomsu\append "\n\n#{("~")\rep(80)}\n\n"
+                    nomsu\append "\n\n#{("~")\rep(80)}\n\n" if i > 1
                     nomsu\append pop_comments(chunk.source.start)
-                    nomsu\append recurse(chunk)
+                    nomsu\append recurse(chunk, top:true)
                 nomsu\append pop_comments(tree.source.stop)
                 return nomsu
 
@@ -520,97 +518,78 @@ with NomsuCompiler
                     nomsu = NomsuCode(tree.source)
                     for i,bit in ipairs tree
                         if type(bit) == "string"
-                            if i > 1
-                                nomsu\append " "
+                            nomsu\append " " if i > 1
                             nomsu\append bit
                         else
                             arg_nomsu = recurse(bit,inline:true)
                             return nil unless arg_nomsu
-                            if bit.type == "Action" or bit.type == "Block"
-                                if bit.type == "Action" and i == #tree and #tostring(arg_nomsu) >= MIN_COLON_LEN
-                                    nomsu\append ":"
-                                else
-                                    arg_nomsu\parenthesize!
                             unless i == 1
                                 nomsu\append " "
+                            if bit.type == "Action" or (bit.type == "Block" and (#bit > 1 or i < #tree))
+                                arg_nomsu\parenthesize!
                             nomsu\append arg_nomsu
                     return nomsu
                 else
                     nomsu = NomsuCode(tree.source)
                     next_space = ""
-                    line_len, last_colon = 0, nil
                     for i,bit in ipairs tree
                         if type(bit) == "string"
-                            line_len += #next_space + #bit
                             nomsu\append next_space, bit
                             next_space = " "
                         else
-                            arg_nomsu = if last_colon == i-1 and bit.type == "Action" then nil
-                            elseif bit.type == "Block" then nil
-                            else recurse(bit,inline:true)
-
-                            if arg_nomsu and line_len + #tostring(arg_nomsu) < MAX_LINE
-                                if bit.type == "Action"
-                                    if can_use_colon and i > 1 and #tostring(arg_nomsu) >= MIN_COLON_LEN
-                                        nomsu\append match(next_space,"[^ ]*"), ": ", arg_nomsu
-                                        next_space = "\n.."
-                                        line_len = 2
-                                        last_colon = i
-                                    else
-                                        nomsu\append next_space, "(", arg_nomsu, ")"
-                                        line_len += #next_space + 2 + #tostring(arg_nomsu)
-                                        next_space = " "
+                            arg_nomsu = if bit.type == "Block" and #bit > 1 then nil
+                            else assert recurse(bit,inline:true)
+                            next_space = match(next_space, "[^ ]*") if bit.type == "Block"
+                            nomsu\append next_space
+                            if arg_nomsu and nomsu.trailing_line_len + #tostring(arg_nomsu) < MAX_LINE
+                                if bit.type == "Block"
+                                    nomsu\append arg_nomsu
+                                    next_space = "\n.."
                                 else
-                                    nomsu\append next_space, arg_nomsu
-                                    line_len += #next_space + #tostring(arg_nomsu)
+                                    arg_nomsu\parenthesize! if bit.type == "Action"
+                                    nomsu\append arg_nomsu
                                     next_space = " "
                             else
-                                arg_nomsu = recurse(bit, can_use_colon:true)
-                                return nil unless arg_nomsu
+                                arg_nomsu = assert recurse(bit)
                                 -- These types carry their own indentation
-                                if bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
-                                    if i == 1
-                                        arg_nomsu = NomsuCode(bit.source, "(..)\n    ", pop_comments(bit.source.start), arg_nomsu)
-                                    else
-                                        arg_nomsu = NomsuCode(bit.source, "\n    ", pop_comments(bit.source.start), arg_nomsu)
-                                
-                                if last_colon == i-1 and (bit.type == "Action" or bit.type == "Block")
-                                    next_space = ""
-                                nomsu\append next_space, arg_nomsu
+                                if bit.type != "List" and bit.type != "Dict" and bit.type != "Text" and bit.type != "Block"
+                                    nomsu\append NomsuCode(bit.source, "(..)\n    ", pop_comments(bit.source.start), arg_nomsu)
+                                else
+                                    nomsu\append arg_nomsu
                                 next_space = "\n.."
-                                line_len = 2
 
-                            if next_space == " " and #(match(tostring(nomsu),"[^\n]*$")) > MAX_LINE
-                                next_space = "\n.."
+                        if next_space == " " and nomsu.trailing_line_len > MAX_LINE
+                            next_space = "\n.."
                     return nomsu
 
             when "EscapedNomsu"
-                nomsu = recurse(tree[1], inline:true)
-                if nomsu == nil and not inline
-                    nomsu = recurse(tree[1])
-                    return nomsu and NomsuCode tree.source, "\\:\n    ", pop_comments(tree.source.start), nomsu
-                return nomsu and NomsuCode tree.source, "\\(", nomsu, ")"
+                nomsu = NomsuCode(tree.source, "\\(", assert(recurse(tree[1], inline:true)), ")")
+                if inline or #tostring(nomsu) <= MAX_LINE
+                    return nomsu
+                nomsu = assert recurse(tree[1])
+                switch tree[1].type
+                    when "List", "Dict", "Text", "Block"
+                        return NomsuCode tree.source, "\\", nomsu
+                    else
+                        return NomsuCode tree.source, "\\(..)\n    ", pop_comments(tree.source.start), nomsu
 
             when "Block"
                 if inline
-                    nomsu = NomsuCode(tree.source)
+                    nomsu = NomsuCode(tree.source, ":")
                     for i,line in ipairs tree
-                        if i > 1
-                            nomsu\append "; "
-                        line_nomsu = recurse(line,inline:true)
-                        return nil unless line_nomsu
-                        nomsu\append line_nomsu
+                        nomsu\append(i == 1 and " " or "; ")
+                        nomsu\append assert(recurse(line, inline:true))
                     return nomsu
                 nomsu = NomsuCode(tree.source)
                 for i, line in ipairs tree
                     nomsu\append pop_comments(line.source.start)
-                    line = assert(recurse(line, can_use_colon:true), "Could not convert line to nomsu")
+                    line = assert(recurse(line), "Could not convert line to nomsu")
                     nomsu\append line
                     if i < #tree
                         nomsu\append "\n"
                         if match(tostring(line), "\n")
                             nomsu\append "\n"
-                return nomsu
+                return options.top and nomsu or NomsuCode(tree.source, ":\n    ", nomsu)
 
             when "Text"
                 if inline
@@ -624,7 +603,7 @@ with NomsuCompiler
                                 nomsu\append(make_text(bit))
                             else
                                 interp_nomsu = assert recurse(bit, inline:true)
-                                if bit.type != "Var" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
+                                if bit.type != "Var" and bit.type != "List" and bit.type != "Dict"
                                     interp_nomsu\parenthesize!
                                 nomsu\append "\\", interp_nomsu
                         return nomsu
@@ -662,7 +641,7 @@ with NomsuCompiler
                             else
                                 interp_nomsu = recurse(bit, inline:true)
                                 if interp_nomsu
-                                    if bit.type != "Var" and bit.type != "List" and bit.type != "Dict" and bit.type != "Text"
+                                    if bit.type != "Var" and bit.type != "List" and bit.type != "Dict"
                                         interp_nomsu\parenthesize!
                                     nomsu\append "\\", interp_nomsu
                                 else
@@ -678,113 +657,98 @@ with NomsuCompiler
                 if inline
                     nomsu = NomsuCode(tree.source, "[")
                     for i, item in ipairs tree
-                        item_nomsu = recurse(item, inline:true)
-                        return nil unless item_nomsu
-                        if i > 1
-                            nomsu\append ", "
-                        nomsu\append item_nomsu
+                        nomsu\append ", " if i > 1
+                        nomsu\append assert(recurse(item, inline:true))
                     nomsu\append "]"
                     return nomsu
                 else
                     inline_version = recurse(tree, inline:true)
-                    if inline_version and #inline_version <= MAX_LINE
+                    if inline_version and #tostring(inline_version) <= MAX_LINE
                         return inline_version
-                    nomsu = NomsuCode(tree.source, "[..]")
-                    line = NomsuCode(tree.source, "\n    ")
-                    line_comments = if #tree > 0
-                        pop_comments(tree[1].source.start)
-                    else ''
+                    assert #tree > 0
+                    nomsu = NomsuCode(tree.source, pop_comments(tree[1].source.start))
                     for i, item in ipairs tree
-                        item_nomsu = recurse(item, inline:true)
-                        if item_nomsu and #tostring(line) + #", " + #item_nomsu <= MAX_LINE
-                            if #line.bits > 1
-                                line\append ", "
-                            line\append item_nomsu
+                        item_nomsu = assert recurse(item, inline:true)
+                        item_nomsu\parenthesize! if item.type == "Block"
+                        if nomsu.trailing_line_len + #tostring(item_nomsu) <= MAX_LINE
+                            nomsu\append ", " if nomsu.trailing_line_len > 0
+                            nomsu\append item_nomsu
                         else
-                            unless item_nomsu
+                            if #tostring(item_nomsu) > MAX_LINE
                                 item_nomsu = recurse(item)
-                                return nil unless item_nomsu
-                            if #line.bits > 1
-                                if #tostring(line_comments) > 0
-                                    nomsu\append '\n    ', line_comments
-                                nomsu\append line
-                                line = NomsuCode(line.source, "\n    ")
-                                line_comments = if i < #tree
-                                    pop_comments(tree[i+1].source.start)
-                                else ''
-                            line\append item_nomsu
-                    if #line.bits > 1
-                        nomsu\append line
-                    return nomsu
+                                switch item.type
+                                    when "List", "Dict", "Text", "Block"
+                                        nomsu\append item_nomsu
+                                    else
+                                        nomsu\append "(..)\n    ", item_nomsu
+                                nomsu\append "\n" if i < #tree
+                            else
+                                nomsu\append '\n' if nomsu.trailing_line_len > 0
+                                nomsu\append pop_comments(item.source.start), item_nomsu
+                    nomsu\append pop_comments(tree.source.stop, '\n')
+                    return NomsuCode(tree.source, "[..]\n    ", nomsu)
             
             when "Dict"
                 if inline
                     nomsu = NomsuCode(tree.source, "{")
                     for i, entry in ipairs tree
-                        entry_nomsu = recurse(entry, inline:true)
-                        return nil unless entry_nomsu
-                        if i > 1
-                            nomsu\append ", "
-                        nomsu\append entry_nomsu
+                        nomsu\append ", " if i > 1
+                        nomsu\append assert(recurse(entry, inline:true))
                     nomsu\append "}"
                     return nomsu
                 else
                     inline_version = recurse(tree, inline:true)
-                    if inline_version then return inline_version
-                    nomsu = NomsuCode(tree.source, "{..}")
-                    line = NomsuCode(tree.source, "\n    ")
-                    line_comments = if #tree > 0
-                        pop_comments(tree[1].source.start)
-                    else ''
-                    for i, entry in ipairs tree
-                        entry_nomsu = recurse(entry)
-                        return nil unless entry_nomsu
-                        if #line + #tostring(entry_nomsu) <= MAX_LINE
-                            if #line.bits > 1
-                                line\append ", "
-                            line\append entry_nomsu
+                    if inline_version and #tostring(inline_version) <= MAX_LINE
+                        return inline_version
+                    assert #tree > 0
+                    nomsu = NomsuCode(tree.source, pop_comments(tree[1].source.start))
+                    for i, item in ipairs tree
+                        item_nomsu = assert recurse(item, inline:true)
+                        item_nomsu\parenthesize! if item.type == "Block"
+                        if nomsu.trailing_line_len + #tostring(item_nomsu) <= MAX_LINE
+                            nomsu\append ", " if nomsu.trailing_line_len > 0
+                            nomsu\append item_nomsu
                         else
-                            if #line.bits > 1
-                                if #tostring(line_comments) > 0
-                                    nomsu\append "\n    ", line_comments
-                                nomsu\append line
-                                line = NomsuCode(line.source, "\n    ")
-                                line_comments = if i < #tree
-                                    pop_comments(tree[1].source.start)
-                                else ''
-                            line\append entry_nomsu
-                    if #line.bits > 1
-                        nomsu\append line
-                    return nomsu
+                            if #tostring(item_nomsu) > MAX_LINE
+                                item_nomsu = recurse(item)
+                                switch item.type
+                                    when "List", "Dict", "Text", "Block"
+                                        nomsu\append item_nomsu
+                                    else
+                                        nomsu\append "(..)\n    ", item_nomsu
+                                nomsu\append "\n" if i < #tree
+                            else
+                                nomsu\append '\n' if nomsu.trailing_line_len > 0
+                                nomsu\append pop_comments(item.source.start), item_nomsu
+                    nomsu\append pop_comments(tree.source.stop, '\n')
+                    return NomsuCode(tree.source, "{..}\n    ", nomsu)
             
             when "DictEntry"
                 key, value = tree[1], tree[2]
-                key_nomsu = recurse(key, inline:true)
-                return nil unless key_nomsu
-                if key.type == "Action" or key.type == "Block"
-                    key_nomsu\parenthesize!
+                key_nomsu = assert recurse(key, inline:true)
+                key_nomsu\parenthesize! if key.type == "Action" or key.type == "Block"
                 value_nomsu = if value
-                    recurse(value, inline:true)
+                    assert recurse(value, inline:true)
                 else NomsuCode(tree.source, "")
-                if inline and not value_nomsu then return nil
-                if not value_nomsu
-                    return nil if inline
-                    value_nomsu = recurse(value)
-                    return nil unless value_nomsu
-                return NomsuCode tree.source, key_nomsu, ":", value_nomsu
+                assert(value.type != "Block", "Didn't expect to find a Block as a value in a dict")
+                value_nomsu\parenthesize! if value.type == "Block"
+                if inline or #tostring(key_nomsu) + 2 + #tostring(value_nomsu) <= MAX_LINE
+                    return NomsuCode tree.source, key_nomsu, ": ", value_nomsu
+                value_nomsu = recurse(value)
+                if value.type == "List" or value.type == "Dict" or value.type == "Text"
+                    return NomsuCode tree.source, key_nomsu, ": ", value_nomsu
+                else
+                    return NomsuCode tree.source, key_nomsu, ": (..)\n    ", value_nomsu
             
             when "IndexChain"
                 nomsu = NomsuCode(tree.source)
                 for i, bit in ipairs tree
-                    if i > 1
-                        nomsu\append "."
+                    nomsu\append "." if i > 1
                     local bit_nomsu
-                    if bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string'
+                    bit_nomsu = if bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and bit[1]\match("[_a-zA-Z][_a-zA-Z0-9]*")
                         -- TODO: support arbitrary words here, including operators and unicode
-                        if bit[1]\match("[_a-zA-Z][_a-zA-Z0-9]*")
-                            bit_nomsu = bit[1]
-                    unless bit_nomsu then bit_nomsu = recurse(bit, inline:true)
-                    return nil unless bit_nomsu
+                        bit[1]
+                    else assert recurse(bit, inline:true)
                     switch bit.type
                         when "Action", "Block", "IndexChain"
                             bit_nomsu\parenthesize!

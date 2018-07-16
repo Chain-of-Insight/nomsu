@@ -1,5 +1,5 @@
 -- Nomsu version 2
-file (File):
+file (FileChunks):
     {:curr_indent: ' '* :}
     comment? blank_lines?
     (chunk (nl_nodent chunk_delimeter nl_nodent chunk)*)?

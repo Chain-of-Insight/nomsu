@@ -1,3 +1,4 @@
+#!/usr/bin/env nomsu -V1
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
@@ -186,6 +187,8 @@ compile [remove free vars %vars from %code] to
 
 compile [%lua <-write %code, to %lua write %code] to: Lua "\(%lua as lua expr):append(\(%code as lua expr));"
 
+compile [to %lua write %code joined by %glue] to: Lua "\(%lua as lua expr):concat_append(\(%code as lua expr), \(%glue as lua expr));"
+
 compile [quote %s] to
     Lua value ".."
         repr(\(%s as lua expr))
@@ -212,7 +215,7 @@ compile [compile %block, compiled %block, %block compiled] to
 # Return statement is wrapped in a do..end block because Lua is unhappy if you
     put code after a return statement, unless you wrap it in a block.
 compile [return] to: Lua "do return; end"
-compile [return %return_value] to: Lua "do return \(%return_value as lua expr); end"
+compile [return %return_value] to: Lua "do return \(%return_value as lua expr) end"
 
 # Literals
 compile [yes] to: Lua value "true"

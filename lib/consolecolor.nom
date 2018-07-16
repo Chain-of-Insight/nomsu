@@ -1,3 +1,7 @@
+#!/usr/bin/env nomsu -V1
+#
+    This file defines actions for ANSI console color escape codes.
+
 use "core"
 
 test: bright: "\(green)Color test passed."
@@ -12,6 +16,7 @@ test: bright: "\(green)Color test passed."
 for %name = %colornum in %colors
     with {%escapecode: "\27[\(%colornum)m"}
         run ".."
+            #!/usr/bin/env nomsu -V1
             compile [\%name] to: Lua value (quote \(quote %escapecode))
             compile [\%name %text] to
                 Lua value ".."

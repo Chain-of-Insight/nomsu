@@ -1,0 +1,148 @@
+-- Nomsu version 2
+file (FileChunks):
+    {:curr_indent: ' '* :}
+    comment? blank_lines?
+    (chunk (nl_nodent section_division nl_nodent chunk)*)?
+    blank_lines?
+    %ws* (!! .+ -> "Parse error" !!)?
+
+nodent: =curr_indent !(" ")
+indent: =curr_indent "    "
+blank_lines: %nl ((nodent comment / %ws*) %nl)*
+eol: %ws* eol_comment? (!. / &%nl)
+
+nl_nodent: blank_lines nodent
+nl_indent: blank_lines {:curr_indent: indent :} (comment nl_nodent)?
+
+comment:
+    "#" (({} {~ [^%nl]* ((%nl (!indent %ws* %nl)*) (indent -> '') [^%nl]*)* ~} %userdata) => add_comment)
+eol_comment:
+    "#" (({} {[^%nl]*} %userdata) => add_comment)
+
+section_division: ("~")^+3 eol
+
+inline_block (Block):
+    ":" %ws* ((inline_statement (%ws* ";" %ws* inline_statement)*) / !(eol nl_indent))
+chunk (Block):
+    statement (nl_nodent statement)*
+indented_block (Block):
+    ":" eol nl_indent statement (nl_nodent statement)*
+
+statement: (action / expression) (eol / (!! [^%nl]+ -> "Unexpected character while parsing line" !!))
+inline_statement: (inline_action / inline_expression)
+
+noindex_inline_expression:
+    number / variable / inline_text / inline_list / inline_dict / inline_nomsu
+    / ( "("
+            %ws* (inline_block / inline_action / inline_expression) %ws*
+            (%ws* ',' %ws* (inline_block / inline_action / inline_expression) %ws*)*
+        (")"
+            / (!! eol -> 'Line ended without finding a closing )-parenthesis' !!)
+            / (!! [^%nl]+ -> 'Unexpected character while parsing subexpression' !!)
+        )
+      )
+inline_expression: index_chain / noindex_inline_expression 
+indented_expression:
+    indented_text / indented_nomsu / indented_list / indented_dict / indented_block / ({|
+        "(..)" nl_indent
+            (action / expression) (nl_nodent comment)*
+            (eol / (!! [^%nl]+ -> "Unexpected character while parsing indented expression" !!))
+    |} -> unpack)
+expression:
+    inline_expression / indented_expression / inline_block 
+
+inline_nomsu (EscapedNomsu): "\" inline_expression
+indented_nomsu (EscapedNomsu):
+    "\" (noindex_inline_expression / indented_expression)
+
+index_chain (IndexChain):
+    noindex_inline_expression ("." (text_word / noindex_inline_expression))+
+
+-- Actions need either at least 1 word, or at least 2 tokens
+inline_action (Action):
+    !section_division
+    (   (inline_expression (%ws* (inline_expression / word))+)
+      / (word              (%ws* (inline_expression / word))*))
+    (%ws* inline_block)?
+action (Action):
+    !section_division
+    (  (expression ((nl_nodent "..")? %ws* (expression / word))+)
+     / (word       ((nl_nodent "..")? %ws* (expression / word))*))
+
+word: !number { %operator_char+ / %ident_char+ }
+
+text_word (Text): word
+
+inline_text (Text):
+    !('".."' eol)
+    '"'
+        ({~ (('\"' -> '"') / ('\\' -> '\') / %escaped_char / [^%nl\"])+ ~}
+        / inline_text_interpolation)*
+    ('"'
+     / (!! eol -> 'Line ended before finding a closing double quotation mark' !!)
+     / (!! [^%nl]+ -> 'Unexpected character while parsing Text' !!))
+inline_text_interpolation:
+    "\" (
+        variable / inline_list / inline_dict / inline_text
+        / ("("
+            %ws* (inline_block / inline_action / inline_expression) %ws*
+            (%ws* ',' %ws* (inline_block / inline_action / inline_expression) %ws*)*
+        (")"
+         / (!! eol -> 'Line ended without finding a closing )-parenthesis' !!)
+         / (!! [^%nl]+ -> 'Unexpected character while parsing Text interpolation' !!)))
+    )
+
+indented_text (Text):
+    '".."' eol %nl {:curr_indent: indent :}
+        (indented_plain_text / text_interpolation / {~ blank_lines (=curr_indent -> "") ~})*
+    (!! [^%nl]+ -> "Unexpected character while parsing Text" !!)?
+indented_plain_text (Text):
+    {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
+        (blank_lines (=curr_indent -> ""))* ~}
+text_interpolation:
+    inline_text_interpolation / ("\" indented_expression blank_lines =curr_indent "..")
+
+number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
+
+-- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
+-- which is a hack to allow %'s to parse as "%" and "' s" separately
+variable (Var): "%" {(%ident_char+ ((!"'" %operator_char+) / %ident_char+)*)?}
+
+inline_list (List):
+    !('[..]')
+    "[" %ws*
+        (inline_list_item (%ws* ',' %ws* inline_list_item)* (%ws* ',')?)? %ws*
+    ("]" / (","? (
+        (!! eol -> "Line ended before finding a closing ]-bracket" !!)
+       /(!! [^%nl]+ -> "Unexpected character while parsing List" !!)
+    )))
+indented_list (List):
+    "[..]" eol nl_indent
+        list_line (nl_nodent list_line)* (nl_nodent comment)*
+    (","? (!! [^%nl]+ -> "Unexpected character while parsing List" !!))?
+list_line:
+      (inline_list_item %ws* "," %ws*)+ eol
+    / (inline_list_item %ws* "," %ws*)* (action / expression) eol
+inline_list_item: inline_block / inline_action / inline_expression
+
+inline_dict (Dict):
+    !('{..}')
+    "{" %ws*
+        (inline_dict_entry (%ws* ',' %ws* inline_dict_entry)*)? %ws*
+    ("}" / (","? (
+        (!! eol -> "Line ended before finding a closing }-brace" !!)
+      / (!! [^%nl]* -> "Unexpected character while parsing Dictionary" !!)
+    )))
+indented_dict (Dict):
+    "{..}" eol nl_indent
+        dict_line (nl_nodent dict_line)* (nl_nodent comment)*
+    (","? (!! [^%nl]+ -> "Unexpected character while parsing Dictionary" !!))?
+dict_line:
+      (inline_dict_entry %ws* "," %ws*)+ eol
+    / (inline_dict_entry %ws* "," %ws*)* dict_entry eol
+dict_entry(DictEntry):
+    dict_key (%ws* ":" %ws* (action / expression))?
+inline_dict_entry(DictEntry):
+    dict_key (%ws* ":" %ws* (inline_action / inline_expression)?)?
+dict_key:
+    text_word / inline_expression

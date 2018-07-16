@@ -1,3 +1,4 @@
+#!/usr/bin/env nomsu -V1
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.

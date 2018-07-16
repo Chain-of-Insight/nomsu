@@ -110,11 +110,12 @@ setmetatable(NOMSU_DEFS, {
     return make_node
   end
 })
-local Parser = { }
-local NOMSU_PATTERN
+local Parser = {
+  version = 2,
+  patterns = { }
+}
 do
-  local peg_tidier = re.compile([[    file <- %nl* version %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
-    version <- "--" (!"version" [^%nl])* "version" (" ")* (([0-9])+ -> set_version) ([^%nl])*
+  local peg_tidier = re.compile([[    file <- %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
     def <- anon_def / captured_def
     anon_def <- ({ident} (" "*) ":"
         {~ ((%nl " "+ def_line?)+) / def_line ~}) -> "%1 <- %2"
@@ -124,39 +125,40 @@ do
     err <- ("(!!" { (!("!!)") .)* } "!!)") -> "(({} (%1) %%userdata) => error)"
     ident <- [a-zA-Z_][a-zA-Z0-9_]*
     comment <- "--" [^%nl]*
-    ]], {
-    set_version = function(v)
-      Parser.version = tonumber(v), {
-        nl = NOMSU_DEFS.nl
-      }
-    end
-  })
-  local peg_file = io.open("nomsu.peg")
-  if not peg_file and package.nomsupath then
-    for path in package.nomsupath:gmatch("[^;]+") do
-      peg_file = io.open(path .. "/nomsu.peg")
-      if peg_file then
-        break
+    ]])
+  for version = 1, Parser.version do
+    local peg_file = io.open("nomsu." .. tostring(version) .. ".peg")
+    if not peg_file and package.nomsupath then
+      for path in package.nomsupath:gmatch("[^;]+") do
+        peg_file = io.open(path .. "/nomsu." .. tostring(version) .. ".peg")
+        if peg_file then
+          break
+        end
       end
     end
+    assert(peg_file, "could not find nomsu .peg file")
+    local nomsu_peg = peg_tidier:match(peg_file:read('*a'))
+    peg_file:close()
+    Parser.patterns[version] = re.compile(nomsu_peg, NOMSU_DEFS)
   end
-  assert(peg_file, "could not find nomsu.peg file")
-  local nomsu_peg = peg_tidier:match(peg_file:read('*a'))
-  peg_file:close()
-  NOMSU_PATTERN = re.compile(nomsu_peg, NOMSU_DEFS)
 end
-Parser.parse = function(nomsu_code, source)
+Parser.parse = function(nomsu_code, source, version)
   if source == nil then
     source = nil
   end
+  if version == nil then
+    version = nil
+  end
   source = source or nomsu_code.source
   nomsu_code = tostring(nomsu_code)
+  version = version or nomsu_code:match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
+  version = (version and tonumber(version)) or Parser.version
   local userdata = {
     errors = { },
     source = source,
     comments = { }
   }
-  local tree = NOMSU_PATTERN:match(nomsu_code, nil, userdata)
+  local tree = Parser.patterns[version]:match(nomsu_code, nil, userdata)
   if not (tree) then
     error("In file " .. tostring(colored.blue(tostring(source or "<unknown>"))) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
   end
@@ -186,7 +188,7 @@ Parser.parse = function(nomsu_code, source)
       end
       errors = _accum_0
     end
-    error("Errors occurred while parsing:\n\n" .. table.concat(errors, "\n\n"), 0)
+    error("Errors occurred while parsing (v" .. tostring(version) .. "):\n\n" .. table.concat(errors, "\n\n"), 0)
   end
   tree.version = userdata.version
   return tree

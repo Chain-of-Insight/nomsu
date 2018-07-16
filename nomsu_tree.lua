@@ -26,7 +26,7 @@ local types = {
   "DictEntry",
   "IndexChain",
   "Action",
-  "File"
+  "FileChunks"
 }
 for _index_0 = 1, #types do
   local name = types[_index_0]
@@ -52,35 +52,25 @@ for _index_0 = 1, #types do
       end)(), ', ')) .. ")"
     end
     cls.map = function(self, fn)
-      do
-        local replacement = fn(self)
-        if replacement then
-          return replacement
-        end
+      local replacement = fn(self)
+      if replacement ~= nil then
+        return replacement or nil
       end
-      local replacements
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_1 = 1, #self do
-          local v = self[_index_1]
-          _accum_0[_len_0] = AST.is_syntax_tree(v) and v:map(fn) or nil
-          _len_0 = _len_0 + 1
+      local replacements = { }
+      local changes = false
+      for i, v in ipairs(self) do
+        if AST.is_syntax_tree(v) then
+          replacement = v:map(fn)
+        else
+          replacement = v
         end
-        replacements = _accum_0
+        changes = changes or (replacement ~= v)
+        replacements[#replacements + 1] = replacement
       end
-      if not (next(replacements)) then
+      if not (changes) then
         return self
       end
-      return (self.__class)(self.source, unpack((function()
-        local _accum_0 = { }
-        local _len_0 = 1
-        for i, v in ipairs(self) do
-          _accum_0[_len_0] = replacements[i] or v
-          _len_0 = _len_0 + 1
-        end
-        return _accum_0
-      end)()))
+      return (self.__class)(self.source, unpack(replacements))
     end
   end
   AST[name] = setmetatable(cls, {
