@@ -266,7 +266,7 @@ do
     local add_bit_lua
     add_bit_lua = function(lua, bit_lua)
       local bit_leading_len = #(tostring(bit_lua):match("^[^\n]*"))
-      lua:append(lua.trailing_line_len + bit_leading_len > MAX_LINE and ",\n    " or ", ")
+      lua:append(lua:trailing_line_len() + bit_leading_len > MAX_LINE and ",\n    " or ", ")
       return lua:append(bit_lua)
     end
     local operate_on_text
@@ -334,11 +334,11 @@ do
     ["use %"] = function(self, tree, _path)
       if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string' then
         local path = _path[1]
-        for f in files.walk(path) do
+        for _, f in files.walk(path) do
           self:run_file(f)
         end
       end
-      return LuaCode(tree.source, "for f in files.walk(", self:compile(_path), ") do nomsu:run_file(f) end")
+      return LuaCode(tree.source, "for i,f in files.walk(", self:compile(_path), ") do nomsu:run_file(f) end")
     end,
     ["test %"] = function(self, tree, _body)
       return LuaCode("")
@@ -845,7 +845,7 @@ do
               next_space = match(next_space, "[^ ]*")
             end
             nomsu:append(next_space)
-            if arg_nomsu and nomsu.trailing_line_len + #tostring(arg_nomsu) < MAX_LINE then
+            if arg_nomsu and nomsu:trailing_line_len() + #tostring(arg_nomsu) < MAX_LINE then
               if bit.type == "Block" then
                 nomsu:append(arg_nomsu)
                 next_space = "\n.."
@@ -867,7 +867,7 @@ do
             end
             pos = bit.source.stop
           end
-          if next_space == " " and nomsu.trailing_line_len > MAX_LINE then
+          if next_space == " " and nomsu:trailing_line_len() > MAX_LINE then
             next_space = "\n.."
           end
         end
@@ -1035,8 +1035,8 @@ do
           if item.type == "Block" then
             item_nomsu:parenthesize()
           end
-          if nomsu.trailing_line_len + #tostring(item_nomsu) <= MAX_LINE then
-            if nomsu.trailing_line_len > 0 then
+          if nomsu:trailing_line_len() + #tostring(item_nomsu) <= MAX_LINE then
+            if nomsu:trailing_line_len() > 0 then
               nomsu:append(", ")
             end
             nomsu:append(item_nomsu)
@@ -1053,7 +1053,7 @@ do
                 nomsu:append("\n")
               end
             else
-              if nomsu.trailing_line_len > 0 then
+              if nomsu:trailing_line_len() > 0 then
                 nomsu:append('\n')
               end
               nomsu:append(pop_comments(item.source.start), item_nomsu)
@@ -1092,8 +1092,8 @@ do
           if item.type == "Block" then
             item_nomsu:parenthesize()
           end
-          if nomsu.trailing_line_len + #tostring(item_nomsu) <= MAX_LINE then
-            if nomsu.trailing_line_len > 0 then
+          if nomsu:trailing_line_len() + #tostring(item_nomsu) <= MAX_LINE then
+            if nomsu:trailing_line_len() > 0 then
               nomsu:append(", ")
             end
             nomsu:append(item_nomsu)
@@ -1110,7 +1110,7 @@ do
                 nomsu:append("\n")
               end
             else
-              if nomsu.trailing_line_len > 0 then
+              if nomsu:trailing_line_len() > 0 then
                 nomsu:append('\n')
               end
               nomsu:append(pop_comments(item.source.start), item_nomsu)

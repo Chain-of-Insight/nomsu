@@ -82,8 +82,8 @@ do
     is_code = true,
     append = function(self, ...)
       local n = select("#", ...)
-      local bits, indents = self.bits, self.indents
       local match = string.match
+      local bits = self.bits
       for i = 1, n do
         local _continue_0 = false
         repeat
@@ -98,27 +98,6 @@ do
           if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
             b = repr(b)
           end
-          if type(b) == 'string' then
-            local trailing_text, spaces = match(b, "\n(([ ]*)[^\n]*)$")
-            if trailing_text then
-              self.current_indent = #spaces
-              self.trailing_line_len = #trailing_text
-            else
-              self.trailing_line_len = self.trailing_line_len + #b
-            end
-          else
-            do
-              local trailing_text = match(tostring(b), "\n([^\n]*)$")
-              if trailing_text then
-                self.trailing_line_len = #trailing_text + self.current_indent
-              else
-                self.trailing_line_len = self.trailing_line_len + #tostring(b)
-              end
-            end
-            if self.current_indent ~= 0 then
-              indents[#bits] = self.current_indent
-            end
-          end
           _continue_0 = true
         until true
         if not _continue_0 then
@@ -126,11 +105,35 @@ do
         end
       end
       self.__str = nil
+      self._trailing_line_len = nil
+    end,
+    trailing_line_len = function(self)
+      if self._trailing_line_len == nil then
+        local bits, match = self.bits, string.match
+        local len = 0
+        for i = #bits, 1, -1 do
+          local b = bits[i]
+          if type(b) == 'string' then
+            do
+              local line = match(b, "\n([^\n]*)$")
+              if line then
+                return len + #line
+              else
+                len = len + #b
+              end
+            end
+          else
+            len = len + b:trailing_line_len()
+          end
+        end
+        self._trailing_line_len = len
+      end
+      return self._trailing_line_len
     end,
     concat_append = function(self, values, joiner, wrapping_joiner)
       wrapping_joiner = wrapping_joiner or joiner
-      local bits, indents = self.bits, self.indents
       local match = string.match
+      local bits = self.bits
       local line_len = 0
       for i = 1, #values do
         local b = values[i]
@@ -143,47 +146,28 @@ do
           end
         end
         bits[#bits + 1] = b
-        if type(b) ~= 'string' and self.current_indent ~= 0 then
-          indents[#bits] = self.current_indent
-        end
         local b_str = tostring(b)
-        local line, spaces = match(b_str, "\n(([ ]*)[^\n]*)$")
-        if spaces then
-          if type(b) == 'string' then
-            self.current_indent = #spaces
-          end
+        local line = match(b_str, "\n([^\n]*)$")
+        if line then
           line_len = #line
         else
           line_len = line_len + #b
         end
       end
       self.__str = nil
+      self._trailing_line_len = nil
     end,
     prepend = function(self, ...)
       local n = select("#", ...)
-      local bits, indents = self.bits, self.indents
+      local bits = self.bits
       for i = #bits + n, n + 1, -1 do
         bits[i] = bits[i - n]
       end
       for i = 1, n do
         bits[i] = select(i, ...)
       end
-      self.current_indent = 0
-      for i, b in ipairs(bits) do
-        if type(b) == 'string' then
-          do
-            local spaces = b:match("\n([ ]*)[^\n]*$")
-            if spaces then
-              self.current_indent = #spaces
-            end
-          end
-        elseif self.current_indent ~= 0 then
-          indents[i] = self.current_indent
-        else
-          indents[i] = nil
-        end
-      end
       self.__str = nil
+      self._trailing_line_len = nil
     end
   }
   _base_0.__index = _base_0
@@ -191,8 +175,6 @@ do
     __init = function(self, source, ...)
       self.source = source
       self.bits = { }
-      self.indents, self.current_indent = { }, 0
-      self.trailing_line_len = 0
       if type(self.source) == 'string' then
         self.source = Source:from_string(self.source)
       end
@@ -242,6 +224,7 @@ do
         end
       end
       self.__str = nil
+      self._trailing_line_len = nil
     end,
     remove_free_vars = function(self, vars)
       if not (#vars > 0) then
@@ -274,6 +257,7 @@ do
         end
       end
       self.__str = nil
+      self._trailing_line_len = nil
     end,
     declare_locals = function(self, to_declare)
       if to_declare == nil then
@@ -336,11 +320,25 @@ do
     end,
     __tostring = function(self)
       if self.__str == nil then
-        local buff, indents = { }, self.indents
+        local buff, indent = { }, 0
+        local match, gsub, rep
+        do
+          local _obj_0 = string
+          match, gsub, rep = _obj_0.match, _obj_0.gsub, _obj_0.rep
+        end
         for i, b in ipairs(self.bits) do
-          b = tostring(b)
-          if indents[i] then
-            b = b:gsub("\n", "\n" .. ((" "):rep(indents[i])))
+          if type(b) == 'string' then
+            do
+              local spaces = match(b, "\n([ ]*)[^\n]*$")
+              if spaces then
+                indent = #spaces
+              end
+            end
+          else
+            b = tostring(b)
+            if indent > 0 then
+              b = gsub(b, "\n", "\n" .. rep(" ", indent))
+            end
           end
           buff[#buff + 1] = b
         end
@@ -394,7 +392,6 @@ do
       _class_0.__parent.__init(self, ...)
       self.free_vars = { }
       self.is_value = false
-      self.__str = nil
     end,
     __base = _base_0,
     __name = "LuaCode",
@@ -424,11 +421,6 @@ do
     lua.is_value = true
     return lua
   end
-  self.Comment = function(...)
-    local lua = LuaCode(...)
-    lua.is_comment = true
-    return lua
-  end
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end
@@ -440,11 +432,25 @@ do
   local _base_0 = {
     __tostring = function(self)
       if self.__str == nil then
-        local buff, indents = { }, self.indents
+        local buff, indent = { }, 0
+        local match, gsub, rep
+        do
+          local _obj_0 = string
+          match, gsub, rep = _obj_0.match, _obj_0.gsub, _obj_0.rep
+        end
         for i, b in ipairs(self.bits) do
-          b = tostring(b)
-          if indents[i] then
-            b = b:gsub("\n", "\n" .. ((" "):rep(indents[i])))
+          if type(b) == 'string' then
+            do
+              local spaces = match(b, "\n([ ]*)[^\n]*$")
+              if spaces then
+                indent = #spaces
+              end
+            end
+          else
+            b = tostring(b)
+            if indent > 0 then
+              b = gsub(b, "\n", "\n" .. rep(" ", indent))
+            end
           end
           buff[#buff + 1] = b
         end

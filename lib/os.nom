@@ -6,7 +6,7 @@ use "core"
 
 action [path of Nomsu file %filename]
     lua> ".."
-        for f in files.walk(\%filename) do return f end
+        for i,f in files.walk(\%filename) do return f end
     barf "Could not find file: \%filename"
 
 action [sh> %cmd]
@@ -21,7 +21,7 @@ action [read file %filename]
 
 compile [for file %f in %path %body] to
     Lua ".."
-        for \(%f as lua expr) in files.walk(\(%path as lua expr)) do
+        for i,\(%f as lua expr) in files.walk(\(%path as lua expr)) do
             \(%body as lua statements)
             \(compile as: === next %f ===)
         end
@@ -31,7 +31,7 @@ compile [%expr for file %f in %path] to
     Lua value ".."
         (function()
             local ret = list{}
-            for \(%f as lua expr) in files.walk(\(%path as lua expr)) do
+            for i,\(%f as lua expr) in files.walk(\(%path as lua expr)) do
                 ret[#ret+1] = \(%expr as lua statements)
             end
             return ret

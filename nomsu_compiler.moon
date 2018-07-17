@@ -162,7 +162,7 @@ with NomsuCompiler
             return LuaCode.Value(code.source, cls_str, repr(tostring(code.source)), ", ", @compile(code), ")")
         add_bit_lua = (lua, bit_lua)->
             bit_leading_len = #(tostring(bit_lua)\match("^[^\n]*"))
-            lua\append(lua.trailing_line_len + bit_leading_len > MAX_LINE and ",\n    " or ", ")
+            lua\append(lua\trailing_line_len! + bit_leading_len > MAX_LINE and ",\n    " or ", ")
             lua\append(bit_lua)
         operate_on_text = (text)->
             lua = LuaCode.Value(text.source, cls_str, repr(tostring(text.source)))
@@ -217,9 +217,9 @@ with NomsuCompiler
         ["use %"]: (tree, _path)=>
             if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
                 path = _path[1]
-                for f in files.walk(path)
+                for _,f in files.walk(path)
                     @run_file(f)
-            return LuaCode(tree.source, "for f in files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
+            return LuaCode(tree.source, "for i,f in files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
 
         ["test %"]: (tree, _body)=>
             return LuaCode ""
@@ -549,7 +549,7 @@ with NomsuCompiler
                             else assert recurse(bit,inline:true)
                             next_space = match(next_space, "[^ ]*") if bit.type == "Block"
                             nomsu\append next_space
-                            if arg_nomsu and nomsu.trailing_line_len + #tostring(arg_nomsu) < MAX_LINE
+                            if arg_nomsu and nomsu\trailing_line_len! + #tostring(arg_nomsu) < MAX_LINE
                                 if bit.type == "Block"
                                     nomsu\append arg_nomsu
                                     next_space = "\n.."
@@ -567,7 +567,7 @@ with NomsuCompiler
                                 next_space = "\n.."
                             pos = bit.source.stop
 
-                        if next_space == " " and nomsu.trailing_line_len > MAX_LINE
+                        if next_space == " " and nomsu\trailing_line_len! > MAX_LINE
                             next_space = "\n.."
                     nomsu\append pop_comments(pos, '\n')
                     return nomsu
@@ -681,8 +681,8 @@ with NomsuCompiler
                     for i, item in ipairs tree
                         item_nomsu = assert recurse(item, inline:true)
                         item_nomsu\parenthesize! if item.type == "Block"
-                        if nomsu.trailing_line_len + #tostring(item_nomsu) <= MAX_LINE
-                            nomsu\append ", " if nomsu.trailing_line_len > 0
+                        if nomsu\trailing_line_len! + #tostring(item_nomsu) <= MAX_LINE
+                            nomsu\append ", " if nomsu\trailing_line_len! > 0
                             nomsu\append item_nomsu
                         else
                             if #tostring(item_nomsu) > MAX_LINE
@@ -694,7 +694,7 @@ with NomsuCompiler
                                         nomsu\append "(..)\n    ", item_nomsu
                                 nomsu\append "\n" if i < #tree
                             else
-                                nomsu\append '\n' if nomsu.trailing_line_len > 0
+                                nomsu\append '\n' if nomsu\trailing_line_len! > 0
                                 nomsu\append pop_comments(item.source.start), item_nomsu
                     nomsu\append pop_comments(tree.source.stop, '\n')
                     return NomsuCode(tree.source, "[..]\n    ", nomsu)
@@ -716,8 +716,8 @@ with NomsuCompiler
                     for i, item in ipairs tree
                         item_nomsu = assert recurse(item, inline:true)
                         item_nomsu\parenthesize! if item.type == "Block"
-                        if nomsu.trailing_line_len + #tostring(item_nomsu) <= MAX_LINE
-                            nomsu\append ", " if nomsu.trailing_line_len > 0
+                        if nomsu\trailing_line_len! + #tostring(item_nomsu) <= MAX_LINE
+                            nomsu\append ", " if nomsu\trailing_line_len! > 0
                             nomsu\append item_nomsu
                         else
                             if #tostring(item_nomsu) > MAX_LINE
@@ -729,7 +729,7 @@ with NomsuCompiler
                                         nomsu\append "(..)\n    ", item_nomsu
                                 nomsu\append "\n" if i < #tree
                             else
-                                nomsu\append '\n' if nomsu.trailing_line_len > 0
+                                nomsu\append '\n' if nomsu\trailing_line_len! > 0
                                 nomsu\append pop_comments(item.source.start), item_nomsu
                     nomsu\append pop_comments(tree.source.stop, '\n')
                     return NomsuCode(tree.source, "{..}\n    ", nomsu)

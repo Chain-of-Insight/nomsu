@@ -28,11 +28,33 @@ files.read = (filename)->
     _FILE_CACHE[filename] = contents
     return contents
 
-iterate_single = (item, prev) -> if item == prev then nil else item
-
 -- `walk` returns an iterator over all files matching a path.
 {:match, :gsub} = string
-iterate_single = (item, prev) -> if item == prev then nil else item
+
+-- TODO: improve sanitization
+sanitize = (path)->
+    path = gsub(path,"\\","\\\\")
+    path = gsub(path,"`","")
+    path = gsub(path,'"','\\"')
+    path = gsub(path,"$","")
+    return path
+
+files.exists = (path)->
+    return true unless io.popen("ls #{sanitize(path)}")\close!
+    if package.nomsupath
+        for nomsupath in package.nomsupath\gmatch("[^;]+")
+            return true unless io.popen("ls #{nomsupath}/#{sanitize(path)}")\close!
+    return false
+
+_browse_cache = {}
+browse = (path)->
+    unless _browse_cache[path]
+        f = io.popen('find -L "'..package.nomsupath..'/'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
+        _files = {line for line in f\lines!}
+        _files = false unless f\close!
+        _browse_cache[path] = _files
+    return _browse_cache[path]
+
 ok, lfs = pcall(require, "lfs")
 if ok
     raw_file_exists = (filename)->
@@ -44,80 +66,46 @@ if ok
             for nomsupath in package.nomsupath\gmatch("[^;]+")
                 return true if raw_file_exists(nomsupath.."/"..path)
         return false
-    -- Return 'true' if any files or directories are found, otherwise 'false', and yield every filename
-    browse = (filename)->
-        file_type, err = lfs.attributes(filename, 'mode')
-        if file_type == 'file'
-            if match(filename, "%.nom$") or match(filename, "%.lua$")
-                coroutine.yield filename
-                return true
-        elseif file_type == 'directory' or file_type == 'link'
-            for subfile in lfs.dir(filename)
-                unless subfile == "." or subfile == ".."
-                    browse(filename.."/"..subfile)
-            return true
-        elseif file_type == 'char device'
-            coroutine.yield(filename)
-            return true
 
-        return false
-    files.walk = (path)->
-        if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin'
-            return iterate_single, path
-        return coroutine.wrap ->
-            if not browse(path) and package.nomsupath
-                for nomsupath in package.nomsupath\gmatch("[^;]+")
-                    break if browse(nomsupath.."/"..path)
-            return nil
+    export browse
+    browse = (filename)->
+        unless _browse_cache[filename]
+            _browse_cache[filename] = false
+            file_type, err = lfs.attributes(filename, 'mode')
+            if file_type == 'file'
+                if match(filename, "%.nom$") or match(filename, "%.lua$")
+                    _browse_cache[filename] = {filename}
+            elseif file_type == 'char device'
+                _browse_cache[filename] = {filename}
+            elseif file_type == 'directory' or file_type == 'link'
+                _files = {}
+                for subfile in lfs.dir(filename)
+                    unless subfile == "." or subfile == ".."
+                        for f in *(browse(filename.."/"..subfile) or {})
+                            _files[#_files+1] = f
+                _browse_cache[filename] = _files
+        return _browse_cache[filename]
 else
     if io.popen('find . -maxdepth 0')\close!
         error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0
-    
-    -- TODO: improve sanitization
-    sanitize = (path)->
-        path = gsub(path,"\\","\\\\")
-        path = gsub(path,"`","")
-        path = gsub(path,'"','\\"')
-        path = gsub(path,"$","")
-        return path
 
-    files.exists = (path)->
-        return true unless io.popen("ls #{sanitize(path)}")\close!
-        if package.nomsupath
-            for nomsupath in package.nomsupath\gmatch("[^;]+")
-                return true unless io.popen("ls #{nomsupath}/#{sanitize(path)}")\close!
-        return false
-
-    files.walk = (path)->
-        if match(path, "%.nom$") or match(path, "%.lua$") or path == 'stdin'
-            return iterate_single, path
-        path = sanitize(path)
-        return coroutine.wrap ->
-            f = io.popen('find -L "'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
-            found = false
-            for line in f\lines!
-                found = true
-                coroutine.yield(line)
-            if not found and package.nomsupath
-                f\close!
-                for nomsupath in package.nomsupath\gmatch("[^;]+")
-                    f = io.popen('find -L "'..package.nomsupath..'/'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
-                    for line in f\lines!
-                        found = true
-                        coroutine.yield(line)
-                    f\close!
-                    break if found
-            unless found
-                error("Invalid file path: "..tostring(path))
+files.walk = (path, flush_cache=false)->
+    if flush_cache
+        export _browse_cache
+        _browse_cache = {}
+    _files = browse(path)
+    if package.nomsupath and not _files
+        for nomsupath in package.nomsupath\gmatch("[^;]+")
+            if _files = browse(nomsupath.."/"..path) then break
+    iter = (_files, i)->
+        i += 1
+        if f = _files[i]
+            return i, f
+    return iter, _files, 0
 
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*
-]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
-
-get_lines = re.compile([[
-    lines <- {| line (%nl line)* |}
-    line <- {[^%nl]*}
 ]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
 
 -- LINE_STARTS is a mapping from strings to a table that maps line number to character positions
@@ -131,6 +119,7 @@ files.get_line_starts = (str)->
     _LINE_STARTS[str] = line_starts
     return line_starts
 
+log = {}
 files.get_line_number = (str, pos)->
     line_starts = files.get_line_starts(str)
     -- Binary search for line number of position
@@ -145,6 +134,11 @@ files.get_line_number = (str, pos)->
 files.get_line = (str, line_no)->
     line_starts = files.get_line_starts(str)
     return str\sub(line_starts[line_no] or 1, (line_starts[line_no+1] or 1) - 2)
+
+get_lines = re.compile([[
+    lines <- {| line (%nl line)* |}
+    line <- {[^%nl]*}
+]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
 
 files.get_lines = (str)-> get_lines\match(str)
 

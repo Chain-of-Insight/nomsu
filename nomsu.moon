@@ -95,7 +95,7 @@ run = ->
     for f in *file_queue
         unless files.exists(f)
             error("Could not find: #{f}")
-        for filename in files.walk(f)
+        for _,filename in files.walk(f)
             input_files[filename] = true
 
     nomsu.can_optimize = (f)->
@@ -149,7 +149,7 @@ run = ->
 
     parse_errs = {}
     for f in *file_queue
-        for filename in files.walk(f)
+        for _,filename in files.walk(f)
             continue unless filename == "stdin" or filename\match("%.nom$")
             if args.check_syntax
                 -- Check syntax
@@ -218,8 +218,10 @@ say ".."
             elseif not ok
                 Errhand.print_error ret
 
-debugger = if args.debugger == "nil" then {}
-else require(args.debugger or 'error_handling')
-guard = if type(debugger) == 'function' then debugger
-else debugger.guard or debugger.call or debugger.wrap or debugger.run or ((fn)->fn())
-guard(run)
+
+do
+    debugger = if args.debugger == "nil" then {}
+    else require(args.debugger or 'error_handling')
+    guard = if type(debugger) == 'function' then debugger
+    else debugger.guard or debugger.call or debugger.wrap or debugger.run or ((fn)->fn())
+    guard(run)

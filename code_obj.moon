@@ -48,8 +48,6 @@ class Code
     is_code: true
     new: (@source, ...)=>
         @bits = {}
-        @indents, @current_indent = {}, 0
-        @trailing_line_len = 0
         if type(@source) == 'string'
             @source = Source\from_string(@source)
         assert(@source and Source\is_instance(@source), "Source has the wrong type")
@@ -57,8 +55,8 @@ class Code
             
     append: (...)=>
         n = select("#",...)
-        bits, indents = @bits, @indents
         match = string.match
+        bits = @bits
         for i=1,n
             b = select(i, ...)
             assert(b, "code bit is nil")
@@ -67,24 +65,28 @@ class Code
             bits[#bits+1] = b
             if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
                 b = repr(b)
-            if type(b) == 'string'
-                trailing_text, spaces = match(b, "\n(([ ]*)[^\n]*)$")
-                if trailing_text
-                    @current_indent = #spaces
-                    @trailing_line_len = #trailing_text
-                else @trailing_line_len += #b
-            else
-                if trailing_text = match(tostring(b), "\n([^\n]*)$")
-                    @trailing_line_len = #trailing_text + @current_indent
-                else @trailing_line_len += #tostring(b)
-                if @current_indent != 0
-                    indents[#bits] = @current_indent
         @__str = nil
+        @_trailing_line_len = nil
+    
+    trailing_line_len: =>
+        if @_trailing_line_len == nil
+            bits, match = @bits, string.match
+            len = 0
+            for i=#bits,1,-1
+                b = bits[i]
+                if type(b) == 'string'
+                    if line = match(b, "\n([^\n]*)$")
+                        return len + #line
+                    else len += #b
+                else
+                    len += b\trailing_line_len!
+            @_trailing_line_len = len
+        return @_trailing_line_len
             
     concat_append: (values, joiner, wrapping_joiner)=>
         wrapping_joiner or= joiner
-        bits, indents = @bits, @indents
         match = string.match
+        bits = @bits
         line_len = 0
         for i=1,#values
             b = values[i]
@@ -95,50 +97,34 @@ class Code
                 else
                     bits[#bits+1] = joiner
             bits[#bits+1] = b
-            if type(b) != 'string' and @current_indent != 0
-                indents[#bits] = @current_indent
             b_str = tostring(b)
-            line, spaces = match(b_str, "\n(([ ]*)[^\n]*)$")
-            if spaces
-                if type(b) == 'string'
-                    @current_indent = #spaces
+            line = match(b_str, "\n([^\n]*)$")
+            if line
                 line_len = #line
             else
                 line_len += #b
         @__str = nil
+        @_trailing_line_len = nil
     
     prepend: (...)=>
         n = select("#",...)
-        bits, indents = @bits, @indents
+        bits = @bits
         for i=#bits+n,n+1,-1
             bits[i] = bits[i-n]
         for i=1,n
             bits[i] = select(i, ...)
-        @current_indent = 0
-        for i,b in ipairs(bits)
-            if type(b) == 'string'
-                if spaces = b\match("\n([ ]*)[^\n]*$")
-                    @current_indent = #spaces
-            elseif @current_indent != 0
-                indents[i] = @current_indent
-            else indents[i] = nil
         @__str = nil
+        @_trailing_line_len = nil
 
 class LuaCode extends Code
     new: (...)=>
         super ...
         @free_vars = {}
         @is_value = false
-        @__str = nil
     
     @Value = (...)->
         lua = LuaCode(...)
         lua.is_value = true
-        return lua
-    
-    @Comment = (...)->
-        lua = LuaCode(...)
-        lua.is_comment = true
         return lua
 
     add_free_vars: (vars)=>
@@ -150,6 +136,7 @@ class LuaCode extends Code
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
         @__str = nil
+        @_trailing_line_len = nil
     
     remove_free_vars: (vars)=>
         return unless #vars > 0
@@ -169,6 +156,7 @@ class LuaCode extends Code
                 if type(b) != 'string'
                     stack[#stack+1] = b
         @__str = nil
+        @_trailing_line_len = nil
 
     declare_locals: (to_declare=nil)=>
         if to_declare == nil
@@ -205,11 +193,16 @@ class LuaCode extends Code
 
     __tostring: =>
         if @__str == nil
-            buff, indents = {}, @indents
+            buff, indent = {}, 0
+            {:match, :gsub, :rep} = string
             for i,b in ipairs @bits
-                b = tostring(b)
-                if indents[i]
-                    b = b\gsub("\n", "\n"..((" ")\rep(indents[i])))
+                if type(b) == 'string'
+                    if spaces = match(b, "\n([ ]*)[^\n]*$")
+                        indent = #spaces
+                else
+                    b = tostring(b)
+                    if indent > 0
+                        b = gsub(b, "\n", "\n"..rep(" ", indent))
                 buff[#buff+1] = b
             @__str = concat(buff, "")
         return @__str
@@ -246,11 +239,16 @@ class LuaCode extends Code
 class NomsuCode extends Code
     __tostring: =>
         if @__str == nil
-            buff, indents = {}, @indents
+            buff, indent = {}, 0
+            {:match, :gsub, :rep} = string
             for i,b in ipairs @bits
-                b = tostring(b)
-                if indents[i]
-                    b = b\gsub("\n", "\n"..((" ")\rep(indents[i])))
+                if type(b) == 'string'
+                    if spaces = match(b, "\n([ ]*)[^\n]*$")
+                        indent = #spaces
+                else
+                    b = tostring(b)
+                    if indent > 0
+                        b = gsub(b, "\n", "\n"..rep(" ", indent))
                 buff[#buff+1] = b
             @__str = concat(buff, "")
         return @__str

@@ -144,7 +144,7 @@ run = function()
     if not (files.exists(f)) then
       error("Could not find: " .. tostring(f))
     end
-    for filename in files.walk(f) do
+    for _, filename in files.walk(f) do
       input_files[filename] = true
     end
   end
@@ -228,7 +228,7 @@ run = function()
   local parse_errs = { }
   for _index_0 = 1, #file_queue do
     local f = file_queue[_index_0]
-    for filename in files.walk(f) do
+    for _, filename in files.walk(f) do
       local _continue_0 = false
       repeat
         if not (filename == "stdin" or filename:match("%.nom$")) then
@@ -323,18 +323,20 @@ say ".."
     end
   end
 end
-local debugger
-if args.debugger == "nil" then
-  debugger = { }
-else
-  debugger = require(args.debugger or 'error_handling')
+do
+  local debugger
+  if args.debugger == "nil" then
+    debugger = { }
+  else
+    debugger = require(args.debugger or 'error_handling')
+  end
+  local guard
+  if type(debugger) == 'function' then
+    guard = debugger
+  else
+    guard = debugger.guard or debugger.call or debugger.wrap or debugger.run or (function(fn)
+      return fn()
+    end)
+  end
+  return guard(run)
 end
-local guard
-if type(debugger) == 'function' then
-  guard = debugger
-else
-  guard = debugger.guard or debugger.call or debugger.wrap or debugger.run or (function(fn)
-    return fn()
-  end)
-end
-return guard(run)
