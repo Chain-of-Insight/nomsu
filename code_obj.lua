@@ -103,9 +103,18 @@ do
             if trailing_text then
               self.current_indent = #spaces
               self.trailing_line_len = #trailing_text
+            else
+              self.trailing_line_len = self.trailing_line_len + #b
             end
           else
-            self.trailing_line_len = math.min(self.trailing_line_len + #tostring(b), b.trailing_line_len)
+            do
+              local trailing_text = match(tostring(b), "\n([^\n]*)$")
+              if trailing_text then
+                self.trailing_line_len = #trailing_text + self.current_indent
+              else
+                self.trailing_line_len = self.trailing_line_len + #tostring(b)
+              end
+            end
             if self.current_indent ~= 0 then
               indents[#bits] = self.current_indent
             end

@@ -229,4 +229,7 @@ Parser.parse = function(nomsu_code, source, version)
   tree.version = userdata.version
   return tree
 end
+Parser.is_operator = function(s)
+  return not not (NOMSU_DEFS.operator_char ^ 1):match(s)
+end
 return Parser

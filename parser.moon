@@ -139,4 +139,7 @@ Parser.parse = (nomsu_code, source=nil, version=nil)->
     tree.version = userdata.version
     return tree
 
+Parser.is_operator = (s)->
+    return not not (NOMSU_DEFS.operator_char^1)\match(s)
+
 return Parser

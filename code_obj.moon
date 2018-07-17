@@ -72,8 +72,11 @@ class Code
                 if trailing_text
                     @current_indent = #spaces
                     @trailing_line_len = #trailing_text
+                else @trailing_line_len += #b
             else
-                @trailing_line_len = math.min(@trailing_line_len + #tostring(b), b.trailing_line_len)
+                if trailing_text = match(tostring(b), "\n([^\n]*)$")
+                    @trailing_line_len = #trailing_text + @current_indent
+                else @trailing_line_len += #tostring(b)
                 if @current_indent != 0
                     indents[#bits] = @current_indent
         @__str = nil
