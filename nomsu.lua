@@ -323,20 +323,18 @@ say ".."
     end
   end
 end
-do
-  local debugger
-  if args.debugger == "nil" then
-    debugger = { }
-  else
-    debugger = require(args.debugger or 'error_handling')
-  end
-  local guard
-  if type(debugger) == 'function' then
-    guard = debugger
-  else
-    guard = debugger.guard or debugger.call or debugger.wrap or debugger.run or (function(fn)
-      return fn()
-    end)
-  end
-  return guard(run)
+local debugger
+if args.debugger == "nil" then
+  debugger = { }
+else
+  debugger = require(args.debugger or 'error_handling')
 end
+local guard
+if type(debugger) == 'function' then
+  guard = debugger
+else
+  guard = debugger.guard or debugger.call or debugger.wrap or debugger.run or (function(fn)
+    return fn()
+  end)
+end
+return guard(run)

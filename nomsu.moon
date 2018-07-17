@@ -218,10 +218,8 @@ say ".."
             elseif not ok
                 Errhand.print_error ret
 
-
-do
-    debugger = if args.debugger == "nil" then {}
-    else require(args.debugger or 'error_handling')
-    guard = if type(debugger) == 'function' then debugger
-    else debugger.guard or debugger.call or debugger.wrap or debugger.run or ((fn)->fn())
-    guard(run)
+debugger = if args.debugger == "nil" then {}
+else require(args.debugger or 'error_handling')
+guard = if type(debugger) == 'function' then debugger
+else debugger.guard or debugger.call or debugger.wrap or debugger.run or ((fn)->fn())
+guard(run)
