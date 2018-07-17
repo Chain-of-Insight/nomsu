@@ -73,10 +73,7 @@ class Code
                     @current_indent = #spaces
                     @trailing_line_len = #trailing_text
             else
-                if #b.indents > 1
-                    @trailing_line_len = b.trailing_line_len
-                else
-                    @trailing_line_len += #tostring(b)
+                @trailing_line_len = math.min(@trailing_line_len + #tostring(b), b.trailing_line_len)
                 if @current_indent != 0
                     indents[#bits] = @current_indent
         @__str = nil

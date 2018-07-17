@@ -22,17 +22,24 @@ for name in *types
         .__tostring = => "#{@type}(#{repr tostring(@source)}, #{concat([repr(v) for v in *@], ', ')})"
         .map = (fn)=>
             replacement = fn(@)
-            if replacement != nil then return replacement or nil
-            replacements = {}
-            changes = false
-            for i,v in ipairs(@)
-                replacement = if AST.is_syntax_tree(v)
-                    v\map(fn)
-                else v
-                changes or= replacement != v
-                replacements[#replacements+1] = replacement
-            return @ unless changes
-            return (@__class)(@source, unpack(replacements))
+            if replacement == false then return nil
+            if replacement
+                -- Clone the replacement, but give it a proper source
+                replacement = (replacement.__class)(@source, unpack(replacement))
+            else
+                replacements = {}
+                changes = false
+                for i,v in ipairs(@)
+                    replacements[#replacements+1] = v
+                    if AST.is_syntax_tree(v)
+                        r = v\map(fn)
+                        continue if r == v or r == nil
+                        changes = true
+                        replacements[#replacements] = r
+                return @ unless changes
+                replacement = (@__class)(@source, unpack(replacements))
+            replacement.comments = [c for c in *@comments] if @comments
+            return replacement
 
     AST[name] = setmetatable cls,
         __tostring: => @name

@@ -53,24 +53,52 @@ for _index_0 = 1, #types do
     end
     cls.map = function(self, fn)
       local replacement = fn(self)
-      if replacement ~= nil then
-        return replacement or nil
+      if replacement == false then
+        return nil
       end
-      local replacements = { }
-      local changes = false
-      for i, v in ipairs(self) do
-        if AST.is_syntax_tree(v) then
-          replacement = v:map(fn)
-        else
-          replacement = v
+      if replacement then
+        replacement = (replacement.__class)(self.source, unpack(replacement))
+      else
+        local replacements = { }
+        local changes = false
+        for i, v in ipairs(self) do
+          local _continue_0 = false
+          repeat
+            replacements[#replacements + 1] = v
+            if AST.is_syntax_tree(v) then
+              local r = v:map(fn)
+              if r == v or r == nil then
+                _continue_0 = true
+                break
+              end
+              changes = true
+              replacements[#replacements] = r
+            end
+            _continue_0 = true
+          until true
+          if not _continue_0 then
+            break
+          end
         end
-        changes = changes or (replacement ~= v)
-        replacements[#replacements + 1] = replacement
+        if not (changes) then
+          return self
+        end
+        replacement = (self.__class)(self.source, unpack(replacements))
       end
-      if not (changes) then
-        return self
+      if self.comments then
+        do
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = self.comments
+          for _index_1 = 1, #_list_0 do
+            local c = _list_0[_index_1]
+            _accum_0[_len_0] = c
+            _len_0 = _len_0 + 1
+          end
+          replacement.comments = _accum_0
+        end
       end
-      return (self.__class)(self.source, unpack(replacements))
+      return replacement
     end
   end
   AST[name] = setmetatable(cls, {

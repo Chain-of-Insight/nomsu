@@ -105,11 +105,7 @@ do
               self.trailing_line_len = #trailing_text
             end
           else
-            if #b.indents > 1 then
-              self.trailing_line_len = b.trailing_line_len
-            else
-              self.trailing_line_len = self.trailing_line_len + #tostring(b)
-            end
+            self.trailing_line_len = math.min(self.trailing_line_len + #tostring(b), b.trailing_line_len)
             if self.current_indent ~= 0 then
               indents[#bits] = self.current_indent
             end

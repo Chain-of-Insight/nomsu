@@ -175,10 +175,11 @@ run = ->
     if #file_queue == 0
         -- Run in interactive mode (REPL)
         nomsu\run [[
+#!/usr/bin/env nomsu -V2
 use "core"
 use "lib/consolecolor.nom"
 action [quit, exit]: lua> "os.exit(0)"
-action [help]
+action [help]:
     say ".."
         This is the Nomsu v\(Nomsu version) interactive console.
         You can type in Nomsu code here and hit 'enter' twice to run it.

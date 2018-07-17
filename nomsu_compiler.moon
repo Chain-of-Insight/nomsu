@@ -481,36 +481,40 @@ with NomsuCompiler
     MIN_COLON_LEN = 20 -- For beautification purposes, don't bother using colon syntax for short bits
     .tree_to_nomsu = (tree, options)=>
         options or= {}
-        unless options.pop_comments
-            comments = [{comment:c, pos:p} for p,c in pairs(tree.comments or {}) when tree.source.start <= p and p <= tree.source.stop]
-            table.sort comments, (a,b)-> a.pos < b.pos
-            comment_i = 1
-            options.pop_comments = (pos, prefix='')->
-                nomsu = NomsuCode(tree.source)
-                while comments[comment_i] and comments[comment_i].pos <= pos
-                    comment = comments[comment_i].comment
-                    nomsu\append("#"..(gsub(comment, "\n", "\n    ")).."\n")
-                    if comment\match("^\n.") then nomsu\append("\n") -- for aesthetics
-                    comment_i += 1
-                return '' if #nomsu.bits == 0
-                nomsu\prepend prefix
-                return nomsu
+        options.consumed_comments or= {}
+        pop_comments = (pos, prefix='', suffix='')->
+            find_comments = (t)->
+                if t.comments and t.source.filename == tree.source.filename
+                    for c in *t.comments
+                        coroutine.yield(c) unless options.consumed_comments[c]
+                for x in *t
+                    find_comments(x) if AST.is_syntax_tree x
+            nomsu = NomsuCode(tree.source)
+            for comment in coroutine.wrap(-> find_comments(tree))
+                break if comment.pos > pos
+                options.consumed_comments[comment] = true
+                nomsu\append("#"..(gsub(comment.comment, "\n", "\n    ")).."\n")
+                if comment.comment\match("^\n.") then nomsu\append("\n") -- for aesthetics
+            return '' if #nomsu.bits == 0
+            nomsu\prepend prefix
+            nomsu\append suffix
+            return nomsu
 
         recurse = (t, opts)->
             opts or= {}
-            opts.pop_comments = options.pop_comments
+            opts.consumed_comments = options.consumed_comments
             return @tree_to_nomsu(t, opts)
 
-        {:inline, :pop_comments} = options
+        {:inline} = options
         switch tree.type
             when "FileChunks"
                 error("Cannot inline a FileChunks") if inline
-                nomsu = NomsuCode(tree.source)
+                nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
                 for i, chunk in ipairs tree
                     nomsu\append "\n\n#{("~")\rep(80)}\n\n" if i > 1
                     nomsu\append pop_comments(chunk.source.start)
                     nomsu\append recurse(chunk, top:true)
-                nomsu\append pop_comments(tree.source.stop)
+                nomsu\append pop_comments(tree.source.stop, '\n')
                 return nomsu
 
             when "Action"
@@ -523,16 +527,19 @@ with NomsuCompiler
                         else
                             arg_nomsu = recurse(bit,inline:true)
                             return nil unless arg_nomsu
-                            unless i == 1
+                            unless i == 1 or (bit.type == "Block" and not (#bit > 1 or i < #tree))
                                 nomsu\append " "
                             if bit.type == "Action" or (bit.type == "Block" and (#bit > 1 or i < #tree))
                                 arg_nomsu\parenthesize!
                             nomsu\append arg_nomsu
                     return nomsu
                 else
-                    nomsu = NomsuCode(tree.source)
+                    pos = tree.source.start
+                    nomsu = NomsuCode(tree.source, pop_comments(pos))
                     next_space = ""
                     for i,bit in ipairs tree
+                        if match(next_space, '\n')
+                            nomsu\append pop_comments(pos, '\n')
                         if type(bit) == "string"
                             nomsu\append next_space, bit
                             next_space = " "
@@ -557,9 +564,11 @@ with NomsuCompiler
                                 else
                                     nomsu\append arg_nomsu
                                 next_space = "\n.."
+                            pos = bit.source.stop
 
                         if next_space == " " and nomsu.trailing_line_len > MAX_LINE
                             next_space = "\n.."
+                    nomsu\append pop_comments(pos, '\n')
                     return nomsu
 
             when "EscapedNomsu"
@@ -580,7 +589,7 @@ with NomsuCompiler
                         nomsu\append(i == 1 and " " or "; ")
                         nomsu\append assert(recurse(line, inline:true))
                     return nomsu
-                nomsu = NomsuCode(tree.source)
+                nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
                 for i, line in ipairs tree
                     nomsu\append pop_comments(line.source.start)
                     line = assert(recurse(line), "Could not convert line to nomsu")
@@ -589,6 +598,7 @@ with NomsuCompiler
                         nomsu\append "\n"
                         if match(tostring(line), "\n")
                             nomsu\append "\n"
+                nomsu\append pop_comments(tree.source.stop, '\n')
                 return options.top and nomsu or NomsuCode(tree.source, ":\n    ", nomsu)
 
             when "Text"

@@ -1,6 +1,7 @@
 -- Nomsu version 2
 file (FileChunks):
     {:curr_indent: ' '* :}
+    ("#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: ([0-9.]+ -> tonumber) :} [^%nl]*)?
     comment? blank_lines?
     (chunk (nl_nodent section_division nl_nodent chunk)*)?
     blank_lines?
@@ -61,13 +62,16 @@ index_chain (IndexChain):
 -- Actions need either at least 1 word, or at least 2 tokens
 inline_action (Action):
     !section_division
-    (   (inline_expression (%ws* (inline_expression / word))+)
-      / (word              (%ws* (inline_expression / word))*))
+    (   ((smushed_action / inline_expression) (%ws* (smushed_action / inline_expression / word))+)
+      / (word              (%ws* (smushed_action / inline_expression / word))*))
     (%ws* inline_block)?
 action (Action):
     !section_division
-    (  (expression ((nl_nodent "..")? %ws* (expression / word))+)
-     / (word       ((nl_nodent "..")? %ws* (expression / word))*))
+    (  ((smushed_action / expression) ((nl_nodent "..")? %ws* (smushed_action / expression / word))+)
+     / (word       ((nl_nodent "..")? %ws* (smushed_action / expression / word))*))
+smushed_action (Action):
+    !section_division
+    (index_chain / noindex_inline_expression / word+) (index_chain / noindex_inline_expression / word+ / "(" %ws* ")")+
 
 word: !number { %operator_char+ / %ident_char+ }
 
@@ -93,20 +97,20 @@ inline_text_interpolation:
     )
 
 indented_text (Text):
-    '".."' eol %nl {:curr_indent: indent :}
-        (indented_plain_text / text_interpolation / {~ blank_lines (=curr_indent -> "") ~})*
+    '".."' eol %nl {%nl*} {:curr_indent: indent :}
+        (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
     (!! [^%nl]+ -> "Unexpected character while parsing Text" !!)?
 indented_plain_text (Text):
     {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
-        (blank_lines (=curr_indent -> ""))* ~}
+        (%nl+ (=curr_indent -> ""))* ~}
 text_interpolation:
     inline_text_interpolation / ("\" indented_expression blank_lines =curr_indent "..")
 
 number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
--- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
--- which is a hack to allow %'s to parse as "%" and "' s" separately
-variable (Var): "%" {(%ident_char+ ((!"'" %operator_char+) / %ident_char+)*)?}
+-- Variables can be nameless (i.e. just %) and can only contain identifier chars.
+-- This ensures you don't get weird parsings of `%x+%y` or `%'s thing`.
+variable (Var): "%" {%ident_char*}
 
 inline_list (List):
     !('[..]')

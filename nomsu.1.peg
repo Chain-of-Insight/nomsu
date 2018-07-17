@@ -1,6 +1,7 @@
 -- Nomsu version 2
 file (FileChunks):
     {:curr_indent: ' '* :}
+    ("#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: ([0-9.]+ -> tonumber) :} [^%nl]*)?
     comment? blank_lines?
     (chunk (nl_nodent chunk_delimeter nl_nodent chunk)*)?
     blank_lines?
@@ -100,12 +101,12 @@ inline_text_interpolation:
     )
 
 indented_text (Text):
-    '".."' eol %nl {:curr_indent: indent :}
-        (indented_plain_text / text_interpolation / {~ blank_lines (=curr_indent -> "") ~})*
+    '".."' eol %nl {%nl*} {:curr_indent: indent :}
+        (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
     (!! [^%nl]+ -> "Unexpected character while parsing Text" !!)?
 indented_plain_text (Text):
     {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
-        (blank_lines (=curr_indent -> ""))* ~}
+        (%nl+ (=curr_indent -> ""))* ~}
 text_interpolation:
     inline_text_interpolation / ("\" indented_expression blank_lines =curr_indent "..")
 

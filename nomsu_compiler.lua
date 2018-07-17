@@ -722,60 +722,67 @@ do
   local MIN_COLON_LEN = 20
   NomsuCompiler.tree_to_nomsu = function(self, tree, options)
     options = options or { }
-    if not (options.pop_comments) then
-      local comments
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for p, c in pairs(tree.comments or { }) do
-          if tree.source.start <= p and p <= tree.source.stop then
-            _accum_0[_len_0] = {
-              comment = c,
-              pos = p
-            }
-            _len_0 = _len_0 + 1
+    options.consumed_comments = options.consumed_comments or { }
+    local pop_comments
+    pop_comments = function(pos, prefix, suffix)
+      if prefix == nil then
+        prefix = ''
+      end
+      if suffix == nil then
+        suffix = ''
+      end
+      local find_comments
+      find_comments = function(t)
+        if t.comments and t.source.filename == tree.source.filename then
+          local _list_0 = t.comments
+          for _index_0 = 1, #_list_0 do
+            local c = _list_0[_index_0]
+            if not (options.consumed_comments[c]) then
+              coroutine.yield(c)
+            end
           end
         end
-        comments = _accum_0
-      end
-      table.sort(comments, function(a, b)
-        return a.pos < b.pos
-      end)
-      local comment_i = 1
-      options.pop_comments = function(pos, prefix)
-        if prefix == nil then
-          prefix = ''
-        end
-        local nomsu = NomsuCode(tree.source)
-        while comments[comment_i] and comments[comment_i].pos <= pos do
-          local comment = comments[comment_i].comment
-          nomsu:append("#" .. (gsub(comment, "\n", "\n    ")) .. "\n")
-          if comment:match("^\n.") then
-            nomsu:append("\n")
+        for _index_0 = 1, #t do
+          local x = t[_index_0]
+          if AST.is_syntax_tree(x) then
+            find_comments(x)
           end
-          comment_i = comment_i + 1
         end
-        if #nomsu.bits == 0 then
-          return ''
-        end
-        nomsu:prepend(prefix)
-        return nomsu
       end
+      local nomsu = NomsuCode(tree.source)
+      for comment in coroutine.wrap(function()
+        return find_comments(tree)
+      end) do
+        if comment.pos > pos then
+          break
+        end
+        options.consumed_comments[comment] = true
+        nomsu:append("#" .. (gsub(comment.comment, "\n", "\n    ")) .. "\n")
+        if comment.comment:match("^\n.") then
+          nomsu:append("\n")
+        end
+      end
+      if #nomsu.bits == 0 then
+        return ''
+      end
+      nomsu:prepend(prefix)
+      nomsu:append(suffix)
+      return nomsu
     end
     local recurse
     recurse = function(t, opts)
       opts = opts or { }
-      opts.pop_comments = options.pop_comments
+      opts.consumed_comments = options.consumed_comments
       return self:tree_to_nomsu(t, opts)
     end
-    local inline, pop_comments
-    inline, pop_comments = options.inline, options.pop_comments
+    local inline
+    inline = options.inline
     local _exp_0 = tree.type
     if "FileChunks" == _exp_0 then
       if inline then
         error("Cannot inline a FileChunks")
       end
-      local nomsu = NomsuCode(tree.source)
+      local nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
       for i, chunk in ipairs(tree) do
         if i > 1 then
           nomsu:append("\n\n" .. tostring(("~"):rep(80)) .. "\n\n")
@@ -785,7 +792,7 @@ do
           top = true
         }))
       end
-      nomsu:append(pop_comments(tree.source.stop))
+      nomsu:append(pop_comments(tree.source.stop, '\n'))
       return nomsu
     elseif "Action" == _exp_0 then
       if inline then
@@ -803,7 +810,7 @@ do
             if not (arg_nomsu) then
               return nil
             end
-            if not (i == 1) then
+            if not (i == 1 or (bit.type == "Block" and not (#bit > 1 or i < #tree))) then
               nomsu:append(" ")
             end
             if bit.type == "Action" or (bit.type == "Block" and (#bit > 1 or i < #tree)) then
@@ -814,9 +821,13 @@ do
         end
         return nomsu
       else
-        local nomsu = NomsuCode(tree.source)
+        local pos = tree.source.start
+        local nomsu = NomsuCode(tree.source, pop_comments(pos))
         local next_space = ""
         for i, bit in ipairs(tree) do
+          if match(next_space, '\n') then
+            nomsu:append(pop_comments(pos, '\n'))
+          end
           if type(bit) == "string" then
             nomsu:append(next_space, bit)
             next_space = " "
@@ -853,11 +864,13 @@ do
               end
               next_space = "\n.."
             end
+            pos = bit.source.stop
           end
           if next_space == " " and nomsu.trailing_line_len > MAX_LINE then
             next_space = "\n.."
           end
         end
+        nomsu:append(pop_comments(pos, '\n'))
         return nomsu
       end
     elseif "EscapedNomsu" == _exp_0 then
@@ -885,7 +898,7 @@ do
         end
         return nomsu
       end
-      local nomsu = NomsuCode(tree.source)
+      local nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
       for i, line in ipairs(tree) do
         nomsu:append(pop_comments(line.source.start))
         line = assert(recurse(line), "Could not convert line to nomsu")
@@ -897,6 +910,7 @@ do
           end
         end
       end
+      nomsu:append(pop_comments(tree.source.stop, '\n'))
       return options.top and nomsu or NomsuCode(tree.source, ":\n    ", nomsu)
     elseif "Text" == _exp_0 then
       if inline then

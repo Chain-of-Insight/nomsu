@@ -100,7 +100,6 @@ setmetatable(NOMSU_DEFS, {
         end
       end
       setmetatable(value, AST[key])
-      value.comments = userdata.comments
       if value.__init then
         value:__init()
       end
@@ -190,6 +189,43 @@ Parser.parse = function(nomsu_code, source, version)
     end
     error("Errors occurred while parsing (v" .. tostring(version) .. "):\n\n" .. table.concat(errors, "\n\n"), 0)
   end
+  local comments
+  do
+    local _accum_0 = { }
+    local _len_0 = 1
+    for p, c in pairs(userdata.comments) do
+      _accum_0[_len_0] = {
+        comment = c,
+        pos = p
+      }
+      _len_0 = _len_0 + 1
+    end
+    comments = _accum_0
+  end
+  table.sort(comments, function(a, b)
+    return a.pos > b.pos
+  end)
+  local comment_i = 1
+  local walk_tree
+  walk_tree = function(t)
+    local comment_buff = { }
+    while comments[#comments] and comments[#comments].pos <= t.source.start do
+      table.insert(comment_buff, table.remove(comments))
+    end
+    for _index_0 = 1, #t do
+      local x = t[_index_0]
+      if AST.is_syntax_tree(x) then
+        walk_tree(x)
+      end
+    end
+    while comments[#comments] and comments[#comments].pos <= t.source.stop do
+      table.insert(comment_buff, table.remove(comments))
+    end
+    if #comment_buff > 0 then
+      t.comments = comment_buff
+    end
+  end
+  walk_tree(tree)
   tree.version = userdata.version
   return tree
 end

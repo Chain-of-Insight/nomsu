@@ -164,12 +164,11 @@ compile [%tree with %t -> %replacement] to
             \(%replacement as lua return)
         end)
 
-compile [%tree with vars %v] to
-    Lua value ".."
-        \(%tree as lua expr):map(function(t)
-            local replacements = \(%v as lua expr)
-            if t.type == "Var" then
-                return replacements[t[1]]
+action [%tree with vars %replacements]
+    =lua ".."
+        \%tree:map(function(\%t)
+            if \%t.type == "Var" then
+                return \%replacements[\%t[1]]
             end
         end)
 

@@ -65,7 +65,6 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
             with userdata.source
                 value.source = Source(.filename, .start + start-1, .start + stop-1)
         setmetatable(value, AST[key])
-        value.comments = userdata.comments
         if value.__init then value\__init!
         return value
 
@@ -119,7 +118,24 @@ Parser.parse = (nomsu_code, source=nil, version=nil)->
         table.sort(keys)
         errors = [userdata.errors[k] for k in *keys]
         error("Errors occurred while parsing (v#{version}):\n\n"..table.concat(errors, "\n\n"), 0)
-    
+
+    comments = [{comment:c, pos:p} for p,c in pairs(userdata.comments)]
+    -- Sort in descending order so we can pop the first comments off the end one at a time
+    table.sort comments, (a,b)-> a.pos > b.pos
+    comment_i = 1
+    walk_tree = (t)->
+        export comment_i
+        comment_buff = {}
+        while comments[#comments] and comments[#comments].pos <= t.source.start
+            table.insert(comment_buff, table.remove(comments))
+        for x in *t
+            if AST.is_syntax_tree x
+                walk_tree x
+        while comments[#comments] and comments[#comments].pos <= t.source.stop
+            table.insert(comment_buff, table.remove(comments))
+        t.comments = comment_buff if #comment_buff > 0
+    walk_tree tree
+
     tree.version = userdata.version
     return tree
 
