@@ -17,7 +17,7 @@ CORE_NOM_FILES= $(wildcard core/*.nom)
 CORE_LUA_FILES= $(patsubst %.nom,%.lua,$(CORE_NOM_FILES))
 LIB_NOM_FILES= $(wildcard lib/*.nom)
 LIB_LUA_FILES= $(patsubst %.nom,%.lua,$(LIB_NOM_FILES))
-PEG_FILE= nomsu.peg
+PEG_FILES= $(wildcard nomsu.*.peg)
 GET_VERSION= $(LUA_BIN) nomsu.lua --version
 
 all: build optimize
@@ -36,7 +36,7 @@ test: build optimize
 	@$(LUA_BIN) nomsu.lua -c $<
 
 .DELETE_ON_ERROR: version
-version: $(LUA_FILES) $(CORE_NOM_FILES) $(LIB_NOM_FILES) $(PEG_FILE)
+version: $(LUA_FILES) $(CORE_NOM_FILES) $(LIB_NOM_FILES)
 	@$(LUA_BIN) nomsu.lua --version > version || exit
 
 build: $(LUA_FILES)
@@ -47,7 +47,7 @@ optimize: build $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 .PHONY: clean
 clean:
 	@echo "\033[1mDeleting...\033[0m"
-	@rm -rvf version core/*.lua lib/*.lua
+	@rm -rvf version core/*.lua lib/*.lua tools/*.lua tests/*.lua compatibility/*.lua
 
 .PHONY: install
 install: build version optimize
@@ -68,7 +68,7 @@ install: build version optimize
 	&& chmod +x $$prefix/bin/nomsu$$version \
 	&& cp -v nomsu $$prefix/bin \
 	&& cp -v doc/nomsu.1 $$prefix/share/man/man1 \
-	&& cp -rv $(LUA_FILES) $(PEG_FILE) core lib tests $$prefix/share/nomsu/$$version;
+	&& cp -rv $(LUA_FILES) $(PEG_FILES) core lib compatibility tools tests $$prefix/share/nomsu/$$version;
 
 .PHONY: uninstall
 uninstall: version

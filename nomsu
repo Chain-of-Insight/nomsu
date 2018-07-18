@@ -1,7 +1,8 @@
 #!/bin/bash
-while getopts ':V:' flag; do
+while getopts ':V:L' flag; do
   case "${flag}" in
     V) VERSION="${OPTARG/./\.}\\b" ;;
+    L) LIST="YES" ;;
   esac
 done
 
@@ -9,6 +10,11 @@ if [[ $VERSION ]]; then
     candidates=$(ls $(dirname $BASH_SOURCE) | grep "^nomsu$VERSION[0-9.]*$")
 else
     candidates=$(ls $(dirname $BASH_SOURCE) | grep "^nomsu[0-9.]\+$")
+fi
+
+if [[ $LIST ]]; then
+    echo "$candidates"
+    exit
 fi
 
 if [[ $candidates ]]; then
