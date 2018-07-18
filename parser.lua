@@ -229,6 +229,9 @@ Parser.parse = function(nomsu_code, source, version)
   return tree
 end
 Parser.is_operator = function(s)
-  return not not (NOMSU_DEFS.operator_char ^ 1):match(s)
+  return not not (NOMSU_DEFS.operator_char ^ 1 * -1):match(s)
+end
+Parser.is_identifier = function(s)
+  return not not (NOMSU_DEFS.ident_char ^ 1 * -1):match(s)
 end
 return Parser

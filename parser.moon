@@ -139,6 +139,9 @@ Parser.parse = (nomsu_code, source=nil, version=nil)->
     return tree
 
 Parser.is_operator = (s)->
-    return not not (NOMSU_DEFS.operator_char^1)\match(s)
+    return not not (NOMSU_DEFS.operator_char^1 * -1)\match(s)
+
+Parser.is_identifier = (s)->
+    return not not (NOMSU_DEFS.ident_char^1 * -1)\match(s)
 
 return Parser

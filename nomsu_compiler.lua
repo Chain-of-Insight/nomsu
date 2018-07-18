@@ -854,6 +854,9 @@ do
                 inline = true
               }))
             end
+            if tostring(arg_nomsu) ~= '"\\n"' and tostring(arg_nomsu):match("\\n") then
+              arg_nomsu = nil
+            end
             if bit.type == "Block" then
               next_space = match(next_space, "[^ ]*")
             end
@@ -931,10 +934,13 @@ do
         local make_text
         make_text = function(tree)
           local nomsu = NomsuCode(tree.source)
-          for _index_0 = 1, #tree do
-            local bit = tree[_index_0]
+          for i, bit in ipairs(tree) do
             if type(bit) == 'string' then
-              nomsu:append((gsub(gsub(gsub(bit, "\\", "\\\\"), "\n", "\\n"), '"', '\\"')))
+              bit = (gsub(gsub(gsub(bit, "\\", "\\\\"), "\n", "\\n"), '"', '\\"'))
+              bit = gsub(bit, "%G", (function(c)
+                return c == ' ' and c or "\\" .. tostring(c:byte())
+              end))
+              nomsu:append(bit)
             elseif bit.type == "Text" then
               nomsu:append(make_text(bit))
             else
@@ -942,6 +948,8 @@ do
                 inline = true
               }))
               if bit.type ~= "Var" and bit.type ~= "List" and bit.type ~= "Dict" then
+                interp_nomsu:parenthesize()
+              elseif bit.type == "Var" and type(tree[i + 1]) == 'string' and not match(tree[i + 1], "^[ \n\t,.:;#(){}[%]]") then
                 interp_nomsu:parenthesize()
               end
               nomsu:append("\\", interp_nomsu)
@@ -1002,6 +1010,8 @@ do
               if interp_nomsu then
                 if bit.type ~= "Var" and bit.type ~= "List" and bit.type ~= "Dict" then
                   interp_nomsu:parenthesize()
+                elseif bit.type == "Var" and type(tree[i + 1]) == 'string' and not match(tree[i + 1], "^[ \n\t,.:;#(){}[%]]") then
+                  interp_nomsu:parenthesize()
                 end
                 nomsu:append("\\", interp_nomsu)
               else
@@ -1009,7 +1019,11 @@ do
                 if not (interp_nomsu) then
                   return nil
                 end
-                nomsu:append("\\\n    ", interp_nomsu)
+                if bit.type ~= "List" and bit.type ~= "Dict" and bit.type ~= "Text" and bit.type ~= "Block" then
+                  nomsu:append("\\\n(..)    ", interp_nomsu)
+                else
+                  nomsu:append("\\", interp_nomsu)
+                end
                 if i < #tree then
                   nomsu:append("\n..")
                 end
@@ -1136,9 +1150,14 @@ do
       end
     elseif "DictEntry" == _exp_0 then
       local key, value = tree[1], tree[2]
-      local key_nomsu = assert(recurse(key, {
-        inline = true
-      }))
+      local key_nomsu
+      if key.type == "Text" and #key == 1 and Parser.is_identifier(key[1]) then
+        key_nomsu = NomsuCode(key.source, key[1])
+      else
+        key_nomsu = assert(recurse(key, {
+          inline = true
+        }))
+      end
       if key.type == "Action" or key.type == "Block" then
         key_nomsu:parenthesize()
       end

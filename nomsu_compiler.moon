@@ -552,6 +552,8 @@ with NomsuCompiler
                         else
                             arg_nomsu = if bit.type == "Block" and #bit > 1 then nil
                             else assert recurse(bit,inline:true)
+                            if tostring(arg_nomsu) != '"\\n"' and tostring(arg_nomsu)\match("\\n")
+                                arg_nomsu = nil -- Force long text for multi-line text
                             next_space = match(next_space, "[^ ]*") if bit.type == "Block"
                             nomsu\append next_space
                             if arg_nomsu and nomsu\trailing_line_len! + #tostring(arg_nomsu) < MAX_LINE
@@ -611,15 +613,19 @@ with NomsuCompiler
                 if options.inline
                     make_text = (tree)->
                         nomsu = NomsuCode(tree.source)
-                        for bit in *tree
+                        for i, bit in ipairs tree
                             if type(bit) == 'string'
                                 -- TODO: unescape better?
-                                nomsu\append (gsub(gsub(gsub(bit,"\\","\\\\"),"\n","\\n"),'"','\\"'))
+                                bit = (gsub(gsub(gsub(bit,"\\","\\\\"),"\n","\\n"),'"','\\"'))
+                                bit = gsub(bit, "%G", ((c)-> c == ' ' and c or "\\#{c\byte!}"))
+                                nomsu\append bit
                             elseif bit.type == "Text"
                                 nomsu\append(make_text(bit))
                             else
                                 interp_nomsu = assert recurse(bit, inline:true)
                                 if bit.type != "Var" and bit.type != "List" and bit.type != "Dict"
+                                    interp_nomsu\parenthesize!
+                                elseif bit.type == "Var" and type(tree[i+1]) == 'string' and not match(tree[i+1], "^[ \n\t,.:;#(){}[%]]")
                                     interp_nomsu\parenthesize!
                                 nomsu\append "\\", interp_nomsu
                         return nomsu
@@ -660,11 +666,16 @@ with NomsuCompiler
                                 if interp_nomsu
                                     if bit.type != "Var" and bit.type != "List" and bit.type != "Dict"
                                         interp_nomsu\parenthesize!
+                                    elseif bit.type == "Var" and type(tree[i+1]) == 'string' and not match(tree[i+1], "^[ \n\t,.:;#(){}[%]]")
+                                        interp_nomsu\parenthesize!
                                     nomsu\append "\\", interp_nomsu
                                 else
                                     interp_nomsu = assert(recurse(bit))
                                     return nil unless interp_nomsu
-                                    nomsu\append "\\\n    ", interp_nomsu
+                                    if bit.type != "List" and bit.type != "Dict" and bit.type != "Text" and bit.type != "Block"
+                                        nomsu\append "\\\n(..)    ", interp_nomsu
+                                    else
+                                        nomsu\append "\\", interp_nomsu
                                     if i < #tree
                                         nomsu\append "\n.."
                         return nomsu
@@ -742,7 +753,9 @@ with NomsuCompiler
             
             when "DictEntry"
                 key, value = tree[1], tree[2]
-                key_nomsu = assert recurse(key, inline:true)
+                key_nomsu = if key.type == "Text" and #key == 1 and Parser.is_identifier(key[1])
+                    NomsuCode(key.source, key[1])
+                else assert recurse(key, inline:true)
                 key_nomsu\parenthesize! if key.type == "Action" or key.type == "Block"
                 value_nomsu = if value
                     assert recurse(value, inline:true)
