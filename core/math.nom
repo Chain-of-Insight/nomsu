@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.2.4.3
+#!/usr/bin/env nomsu -V2.3.4.3
 #
     This file defines some common math literals and functions
 
@@ -57,7 +57,7 @@ compile [all of %items, all %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.all(\(%items as lua expr))")
     
-    %clauses <- ((% as lua expr) for % in %items)
+    %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses joined with " and "))")
 
 parse [not all of %items, not all %items] as (not (all of %items))
@@ -65,7 +65,7 @@ compile [any of %items, any %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.any(\(%items as lua expr))")
     
-    %clauses <- ((% as lua expr) for % in %items)
+    %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses joined with " or "))")
 
 parse [none of %items, none %items] as (not (any of %items))
@@ -73,14 +73,14 @@ compile [sum of %items, sum %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.sum(\(%items as lua expr))")
     
-    %clauses <- ((% as lua expr) for % in %items)
+    %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses joined with " + "))")
 
 compile [product of %items, product %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.product(\(%items as lua expr))")
     
-    %clauses <- ((% as lua expr) for % in %items)
+    %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses joined with " * "))")
 
 action [avg of %items, average of %items] (=lua "(utils.sum(\%items)/#\%items)")
@@ -92,21 +92,21 @@ compile [max of %items, biggest of %items, largest of %items, highest of %items]
 
 parse [min of %items by %item = %value_expr] as (..)
     result of:
-        <- {%best: nil, %best_key: nil}
+        set {%best: nil, %best_key: nil}
         for %item in %items:
-            %key <- %value_expr
-            if ((%best = (nil)) or (%key < %best_key)):
-                <- {%best: %item, %best_key: %key}
+            %key = %value_expr
+            if ((%best == (nil)) or (%key < %best_key)):
+                set {%best: %item, %best_key: %key}
         
         return %best
 
 parse [max of %items by %item = %value_expr] as (..)
     result of:
-        <- {%best: nil, %best_key: nil}
+        set {%best: nil, %best_key: nil}
         for %item in %items:
-            %key <- %value_expr
-            if ((%best = (nil)) or (%key > %best_key)):
-                <- {%best: %item, %best_key: %key}
+            %key = %value_expr
+            if ((%best == (nil)) or (%key > %best_key)):
+                set {%best: %item, %best_key: %key}
         
         return %best
 
@@ -123,5 +123,5 @@ compile [random int %n, random integer %n, randint %n] to (..)
 compile [random from %low to %high, random number from %low to %high, rand %low %high]
 ..to (Lua value "math.random(\(%low as lua expr), \(%high as lua expr))")
 
-action [random choice from %elements, random choice %elements, random %elements] (..)
-    =lua "\%elements[math.random(#\%elements)]"
+action [random choice from %elements, random choice %elements, random %elements]
+..(=lua "\%elements[math.random(#\%elements)]")

@@ -1,19 +1,10 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.3.4.3
 #
     Tests for the stuff defined in core/control_flow.nom
 
 use "core"
-
-%nums <- []
-%co <-
-    coroutine
-        -> 4
-        -> 5
-        repeat 3 times
-            -> 6
-for % in coroutine %co
-    add % to %nums
-
-assume (%nums = [4,5,6,6,6]) or barf "Coroutine iteration failed"
-
+%nums = []
+%co = (coroutine (: -> 4; -> 5; repeat 3 times: -> 6))
+for % in coroutine %co (add % to %nums)
+assume (%nums == [4, 5, 6, 6, 6]) or barf "Coroutine iteration failed"
 say "Coroutines test passed."

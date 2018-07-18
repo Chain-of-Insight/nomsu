@@ -1,17 +1,15 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.3.4.3
 use "core"
+%x = "outer"
+with local %x:
+    %x = "inner"
+    assume (%x == "inner")
 
-%x <- "outer"
-with local %x
-    %x <- "inner"
-    assume: %x = "inner"
-assume: %x = "outer"
-
+assume (%x == "outer")
 action [foo] "outer foo"
-with local [action: foo]
+with local [action (foo)]:
     action [foo] "inner foo"
-    assume: (foo) = "inner foo"
-assume: (foo) = "outer foo"
+    assume ((foo) == "inner foo")
 
-
+assume ((foo) == "outer foo")
 say "Scopes test passed."

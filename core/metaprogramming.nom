@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.2.4.3
+#!/usr/bin/env nomsu -V2.3.4.3
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
@@ -13,7 +13,7 @@ lua> ".."
         local body_lua = AST.is_syntax_tree(\%body) and nomsu:compile(\%body):as_statements("return ") or \%body
         body_lua:remove_free_vars(lua_args)
         body_lua:declare_locals()
-        lua:append(")\n    ", body_lua, "\nend")
+        lua:append(")\\n    ", body_lua, "\\nend")
         return lua
     end
 
@@ -37,7 +37,8 @@ lua> ".."
             "] = ", \(compile as (%args -> %body)))
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) end))}
+            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) \
+    ..end))}
             lua:append("\\nnomsu.COMPILE_ACTIONS[", repr(alias.stub), "] = ")
             if utils.equivalent(\%args, \%alias_args) then
                 lua:append("nomsu.COMPILE_ACTIONS[", repr(\%actions[1].stub), "]")
@@ -107,7 +108,8 @@ compile [parse %actions as %body] to (..)
             elseif replacements[t[1]] then
                 return replacements[t[1]]
             else
-                return t.type.."("..repr(tostring(t.source))..", "..repr(t[1].." \\0").."..string.format('%X', __MANGLE_INDEX))"
+                return t.type.."("..repr(tostring(t.source))..", "..repr(t[1].." \\0").."..string.format('%X', \
+        ..__MANGLE_INDEX))"
             end
         end
         local \%new_body = LuaCode(\%body.source,

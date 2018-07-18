@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.2.4.3
+#!/usr/bin/env nomsu -V2.3.4.3
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -16,23 +16,23 @@ use "core"
 say "Hello world!"
 
 # How do I set a variable?
-%foobar <- 1
-%text <- "Hello world"
+%foobar = 1
+%text = "Hello world"
 
 # Expressions that are more than just literal values require parentheses:
-%foobar <- (2 + 3)
-%one-two <- 12
-say %one-two
+%foobar = (2 + 3)
+%one_two = 12
+say %one_two
 
 # How do I modify a variable?
-%foobar <- (%foobar + 1)
+%foobar = (%foobar + 1)
 
 # Or, as a shorthand, you can do this to increment a variable:
-%foobar +<- 1
+%foobar += 1
 
 # How do I define a mutli-line string?
 # In Nomsu, "strings" are called "text", and multi-line text looks like:
-%mutli-text <- ".."
+%mutli_text = ".."
     Start with "..", then put indented lines below it. The indented lines will not include
     the indentation, except when the lines are indented more than 4 spaces relative
     to the "..".
@@ -59,124 +59,100 @@ say ".."
     If you need to split a long line without inserting a newline, you can end a line \
     ..with backslash and start the next line with two periods, like that.
     
-    Similarly, you can put a long interpolated indented value like: \(..)
-        1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
-    .. between a backslash and two periods.
+    Similarly, you can put a long interpolated indented value like: \(1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9) between a backslash and two periods.
 
-say "Single-line text can contain escape sequences like \", \\, \n, \065, and \x0A"
+say "Single-line text can contain escape sequences like \", \\, \n, A, and \n"
 
 # How do I define a list?
-%my-list <- [1, 2, "hello"]
+%my_list = [1, 2, "hello"]
 
 # Really long lists can use [..] followed by a bunch of indented values delimited
     by commas and/or newlines
-%my-really-long-list <- [..]
-    1, 2, 3, 4
-    5, 6
-    7
-    8, 9, 10
+%my_really_long_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 # How do I use a list?
-%my-list <- ["first item", "second item", "third item"]
+%my_list = ["first item", "second item", "third item"]
 
 # Lists are 1-indexed because they're implemented as Lua tables, so this prints "first item"
-say %my-list.1
+say %my_list.1
 
 # List entries can be modified like this:
-%my-list.1 <- "ONE!!!"
-say (length of %my-list)
+%my_list.1 = "ONE!!!"
+say (length of %my_list)
 
 # How do I define a dictionary/hash map?
-%my-dict <- {x: 99, y: 101}
-%my-dict <- {..}
-    x: 101, y: 2
-    "99 bottles": 99
-    653: 292
+%my_dict = {x: 99, y: 101}
+%my_dict = {x: 101, y: 2, "99 bottles": 99, 653: 292}
 
 # How do I use a dict?
 # Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
-say %my-dict.x
-%my-dict.x <- 9999
+say %my_dict.x
+%my_dict.x = 9999
 
 # How do I do conditional branching?
-if (1 < 10):
-    say "1 is indeed < 10"
-if (1 > 10):
-    say "this won't print"
-..else:
-    say "this will print"
+if (1 < 10): say "1 is indeed < 10"
+if (1 > 10): say "this won't print"
+..else: say "this will print"
+
 
 # There's no "elseif", so for longer conditionals, a "when" branch is the best option
 when:
     * (3 > 6)
     * (3 > 5)
-    * (3 > 4):
-        say "this won't print"
-    * (3 > 3):
-        say "this won't print"
-    * (3 > 2):
-        say "this will print"
-    *else:
-        say "this is the default case"
+    * (3 > 4): say "this won't print"
+    * (3 > 3): say "this won't print"
+    * (3 > 2): say "this will print"
+    *else: say "this is the default case"
 
 
 # How do I do a switch statement?
 when 3 = ?:
     * 0
     * 1
-    * 2:
-        say "this won't print"
-    * 3:
-        say "this will print"
-    *else:
-        say "this won't print"
+    * 2: say "this won't print"
+    * 3: say "this will print"
+    *else: say "this won't print"
 
 
 # How do I loop over a list (a foreach loop)?
-%list <- [1, 2, 3]
-for %x in %list:
-    say "For %x loop #\%x"
+%list = [1, 2, 3]
+for %x in %list: say "For %x loop #\%x"
 
 # How do I loop over a number range?
 # This is inclusive, so it will loop over 1,2, and 3
-for %i in 1 to 3:
-    say "For %i in 1 to 3 loop #\%i"
+for %i in 1 to 3: say "For %i in 1 to 3 loop #\%i"
 
 # This will print 0,2, and 4
-for %even in 0 to 5 by 2:
-    say "Even #\%even"
-for %backwards in 3 to 1 by -1:
-    say "Backwards #\%backwards"
+for %even in 0 to 5 by 2: say "Even #\%even"
+for %backwards in 3 to 1 by -1: say "Backwards #\%backwards"
 
 # How do I do a 'while' loop?
-%x <- 1
+%x = 1
 repeat while (%x <= 3):
     say "repeat while loop #\%x"
-    %x +<- 1
+    %x += 1
 
-%x <- 1
+%x = 1
 repeat until (%x > 3):
     say "repeat until loop #\%x"
-    %x +<- 1
+    %x += 1
 
 
 # How do I do an infinite loop?
-%x <- 1
+%x = 1
 repeat:
     say "repeat loop #\%x"
-    %x +<- 1
-    if (%x > 3):
-        stop repeating
+    %x += 1
+    if (%x > 3): stop repeating
 
 
 # How do I do a 'goto'?
 do:
-    %x <- 1
+    %x = 1
     === %again ===
     say "GOTO loop #\%x"
-    %x +<- 1
-    if (%x <= 3):
-        go to %again
+    %x += 1
+    if (%x <= 3): go to %again
     say "finished going to"
 
 
@@ -191,24 +167,22 @@ action [say both %first and also %second]:
 
 # Actions can use "return" to return a value early
 action [first fibonacci above %n]:
-    %f1 <- 0
-    %f2 <- 1
+    %f1 = 0
+    %f2 = 1
     repeat:
-        %tmp <- (%f1 + %f2)
-        %f1 <- %f2
-        %f2 <- %tmp
-        if (%f2 > %n):
-            return %f2
+        %tmp = (%f1 + %f2)
+        %f1 = %f2
+        %f2 = %tmp
+        if (%f2 > %n): return %f2
 
 say (first fibonacci above 10)
 
 # Actions can have aliases, which may or may not have the arguments in different order
 action [..]
-    I hate %worse-things more than %better-things
-    I think %worse-things are worse than %better-things
-    I like %better-things more than %worse-things
-..:
-    say "\(%better-things capitalized) rule and \%worse-things drool!"
+    I hate %worse_things more than %better_things
+    I think %worse_things are worse than %better_things
+    I like %better_things more than %worse_things
+..: say "\(%better_things capitalized) rule and \%worse_things drool!"
 
 I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"
@@ -218,23 +192,23 @@ I think "chihuahuas" are worse than "corgis"
 say both "Hello" and also "again!"
 
 # Actions can even start with a parameter
-action [%what-she-said is what she said]:
-    say %what-she-said
+action [%what_she_said is what she said]:
+    say %what_she_said
     say "-- she said"
 
 "Howdy pardner" is what she said
 
 # The language only reserves []{}().,:;% as special characters, so actions
     can have really funky names!
-action [>> %foo-bar $$$^ --> % @&_~-^-~_~-^ %1 !]:
-    say %foo-bar
+action [>> %foo_bar $$$^ --> % @&_~-^-~_~-^ %1 !]:
+    say %foo_bar
     say %
     say %1
 
 >> "wow" $$$^ --> "so flexible!" @&_~-^-~_~-^ "even numbers can be variables!" !
 
 # There's also full unicode support
-%こんにちは <- "こんにちは"
+%こんにちは = "\227\129\147\227\130\147\227\129\171\227\129\161\227\129\175"
 action [% と言う] "\%世界"
 say (%こんにちは と言う)
 
@@ -251,26 +225,19 @@ say (1 ++ (2 * 3))
 say (2 + 3)
 
 # Or by (..) followed by an indented region
-say (..)
-    2 + 3
+say (2 + 3)
 
 # If you need to keep going after an indented region, you can start the next line with ".."
-say both "Very long first argument that needs its own line"
-..and also "short second arg"
-
+say both "Very long first argument that needs its own line" and also "short second arg"
 action [my favorite number] (21 + 2)
 
 # This can be nested:
-say both (..)
-    my favorite
-    ..number
-..and also "foo"
+say both (my favorite number) and also "foo"
 
 # Macros: 
 # The "lua> %" and "=lua %" macros can be used to write raw lua code: 
 action [say the time] (..)
-    lua> ".."
-        io.write("The OS time is: ", os.time(), "\\n");
+    lua> "io.write(\"The OS time is: \", os.time(), \"\\n\");"
 
 say the time
 say "Math expression result is: \(=lua "(1 + 2*3 + 3*4)^2")"
@@ -280,15 +247,11 @@ action [square root of %n] (=lua "math.sqrt(\%n)")
 say "The square root of 2 is \(square root of 2)"
 
 # Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
-parse [if %condition is untrue %body] as (..)
-    if (not %condition) %body
+parse [if %condition is untrue %body] as (if (not %condition) %body)
 
 # Or to transform nomsu code into custom lua code using "compile % to %"
 compile [if %condition on opposite day %body] to (..)
-    Lua ".."
-        if not \(%condition as lua expr) then
-            \(%body as lua statements)
-        end
+    Lua "if not \(%condition as lua expr) then\n    \(%body as lua statements)\nend"
 
 
 # Constants can be defined as macros
@@ -313,12 +276,12 @@ if (1 > (TWENTY)) on opposite day:
 
 # How do I use an action as a value?
 # Well... it's always *possible* to fall back to Lua behavior for something like this:
-action [best of %items according to %key-fn]:
-    <- {%best: nil, %best-key: nil}
+action [best of %items according to %key_fn]:
+    set {%best: nil, %best_key: nil}
     for %item in %items:
-        %key <- (=lua "\%key-fn(\%item)")
-        if ((%best is (nil)) or (%key > %best-key)):
-            <- {%best: %item, %best-key: %key}
+        %key = (=lua "\%key_fn(\%item)")
+        if ((%best is (nil)) or (%key > %best_key)):
+            set {%best: %item, %best_key: %key}
     
     return %best
 
@@ -328,13 +291,13 @@ say (best of [2, -3, 4, -8] according to ([%x] -> (%x * %x)))
     one-off function to pass to another function and get called a bunch of times, you
     could use a macro to generate a single block of code that inlines the expression you
     want to use:
-parse [best of %items where %item-var has score %key-expr] as (..)
+parse [best of %items where %item_var has score %key_expr] as (..)
     result of:
-        <- {%best: nil, %best-key: nil}
-        for %item-var in %items:
-            %key <- %key-expr
-            if ((%best is (nil)) or (%key > %best-key)):
-                <- {%best: %item-var, %best-key: %key}
+        set {%best: nil, %best_key: nil}
+        for %item_var in %items:
+            %key = %key_expr
+            if ((%best is (nil)) or (%key > %best_key)):
+                set {%best: %item_var, %best_key: %key}
         
         return %best
 

@@ -1,19 +1,19 @@
-#!/usr/bin/env Nomsu -V 2.2.4.3
+#!/usr/bin/env Nomsu -V2.3.4.3
 use "core"
 use "compatibility"
 use "lib/os.nom"
 
-%args <- (command line args)
-%inplace <- (no)
+%args = (command line args)
+%inplace = (no)
 if (%args.1 is "-i"):
-    %inplace <- (yes)
+    %inplace = (yes)
     remove index 1 from %args
 for %path in %args:
-    if (%path is "-i"): %inplace <- (yes)
+    if (%path is "-i"): %inplace = (yes)
     for file %filename in %path:
-        %tree <- (parse (read file %filename) from %filename)
-        %tree <- (%tree upgraded from %tree.version to (Nomsu version))
-        %text <- "#!/usr/bin/env nomsu -V\(Nomsu version)\n\(%tree as nomsu)"
+        %tree = (parse (read file %filename) from %filename)
+        %tree = (%tree upgraded from %tree.version to (Nomsu version))
+        %text = "#!/usr/bin/env nomsu -V\(Nomsu version)\n\(%tree as nomsu)"
         if %inplace:
             write %text to file %filename
         ..else:

@@ -1,40 +1,37 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.3.4.3
 #..
     Tests for the stuff defined in core/control_flow.nom
-
 use "core"
-
-assume ((2nd to last in [1,2,3,4,5]) = 4)
-assume (3 is in [1,2,3,4,5])
-assume (99 isn't in [1,2,3])
-assume ({x:no} has key "x")
-assume ({x:no} doesn't have key "y")
-assume (not ({x:no} doesn't have key "x"))
-assume ((length of [1,2,3]) = 3)
-%list <- [1,2,3,4,5]
+assume ((2 nd to last in [1, 2, 3, 4, 5]) == 4)
+assume (3 is in [1, 2, 3, 4, 5])
+assume (99 isn't in [1, 2, 3])
+assume ({x: no} has key "x")
+assume ({x: no} doesn't have key "y")
+assume (not ({x: no} doesn't have key "x"))
+assume ((length of [1, 2, 3]) == 3)
+%list = [1, 2, 3, 4, 5]
 append 6 to %list
-assume ((last in %list) = 6)
+assume ((last in %list) == 6)
 pop from %list
-assume ((last in %list) = 5)
+assume ((last in %list) == 5)
 remove index 1 from %list
-assume ((first in %list) = 2)
-assume (((% * %) for % in [1,2,3]) = [1,4,9])
-assume ((%k = (%v * %v) for %k = %v in {x:1,y:2,z:3}) = {x:1,y:4,z:9})
-assume ((%k for %k = %v in {x:1}) = ["x"])
-assume ((% = (% * %) for % in [1,2,3]) = {1:1,2:4,3:9})
-assume (([[1,2],[3,4]] flattened) = [1,2,3,4])
-assume ((entries in {x:1}) = [{key:"x",value:1}])
-assume ((keys in {x:1}) = ["x"])
-assume ((values in {x:1}) = [1])
-assume ((sorted [3,1,2]) = [1,2,3])
-%x <- [3,1,2]
+assume ((first in %list) == 2)
+assume (((% * %) for % in [1, 2, 3]) == [1, 4, 9])
+assume ((%k = (%v * %v) for %k = %v in {x: 1, y: 2, z: 3}) == {x: 1, y: 4, z: 9})
+assume ((%k for %k = %v in {x: 1}) == ["x"])
+assume ((% = (% * %) for % in [1, 2, 3]) == {1: 1, 2: 4, 3: 9})
+assume (([[1, 2], [3, 4]] flattened) == [1, 2, 3, 4])
+assume ((entries in {x: 1}) == [{key: "x", value: 1}])
+assume ((keys in {x: 1}) == ["x"])
+assume ((values in {x: 1}) == [1])
+assume ((sorted [3, 1, 2]) == [1, 2, 3])
+%x = [3, 1, 2]
 sort %x
-assume (%x = [1,2,3])
-sort %x by % = (-%)
-assume (%x = [3,2,1])
-%keys <- {1:999,2:0,3:50}
+assume (%x == [1, 2, 3])
+sort %x by % = (- %)
+assume (%x == [3, 2, 1])
+%keys = {1: 999, 2: 0, 3: 50}
 sort %x by % = %keys.%
-assume (%x = [2,3,1])
-assume ((unique [1,2,1,3,2,3]) = [1,2,3])
-
+assume (%x == [2, 3, 1])
+assume ((unique [1, 2, 1, 3, 2, 3]) == [1, 2, 3])
 say "Collections test passed."

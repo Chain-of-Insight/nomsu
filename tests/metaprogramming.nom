@@ -1,76 +1,71 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.3.4.3
 #
     Tests for the stuff defined in core/metaprogramming.nom
 
 use "core"
+compile [five] to (Lua value "5")
 
-compile [five] to: Lua value "5"
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-assume ((five) = 5) or barf "Compile to expression failed."
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-compile [loc x] to: Lua "local _x = 99;"
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+assume ((five) == 5) or barf "Compile to expression failed."
+compile [loc x] to (Lua "local _x = 99;")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 lua> "do"
 loc x
 assume (%x is 99) or barf "Compile to statements with locals failed."
 lua> "end"
 assume (%x is (nil)) or barf "Failed to properly localize a variable."
+compile [asdf] to:
+    %tmp = ""
+    return (Lua %tmp)
 
-compile [asdf] to
-    %tmp <- ""
-    return: Lua %tmp
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 asdf
 assume (%tmp is (nil)) or barf "compile to is leaking variables"
-
-action [foo %x]
-    %y <- (%x + 1)
+action [foo %x]:
+    %y = (%x + 1)
     return %y
-assume ((foo 10) = 11) or barf "Action didn't work."
+
+assume ((foo 10) == 11) or barf "Action didn't work."
 assume (%y is (nil)) or barf "Action leaked a local into globals."
+parse [baz %] as (foo %)
 
-parse [baz %] as: foo %
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-assume ((baz 10) = 11) or barf "Parse as action failed."
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-parse [V] as: five
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-assume ((V) = 5) or barf "Parse as compile action failed."
+assume ((baz 10) == 11) or barf "Parse as action failed."
+parse [V] as (five)
 
-parse [swap %x and %y] as
-    do
-        %tmp <- %x
-        %x <- %y
-        %y <- %tmp
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-<- {%1:1, %2:2}
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+assume ((V) == 5) or barf "Parse as compile action failed."
+parse [swap %x and %y] as (do (: %tmp = %x; %x = %y; %y = %tmp))
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+set {%1: 1, %2: 2}
 swap %1 and %2
-assume ((%1 = 2) and (%2 = 1)) or barf "'parse % as %' failed on 'swap % and %'"
-<- {%tmp:1, %tmp2:2}
+assume ((%1 == 2) and (%2 == 1)) or barf "'parse % as %' failed on 'swap % and %'"
+set {%tmp: 1, %tmp2: 2}
 swap %tmp and %tmp2
-assume ((%tmp = 2) and (%tmp2 = 1)) or barf "'parse % as %' variable mangling failed."
+assume ((%tmp == 2) and (%tmp2 == 1)) or barf "'parse % as %' variable mangling failed."
 
 #
     remove action (foo %)
     try: foo 99
     ..and if it succeeds: barf "Failed to delete action"
 
-assume ((\(5 + 5) as value) = 10) or barf "%tree as value failed."
-
-assume ("\(\(foo %x) as nomsu)" = "foo %x") or barf "action source code failed."
-
-assume ("\(\%x as nomsu)" = "%x") or barf "var source code failed."
-
-assume ((type of {}) = "table") or barf "type of failed."
-
-assume ("\(\%x as lua identifier)" = "_x") or barf "converting to identifier failed."
-
-assume ((run "return 99") = 99) or barf "run % failed."
-
-%code <-: Lua "global_x = true;"
+assume ((\(5 + 5) as value) == 10) or barf "%tree as value failed."
+assume ("\(\(foo %x) as nomsu)" == "foo %x") or barf "action source code failed."
+assume ("\(\(%x) as nomsu)" == "%x") or barf "var source code failed."
+assume ((type of {}) == "table") or barf "type of failed."
+assume ("\(\(%x) as lua identifier)" == "_x") or barf "converting to identifier failed."
+assume ((run "return 99") == 99) or barf "run % failed."
+%code = (Lua "global_x = true;")
 lua> %code
 assume (=lua "global_x") or barf "Running lua from a variable failed."
-%code <-: Lua value "global_x"
+%code = (Lua value "global_x")
 assume (=lua %code) or barf "Running lua from a variable failed."
-
 say "Metaprogramming test passed."

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.2.4.3
+#!/usr/bin/env nomsu -V2.3.4.3
 #
     This file contains definitions of operators like "+" and "and".
 
@@ -10,7 +10,7 @@ compile [%x < %y] to (Lua value "(\(%x as lua expr) < \(%y as lua expr))")
 compile [%x > %y] to (Lua value "(\(%x as lua expr) > \(%y as lua expr))")
 compile [%x <= %y] to (Lua value "(\(%x as lua expr) <= \(%y as lua expr))")
 compile [%x >= %y] to (Lua value "(\(%x as lua expr) >= \(%y as lua expr))")
-compile [%a is %b, %a = %b, %a == %b] to (..)
+compile [%a is %b, %a == %b] to (..)
     Lua value "(\(%a as lua expr) == \(%b as lua expr))"
 
 compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to (..)
@@ -40,7 +40,7 @@ compile [% 's id, id of %] to (Lua value "IDS[\(% as lua expr)]")
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Variable assignment operator
-compile [%var <- %value] to:
+compile [%var = %value] to:
     lua> "local \%var_lua = \(%var as lua)"
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
     lua> ".."
@@ -61,7 +61,7 @@ compile [%var <- %value] to:
 
 
 # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
-compile [<- %assignments, assign %assignments] to:
+compile [set %assignments] to:
     assume (%assignments.type is "Dict") or barf ".."
         Expected a Dict for the assignments part of '<- %' statement, not \%assignments
     
@@ -92,22 +92,22 @@ compile [<- %assignments, assign %assignments] to:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-compile [external %var <- %value] to:
-    %var_lua <- (%var as lua)
+compile [external %var = %value] to:
+    %var_lua = (%var as lua)
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-    %value_lua <- (%value as lua)
+    %value_lua = (%value as lua)
     assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
     return (Lua "\%var_lua = \%value_lua;")
 
 compile [with external %externs %body] to:
-    %body_lua <- (%body as lua statements)
+    %body_lua = (%body as lua statements)
     lua> ".."
         \%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))
     
     return %body_lua
 
 compile [with %assignments %body] to:
-    %lua <- (%body as lua statements)
+    %lua = (%body as lua statements)
     lua> ".."
         local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
         local vars = {}
@@ -135,10 +135,7 @@ compile [with %assignments %body] to:
         \%lua:prepend("local ", lhs, " = ", rhs, ";\\n")
     
     return (..)
-        Lua ".."
-            do
-                \%lua
-            end -- 'with' block
+        Lua "do\n    \%lua\nend -- 'with' block"
 
 
 # Math Operators
@@ -194,17 +191,17 @@ compile [%x ARSHIFT %shift, %x >> %shift] to (..)
 # Unary operators
 compile [- %] to (Lua value "(- \(% as lua expr))")
 compile [not %] to (Lua value "(not \(% as lua expr))")
-test: assume ((length of [1, 2, 3]) = 3)
+test: assume ((length of [1, 2, 3]) == 3)
 compile [length of %list, || %list ||] to (Lua value "(#\(%list as lua expr))")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Update operators
-parse [%var + <- %, %var +<- %] as (%var <- (%var + %))
-parse [%var - <- %, %var -<- %] as (%var <- (%var - %))
-parse [%var * <- %, %var *<- %] as (%var <- (%var * %))
-parse [%var / <- %, %var /<- %] as (%var <- (%var / %))
-parse [%var ^ <- %, %var ^<- %] as (%var <- (%var ^ %))
-parse [%var and<- %] as (%var <- (%var and %))
-parse [%var or<- %] as (%var <- (%var or %))
-parse [wrap %var around %] as (%var <- (%var wrapped around %))
+parse [%var += %] as (%var = (%var + %))
+parse [%var -= %] as (%var = (%var - %))
+parse [%var *= %] as (%var = (%var * %))
+parse [%var /= %] as (%var = (%var / %))
+parse [%var ^= %] as (%var = (%var ^ %))
+parse [%var and= %] as (%var = (%var and %))
+parse [%var or= %] as (%var = (%var or %))
+parse [wrap %var around %] as (%var = (%var wrapped around %))

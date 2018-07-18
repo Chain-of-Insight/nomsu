@@ -1,54 +1,52 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.3.4.3
 #..
     Tests for the stuff defined in core/operators.nom
-
 use "core"
-
-<-{%x:10,%y:20}
-assume ((%x = 10) and (%y = 20)) or barf "mutli-assignment failed."
-<-{%x:%y, %y:%x}
-assume ((%y = 10) and (%x = 20)) or barf "swapping vars failed."
-
-% <- [%x < %y, %x <= %y, %x > %y, %x >= %y, %x = %y, %x is %y, %x != %y, %x isn't %y, %x is not %y]
+set {%x: 10, %y: 20}
+assume ((%x == 10) and (%y == 20)) or barf "mutli-assignment failed."
+set {%x: %y, %y: %x}
+assume ((%y == 10) and (%x == 20)) or barf "swapping vars failed."
+% = [..]
+    %x < %y, %x <= %y, %x > %y, %x >= %y, %x == %y, %x is %y, %x != %y, %x isn't %y
+    %x is not %y
 
 assume ({} is {}) or barf "Equality check failed."
-assume (({}'s id) is not ({}'s id)) or barf "Identity check failed."
+assume (({} 's id) is not ({} 's id)) or barf "Identity check failed."
+set {%foozle: "outer", %y: "outer"}
+action [set global x local y]:
+    external %foozle = "inner"
+    %y = "inner"
 
-<-{%foozle:"outer",%y:"outer"}
-action [set global x local y]
-    external %foozle <- "inner"
-    %y <- "inner"
 set global x local y
-assume ((%foozle = "inner") and (%y = "outer")) or barf "external failed."
+assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
+set {%foozle: "outer", %y: "outer"}
+action [set global x local y] (..)
+    with external [%foozle]:
+        %foozle = "inner"
+        %y = "inner"
 
-<-{%foozle:"outer",%y:"outer"}
-action [set global x local y]
-    with external [%foozle]
-        %foozle <- "inner"
-        %y <- "inner"
 set global x local y
-assume ((%foozle = "inner") and (%y = "outer")) or barf "'with external' failed."
+assume ((%foozle == "inner") and (%y == "outer")) or barf "'with external' failed."
+set {%x: 1, %y: 2}
+with {%z: nil, %x: 999}:
+    %z = 999
+    assume (%z == 999) or barf "'with' failed."
+    assume (%x == 999) or barf "'with' assignment failed."
 
-<-{%x:1,%y:2}
-with {%z:nil, %x:999}
-    %z <- 999
-    assume (%z = 999) or barf "'with' failed."
-    assume (%x = 999) or barf "'with' assignment failed."
-assume (%x = 1) or barf "'with' scoping failed"
-assume (%z = (nil)) or barf "'with' scoping failed"
-
-assume ((1 + 2*3 - 4/2^2) = 6) or barf "math expressions not working properly"
-assume ((5 wrapped around 2) = 1) or barf "mod not working"
+assume (%x == 1) or barf "'with' scoping failed"
+assume (%z == (nil)) or barf "'with' scoping failed"
+assume ((1 + 2 * 3 - 4 / 2 ^ 2) == 6) or barf "math expressions not working properly"
+assume ((5 wrapped around 2) == 1) or barf "mod not working"
 assume (1 <= 2 < 3) or barf "chained operator fail."
-%value <- -999
-action [flipflop]
-    external %value <- (-%value)
+%value = -999
+action [flipflop]:
+    external %value = (- %value)
     return %value
+
 assume (not (1 < (flipflop) < 1)) or barf "3-way inequality evaluated middle term twice"
-assume (((yes) and (yes)) = (yes))
-action [barfer]
-    barf "short circuiting failed"
-assume (((no) and (barfer)) = (no))
+assume (((yes) and (yes)) == (yes))
+action [barfer] (barf "short circuiting failed")
+assume (((no) and (barfer)) == (no))
 assume ((no) or (yes))
 assume ((yes) or (barfer))
 
@@ -62,15 +60,13 @@ assume ((yes) or (barfer))
     assume ((2>>>1) = 1)
 #.. Ugh, Lua is stupid when it comes to bitwise arithmetic on negative numbers, so I'm
     skipping the tests for those.
-
-assume ((-(5)) = -5)
-assume ((not (yes)) = (no))
-%x <- 1
-%x +<- 1
-assume (%x = 2) or barf "+<- failed"
-%x *<- 2
-assume (%x = 4) or barf "*<- failed"
+assume ((- 5) == -5)
+assume ((not (yes)) == (no))
+%x = 1
+%x += 1
+assume (%x == 2) or barf "+<- failed"
+%x *= 2
+assume (%x == 4) or barf "*<- failed"
 wrap %x around 3
-assume (%x = 1) or barf "wrap around failed"
-
+assume (%x == 1) or barf "wrap around failed"
 say "Operator test passed."
