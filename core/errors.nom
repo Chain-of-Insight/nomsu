@@ -1,32 +1,34 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.2.4.3
 #
     This file contains basic error reporting code
 
 use "core/metaprogramming.nom"
-
-compile [traceback] to: Lua value "debug.traceback()"
-compile [traceback %] to: Lua value "debug.traceback('', \(% as lua expr))"
-compile [barf] to: Lua "error(nil, 0);"
-compile [barf %msg] to: Lua "error(\(%msg as lua expr), 0);"
-compile [assume %condition] to
-    lua> "local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition))"
-    return
+compile [traceback] to (Lua value "debug.traceback()")
+compile [traceback %] to (Lua value "debug.traceback('', \(% as lua expr))")
+compile [barf] to (Lua "error(nil, 0);")
+compile [barf %msg] to (Lua "error(\(%msg as lua expr), 0);")
+compile [assume %condition] to:
+    lua> ".."
+        local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition))
+    
+    return (..)
         Lua ".."
             if not \(%condition as lua expr) then
                 error(\(quote "\%assumption"), 0)
             end
 
-compile [assume %condition or barf %message] to
+compile [assume %condition or barf %message] to (..)
     Lua ".."
         if not \(%condition as lua expr) then
             error(\(%message as lua expr), 0)
         end
 
+
 # Try/except
 compile [..]
     try %action and if it succeeds %success or if it barfs %msg %fallback
     try %action and if it barfs %msg %fallback or if it succeeds %success
-..to
+..to (..)
     Lua ".."
         do
             local fell_through = false
@@ -50,20 +52,23 @@ compile [..]
             end
         end
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 parse [..]
     try %action and if it succeeds %success or if it barfs %fallback
     try %action and if it barfs %fallback or if it succeeds %success
-..as: try %action and if it succeeds %success or if it barfs (=lua "") %fallback
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-parse [try %action] as
-    try %action and if it succeeds: do nothing
-    ..or if it barfs: do nothing
-parse [try %action and if it barfs %fallback] as
-    try %action and if it succeeds: do nothing
-    ..or if it barfs %fallback
-parse [try %action and if it barfs %msg %fallback] as
-    try %action and if it succeeds: do nothing
-    ..or if it barfs %msg %fallback
-parse [try %action and if it succeeds %success] as
-    try %action and if it succeeds %success or if it barfs: do nothing
+..as (try %action and if it succeeds %success or if it barfs (=lua "") %fallback)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+parse [try %action] as (..)
+    try %action and if it succeeds (do nothing) or if it barfs (do nothing)
+
+parse [try %action and if it barfs %fallback] as (..)
+    try %action and if it succeeds (do nothing) or if it barfs %fallback
+
+parse [try %action and if it barfs %msg %fallback] as (..)
+    try %action and if it succeeds (do nothing) or if it barfs %msg %fallback
+
+parse [try %action and if it succeeds %success] as (..)
+    try %action and if it succeeds %success or if it barfs (do nothing)

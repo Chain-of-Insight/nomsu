@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.2.4.3
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -6,36 +6,39 @@
 use "core/metaprogramming.nom"
 
 # Text functions
-action [%texts joined with %glue]
+action [%texts joined with %glue] (..)
     lua> ".."
         local text_bits = {}
         for i,bit in ipairs(\%texts) do text_bits[i] = stringify(bit) end
         return table.concat(text_bits, \%glue)
-parse [joined %texts, %texts joined] as: %texts joined with ""
 
-compile [capitalized %text, %text capitalized] to
+parse [joined %texts, %texts joined] as (%texts joined with "")
+compile [capitalized %text, %text capitalized] to (..)
     Lua value "((\(%text as lua expr)):gsub('%l', string.upper, 1))"
 
-compile [%text with %sub instead of %patt, %text with %patt replaced by %sub, %text s/%patt / %sub] to
+compile [..]
+    %text with %sub instead of %patt, %text with %patt replaced by %sub
+    %text s/ %patt / %sub
+..to (..)
     Lua value "((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))"
 
-action [lines in %text, lines of %text]
+action [lines in %text, lines of %text] (..)
     lua> ".."
         local result = list{}
-        for line in (\%text):gmatch('[^\n]+') do
+        for line in (\%text):gmatch('[^\\n]+') do
             result[#result+1] = line
         end
         return result
 
-compile [for %match where %text matches %patt %body] to
+compile [for %match where %text matches %patt %body] to (..)
     Lua ".."
         for \(%match as lua expr) in \(%text as lua expr):gmatch(\(%patt as lua expr)) do
             \(%body as lua statements)
-            \(compile as: === next %match ===)
+            \(compile as (===next %match ===))
         end
-        \(compile as: === stop %match ===)
+        \(compile as (===stop %match ===))
 
-compile [%expr for %match where %text matches %patt] to
+compile [%expr for %match where %text matches %patt] to (..)
     Lua value ".."
         (function()
             local ret = list{}
@@ -45,19 +48,22 @@ compile [%expr for %match where %text matches %patt] to
             return ret
         end)()
 
-compile [%text matches %pattern] to
+compile [%text matches %pattern] to (..)
     Lua value "(\(%text as lua expr):match(\(%pattern as lua expr)) and true or false)"
+
 
 # Text literals
 lua> ".."
     do
         local escapes = {
-            nl="\\\\n", newline="\\\\n", tab="\\\\t", bell="\\\\a", cr="\\\\r", ["carriage return"]="\\\\r",
-            backspace="\\\\b", ["form feed"]="\\\\f", formfeed="\\\\f", ["vertical tab"]="\\\\v",
+            nl="\\\\n", newline="\\\\n", tab="\\\\t", bell="\\\\a", cr="\\\\r",
+            ["carriage return"]="\\\\r", backspace="\\\\b", ["form feed"]="\\\\f",
+            formfeed="\\\\f", ["vertical tab"]="\\\\v",
         };
         for name, e in pairs(escapes) do
             local lua = "'"..e.."'"
-            nomsu.COMPILE_ACTIONS[name] = (function(nomsu, tree) return LuaCode.Value(tree.source, lua) end)
+            nomsu.COMPILE_ACTIONS[name] = function(nomsu, tree)
+                return LuaCode.Value(tree.source, lua)
+            end
         end
     end
-

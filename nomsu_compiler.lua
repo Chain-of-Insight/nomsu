@@ -508,9 +508,14 @@ do
   NomsuCompiler.compile = function(self, tree)
     if tree.version then
       do
-        local upgrade = self['A' .. string.as_lua_id("upgrade 1 from 2")]
-        if upgrade then
-          tree = upgrade(tree, tree.version)
+        local get_version = self['A' .. string.as_lua_id("Nomsu version")]
+        if get_version then
+          do
+            local upgrade = self['A' .. string.as_lua_id("1 upgraded from 2 to 3")]
+            if upgrade then
+              tree = upgrade(tree, tree.version, get_version())
+            end
+          end
         end
       end
     end

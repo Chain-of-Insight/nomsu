@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.2.4.3
 #
     This file contains definitions of operators like "+" and "and".
 
@@ -6,14 +6,17 @@ use "core/metaprogramming.nom"
 use "core/errors.nom"
 
 # Comparison Operators
-compile [%x < %y] to: Lua value "(\(%x as lua expr) < \(%y as lua expr))"
-compile [%x > %y] to: Lua value "(\(%x as lua expr) > \(%y as lua expr))"
-compile [%x <= %y] to: Lua value "(\(%x as lua expr) <= \(%y as lua expr))"
-compile [%x >= %y] to: Lua value "(\(%x as lua expr) >= \(%y as lua expr))"
-compile [%a is %b, %a = %b, %a == %b] to
+compile [%x < %y] to (Lua value "(\(%x as lua expr) < \(%y as lua expr))")
+compile [%x > %y] to (Lua value "(\(%x as lua expr) > \(%y as lua expr))")
+compile [%x <= %y] to (Lua value "(\(%x as lua expr) <= \(%y as lua expr))")
+compile [%x >= %y] to (Lua value "(\(%x as lua expr) >= \(%y as lua expr))")
+compile [%a is %b, %a = %b, %a == %b] to (..)
     Lua value "(\(%a as lua expr) == \(%b as lua expr))"
-compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to
+
+compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to (..)
     Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
+
+
 # For strict identity checking, use (%x's id) is (%y's id)
 lua> ".."
     do
@@ -31,12 +34,13 @@ lua> ".."
             end
         })
     end
-compile [%'s id, id of %] to: Lua value "IDS[\(% as lua expr)]"
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+compile [% 's id, id of %] to (Lua value "IDS[\(% as lua expr)]")
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Variable assignment operator
-compile [%var <- %value] to
+compile [%var <- %value] to:
     lua> "local \%var_lua = \(%var as lua)"
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
     lua> ".."
@@ -46,7 +50,7 @@ compile [%var <- %value] to
             end
         end)
         local \%value_lua = \(%value as lua)
-
+    
     assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
     lua> ".."
         local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
@@ -55,10 +59,12 @@ compile [%var <- %value] to
         end
         return lua
 
+
 # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
-compile [<- %assignments, assign %assignments] to
+compile [<- %assignments, assign %assignments] to:
     assume (%assignments.type is "Dict") or barf ".."
         Expected a Dict for the assignments part of '<- %' statement, not \%assignments
+    
     lua> ".."
         local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
         for i, item in ipairs(\%assignments) do
@@ -84,21 +90,23 @@ compile [<- %assignments, assign %assignments] to
         end
         return LuaCode(tree.source, lhs, " = ", rhs, ";")
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-compile [external %var <- %value] to
+compile [external %var <- %value] to:
     %var_lua <- (%var as lua)
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
     %value_lua <- (%value as lua)
     assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
-    return: Lua "\%var_lua = \%value_lua;"
+    return (Lua "\%var_lua = \%value_lua;")
 
-compile [with external %externs %body] to
+compile [with external %externs %body] to:
     %body_lua <- (%body as lua statements)
-    lua> "\%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))"
+    lua> ".."
+        \%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))
+    
     return %body_lua
 
-compile [with %assignments %body] to
+compile [with %assignments %body] to:
     %lua <- (%body as lua statements)
     lua> ".."
         local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
@@ -124,57 +132,79 @@ compile [with %assignments %body] to
             end
         end
         \%lua:remove_free_vars(vars)
-        \%lua:prepend("local ", lhs, " = ", rhs, ";\n")
-    return
+        \%lua:prepend("local ", lhs, " = ", rhs, ";\\n")
+    
+    return (..)
         Lua ".."
             do
                 \%lua
             end -- 'with' block
 
+
 # Math Operators
-compile [%x wrapped around %y, %x mod %y] to: Lua value "(\(%x as lua expr) % \(%y as lua expr))"
+compile [%x wrapped around %y, %x mod %y] to (..)
+    Lua value "(\(%x as lua expr) % \(%y as lua expr))"
+
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
-parse [%x <  %y <  %z] as: =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"
-parse [%x <= %y <  %z] as: =lua "(function(x,y,z) return x <= y and y <  z; end)(\%x,\%y,\%z)"
-parse [%x <  %y <= %z] as: =lua "(function(x,y,z) return x <  y and y <= z; end)(\%x,\%y,\%z)"
-parse [%x <= %y <= %z] as: =lua "(function(x,y,z) return x <= y and y <= z; end)(\%x,\%y,\%z)"
-parse [%x >  %y >  %z] as: =lua "(function(x,y,z) return x >  y and y >  z; end)(\%x,\%y,\%z)"
-parse [%x >= %y >  %z] as: =lua "(function(x,y,z) return x >= y and y >  z; end)(\%x,\%y,\%z)"
-parse [%x >  %y >= %z] as: =lua "(function(x,y,z) return x >  y and y >= z; end)(\%x,\%y,\%z)"
-parse [%x >= %y >= %z] as: =lua "(function(x,y,z) return x >= y and y >= z; end)(\%x,\%y,\%z)"
-# TODO: optimize for common case where x,y,z are all either variables or number literals
+parse [%x < %y < %z] as (..)
+    =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"
+parse [%x <= %y < %z] as (..)
+    =lua "(function(x,y,z) return x <= y and y <  z; end)(\%x,\%y,\%z)"
+parse [%x < %y <= %z] as (..)
+    =lua "(function(x,y,z) return x <  y and y <= z; end)(\%x,\%y,\%z)"
+parse [%x <= %y <= %z] as (..)
+    =lua "(function(x,y,z) return x <= y and y <= z; end)(\%x,\%y,\%z)"
+parse [%x > %y > %z] as (..)
+    =lua "(function(x,y,z) return x >  y and y >  z; end)(\%x,\%y,\%z)"
+parse [%x >= %y > %z] as (..)
+    =lua "(function(x,y,z) return x >= y and y >  z; end)(\%x,\%y,\%z)"
+parse [%x > %y >= %z] as (..)
+    =lua "(function(x,y,z) return x >  y and y >= z; end)(\%x,\%y,\%z)"
+parse [%x >= %y >= %z] as (..)
+    =lua "(function(x,y,z) return x >= y and y >= z; end)(\%x,\%y,\%z)"
 
+# TODO: optimize for common case where x,y,z are all either variables or number literals
 # Boolean Operators
-compile [%x and %y] to: Lua value "(\(%x as lua expr) and \(%y as lua expr))"
-compile [%x or %y] to: Lua value "(\(%x as lua expr) or \(%y as lua expr))"
+compile [%x and %y] to (Lua value "(\(%x as lua expr) and \(%y as lua expr))")
+compile [%x or %y] to (Lua value "(\(%x as lua expr) or \(%y as lua expr))")
 
 # Bitwise Operators
 # TODO: support bit.???() for luajit and bit32.??? for lua 5.2
-compile [%a OR %b, %a | %b] to: Lua value "(\(%a as lua expr) | \(%b as lua expr))"
-compile [%a XOR %b] to: Lua value "(\(%a as lua expr) ^ \(%b as lua expr))"
-compile [%a AND %b, %a & %b] to: Lua value "(\(%a as lua expr) & \(%b as lua expr))"
-compile [NOT %, ~ %] to: Lua value "~(\(% as lua expr))"
-compile [%x LSHIFT %shift, %x << %shift] to: Lua value "(\(%x as lua expr) << \(%shift as lua expr))"
-compile [%x RSHIFT %shift, %x >>> %shift] to: Lua value "(\(%x as lua expr) >>> \(%shift as lua expr))"
-compile [%x ARSHIFT %shift, %x >> %shift] to: Lua value "(\(%x as lua expr) >> \(%shift as lua expr))"
+compile [%a OR %b, %a | %b] to (..)
+    Lua value "(\(%a as lua expr) | \(%b as lua expr))"
+
+compile [%a XOR %b] to (Lua value "(\(%a as lua expr) ^ \(%b as lua expr))")
+compile [%a AND %b, %a & %b] to (..)
+    Lua value "(\(%a as lua expr) & \(%b as lua expr))"
+
+compile [NOT %, ~ %] to (Lua value "~(\(% as lua expr))")
+compile [%x LSHIFT %shift, %x << %shift] to (..)
+    Lua value "(\(%x as lua expr) << \(%shift as lua expr))"
+
+compile [%x RSHIFT %shift, %x >>> %shift] to (..)
+    Lua value "(\(%x as lua expr) >>> \(%shift as lua expr))"
+
+compile [%x ARSHIFT %shift, %x >> %shift] to (..)
+    Lua value "(\(%x as lua expr) >> \(%shift as lua expr))"
+
+
 # TODO: implement OR, XOR, AND for multiple operands?
-
 # Unary operators
-compile [- %] to: Lua value "(- \(% as lua expr))"
-compile [not %] to: Lua value "(not \(% as lua expr))"
-test: assume: (length of [1,2,3]) = 3
-compile [length of %list, || %list ||] to: Lua value "(#\(%list as lua expr))"
+compile [- %] to (Lua value "(- \(% as lua expr))")
+compile [not %] to (Lua value "(not \(% as lua expr))")
+test: assume ((length of [1, 2, 3]) = 3)
+compile [length of %list, || %list ||] to (Lua value "(#\(%list as lua expr))")
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Update operators
-parse [%var + <- %, %var +<- %] as: %var <- (%var + %)
-parse [%var - <- %, %var -<- %] as: %var <- (%var - %)
-parse [%var * <- %, %var *<- %] as: %var <- (%var * %)
-parse [%var / <- %, %var /<- %] as: %var <- (%var / %)
-parse [%var ^ <- %, %var ^<- %] as: %var <- (%var ^ %)
-parse [%var and <- %] as: %var <- (%var and %)
-parse [%var or <- %] as: %var <- (%var or %)
-parse [wrap %var around %] as: %var <- (%var wrapped around %)
+parse [%var + <- %, %var +<- %] as (%var <- (%var + %))
+parse [%var - <- %, %var -<- %] as (%var <- (%var - %))
+parse [%var * <- %, %var *<- %] as (%var <- (%var * %))
+parse [%var / <- %, %var /<- %] as (%var <- (%var / %))
+parse [%var ^ <- %, %var ^<- %] as (%var <- (%var ^ %))
+parse [%var and<- %] as (%var <- (%var and %))
+parse [%var or<- %] as (%var <- (%var or %))
+parse [wrap %var around %] as (%var <- (%var wrapped around %))

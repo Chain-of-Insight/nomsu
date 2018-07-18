@@ -37,7 +37,7 @@ compile [%expr for file %f in %path] to
             return ret
         end)()
 
-action [write to file %filename %text, to file %filename write %text]
+action [write to file %filename %text, to file %filename write %text, write %text to file %filename]
     lua> ".."
         local file = io.open(\%filename, 'w')
         file:write(\%text)

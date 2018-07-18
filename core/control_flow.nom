@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.2.4.3
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -10,19 +10,21 @@ use "core/errors.nom"
 
 # No-Op
 test: do nothing
-compile [do nothing] to: Lua ""
+compile [do nothing] to (Lua "")
 
 # Conditionals
 test: if (no): barf "conditional fail"
-compile [if %condition %if_body] to
+compile [if %condition %if_body] to (..)
     Lua ".."
         if \(%condition as lua expr) then
             \(%if_body as lua statements)
         end
-test: unless (yes): barf "conditional fail"
-parse [unless %condition %unless_body] as: if (not %condition) %unless_body
 
-compile [if %condition %if_body else %else_body, unless %condition %else_body else %if_body] to
+test: unless (yes): barf "conditional fail"
+parse [unless %condition %unless_body] as (if (not %condition) %unless_body)
+compile [..]
+    if %condition %if_body else %else_body, unless %condition %else_body else %if_body
+..to (..)
     Lua ".."
         if \(%condition as lua expr) then
             \(%if_body as lua statements)
@@ -30,7 +32,7 @@ compile [if %condition %if_body else %else_body, unless %condition %else_body el
             \(%else_body as lua statements)
         end
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Conditional expression (ternary operator)
 #   Note: this uses a function instead of "(condition and if_expr or else_expr)"
@@ -40,18 +42,20 @@ compile [..]
     %when_true_expr if %condition otherwise %when_false_expr
     %when_false_expr unless %condition else %when_true_expr
     %when_false_expr unless %condition then %when_true_expr
-..to
+..to (..)
+    
     #   If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
         equivalent of a conditional expression: (cond and if_true or if_false)
-    if: {Text:yes, List:yes, Dict:yes, Number:yes}.(%when_true_expr.type)
-        return
+    if {"Text": yes, "List": yes, "Dict": yes, "Number": yes}.(%when_true_expr.type):
+        return (..)
             Lua value ".."
                 (\(%condition as lua expr) and \(%when_true_expr as lua expr) or \(%when_false_expr as lua expr))
-    ..else
+    ..else:
+        
         #   Otherwise, need to do an anonymous inline function (yuck, too bad lua 
             doesn't have a proper ternary operator!)
             To see why this is necessary consider: (random()<.5 and false or 99)
-        return
+        return (..)
             Lua value ".."
                 ((function()
                     if \(%condition as lua expr) then
@@ -61,19 +65,21 @@ compile [..]
                     end
                 end)())
 
+
 # GOTOs
-compile [=== %label ===, --- %label ---, *** %label ***] to
+compile [=== %label ===, --- %label ---, *** %label ***] to (..)
     Lua "::label_\(%label as lua identifier)::"
-compile [go to %label] to
+
+compile [go to %label] to (..)
     Lua "goto label_\(%label as lua identifier)"
 
 # Basic loop control
-compile [do next] to: Lua "continue"
-compile [stop] to: Lua "break"
+compile [do next] to (Lua "continue")
+compile [stop] to (Lua "break")
 
 # Helper function
 #TODO: do "using % compile %" instead so it's actually a helper function
-compile [%tree has subtree %subtree where %condition] to
+compile [%tree has subtree %subtree where %condition] to (..)
     Lua value ".."
         (function()
             for \(%subtree as lua expr) in coroutine.wrap(function() \(%tree as lua expr):map(coroutine.yield) end) do
@@ -84,294 +90,271 @@ compile [%tree has subtree %subtree where %condition] to
             return false
         end)()
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # While loops
-compile [do next repeat] to: Lua "goto continue_repeat"
-compile [stop repeating] to: Lua "goto stop_repeat"
-compile [repeat while %condition %body] to
-    %lua <-
+compile [do next repeat] to (Lua "goto continue_repeat")
+compile [stop repeating] to (Lua "goto stop_repeat")
+compile [repeat while %condition %body] to:
+    %lua <- (..)
         Lua ".."
             while \(%condition as lua expr) do
                 \(%body as lua statements)
-    if
-        %body has subtree % where: (%.type = "Action") and (%.stub is "do next repeat")
-    ..:to %lua write "\n    ::continue_repeat::"
-    to %lua write "\nend --while-loop"
-    if
-        %body has subtree % where: (%.type = "Action") and (%.stub is "stop repeating")
-    ..
-        %lua <-
-            Lua ".."
-                do -- scope of "stop repeating" label
-                    \%lua
-                    ::stop_repeat::
-                end -- end of "stop repeating" label scope
-    return %lua
-parse [repeat %body] as: repeat while (yes) %body
-parse [repeat until %condition %body] as: repeat while (not %condition) %body
-
-compile [..]
-    repeat %n times %body
-..to
-    %lua <-
-        Lua ".."
-            for i=1,\(%n as lua expr) do
-                \(%body as lua statements)
-    if
-        %body has subtree % where: (%.type = "Action") and (%.stub is "do next repeat")
+    
+    if (..)
+        %body has subtree % where ((%.type = "Action") and (%.stub is "do next repeat"))
     ..: to %lua write "\n    ::continue_repeat::"
-    to %lua write "\nend --numeric for-loop"
-    if
-        %body has subtree % where: (%.type = "Action") and (%.stub is "stop repeating")
-    ..
-        %lua <-
+    
+    to %lua write "\nend --while-loop"
+    if (%body has subtree % where ((%.type = "Action") and (%.stub is "stop repeating"))):
+        %lua <- (..)
             Lua ".."
                 do -- scope of "stop repeating" label
                     \%lua
                     ::stop_repeat::
                 end -- end of "stop repeating" label scope
+    
     return %lua
+
+parse [repeat %body] as (repeat while (yes) %body)
+parse [repeat until %condition %body] as (repeat while (not %condition) %body)
+compile [repeat %n times %body] to:
+    %lua <- (Lua "for i=1,\(%n as lua expr) do\n    \(%body as lua statements)")
+    if (%body has subtree % where ((%.type = "Action") and (%.stub is "do next repeat"))):
+        to %lua write "\n    ::continue_repeat::"
+    
+    to %lua write "\nend --numeric for-loop"
+    if (%body has subtree % where ((%.type = "Action") and (%.stub is "stop repeating"))):
+        %lua <- (..)
+            Lua ".."
+                do -- scope of "stop repeating" label
+                    \%lua
+                    ::stop_repeat::
+                end -- end of "stop repeating" label scope
+    
+    return %lua
+
 
 # For loop control flow
-compile [stop %var] to
-    Lua "goto stop_\(%var as lua identifier)"
-compile [do next %var] to
-    Lua "goto continue_\(%var as lua identifier)"
-
-compile [=== stop %var ===, --- stop %var ---, *** stop %var ***] to
+compile [stop %var] to (Lua "goto stop_\(%var as lua identifier)")
+compile [do next %var] to (Lua "goto continue_\(%var as lua identifier)")
+compile [===stop %var ===, ---stop %var ---, ***stop %var ***] to (..)
     Lua "::stop_\(%var as lua identifier)::"
-compile [=== next %var ===, --- next %var ---, *** next %var ***] to
+
+compile [===next %var ===, ---next %var ---, ***next %var ***] to (..)
     Lua "::continue_\(%var as lua identifier)::"
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Numeric range for loops
 compile [..]
     for %var in %start to %stop by %step %body
     for %var in %start to %stop via %step %body
-..to
+..to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     assume (%var.type is "Var") or barf "Loop expected variable, not: \%var"
-    %lua <-
+    %lua <- (..)
         Lua ".."
             for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(%step as lua expr) do
                 \(%body as lua statements)
-    if
-        %body has subtree % where
-            (%.type = "Action") and
-                (%.stub is "do next %") and 
-                    %.(3).1 = %var.1
-    ..: to %lua write "\n    \(compile as: === next %var ===)"
+    
+    if (..)
+        %body has subtree % where (..)
+            (%.type = "Action") and ((%.stub is "do next %") and (%.(3).1 = %var.1))
+    ..: to %lua write "\n    \(compile as (===next %var ===))"
+    
     to %lua write "\nend --numeric for-loop"
-
-    if
-        %body has subtree % where
-            (%.type = "Action") and
-                (%.stub is "stop %") and
-                    %.(2).1 = %var.1
-    ..
-        %lua <-
+    if (..)
+        %body has subtree % where (..)
+            (%.type = "Action") and ((%.stub is "stop %") and (%.(2).1 = %var.1))
+    ..:
+        %lua <- (..)
             Lua ".."
                 do -- scope for stopping for-loop
                     \%lua
-                    \(compile as: === stop %var ===)
+                    \(compile as (===stop %var ===))
                 end -- end of scope for stopping for-loop
-
+    
     return %lua
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-parse [for %var in %start to %stop %body] as: for %var in %start to %stop via 1 %body
+parse [for %var in %start to %stop %body] as (..)
+    for %var in %start to %stop via 1 %body
+
 
 # For-each loop (lua's "ipairs()")
-compile [for %var in %iterable %body] to
+compile [for %var in %iterable %body] to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     assume (%var.type is "Var") or barf "Loop expected variable, not: \%var"
-    %lua <-
+    %lua <- (..)
         Lua ".."
             for i,\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
                 \(%body as lua statements)
-    if
-        %body has subtree % where
-            (%.type = "Action") and
-                (%.stub is "do next %") and
-                    %.3.(1) = %var.(1)
-    ..: to %lua write (Lua "\n\(compile as: === next %var ===)")
+    
+    if (..)
+        %body has subtree % where (..)
+            (%.type = "Action") and ((%.stub is "do next %") and (%.(3).1 = %var.1))
+    ..: to %lua write (Lua "\n\(compile as (===next %var ===))")
+    
     to %lua write "\nend --foreach-loop"
-    if
-        %body has subtree % where
-            (%.type = "Action") and
-                (%.stub is "stop %") and
-                    %.2.(1) = %var.(1)
-    ..
-        %lua <-
+    if (..)
+        %body has subtree % where (..)
+            (%.type = "Action") and ((%.stub is "stop %") and (%.(2).1 = %var.1))
+    ..:
+        %lua <- (..)
             Lua ".."
                 do -- scope for stopping for-loop
                     \%lua
-                    \(compile as: === stop %var ===)
+                    \(compile as (===stop %var ===))
                 end -- end of scope for stopping for-loop
+    
     return %lua
 
+
 # Dict iteration (lua's "pairs()")
-compile [..]
-    for %key = %value in %iterable %body
-    for (%key,%value) in %iterable %body
-..to
+compile [for %key = %value in %iterable %body, for %key %value in %iterable %body] to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     assume (%key.type is "Var") or barf "Loop expected variable, not: \%key"
     assume (%value.type is "Var") or barf "Loop expected variable, not: \%value"
-    %lua <-
+    %lua <- (..)
         Lua ".."
             for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(%iterable as lua expr)) do
                 \(%body as lua statements)
-    if
-        %body has subtree % where
-            (%.type = "Action") and
-                (%.stub is "do next %") and
-                    %.3.(1) = %key.(1)
-    ..: to %lua write (Lua "\n\(compile as: === next %key ===)")
-
-    if
-        %body has subtree % where
-            (%.type = "Action") and
-                (%.stub is "do next %") and
-                    %.3.(1) = %value.(1)
-    ..: to %lua write (Lua "\n\(compile as: === next %value ===)")
-    to %lua write "\nend --foreach-loop"
     
+    if (..)
+        %body has subtree % where (..)
+            (%.type = "Action") and ((%.stub is "do next %") and (%.(3).1 = %key.1))
+    ..: to %lua write (Lua "\n\(compile as (===next %key ===))")
+    
+    if (..)
+        %body has subtree % where (..)
+            (%.type = "Action") and ((%.stub is "do next %") and (%.(3).1 = %value.1))
+    ..: to %lua write (Lua "\n\(compile as (===next %value ===))")
+    
+    to %lua write "\nend --foreach-loop"
     %stop_labels <- (Lua "")
-    if
-        %body has subtree % where
-            (%.type = "Action") and
-                (%.stub is "stop %") and
-                    %.2.(1) = %key.(1)
-    ..: to %stop_labels write "\n\(compile as: === stop %key ===)"
-
-    if
-        %body has subtree % where
-            (%.type = "Action") and
-                (%.stub is "stop %") and
-                    %.2.(1) = %value.(1)
-    ..: to %stop_labels write "\n\(compile as: === stop %value ===)"
-
-    if: (length of "\%stop_labels") > 0
-        %lua <-
-            Lua ".."
-                do -- scope for stopping for % = % loop
-                    \%lua\%stop_labels
-                end
+    if (..)
+        %body has subtree % where (..)
+            (%.type = "Action") and ((%.stub is "stop %") and (%.(2).1 = %key.1))
+    ..: to %stop_labels write "\n\(compile as (===stop %key ===))"
+    
+    if (..)
+        %body has subtree % where (..)
+            (%.type = "Action") and ((%.stub is "stop %") and (%.(2).1 = %value.1))
+    ..: to %stop_labels write "\n\(compile as (===stop %value ===))"
+    
+    if ((length of "\%stop_labels") > 0):
+        %lua <- (..)
+            Lua "do -- scope for stopping for % = % loop\n    \%lua\%stop_labels\nend"
+    
     return %lua
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Switch statement/multi-branch if
-compile [when %body] to
+compile [when %body] to:
     %code <- (Lua "")
     %fallthroughs <- []
     %is_first <- (yes)
     %seen_else <- (no)
-    %branches <-
-        %body if (%body.type = "Block") else [%body]
-    for %func_call in %branches
-        assume (%func_call.type is "Action") or barf ".."
-            Invalid format for 'when' statement. Only '*' blocks are allowed.
-        with {..}
-            %star: %func_call.1
-            %condition: %func_call.2
-            %action: %func_call.3
-        ..
-            assume (%star = "*") or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*'
+    %branches <- (%body if (%body.type = "Block") else [%body])
+    for %func_call in %branches:
+        assume (%func_call.type is "Action") or barf "Invalid format for 'when' statement. Only '*' blocks are allowed."
+        with {%star: %func_call.1, %condition: %func_call.2, %action: %func_call.3}:
+            assume (%star = "*") or barf "Invalid format for 'when' statement. Lines must begin with '*'"
             assume %condition or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
-            if: %action is (nil)
+                Invalid format for 'when' statement. Lines must begin with '*' and have a condition \
+                ..or the word "else"
+            
+            if (%action is (nil)):
                 lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
                 do next %func_call
-
-            if: %condition = "else"
+            
+            if (%condition = "else"):
                 assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
                 to %code write "\nelse\n    "
-                to %code write: %action as lua statements
+                to %code write (%action as lua statements)
                 %seen_else <- (yes)
-            ..else
+            ..else:
                 assume (not %seen_else) or barf "'else' clause needs to be last in 'when' block"
                 lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
                 to %code write "\("if" if %is_first else "\nelseif") "
-                for %i = %condition in %fallthroughs
+                for %i = %condition in %fallthroughs:
                     if (%i > 1): to %code write " or "
                     to %code write %condition
+                
                 to %code write " then\n    "
                 to %code write (%action as lua statements)
-
+            
             %fallthroughs <- []
             %is_first <- (no)
-
+    
     assume (%fallthroughs = []) or barf "Unfinished fallthrough conditions in 'when' block"
     assume ((length of "\%code") > 0) or barf "Empty body for 'when' block"
     to %code write "\nend --when"
     return %code
 
+
 # Switch statement
-compile [when %branch_value = ? %body, when %branch_value is ? %body] to
+compile [when %branch_value = ? %body, when %branch_value is ? %body] to:
     %code <- (Lua "")
     %fallthroughs <- []
     %is_first <- (yes)
     %seen_else <- (no)
-    %branches <-
-        %body if (%body.type = "Block") else [%body]
-    for %func_call in %branches
-        assume (%func_call.type is "Action") or barf ".."
-            Invalid format for 'when' statement. Only '*' blocks are allowed.
-        with {%star:%func_call.1, %condition:%func_call.2, %action:%func_call.3}
-            assume (%star = "*") or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*'
+    %branches <- (%body if (%body.type = "Block") else [%body])
+    for %func_call in %branches:
+        assume (%func_call.type is "Action") or barf "Invalid format for 'when' statement. Only '*' blocks are allowed."
+        with {%star: %func_call.1, %condition: %func_call.2, %action: %func_call.3}:
+            assume (%star = "*") or barf "Invalid format for 'when' statement. Lines must begin with '*'"
             assume %condition or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*' and have a condition or the word "else"
-            if: %action is (nil)
+                Invalid format for 'when' statement. Lines must begin with '*' and have a condition \
+                ..or the word "else"
+            
+            if (%action is (nil)):
                 lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
                 do next %func_call
-
-            if: %condition = "else"
+            
+            if (%condition = "else"):
                 assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
                 to %code write "\nelse\n    "
-                to %code write: %action as lua statements
-            ..else
+                to %code write (%action as lua statements)
+            ..else:
                 assume (not %seen_else) or barf "'else' clause needs to be last in 'when % = ?' block"
                 to %code write "\("if" if %is_first else "\nelseif") "
                 lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
-                for %i = % in %fallthroughs
-                    if: %i > 1
-                        to %code write " or "
-                    if: (%.type is "Text") or (%.type is "Number")
+                for %i = % in %fallthroughs:
+                    if (%i > 1): to %code write " or "
+                    if ((%.type is "Text") or (%.type is "Number")):
                         to %code write "branch_value == \%"
-                    ..else
-                        to %code write "utils.equivalent(branch_value, \%)"
+                    ..else: to %code write "utils.equivalent(branch_value, \%)"
+                
                 to %code write "then\n    "
                 to %code write (%action as lua statements)
-
+        
         %fallthroughs <- []
         %is_first <- (no)
     
     assume (%fallthroughs = []) or barf "Unfinished fallthrough conditions in 'when' block"
     assume ((length of "\%code") > 0) or barf "No body for 'when % = ?' block!"
     to %code write "\nend"
-    %code <-
+    %code <- (..)
         Lua ".."
             do --when % = ?
                 local branch_value = \(%branch_value as lua expr)
                 \%code
             end --when % = ?
+    
     return %code
 
+
 # Do/finally
-compile [do %action] to
+compile [do %action] to (..)
     Lua ".."
         do
             \(%action as lua statements)
         end --do
-
-compile [do %action then always %final_action] to
+compile [do %action then always %final_action] to (..)
     Lua ".."
         do
             local fell_through = false
@@ -384,23 +367,24 @@ compile [do %action then always %final_action] to
             if not fell_through then return ret end
         end
 
+
 # Inline thunk:
-compile [result of %body] to
-    Lua value "(\(compile as: [] -> %body))()"
+compile [result of %body] to (Lua value "(\(compile as ([] -> %body)))()")
 
 # Recurion control flow
-compile [for %var in recursive %structure %body] to
-    with local compile actions
-        compile [recurse %v on %x] to
+compile [for %var in recursive %structure %body] to (..)
+    with local compile actions:
+        compile [recurse %v on %x] to (..)
             Lua "table.insert(stack\(%v as lua id), \(%x as lua expr))"
-        return
+        
+        return (..)
             Lua ".."
                 do
                     local stack\(%var as lua id) = list{\(%structure as lua expr)}
                     while #stack\(%var as lua id) > 0 do
                         \(%var as lua expr) = table.remove(stack\(%var as lua id), 1)
                         \(%body as lua statements)
-                        \(compile as: === next %var ===)
+                        \(compile as (===next %var ===))
                     end
-                    \(compile as: === stop %var ===)
+                    \(compile as (===stop %var ===))
                 end

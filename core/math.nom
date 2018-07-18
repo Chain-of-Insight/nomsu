@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.2.4.3
 #
     This file defines some common math literals and functions
 
@@ -9,91 +9,119 @@ use "core/control_flow.nom"
 use "core/collections.nom"
 
 # Literals:
-compile [infinity, inf] to: Lua value "math.huge"
-compile [not a number, NaN, nan] to: Lua value "(0/0)"
-compile [pi, Pi, PI] to: Lua value "math.pi"
-compile [tau, Tau, TAU] to: Lua value "(2*math.pi)"
-compile [golden ratio] to: Lua value "((1+math.sqrt(5))/2)"
-compile [e] to: Lua value "math.exp(1)"
+compile [infinity, inf] to (Lua value "math.huge")
+compile [not a number, NaN, nan] to (Lua value "(0/0)")
+compile [pi, Pi, PI] to (Lua value "math.pi")
+compile [tau, Tau, TAU] to (Lua value "(2*math.pi)")
+compile [golden ratio] to (Lua value "((1+math.sqrt(5))/2)")
+compile [e] to (Lua value "math.exp(1)")
 
 # Functions:
-compile [% as a number, % as number] to: Lua value "tonumber(\(% as lua expr))"
-compile [absolute value %, | % |, abs %] to: Lua value "math.abs(\(% as lua expr))"
-compile [square root %, square root of %, √%, sqrt %] to: Lua value "math.sqrt(\(% as lua expr))"
-compile [sine %, sin %] to: Lua value "math.sin(\(% as lua expr))"
-compile [cosine %, cos %] to: Lua value "math.cos(\(% as lua expr))"
-compile [tangent %, tan %] to: Lua value "math.tan(\(% as lua expr))"
-compile [arc sine %, asin %] to: Lua value "math.asin(\(% as lua expr))"
-compile [arc cosine %, acos %] to: Lua value "math.acos(\(% as lua expr))"
-compile [arc tangent %, atan %] to: Lua value "math.atan(\(% as lua expr))"
-compile [arc tangent %y / %x, atan2 %y %x] to: Lua value "math.atan2(\(%y as lua expr), \(%x as lua expr))"
-compile [hyperbolic sine %, sinh %] to: Lua value "math.sinh(\(% as lua expr))"
-compile [hyperbolic cosine %, cosh %] to: Lua value "math.cosh(\(% as lua expr))"
-compile [hyperbolic tangent %, tanh %] to: Lua value "math.tanh(\(% as lua expr))"
-compile [e^%, exp %] to: Lua value "math.exp(\(% as lua expr))"
-compile [natural log %, ln %, log %] to: Lua value "math.log(\(% as lua expr))"
-compile [log % base %base, log base %base of %] to: Lua value "math.log(\(% as lua expr), \(%base as lua expr))"
-compile [floor %] to: Lua value "math.floor(\(% as lua expr))"
-compile [ceiling %, ceil %] to: Lua value "math.ceil(\(% as lua expr))"
-compile [round %, % rounded] to: Lua value "math.floor(\(% as lua expr) + .5)"
-action [%n to the nearest %rounder]
+compile [% as a number, % as number] to (Lua value "tonumber(\(% as lua expr))")
+compile [absolute value %, | % |, abs %] to (..)
+    Lua value "math.abs(\(% as lua expr))"
+
+compile [square root %, square root of %, √ %, sqrt %] to (..)
+    Lua value "math.sqrt(\(% as lua expr))"
+
+compile [sine %, sin %] to (Lua value "math.sin(\(% as lua expr))")
+compile [cosine %, cos %] to (Lua value "math.cos(\(% as lua expr))")
+compile [tangent %, tan %] to (Lua value "math.tan(\(% as lua expr))")
+compile [arc sine %, asin %] to (Lua value "math.asin(\(% as lua expr))")
+compile [arc cosine %, acos %] to (Lua value "math.acos(\(% as lua expr))")
+compile [arc tangent %, atan %] to (Lua value "math.atan(\(% as lua expr))")
+compile [arc tangent %y / %x, atan2 %y %x] to (..)
+    Lua value "math.atan2(\(%y as lua expr), \(%x as lua expr))"
+
+compile [hyperbolic sine %, sinh %] to (Lua value "math.sinh(\(% as lua expr))")
+compile [hyperbolic cosine %, cosh %] to (..)
+    Lua value "math.cosh(\(% as lua expr))"
+
+compile [hyperbolic tangent %, tanh %] to (..)
+    Lua value "math.tanh(\(% as lua expr))"
+
+compile [e^ %, exp %] to (Lua value "math.exp(\(% as lua expr))")
+compile [natural log %, ln %, log %] to (Lua value "math.log(\(% as lua expr))")
+compile [log % base %base, log base %base of %] to (..)
+    Lua value "math.log(\(% as lua expr), \(%base as lua expr))"
+
+compile [floor %] to (Lua value "math.floor(\(% as lua expr))")
+compile [ceiling %, ceil %] to (Lua value "math.ceil(\(% as lua expr))")
+compile [round %, % rounded] to (Lua value "math.floor(\(% as lua expr) + .5)")
+action [%n to the nearest %rounder] (..)
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 
+
 # Any/all/none
-compile [all of %items, all %items] to
-    unless: %items.type is "List"
-        return: Lua value "utils.all(\(%items as lua expr))"
+compile [all of %items, all %items] to:
+    unless (%items.type is "List"):
+        return (Lua value "utils.all(\(%items as lua expr))")
+    
     %clauses <- ((% as lua expr) for % in %items)
-    return: Lua value "(\(%clauses joined with " and "))"
-parse [not all of %items, not all %items] as: not (all of %items)
-compile [any of %items, any %items] to
-    unless: %items.type is "List"
-        return: Lua value "utils.any(\(%items as lua expr))"
+    return (Lua value "(\(%clauses joined with " and "))")
+
+parse [not all of %items, not all %items] as (not (all of %items))
+compile [any of %items, any %items] to:
+    unless (%items.type is "List"):
+        return (Lua value "utils.any(\(%items as lua expr))")
+    
     %clauses <- ((% as lua expr) for % in %items)
-    return: Lua value "(\(%clauses joined with " or "))"
-parse [none of %items, none %items] as: not (any of %items)
-compile [sum of %items, sum %items] to
-    unless: %items.type is "List"
-        return: Lua value "utils.sum(\(%items as lua expr))"
+    return (Lua value "(\(%clauses joined with " or "))")
+
+parse [none of %items, none %items] as (not (any of %items))
+compile [sum of %items, sum %items] to:
+    unless (%items.type is "List"):
+        return (Lua value "utils.sum(\(%items as lua expr))")
+    
     %clauses <- ((% as lua expr) for % in %items)
-    return: Lua value "(\(%clauses joined with " + "))"
-compile [product of %items, product %items] to
-    unless: %items.type is "List"
-        return: Lua value "utils.product(\(%items as lua expr))"
+    return (Lua value "(\(%clauses joined with " + "))")
+
+compile [product of %items, product %items] to:
+    unless (%items.type is "List"):
+        return (Lua value "utils.product(\(%items as lua expr))")
+    
     %clauses <- ((% as lua expr) for % in %items)
-    return: Lua value "(\(%clauses joined with " * "))"
-action [avg of %items, average of %items]
-    =lua "(utils.sum(\%items)/#\%items)"
-compile [min of %items, smallest of %items, lowest of %items] to
+    return (Lua value "(\(%clauses joined with " * "))")
+
+action [avg of %items, average of %items] (=lua "(utils.sum(\%items)/#\%items)")
+compile [min of %items, smallest of %items, lowest of %items] to (..)
     Lua value "utils.min(\(%items as lua expr))"
-compile [max of %items, biggest of %items, largest of %items, highest of %items] to
-    Lua value "utils.max(\(%items as lua expr))"
-parse [min of %items by %item = %value_expr] as
-    result of
-        <- {%best:nil, %best_key:nil}
-        for %item in %items
+
+compile [max of %items, biggest of %items, largest of %items, highest of %items]
+..to (Lua value "utils.max(\(%items as lua expr))")
+
+parse [min of %items by %item = %value_expr] as (..)
+    result of:
+        <- {%best: nil, %best_key: nil}
+        for %item in %items:
             %key <- %value_expr
-            if: (%best = (nil)) or (%key < %best_key)
-                <- {%best:%item, %best_key:%key}
-        return %best
-parse [max of %items by %item = %value_expr] as
-    result of
-        <- {%best:nil, %best_key:nil}
-        for %item in %items
-            %key <- %value_expr
-            if: (%best = (nil)) or (%key > %best_key)
-                <- {%best:%item, %best_key:%key}
+            if ((%best = (nil)) or (%key < %best_key)):
+                <- {%best: %item, %best_key: %key}
+        
         return %best
 
+parse [max of %items by %item = %value_expr] as (..)
+    result of:
+        <- {%best: nil, %best_key: nil}
+        for %item in %items:
+            %key <- %value_expr
+            if ((%best = (nil)) or (%key > %best_key)):
+                <- {%best: %item, %best_key: %key}
+        
+        return %best
+
+
 # Random functions
-action [seed random with %]
-    lua> ".."
-        math.randomseed(\%);
-        for i=1,20 do math.random(); end
-parse [seed random] as: seed random with (=lua "os.time()")
-compile [random number, random, rand] to: Lua value "math.random()"
-compile [random int %n, random integer %n, randint %n] to: Lua value "math.random(\(%n as lua expr))"
-compile [random from %low to %high, random number from %low to %high, rand %low %high] to
-    Lua value "math.random(\(%low as lua expr), \(%high as lua expr))"
-action [random choice from %elements, random choice %elements, random %elements]
+action [seed random with %] (..)
+    lua> "math.randomseed(\%);\nfor i=1,20 do math.random(); end"
+
+parse [seed random] as (seed random with (=lua "os.time()"))
+compile [random number, random, rand] to (Lua value "math.random()")
+compile [random int %n, random integer %n, randint %n] to (..)
+    Lua value "math.random(\(%n as lua expr))"
+
+compile [random from %low to %high, random number from %low to %high, rand %low %high]
+..to (Lua value "math.random(\(%low as lua expr), \(%high as lua expr))")
+
+action [random choice from %elements, random choice %elements, random %elements] (..)
     =lua "\%elements[math.random(#\%elements)]"

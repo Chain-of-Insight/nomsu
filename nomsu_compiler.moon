@@ -328,8 +328,9 @@ with NomsuCompiler
 
     .compile = (tree)=>
         if tree.version
-            if upgrade = @['A'..string.as_lua_id("upgrade 1 from 2")]
-                tree = upgrade(tree, tree.version)
+            if get_version = @['A'..string.as_lua_id("Nomsu version")]
+                if upgrade = @['A'..string.as_lua_id("1 upgraded from 2 to 3")]
+                    tree = upgrade(tree, tree.version, get_version!)
         switch tree.type
             when "Action"
                 stub = tree.stub
