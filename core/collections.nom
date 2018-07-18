@@ -62,6 +62,9 @@ compile [..]
     to %list append %item
 ..to (Lua "table.insert(\(%list as lua expr), \(%item as lua expr))")
 
+compile [add %item to %list at index %i] to (..)
+    Lua "table.insert(\(%list as lua expr), \(%i as lua expr), \(%item as lua expr))"
+
 compile [pop from %list, remove last from %list] to (..)
     Lua value "table.remove(\(%list as lua expr))"
 

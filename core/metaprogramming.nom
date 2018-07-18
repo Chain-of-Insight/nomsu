@@ -3,7 +3,7 @@
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
 
-lua> "NOMSU_CORE_VERSION = 2"
+lua> "NOMSU_CORE_VERSION = 3"
 lua> ".."
     nomsu.COMPILE_ACTIONS["% -> %"] = function(nomsu, tree, \%args, \%body)
         local lua = LuaCode.Value(tree.source, "function(")
