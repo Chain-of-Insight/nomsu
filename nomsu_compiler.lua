@@ -962,6 +962,7 @@ do
                 if j > 1 then
                   nomsu:append("\n")
                 end
+                line = gsub(line, "\\", "\\\\")
                 if #line > 1.25 * MAX_LINE then
                   local remainder = line
                   while #remainder > 0 do

@@ -634,6 +634,7 @@ with NomsuCompiler
                                 bit_lines = files.get_lines(bit)
                                 for j, line in ipairs bit_lines
                                     if j > 1 then nomsu\append "\n"
+                                    line = gsub(line, "\\", "\\\\")
                                     if #line > 1.25*MAX_LINE
                                         remainder = line
                                         while #remainder > 0

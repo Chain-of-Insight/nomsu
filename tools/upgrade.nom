@@ -1,0 +1,10 @@
+use "core"
+use "compatibility"
+use "lib/os.nom"
+
+for %path in (=lua "arg"):
+    for file %filename in %path:
+        %tree <- (parse (read file %filename) from %filename)
+        %tree <- (%tree upgraded from %tree.version to (Nomsu version))
+        say "#!/usr/bin/env nomsu -V\(Nomsu version)\n\(%tree as nomsu)"
+
