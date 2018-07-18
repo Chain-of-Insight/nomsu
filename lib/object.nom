@@ -1,37 +1,35 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.2.4.3
 #
     This file contains the implementation of an Object-Oriented programming system.
 
 use "core"
 
-compile [@, me] to: Lua value "self"
-
-compile [method %actions %body] to
-    %lua <- (compile as: action %actions %body)
+compile [@, me] to (Lua value "self")
+compile [method %actions %body] to:
+    %lua <- (compile as (action %actions %body))
     add free vars ((% as lua id) for % in %actions) to %lua
     declare locals in %lua
-    for % in %actions
+    for % in %actions:
         to %lua write "\nclass.\(% as lua id) = \(% as lua id)"
-    return
+    
+    return (..)
         Lua ".."
-            do -- Method: \(%actions.1.stub)
+            do -- Method: \(%actions.(1).stub)
                 \%lua
             end
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-parse [as %instance %body] as
-    result of
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+parse [as %instance %body] as (..)
+    result of:
         %old_self <- (me)
         (me) <- %instance
-        try
-            %body
-        ..and if it barfs %msg
+        try %body and if it barfs %msg:
             (me) <- %old_self
             barf %msg
-        ..or if it succeeds
-            (me) <- %old_self
+        ..or if it succeeds: (me) <- %old_self
 
-compile [object %classname extends %parent %class_body] to
+compile [object %classname extends %parent %class_body] to (..)
     Lua ".."
         do
             local class = {name=\(%classname as lua expr)}
@@ -51,11 +49,13 @@ compile [object %classname extends %parent %class_body] to
             _ENV["A"..string.as_lua_id("class "..class.name)] = function() return class end
             class.__index = class
             class.class = class
-
+        
             \(%class_body as lua statements)
-
+        
             class.__tostring = class["A"..string.as_lua_id("as text")]
         end
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-parse [object %classname %class_body] as: object %classname extends (nil) %class_body
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+parse [object %classname %class_body] as (..)
+    object %classname extends (nil) %class_body

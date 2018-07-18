@@ -1,33 +1,29 @@
-#!/usr/bin/env nomsu -V1
+#!/usr/bin/env nomsu -V2.2.4.3
 #
     This file defines some actions that interact with the operating system and filesystem.
 
 use "core"
-
-action [path of Nomsu file %filename]
-    lua> ".."
-        for i,f in files.walk(\%filename) do return f end
+action [path of Nomsu file %filename]:
+    lua> "for i,f in files.walk(\%filename) do return f end"
     barf "Could not find file: \%filename"
 
-action [sh> %cmd]
+action [sh> %cmd]:
     lua> ".."
         local result = io.popen(\%cmd)
         local contents = result:read("*a")
         result:close()
         return contents
 
-action [read file %filename]
-    =lua "files.read(\%filename)"
-
-compile [for file %f in %path %body] to
+action [read file %filename] (=lua "files.read(\%filename)")
+compile [for file %f in %path %body] to (..)
     Lua ".."
         for i,\(%f as lua expr) in files.walk(\(%path as lua expr)) do
             \(%body as lua statements)
-            \(compile as: === next %f ===)
+            \(compile as (===next %f ===))
         end
-        \(compile as: === stop %f ===)
+        \(compile as (===stop %f ===))
 
-compile [%expr for file %f in %path] to
+compile [%expr for file %f in %path] to (..)
     Lua value ".."
         (function()
             local ret = list{}
@@ -37,14 +33,14 @@ compile [%expr for file %f in %path] to
             return ret
         end)()
 
-action [write to file %filename %text, to file %filename write %text, write %text to file %filename]
-    lua> ".."
-        local file = io.open(\%filename, 'w')
-        file:write(\%text)
-        file:close()
+action [..]
+    write to file %filename %text, to file %filename write %text
+    write %text to file %filename
+..:
+    lua> "local file = io.open(\%filename, 'w')\nfile:write(\%text)\nfile:close()"
 
-action [line number of %pos in %str]
+action [line number of %pos in %str] (..)
     =lua "files.get_line_number(\%str, \%pos)"
-    
-action [line %line_num in %str]
+
+action [line %line_num in %str] (..)
     =lua "files.get_line(\%str, \%line_num)"
