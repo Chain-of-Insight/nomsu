@@ -71,13 +71,17 @@ _list_mt =
     __lt: (other)=>
         assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
         for i=1,math.max(#@, #other)
-            if @[i] < other[i] then return true
+            if not @[i] and other[i] then return true
+            elseif @[i] and not other[i] then return false
+            elseif @[i] < other[i] then return true
             elseif @[i] > other[i] then return false
         return false
     __le: (other)=>
         assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
         for i=1,math.max(#@, #other)
-            if @[i] < other[i] then return true
+            if not @[i] and other[i] then return true
+            elseif @[i] and not other[i] then return false
+            elseif @[i] < other[i] then return true
             elseif @[i] > other[i] then return false
         return true
 

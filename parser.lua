@@ -151,13 +151,13 @@ Parser.parse = function(nomsu_code, source, version)
   source = source or nomsu_code.source
   nomsu_code = tostring(nomsu_code)
   version = version or nomsu_code:match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
-  version = (version and tonumber(version)) or Parser.version
+  local syntax_version = version and tonumber(version:match("^[0-9]+")) or Parser.version
   local userdata = {
     errors = { },
     source = source,
     comments = { }
   }
-  local tree = Parser.patterns[version]:match(nomsu_code, nil, userdata)
+  local tree = Parser.patterns[syntax_version]:match(nomsu_code, nil, userdata)
   if not (tree) then
     error("In file " .. tostring(colored.blue(tostring(source or "<unknown>"))) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
   end
@@ -187,7 +187,7 @@ Parser.parse = function(nomsu_code, source, version)
       end
       errors = _accum_0
     end
-    error("Errors occurred while parsing (v" .. tostring(version) .. "):\n\n" .. table.concat(errors, "\n\n"), 0)
+    error("Errors occurred while parsing (v" .. tostring(syntax_version) .. "):\n\n" .. table.concat(errors, "\n\n"), 0)
   end
   local comments
   do
@@ -226,7 +226,6 @@ Parser.parse = function(nomsu_code, source, version)
     end
   end
   walk_tree(tree)
-  tree.version = userdata.version
   return tree
 end
 Parser.is_operator = function(s)

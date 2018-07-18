@@ -1,7 +1,7 @@
 -- Nomsu version 2
 file (FileChunks):
     {:curr_indent: ' '* :}
-    ("#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: ([0-9.]+ -> tonumber) :} [^%nl]*)?
+    ("#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^%nl]*)?
     comment? blank_lines?
     (chunk (nl_nodent chunk_delimeter nl_nodent chunk)*)?
     blank_lines?
@@ -16,7 +16,7 @@ nl_nodent: blank_lines nodent
 nl_indent: blank_lines {:curr_indent: indent :} (comment nl_nodent)?
 
 comment:
-    "#" (({} {~ [^%nl]* ((%nl (!indent %ws* %nl)*) (indent -> '') [^%nl]*)* ~} %userdata) => add_comment)
+    "#" (({} {~ [^%nl]* (%nl+ (indent -> '') [^%nl]*)* ~} %userdata) => add_comment)
 eol_comment:
     "#" (({} {[^%nl]*} %userdata) => add_comment)
 

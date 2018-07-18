@@ -94,7 +94,11 @@ local _list_mt = {
   __lt = function(self, other)
     assert(type(self) == 'table' and type(other) == 'table', "Incompatible types for comparison")
     for i = 1, math.max(#self, #other) do
-      if self[i] < other[i] then
+      if not self[i] and other[i] then
+        return true
+      elseif self[i] and not other[i] then
+        return false
+      elseif self[i] < other[i] then
         return true
       elseif self[i] > other[i] then
         return false
@@ -105,7 +109,11 @@ local _list_mt = {
   __le = function(self, other)
     assert(type(self) == 'table' and type(other) == 'table', "Incompatible types for comparison")
     for i = 1, math.max(#self, #other) do
-      if self[i] < other[i] then
+      if not self[i] and other[i] then
+        return true
+      elseif self[i] and not other[i] then
+        return false
+      elseif self[i] < other[i] then
         return true
       elseif self[i] > other[i] then
         return false

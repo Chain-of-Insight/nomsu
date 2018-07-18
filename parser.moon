@@ -103,11 +103,11 @@ Parser.parse = (nomsu_code, source=nil, version=nil)->
     source or= nomsu_code.source
     nomsu_code = tostring(nomsu_code)
     version or= nomsu_code\match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
-    version = (version and tonumber(version)) or Parser.version
+    syntax_version = version and tonumber(version\match("^[0-9]+")) or Parser.version
     userdata = {
         errors: {}, :source, comments: {}
     }
-    tree = Parser.patterns[version]\match(nomsu_code, nil, userdata)
+    tree = Parser.patterns[syntax_version]\match(nomsu_code, nil, userdata)
     unless tree
         error "In file #{colored.blue tostring(source or "<unknown>")} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
     if type(tree) == 'number'
@@ -117,7 +117,7 @@ Parser.parse = (nomsu_code, source=nil, version=nil)->
         keys = [k for k,v in pairs(userdata.errors)]
         table.sort(keys)
         errors = [userdata.errors[k] for k in *keys]
-        error("Errors occurred while parsing (v#{version}):\n\n"..table.concat(errors, "\n\n"), 0)
+        error("Errors occurred while parsing (v#{syntax_version}):\n\n"..table.concat(errors, "\n\n"), 0)
 
     comments = [{comment:c, pos:p} for p,c in pairs(userdata.comments)]
     -- Sort in descending order so we can pop the first comments off the end one at a time
@@ -136,7 +136,6 @@ Parser.parse = (nomsu_code, source=nil, version=nil)->
         t.comments = comment_buff if #comment_buff > 0
     walk_tree tree
 
-    tree.version = userdata.version
     return tree
 
 Parser.is_operator = (s)->

@@ -1,7 +1,7 @@
 -- Nomsu version 2
 file (FileChunks):
     {:curr_indent: ' '* :}
-    ("#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: ([0-9.]+ -> tonumber) :} [^%nl]*)?
+    ("#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^%nl]*)?
     comment? blank_lines?
     (chunk (nl_nodent section_division nl_nodent chunk)*)?
     blank_lines?
@@ -16,7 +16,7 @@ nl_nodent: blank_lines nodent
 nl_indent: blank_lines {:curr_indent: indent :} (comment nl_nodent)?
 
 comment:
-    "#" (({} {~ [^%nl]* ((%nl (!indent %ws* %nl)*) (indent -> '') [^%nl]*)* ~} %userdata) => add_comment)
+    "#" (({} {~ [^%nl]* (%nl+ (indent -> '') [^%nl]*)* ~} %userdata) => add_comment)
 eol_comment:
     "#" (({} {[^%nl]*} %userdata) => add_comment)
 
@@ -27,7 +27,7 @@ inline_block (Block):
 chunk (Block):
     statement (nl_nodent statement)*
 indented_block (Block):
-    ":" eol nl_indent statement (nl_nodent statement)*
+    ":" eol nl_indent statement (nl_nodent statement)* (%nl (%ws* %nl)* nodent comment)*
 
 statement: (action / expression) (eol / (!! [^%nl]+ -> "Unexpected character while parsing line" !!))
 inline_statement: (inline_action / inline_expression)
@@ -62,16 +62,13 @@ index_chain (IndexChain):
 -- Actions need either at least 1 word, or at least 2 tokens
 inline_action (Action):
     !section_division
-    (   ((smushed_action / inline_expression) (%ws* (smushed_action / inline_expression / word))+)
-      / (word              (%ws* (smushed_action / inline_expression / word))*))
+    (   (inline_expression (%ws* (inline_expression / word))+)
+      / (word              (%ws* (inline_expression / word))*))
     (%ws* inline_block)?
 action (Action):
     !section_division
-    (  ((smushed_action / expression) ((nl_nodent "..")? %ws* (smushed_action / expression / word))+)
-     / (word       ((nl_nodent "..")? %ws* (smushed_action / expression / word))*))
-smushed_action (Action):
-    !section_division
-    (index_chain / noindex_inline_expression / word+) (index_chain / noindex_inline_expression / word+ / "(" %ws* ")")+
+    (  (expression ((nl_nodent "..")? %ws* (expression / word))+)
+     / (word       ((nl_nodent "..")? %ws* (expression / word))*))
 
 word: !number { %operator_char+ / %ident_char+ }
 
