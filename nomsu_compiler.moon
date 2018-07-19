@@ -509,6 +509,7 @@ with NomsuCompiler
         recurse = (t, opts)->
             opts or= {}
             opts.consumed_comments = options.consumed_comments
+            opts.inside_multiblock or= options.inside_multiblock
             return @tree_to_nomsu(t, opts)
 
         switch tree.type
@@ -532,11 +533,15 @@ with NomsuCompiler
                         else
                             arg_nomsu = recurse(bit,inline:true)
                             return nil unless arg_nomsu
-                            unless i == 1 or (bit.type == "Block" and not (#bit > 1 or i < #tree))
-                                nomsu\append " "
-                            if bit.type == "Action" or (bit.type == "Block" and (#bit > 1 or i < #tree))
-                                arg_nomsu\parenthesize!
-                            nomsu\append arg_nomsu
+                            if bit.type == "Block"
+                                if i == 1 or i < #tree or (options.inside_multiblock and #bit > 1)
+                                    nomsu\append " " if i > 1
+                                    arg_nomsu\parenthesize!
+                                nomsu\append arg_nomsu
+                            else
+                                nomsu\append " " if i > 1
+                                arg_nomsu\parenthesize! if bit.type == "Action"
+                                nomsu\append arg_nomsu
                     return nomsu
                 else
                     pos = tree.source.start
@@ -596,7 +601,7 @@ with NomsuCompiler
                     nomsu = NomsuCode(tree.source, ":")
                     for i,line in ipairs tree
                         nomsu\append(i == 1 and " " or "; ")
-                        nomsu\append assert(recurse(line, inline:true))
+                        nomsu\append assert(recurse(line, inline:true, inside_multiblock:true))
                     return nomsu
                 nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
                 for i, line in ipairs tree

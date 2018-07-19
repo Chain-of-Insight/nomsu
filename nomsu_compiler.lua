@@ -787,6 +787,7 @@ do
     recurse = function(t, opts)
       opts = opts or { }
       opts.consumed_comments = options.consumed_comments
+      opts.inside_multiblock = opts.inside_multiblock or options.inside_multiblock
       return self:tree_to_nomsu(t, opts)
     end
     local _exp_0 = tree.type
@@ -822,13 +823,23 @@ do
             if not (arg_nomsu) then
               return nil
             end
-            if not (i == 1 or (bit.type == "Block" and not (#bit > 1 or i < #tree))) then
-              nomsu:append(" ")
+            if bit.type == "Block" then
+              if i == 1 or i < #tree or (options.inside_multiblock and #bit > 1) then
+                if i > 1 then
+                  nomsu:append(" ")
+                end
+                arg_nomsu:parenthesize()
+              end
+              nomsu:append(arg_nomsu)
+            else
+              if i > 1 then
+                nomsu:append(" ")
+              end
+              if bit.type == "Action" then
+                arg_nomsu:parenthesize()
+              end
+              nomsu:append(arg_nomsu)
             end
-            if bit.type == "Action" or (bit.type == "Block" and (#bit > 1 or i < #tree)) then
-              arg_nomsu:parenthesize()
-            end
-            nomsu:append(arg_nomsu)
           end
         end
         return nomsu
@@ -911,7 +922,8 @@ do
         for i, line in ipairs(tree) do
           nomsu:append(i == 1 and " " or "; ")
           nomsu:append(assert(recurse(line, {
-            inline = true
+            inline = true,
+            inside_multiblock = true
           })))
         end
         return nomsu
