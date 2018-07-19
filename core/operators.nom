@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.4.4.3
 #
     This file contains definitions of operators like "+" and "and".
 
@@ -147,20 +147,28 @@ compile [%x wrapped around %y, %x mod %y] to (..)
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
 parse [%x < %y < %z] as (..)
     =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"
+
 parse [%x <= %y < %z] as (..)
     =lua "(function(x,y,z) return x <= y and y <  z; end)(\%x,\%y,\%z)"
+
 parse [%x < %y <= %z] as (..)
     =lua "(function(x,y,z) return x <  y and y <= z; end)(\%x,\%y,\%z)"
+
 parse [%x <= %y <= %z] as (..)
     =lua "(function(x,y,z) return x <= y and y <= z; end)(\%x,\%y,\%z)"
+
 parse [%x > %y > %z] as (..)
     =lua "(function(x,y,z) return x >  y and y >  z; end)(\%x,\%y,\%z)"
+
 parse [%x >= %y > %z] as (..)
     =lua "(function(x,y,z) return x >= y and y >  z; end)(\%x,\%y,\%z)"
+
 parse [%x > %y >= %z] as (..)
     =lua "(function(x,y,z) return x >  y and y >= z; end)(\%x,\%y,\%z)"
+
 parse [%x >= %y >= %z] as (..)
     =lua "(function(x,y,z) return x >= y and y >= z; end)(\%x,\%y,\%z)"
+
 
 # TODO: optimize for common case where x,y,z are all either variables or number literals
 # Boolean Operators

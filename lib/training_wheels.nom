@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.4.4.3
 #
     This file contains a set of definitions that bring some familiar language features
     from other languages into nomsu (e.g. "==" and "continue")
@@ -11,7 +11,7 @@ parse [%a === %b] as ((%a 's id) is (%b 's id))
 parse [%a !== %b] as ((%a 's id) is not (%b 's id))
 parse [%a mod %b] as (%a wrapped around %b)
 parse [function %names %body, def %names %body] as (action %names %body)
-parse [switch %branch_value %body] as (when %branch_value = ? %body)
+parse [switch %branch_value %body] as (if %branch_value is: %body)
 parse [None, Null] as (nil)
 parse [True, true] as (yes)
 parse [False, false] as (no)

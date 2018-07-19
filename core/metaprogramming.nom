@@ -1,9 +1,9 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.4.4.3
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
 
-lua> "NOMSU_CORE_VERSION = 3"
+lua> "NOMSU_CORE_VERSION = 4"
 lua> ".."
     nomsu.COMPILE_ACTIONS["% -> %"] = function(nomsu, tree, \%args, \%body)
         local lua = LuaCode.Value(tree.source, "function(")
@@ -119,8 +119,16 @@ compile [parse %actions as %body] to (..)
         local ret = \(compile as (compile %actions to %new_body))
         return ret
 
-compile [%tree as lua expr] to (..)
-    Lua value "nomsu:compile(\(=lua "nomsu:compile(\%tree):as_expr()")):as_expr()"
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+action [%tree as lua expr]:
+    lua> ".."
+        \%tree_lua = nomsu:compile(\%tree)
+        if not \%tree_lua.is_value then
+            nomsu:compile_error(\%tree.source, "Could not convert %s to a Lua expression",
+                nomsu:tree_to_nomsu(\%tree))
+        end
+        return \%tree_lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

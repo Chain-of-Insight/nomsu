@@ -124,18 +124,19 @@ with NomsuCompiler
     .LOADED = {}
     .AST = AST
 
-    .compile_error = (tok, err_format_string, ...)=>
-        file = files.read(tok.source.filename)
+    .compile_error = (source, err_format_string, ...)=>
+        err_format_string = err_format_string\gsub("%%[^s]", "%%%1")
+        file = files.read(source.filename)
         line_starts = files.get_line_starts(file)
-        line_no = files.get_line_number(file, tok.source.start)
+        line_no = files.get_line_number(file, source.start)
         line_start = line_starts[line_no]
-        src = colored.dim(file\sub(line_start, tok.source.start-1))
-        src ..= colored.underscore colored.bright colored.red(file\sub(tok.source.start, tok.source.stop-1))
-        end_of_line = (line_starts[files.get_line_number(file, tok.source.stop) + 1] or 0) - 1
-        src ..= colored.dim(file\sub(tok.source.stop, end_of_line-1))
+        src = colored.dim(file\sub(line_start, source.start-1))
+        src ..= colored.underscore colored.bright colored.red(file\sub(source.start, source.stop-1))
+        end_of_line = (line_starts[files.get_line_number(file, source.stop) + 1] or 0) - 1
+        src ..= colored.dim(file\sub(source.stop, end_of_line-1))
         src = '    '..src\gsub('\n', '\n    ')
         err_msg = err_format_string\format(src, ...)
-        error("#{tok.source.filename}:#{line_no}: "..err_msg, 0)
+        error("#{source.filename}:#{line_no}: "..err_msg, 0)
 
     -- This is a bit of a hack, but this code handles arbitrarily complex
     -- math expressions like 2*x + 3^2 without having to define a single
@@ -154,7 +155,7 @@ with NomsuCompiler
                 else
                     bit_lua = @compile(bit)
                     unless bit_lua.is_value
-                        @compile_error bit,
+                        @compile_error bit.source,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     lua\append bit_lua
             return lua
@@ -178,7 +179,7 @@ with NomsuCompiler
                 else
                     bit_lua = @compile(bit)
                     unless bit_lua.is_value
-                        @compile_error bit,
+                        @compile_error bit.source,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     add_bit_lua(lua, bit_lua)
             lua\append ")"
@@ -194,7 +195,7 @@ with NomsuCompiler
                 else
                     tok_lua = @compile(tok)
                     unless tok_lua.is_value
-                        @compile_error tok, "Non-expression value inside math expression:\n%s"
+                        @compile_error tok.source, "Non-expression value inside math expression:\n%s"
                     if tok.type == "Action"
                         tok_lua\parenthesize!
                     lua\append tok_lua
@@ -293,7 +294,7 @@ with NomsuCompiler
 
     .run_lua = (lua, source=nil)=>
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", self)
+        run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
         if not run_lua_fn
             line_numbered_lua = concat(
                 [format("%3d|%s",i,line) for i, line in ipairs files.get_lines(lua_string)],
@@ -340,7 +341,7 @@ with NomsuCompiler
                     -- TODO: use tail call?
                     ret = compile_action(@, tree, unpack(args))
                     if not ret
-                        @compile_error tree,
+                        @compile_error tree.source,
                             "Compile-time action:\n%s\nfailed to produce any Lua"
                     return ret
 
@@ -350,7 +351,7 @@ with NomsuCompiler
                     if type(tok) == "string" then continue
                     arg_lua = @compile(tok)
                     unless arg_lua.is_value
-                        @compile_error tok,
+                        @compile_error tok.source,
                             "Cannot use:\n%s\nas an argument to %s, since it's not an expression, it produces: %s",
                             stub, repr arg_lua
                     insert args, arg_lua
@@ -387,7 +388,7 @@ with NomsuCompiler
                     unless bit_lua.is_value
                         src = '    '..gsub(tostring(recurse(bit)), '\n','\n    ')
                         line = "#{bit.source.filename}:#{files.get_line_number(files.read(bit.source.filename), bit.source.start)}"
-                        @compile_error bit,
+                        @compile_error bit.source,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     if #lua.bits > 0 then lua\append ".."
                     if bit.type != "Text"
@@ -408,7 +409,7 @@ with NomsuCompiler
                 for i, item in ipairs tree
                     item_lua = @compile(item)
                     unless item_lua.is_value
-                        @compile_error item,
+                        @compile_error item.source,
                             "Cannot use:\n%s\nas a list item, since it's not an expression."
                     items[i] = item_lua
                 lua\concat_append(items, ", ", ",\n  ")
@@ -425,11 +426,11 @@ with NomsuCompiler
                 key, value = tree[1], tree[2]
                 key_lua = @compile(key)
                 unless key_lua.is_value
-                    @compile_error tree[1],
+                    @compile_error tree[1].source,
                         "Cannot use:\n%s\nas a dict key, since it's not an expression."
                 value_lua = value and @compile(value) or LuaCode.Value(key.source, "true")
                 unless value_lua.is_value
-                    @compile_error tree[2],
+                    @compile_error tree[2].source,
                         "Cannot use:\n%s\nas a dict value, since it's not an expression."
                 -- TODO: support arbitrary words here, like operators and unicode
                 key_str = match(tostring(key_lua), [=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
@@ -446,7 +447,7 @@ with NomsuCompiler
             when "IndexChain"
                 lua = @compile(tree[1])
                 unless lua.is_value
-                    @compile_error tree[1],
+                    @compile_error tree[1].source,
                         "Cannot index:\n%s\nsince it's not an expression."
                 first_char = sub(tostring(lua),1,1)
                 if first_char == "{" or first_char == '"' or first_char == "["
@@ -456,7 +457,7 @@ with NomsuCompiler
                     key = tree[i]
                     key_lua = @compile(key)
                     unless key_lua.is_value
-                        @compile_error key,
+                        @compile_error key.source,
                             "Cannot use:\n%s\nas an index, since it's not an expression."
                     key_lua_str = tostring(key_lua)
                     if lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
@@ -539,7 +540,7 @@ with NomsuCompiler
                     return nomsu
                 else
                     pos = tree.source.start
-                    nomsu = NomsuCode(tree.source, pop_comments(pos, '\n'))
+                    nomsu = NomsuCode(tree.source, pop_comments(pos))
                     next_space = ""
                     for i,bit in ipairs tree
                         if match(next_space, '\n')

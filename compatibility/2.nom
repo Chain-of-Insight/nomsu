@@ -4,7 +4,7 @@ use "compatibility/compatibility.nom"
 
 upgrade %tree to "2" as:
     unless (%tree is "Action" syntax tree): return
-    if (all[%tree.stub is "if % % else %", not (%tree.3 is "Var" syntax tree), not (%tree.5 is "Var" syntax tree)]):
+    if (%tree.stub is "if % % else %"):
         %true_body = (%tree.3 upgraded)
         unless (%true_body is "Block" syntax tree):
             %true_body = (=lua "Block(\%true_body.source, \%true_body)")
@@ -22,7 +22,7 @@ upgrade %tree to "2" as:
         "for % in % to % via % %", "for % in % to % %", "for % % in % %", "do %"
         "for % in recursive % %", "test %", "with % %", "result of %"
     for %n in %need_blocks:
-        if ((%tree.stub is %n) and (not ((last in %tree) is "Var" syntax tree))):
+        if (%tree.stub is %n):
             %bits = (((% upgraded) if (% is syntax tree) else %) for % in %tree)
             unless ((last in %bits) is "Block" syntax tree):
                 %body = (last in %bits)

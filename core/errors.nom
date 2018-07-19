@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.4.4.3
 #
     This file contains basic error reporting code
 
@@ -7,6 +7,9 @@ compile [traceback] to (Lua value "debug.traceback()")
 compile [traceback %] to (Lua value "debug.traceback('', \(% as lua expr))")
 compile [barf] to (Lua "error(nil, 0);")
 compile [barf %msg] to (Lua "error(\(%msg as lua expr), 0);")
+compile [compile error at %source %msg] to (..)
+    Lua "nomsu:compile_error(\(%source as lua expr), \(%msg as lua expr))"
+
 compile [assume %condition] to:
     lua> ".."
         local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition))

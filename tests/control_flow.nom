@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.4.4.3
 #
     Tests for the stuff defined in core/control_flow.nom
 
@@ -107,37 +107,35 @@ for %key = %value in {x: 1, y: 2}:
     do next %value
     barf "skipping value failed"
 
-action [barfer] (barf "this should never be reached")
-when:
-    * (no) (barf "'when' fail")
-    * (no)
-    * (3 > 4) (barf "'when' fail 2")
-    * (yes)
-    * (barfer) (do nothing)
-    * (99 > 1) (barf "Fell through incorrectly")
+action [barfer]: barf "this should never be reached"
+if:
+    (no): barf "'when' fail"
+    (no) (3 > 4): barf "'when' fail 2"
+    (yes) (barfer): do nothing
+    (99 > 1): barf "Fell through incorrectly"
 
 %else_worked = (no)
-when:
-    * (no) (barf)
-    *else (%else_worked = (yes))
+if:
+    (no): barf
+    else: %else_worked = (yes)
+
+
 
 assume %else_worked or barf "when..else failed"
-action [test when scope] (when (* (yes) (%leaked = (yes))))
+action [test when scope]:
+    if (yes): %leaked = (yes)
 test when scope
 assume (not %leaked) or barf "'when' is leaking locals"
 %when_worked = (no)
-when 4 = ?:
-    * 1
-    * 2 (barf "'when = ?' fail")
-    * 3
-    * 4
-    * (barfer) (%when_worked = (yes))
+if 4 is:
+    1 2: barf "'when = ?' fail"
+    3 4 (barfer): %when_worked = (yes)
 
 assume %when_worked
 %when_worked = (no)
-when 5 = ?:
-    * 6 (barf)
-    *else (%when_worked = (yes))
+if 5 is:
+    6: barf
+    else: %when_worked = (yes)
 
 assume %when_worked
 %x = 1
@@ -149,8 +147,7 @@ assume (..)
             %n = 0
             for % in [1, 2, 3]: %n += %
             return %n
-    ..== 6
-
+    .. == 6
 %t = [1, [2, [[3], 4], 5, [[[6]]]]]
 %flat = []
 for % in recursive %t:

@@ -312,12 +312,6 @@ do
       end
       return statements
     end,
-    as_expr = function(self)
-      if self.is_value then
-        return self
-      end
-      return error("Cannot convert to expression: " .. tostring(tostring(self)))
-    end,
     __tostring = function(self)
       if self.__str == nil then
         local buff, indent = { }, 0

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.4.4.3
 #..
     Tests for the stuff defined in core/text.nom
 use "core"
@@ -40,10 +40,9 @@ assume (..)
     ..== "one\ntwo"
 
 assume ("nogap" == "nogap")
+
 #comment
 #
     block comment
-
-
 
 say "Text test passed."

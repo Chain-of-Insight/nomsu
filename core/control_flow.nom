@@ -154,7 +154,7 @@ compile [..]
 ..to:
     
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
-    assume (%var.type is "Var") or barf "Loop expected variable, not: \%var"
+    unless (%var.type is "Var"): compile error at %var.source "Loop expected variable, not: %s"
     %lua = (..)
         Lua ".."
             for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(%step as lua expr) do
@@ -185,12 +185,11 @@ compile [..]
 parse [for %var in %start to %stop %body] as (..)
     for %var in %start to %stop via 1 %body
 
-
 # For-each loop (lua's "ipairs()")
 compile [for %var in %iterable %body] to:
     
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
-    assume (%var.type is "Var") or barf "Loop expected variable, not: \%var"
+    unless (%var.type is "Var"): compile error at %var.source "Loop expected variable, not: %s"
     %lua = (..)
         Lua ".."
             for i,\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
@@ -223,8 +222,8 @@ compile [for %key = %value in %iterable %body, for %key %value in %iterable %bod
 ..to:
     
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
-    assume (%key.type is "Var") or barf "Loop expected variable, not: \%key"
-    assume (%value.type is "Var") or barf "Loop expected variable, not: \%value"
+    unless (%key.type is "Var"): compile error at %key.source "Loop expected variable, not: %s"
+    unless (%value.type is "Var"): compile error at %value.source "Loop expected variable, not: %s"
     %lua = (..)
         Lua ".."
             for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(%iterable as lua expr)) do
@@ -266,101 +265,88 @@ compile [for %key = %value in %iterable %body, for %key %value in %iterable %bod
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Switch statement/multi-branch if
-compile [when %body] to:
+# Multi-branch conditional (if..elseif..else)
+compile [if %body, when %body] to:
     %code = (Lua "")
-    %fallthroughs = []
-    %is_first = (yes)
-    %seen_else = (no)
-    %branches = (%body if (%body.type == "Block") else [%body])
-    for %func_call in %branches:
-        assume (%func_call.type is "Action") or barf "Invalid format for 'when' statement. Only '*' blocks are allowed."
-        with {%star: %func_call.1, %condition: %func_call.2, %action: %func_call.3}:
-            assume (%star == "*") or barf "Invalid format for 'when' statement. Lines must begin with '*'"
-            assume %condition or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*' and have a condition \
-                ..or the word "else"
-            
-            if (%action is (nil)):
-                lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
-                do next %func_call
-            
-            if (%condition == "else"):
-                assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
-                to %code write "\nelse\n    "
-                to %code write (%action as lua statements)
-                %seen_else = (yes)
-            ..else:
-                assume (not %seen_else) or barf "'else' clause needs to be last in 'when' block"
-                lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
-                to %code write "\("if" if %is_first else "\nelseif") "
-                for %i = %condition in %fallthroughs:
-                    if (%i > 1): to %code write " or "
-                    to %code write %condition
-                
-                to %code write " then\n    "
-                to %code write (%action as lua statements)
-            
-            %fallthroughs = []
-            %is_first = (no)
+    %clause = "if"
+    %else_allowed = (yes)
+    unless (%body.type is "Block"): compile error at %body.source "'if' expected a Block, but got: %s"
+    for %line in %body:
+        unless (..)
+            ((%line.type is "Action") and ((length of %line) >= 2))
+            ..and (%line.(length of %line) is "Block" syntax tree)
+        ..:
+            compile error at %line.source ".."
+                Invalid line for 'if', each line should contain conditional expressions \
+                ..followed by a block, or "else" followed by a block:
+                %s
+        %action = %line.(length of %line)
+        if ((%line.1 is "else") and ((length of %line) == 2)):
+            unless %else_allowed: compile error at %line.source "Can't have two 'else' blocks"
+            unless ((length of "\%code") > 0):
+                compile error at %line.source "Can't have an 'else' block without a preceeding condition"
+            to %code write "\nelse\n    \(%action as lua statements)"
+            %else_allowed = (no)
+        ..else:
+            to %code write "\%clause "
+            for %i in 1 to ((length of %line) - 1):
+                unless (%line.%i is syntax tree):
+                    compile error at %line.source ".."
+                        Invalid condition for 'if' statement:
+                        %s
+                if (%i > 1): to %code write " or "
+                to %code write (%line.%i as lua expr)
+            to %code write " then\n    \(%action as lua statements)"
+            %clause = "\nelseif"
     
-    assume (%fallthroughs == []) or barf "Unfinished fallthrough conditions in 'when' block"
-    assume ((length of "\%code") > 0) or barf "Empty body for 'when' block"
+    if ((length of "\%code") == 0):
+        compile error at %body.source "'if' block has an empty body"
     to %code write "\nend --when"
     return %code
 
-
 # Switch statement
-compile [when %branch_value = ? %body, when %branch_value is? %body] to:
+compile [if %branch_value is %body, when %branch_value is %body] to:
     %code = (Lua "")
-    %fallthroughs = []
-    %is_first = (yes)
-    %seen_else = (no)
-    %branches = (%body if (%body.type == "Block") else [%body])
-    for %func_call in %branches:
-        assume (%func_call.type is "Action") or barf "Invalid format for 'when' statement. Only '*' blocks are allowed."
-        with {%star: %func_call.1, %condition: %func_call.2, %action: %func_call.3}:
-            assume (%star == "*") or barf "Invalid format for 'when' statement. Lines must begin with '*'"
-            assume %condition or barf ".."
-                Invalid format for 'when' statement. Lines must begin with '*' and have a condition \
-                ..or the word "else"
-            
-            if (%action is (nil)):
-                lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
-                do next %func_call
-            
-            if (%condition == "else"):
-                assume (not %is_first) or barf "'else' clause cannot be first in 'when % = ?' block"
-                to %code write "\nelse\n    "
-                to %code write (%action as lua statements)
-            ..else:
-                assume (not %seen_else) or barf "'else' clause needs to be last in 'when % = ?' block"
-                to %code write "\("if" if %is_first else "\nelseif") "
-                lua> "table.insert(\%fallthroughs, \(%condition as lua expr))"
-                for %i = % in %fallthroughs:
-                    if (%i > 1): to %code write " or "
-                    if ((%.type is "Text") or (%.type is "Number")):
-                        to %code write "branch_value == \%"
-                    ..else: to %code write "utils.equivalent(branch_value, \%)"
-                
-                to %code write "then\n    "
-                to %code write (%action as lua statements)
-        
-        %fallthroughs = []
-        %is_first = (no)
+    %clause = "if"
+    %else_allowed = (yes)
+    unless (%body.type is "Block"): compile error at %body.source "'if' expected a Block, but got: %s"
+    for %line in %body:
+        unless (..)
+            ((%line.type is "Action") and ((length of %line) >= 2))
+            ..and (%line.(length of %line) is "Block" syntax tree)
+        ..:
+            compile error at %line.source ".."
+                Invalid line for 'if % is % %', each line should contain expressions \
+                ..followed by a block, or "else" followed by a block:
+                %s
+        %action = %line.(length of %line)
+        if ((%line.1 is "else") and ((length of %line) == 2)):
+            unless %else_allowed: compile error at %line.source "Can't have two 'else' blocks"
+            unless ((length of "\%code") > 0):
+                compile error at %line.source "Can't have an 'else' block without a preceeding condition"
+            to %code write "\nelse\n    \(%action as lua statements)"
+            %else_allowed = (no)
+        ..else:
+            to %code write "\%clause "
+            for %i in 1 to ((length of %line) - 1):
+                unless (%line.%i is syntax tree):
+                    compile error at %line.source ".."
+                        Invalid condition for 'if' statement:
+                        %s
+                if (%i > 1): to %code write " or "
+                to %code write "branch_value == \(%line.%i as lua expr)"
+            to %code write " then\n    \(%action as lua statements)"
+            %clause = "\nelseif"
     
-    assume (%fallthroughs == []) or barf "Unfinished fallthrough conditions in 'when' block"
-    assume ((length of "\%code") > 0) or barf "No body for 'when % = ?' block!"
-    to %code write "\nend"
-    %code = (..)
+    if ((length of "\%code") == 0):
+        compile error at %body.source "'if % is % %' block has an empty body"
+    to %code write "\nend --when"
+    return (..)
         Lua ".."
-            do --when % = ?
+            do --if % is
                 local branch_value = \(%branch_value as lua expr)
                 \%code
-            end --when % = ?
-    
-    return %code
-
+            end --if % is
 
 # Do/finally
 compile [do %action] to (..)

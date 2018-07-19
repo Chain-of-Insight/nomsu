@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.4.4.3
 #
     This file contains definitions pertaining to variable scoping
 
@@ -8,17 +8,16 @@ use "core/collections.nom"
 use "core/control_flow.nom"
 compile [with local %locals %body, with local %locals do %body] to:
     %body_lua = (%body as lua statements)
-    when %locals.type = ?:
-        * "Dict":
+    if %locals.type is:
+        "Dict":
             %body_lua = (..)
                 Lua "\(compile as (<- %locals))\n\%body_lua"
             
             declare locals ("\(%.1 as lua)" for % in %locals) in %body_lua
         
-        * "List": declare locals ("\(% as lua)" for % in %locals) in %body_lua
-        * "Var"
-        * "Action": declare locals ["\(%locals as lua)"] in %body_lua
-        *else (barf "Unexpected local: \(%locals as nomsu)")
+        "List": declare locals ("\(% as lua)" for % in %locals) in %body_lua
+        "Var" "Action": declare locals ["\(%locals as lua)"] in %body_lua
+        else: compile error at %locals.source "Unexpected locals: %s"
     
     return (..)
         Lua "do\n    \%body_lua\nend"

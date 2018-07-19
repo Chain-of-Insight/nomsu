@@ -227,18 +227,19 @@ do
   })
   NomsuCompiler.LOADED = { }
   NomsuCompiler.AST = AST
-  NomsuCompiler.compile_error = function(self, tok, err_format_string, ...)
-    local file = files.read(tok.source.filename)
+  NomsuCompiler.compile_error = function(self, source, err_format_string, ...)
+    err_format_string = err_format_string:gsub("%%[^s]", "%%%1")
+    local file = files.read(source.filename)
     local line_starts = files.get_line_starts(file)
-    local line_no = files.get_line_number(file, tok.source.start)
+    local line_no = files.get_line_number(file, source.start)
     local line_start = line_starts[line_no]
-    local src = colored.dim(file:sub(line_start, tok.source.start - 1))
-    src = src .. colored.underscore(colored.bright(colored.red(file:sub(tok.source.start, tok.source.stop - 1))))
-    local end_of_line = (line_starts[files.get_line_number(file, tok.source.stop) + 1] or 0) - 1
-    src = src .. colored.dim(file:sub(tok.source.stop, end_of_line - 1))
+    local src = colored.dim(file:sub(line_start, source.start - 1))
+    src = src .. colored.underscore(colored.bright(colored.red(file:sub(source.start, source.stop - 1))))
+    local end_of_line = (line_starts[files.get_line_number(file, source.stop) + 1] or 0) - 1
+    src = src .. colored.dim(file:sub(source.stop, end_of_line - 1))
     src = '    ' .. src:gsub('\n', '\n    ')
     local err_msg = err_format_string:format(src, ...)
-    return error(tostring(tok.source.filename) .. ":" .. tostring(line_no) .. ": " .. err_msg, 0)
+    return error(tostring(source.filename) .. ":" .. tostring(line_no) .. ": " .. err_msg, 0)
   end
   local math_expression = re.compile([[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]])
   local add_lua_bits
@@ -256,7 +257,7 @@ do
         else
           local bit_lua = self:compile(bit)
           if not (bit_lua.is_value) then
-            self:compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+            self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
           lua:append(bit_lua)
         end
@@ -289,7 +290,7 @@ do
         else
           local bit_lua = self:compile(bit)
           if not (bit_lua.is_value) then
-            self:compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+            self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
           add_bit_lua(lua, bit_lua)
         end
@@ -308,7 +309,7 @@ do
         else
           local tok_lua = self:compile(tok)
           if not (tok_lua.is_value) then
-            self:compile_error(tok, "Non-expression value inside math expression:\n%s")
+            self:compile_error(tok.source, "Non-expression value inside math expression:\n%s")
           end
           if tok.type == "Action" then
             tok_lua:parenthesize()
@@ -456,7 +457,7 @@ do
       source = nil
     end
     local lua_string = tostring(lua)
-    local run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", self)
+    local run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
     if not run_lua_fn then
       local line_numbered_lua = concat((function()
         local _accum_0 = { }
@@ -540,7 +541,7 @@ do
           end
           local ret = compile_action(self, tree, unpack(args))
           if not ret then
-            self:compile_error(tree, "Compile-time action:\n%s\nfailed to produce any Lua")
+            self:compile_error(tree.source, "Compile-time action:\n%s\nfailed to produce any Lua")
           end
           return ret
         end
@@ -556,7 +557,7 @@ do
           end
           local arg_lua = self:compile(tok)
           if not (arg_lua.is_value) then
-            self:compile_error(tok, "Cannot use:\n%s\nas an argument to %s, since it's not an expression, it produces: %s", stub, repr(arg_lua))
+            self:compile_error(tok.source, "Cannot use:\n%s\nas an argument to %s, since it's not an expression, it produces: %s", stub, repr(arg_lua))
           end
           insert(args, arg_lua)
           _continue_0 = true
@@ -624,7 +625,7 @@ do
           if not (bit_lua.is_value) then
             local src = '    ' .. gsub(tostring(recurse(bit)), '\n', '\n    ')
             local line = tostring(bit.source.filename) .. ":" .. tostring(files.get_line_number(files.read(bit.source.filename), bit.source.start))
-            self:compile_error(bit, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+            self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
           if #lua.bits > 0 then
             lua:append("..")
@@ -655,7 +656,7 @@ do
       for i, item in ipairs(tree) do
         local item_lua = self:compile(item)
         if not (item_lua.is_value) then
-          self:compile_error(item, "Cannot use:\n%s\nas a list item, since it's not an expression.")
+          self:compile_error(item.source, "Cannot use:\n%s\nas a list item, since it's not an expression.")
         end
         items[i] = item_lua
       end
@@ -680,11 +681,11 @@ do
       local key, value = tree[1], tree[2]
       local key_lua = self:compile(key)
       if not (key_lua.is_value) then
-        self:compile_error(tree[1], "Cannot use:\n%s\nas a dict key, since it's not an expression.")
+        self:compile_error(tree[1].source, "Cannot use:\n%s\nas a dict key, since it's not an expression.")
       end
       local value_lua = value and self:compile(value) or LuaCode.Value(key.source, "true")
       if not (value_lua.is_value) then
-        self:compile_error(tree[2], "Cannot use:\n%s\nas a dict value, since it's not an expression.")
+        self:compile_error(tree[2].source, "Cannot use:\n%s\nas a dict value, since it's not an expression.")
       end
       local key_str = match(tostring(key_lua), [=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
       if key_str then
@@ -697,7 +698,7 @@ do
     elseif "IndexChain" == _exp_0 then
       local lua = self:compile(tree[1])
       if not (lua.is_value) then
-        self:compile_error(tree[1], "Cannot index:\n%s\nsince it's not an expression.")
+        self:compile_error(tree[1].source, "Cannot index:\n%s\nsince it's not an expression.")
       end
       local first_char = sub(tostring(lua), 1, 1)
       if first_char == "{" or first_char == '"' or first_char == "[" then
@@ -707,7 +708,7 @@ do
         local key = tree[i]
         local key_lua = self:compile(key)
         if not (key_lua.is_value) then
-          self:compile_error(key, "Cannot use:\n%s\nas an index, since it's not an expression.")
+          self:compile_error(key.source, "Cannot use:\n%s\nas an index, since it's not an expression.")
         end
         local key_lua_str = tostring(key_lua)
         do
@@ -833,7 +834,7 @@ do
         return nomsu
       else
         local pos = tree.source.start
-        local nomsu = NomsuCode(tree.source, pop_comments(pos, '\n'))
+        local nomsu = NomsuCode(tree.source, pop_comments(pos))
         local next_space = ""
         for i, bit in ipairs(tree) do
           if match(next_space, '\n') then
