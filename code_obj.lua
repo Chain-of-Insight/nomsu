@@ -113,28 +113,7 @@ do
     end,
     trailing_line_len = function(self)
       if self._trailing_line_len == nil then
-        local bits, match = self.bits, string.match
-        local len = 0
-        for i = #bits, 1, -1 do
-          local b = bits[i]
-          if type(b) == 'string' then
-            do
-              local line = match(b, "\n([^\n]*)$")
-              if line then
-                len = len + #line
-                break
-              else
-                len = len + #b
-              end
-            end
-          else
-            len = len + b:trailing_line_len()
-            if b:is_multiline() then
-              break
-            end
-          end
-        end
-        self._trailing_line_len = len
+        self._trailing_line_len = #tostring(self):match("[^\n]*$")
       end
       return self._trailing_line_len
     end,
@@ -145,7 +124,12 @@ do
         local _list_0 = self.bits
         for _index_0 = 1, #_list_0 do
           local b = _list_0[_index_0]
-          if type(b) ~= 'string' or match(b, "\n") then
+          if type(b) == 'string' then
+            if match(b, '\n') then
+              self._is_multiline = true
+              break
+            end
+          elseif b:is_multiline() then
             self._is_multiline = true
             break
           end

@@ -73,19 +73,7 @@ class Code
     
     trailing_line_len: =>
         if @_trailing_line_len == nil
-            bits, match = @bits, string.match
-            len = 0
-            for i=#bits,1,-1
-                b = bits[i]
-                if type(b) == 'string'
-                    if line = match(b, "\n([^\n]*)$")
-                        len += #line
-                        break
-                    else len += #b
-                else
-                    len += b\trailing_line_len!
-                    break if b\is_multiline!
-            @_trailing_line_len = len
+            @_trailing_line_len = #tostring(@)\match("[^\n]*$")
         return @_trailing_line_len
     
     is_multiline: =>
@@ -93,7 +81,11 @@ class Code
             match = string.match
             @_is_multiline = false
             for b in *@bits
-                if type(b) != 'string' or match(b, "\n")
+                if type(b) == 'string'
+                    if match(b, '\n')
+                        @_is_multiline = true
+                        break
+                elseif b\is_multiline!
                     @_is_multiline = true
                     break
         return @_is_multiline

@@ -592,20 +592,19 @@ with NomsuCompiler
             else
                 error("Unknown type: #{tree.type}")
 
-    .tree_to_nomsu = (tree, options)=>
-        options or= {}
-        options.consumed_comments or= {}
+    .tree_to_nomsu = (tree, consumed_comments=nil)=>
+        consumed_comments or= {}
         pop_comments = (pos, prefix='', suffix='')->
             find_comments = (t)->
                 if t.comments and t.source.filename == tree.source.filename
                     for c in *t.comments
-                        coroutine.yield(c) unless options.consumed_comments[c]
+                        coroutine.yield(c) unless consumed_comments[c]
                 for x in *t
                     find_comments(x) if AST.is_syntax_tree x
             nomsu = NomsuCode(tree.source)
             for comment in coroutine.wrap(-> find_comments(tree))
                 break if comment.pos > pos
-                options.consumed_comments[comment] = true
+                consumed_comments[comment] = true
                 nomsu\append("#"..(gsub(comment.comment, "\n", "\n    ")).."\n")
                 if comment.comment\match("^\n.") then nomsu\append("\n") -- for aesthetics
             return '' if #nomsu.bits == 0
@@ -613,10 +612,8 @@ with NomsuCompiler
             nomsu\append suffix
             return nomsu
 
-        recurse = (t, opts)->
-            opts or= {}
-            opts.consumed_comments = options.consumed_comments
-            return @tree_to_nomsu(t, opts)
+        -- For concision:
+        recurse = (t)-> @tree_to_nomsu(t, consumed_comments)
 
         switch tree.type
             when "FileChunks"
@@ -624,7 +621,15 @@ with NomsuCompiler
                 for i, chunk in ipairs tree
                     nomsu\append "\n\n#{("~")\rep(80)}\n\n" if i > 1
                     nomsu\append pop_comments(chunk.source.start)
-                    nomsu\append recurse(chunk, top:true)
+                    if chunk.type == "Block"
+                        for j, line in ipairs chunk
+                            nomsu\append pop_comments(line.source.start, '\n')
+                            line_nomsu = recurse(line)
+                            nomsu\append line_nomsu
+                            nomsu\append(line_nomsu\is_multiline! and "\n\n" or "\n") if j < #chunk
+                        nomsu\append pop_comments(tree.source.stop, '\n')
+                    else
+                        nomsu\append recurse(chunk)
                 nomsu\append pop_comments(tree.source.stop, '\n')
                 return nomsu
 
@@ -691,7 +696,7 @@ with NomsuCompiler
                     if i < #tree
                         nomsu\append(line_nomsu\is_multiline! and "\n\n" or "\n")
                 nomsu\append pop_comments(tree.source.stop, '\n')
-                return options.top and nomsu or NomsuCode(tree.source, ":\n    ", nomsu)
+                return NomsuCode(tree.source, ":\n    ", nomsu)
 
             when "Text"
                 inline_version = @tree_to_inline_nomsu(tree)
@@ -759,6 +764,9 @@ with NomsuCompiler
                     if nomsu\trailing_line_len! + #tostring(item_nomsu) <= MAX_LINE
                         nomsu\append ", " if nomsu\trailing_line_len! > 0
                         nomsu\append item_nomsu
+                    elseif #tostring(item_nomsu) <= MAX_LINE
+                        nomsu\append "\n" if nomsu\trailing_line_len! > 0
+                        nomsu\append item_nomsu
                     else
                         item_nomsu = recurse(item)
                         switch item.type
@@ -781,6 +789,9 @@ with NomsuCompiler
                     item_nomsu\parenthesize! if item.type == "Block"
                     if nomsu\trailing_line_len! + #tostring(item_nomsu) <= MAX_LINE
                         nomsu\append ", " if nomsu\trailing_line_len! > 0
+                        nomsu\append item_nomsu
+                    elseif #tostring(item_nomsu) <= MAX_LINE
+                        nomsu\append "\n" if nomsu\trailing_line_len! > 0
                         nomsu\append item_nomsu
                     else
                         item_nomsu = recurse(item)
