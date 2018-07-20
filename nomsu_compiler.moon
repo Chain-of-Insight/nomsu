@@ -534,7 +534,7 @@ with NomsuCompiler
                             arg_nomsu = recurse(bit,inline:true)
                             return nil unless arg_nomsu
                             if bit.type == "Block"
-                                if i == 1 or i < #tree or (options.inside_multiblock and #bit > 1)
+                                if i == 1 or i < #tree or options.inside_multiblock
                                     nomsu\append " " if i > 1
                                     arg_nomsu\parenthesize!
                                 nomsu\append arg_nomsu

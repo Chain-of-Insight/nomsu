@@ -824,7 +824,7 @@ do
               return nil
             end
             if bit.type == "Block" then
-              if i == 1 or i < #tree or (options.inside_multiblock and #bit > 1) then
+              if i == 1 or i < #tree or options.inside_multiblock then
                 if i > 1 then
                   nomsu:append(" ")
                 end
