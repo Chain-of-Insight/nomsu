@@ -160,6 +160,9 @@ files.walk = function(path, flush_cache)
   end
   local iter
   iter = function(_files, i)
+    if not (_files) then
+      return 
+    end
     i = i + 1
     do
       local f = _files[i]

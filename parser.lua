@@ -234,4 +234,22 @@ end
 Parser.is_identifier = function(s)
   return not not (NOMSU_DEFS.ident_char ^ 1 * -1):match(s)
 end
+local inline_escaper = re.compile("{~ (%utf8_char / ('\\' -> '\\\\') / [ -~] / ('\n' -> '\\n') / ('\t' -> '\\t') / ('\b' -> '\\b') / ('\a' -> '\\a') / ('\v' -> '\\v') / ('\f' -> '\\f') / ('\r' -> '\\r') / ('\"' -> '\\\"') / (. -> escape))* ~}", {
+  utf8_char = NOMSU_DEFS.utf8_char,
+  escape = (function(self)
+    return ("\\%03d"):format(self:byte())
+  end)
+})
+Parser.inline_escape = function(s)
+  return inline_escaper:match(s)
+end
+local escaper = re.compile("{~ (%utf8_char / ('\\' -> '\\\\') / [\n\r\t -~] / (. -> escape))* ~}", {
+  utf8_char = NOMSU_DEFS.utf8_char,
+  escape = (function(self)
+    return ("\\%03d"):format(self:byte())
+  end)
+})
+Parser.escape = function(s)
+  return escaper:match(s)
+end
 return Parser

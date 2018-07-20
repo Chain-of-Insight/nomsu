@@ -98,6 +98,7 @@ files.walk = (path, flush_cache=false)->
         for nomsupath in package.nomsupath\gmatch("[^;]+")
             if _files = browse(nomsupath.."/"..path) then break
     iter = (_files, i)->
+        return unless _files
         i += 1
         if f = _files[i]
             return i, f

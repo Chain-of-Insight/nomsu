@@ -1,6 +1,17 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.4.4.3
 use "core"
 use "lib/os.nom"
-for %path in (=lua "arg"):
+%args = (command line args)
+%inplace = (no)
+if (%args.1 is "-i"):
+    %inplace = (yes)
+    remove index 1 from %args
+
+for %path in %args:
     for file %filename in %path:
-        say ((parse (read file %filename) from %filename) as nomsu)
+        %formatted = ".."
+            #!/usr/bin/env nomsu -V\(Nomsu version)
+            \((parse (read file %filename) from %filename) as nomsu)
+        
+        if %inplace: write %formatted to file %filename
+        ..else: say %formatted

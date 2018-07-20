@@ -144,4 +144,11 @@ Parser.is_operator = (s)->
 Parser.is_identifier = (s)->
     return not not (NOMSU_DEFS.ident_char^1 * -1)\match(s)
 
+inline_escaper = re.compile "{~ (%utf8_char / ('\\' -> '\\\\') / [ -~] / ('\n' -> '\\n') / ('\t' -> '\\t') / ('\b' -> '\\b') / ('\a' -> '\\a') / ('\v' -> '\\v') / ('\f' -> '\\f') / ('\r' -> '\\r') / ('\"' -> '\\\"') / (. -> escape))* ~}", {utf8_char: NOMSU_DEFS.utf8_char, escape:(=> ("\\%03d")\format(@byte!))}
+Parser.inline_escape = (s)->
+    return inline_escaper\match(s)
+escaper = re.compile "{~ (%utf8_char / ('\\' -> '\\\\') / [\n\r\t -~] / (. -> escape))* ~}", {utf8_char: NOMSU_DEFS.utf8_char, escape:(=> ("\\%03d")\format(@byte!))}
+Parser.escape = (s)->
+    return escaper\match(s)
+
 return Parser

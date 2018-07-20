@@ -80,6 +80,11 @@ do
   local _class_0
   local _base_0 = {
     is_code = true,
+    dirty = function(self)
+      self.__str = nil
+      self._trailing_line_len = nil
+      self._is_multiline = nil
+    end,
     append = function(self, ...)
       local n = select("#", ...)
       local match = string.match
@@ -104,8 +109,7 @@ do
           break
         end
       end
-      self.__str = nil
-      self._trailing_line_len = nil
+      return self:dirty()
     end,
     trailing_line_len = function(self)
       if self._trailing_line_len == nil then
@@ -117,18 +121,37 @@ do
             do
               local line = match(b, "\n([^\n]*)$")
               if line then
-                return len + #line
+                len = len + #line
+                break
               else
                 len = len + #b
               end
             end
           else
             len = len + b:trailing_line_len()
+            if b:is_multiline() then
+              break
+            end
           end
         end
         self._trailing_line_len = len
       end
       return self._trailing_line_len
+    end,
+    is_multiline = function(self)
+      if self._is_multiline == nil then
+        local match = string.match
+        self._is_multiline = false
+        local _list_0 = self.bits
+        for _index_0 = 1, #_list_0 do
+          local b = _list_0[_index_0]
+          if type(b) ~= 'string' or match(b, "\n") then
+            self._is_multiline = true
+            break
+          end
+        end
+      end
+      return self._is_multiline
     end,
     concat_append = function(self, values, joiner, wrapping_joiner)
       wrapping_joiner = wrapping_joiner or joiner
@@ -154,8 +177,7 @@ do
           line_len = line_len + #b
         end
       end
-      self.__str = nil
-      self._trailing_line_len = nil
+      return self:dirty()
     end,
     prepend = function(self, ...)
       local n = select("#", ...)
@@ -166,8 +188,7 @@ do
       for i = 1, n do
         bits[i] = select(i, ...)
       end
-      self.__str = nil
-      self._trailing_line_len = nil
+      return self:dirty()
     end
   }
   _base_0.__index = _base_0
@@ -223,8 +244,7 @@ do
           seen[var] = true
         end
       end
-      self.__str = nil
-      self._trailing_line_len = nil
+      return self:dirty()
     end,
     remove_free_vars = function(self, vars)
       if not (#vars > 0) then
@@ -256,8 +276,7 @@ do
           end
         end
       end
-      self.__str = nil
-      self._trailing_line_len = nil
+      return self:dirty()
     end,
     declare_locals = function(self, to_declare)
       if to_declare == nil then

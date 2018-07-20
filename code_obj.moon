@@ -51,6 +51,11 @@ class Code
             @source = Source\from_string(@source)
         assert(@source and Source\is_instance(@source), "Source has the wrong type")
         @append(...)
+    
+    dirty: =>
+        @__str = nil
+        @_trailing_line_len = nil
+        @_is_multiline = nil
             
     append: (...)=>
         n = select("#",...)
@@ -64,8 +69,7 @@ class Code
             bits[#bits+1] = b
             if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
                 b = repr(b)
-        @__str = nil
-        @_trailing_line_len = nil
+        @dirty!
     
     trailing_line_len: =>
         if @_trailing_line_len == nil
@@ -75,13 +79,25 @@ class Code
                 b = bits[i]
                 if type(b) == 'string'
                     if line = match(b, "\n([^\n]*)$")
-                        return len + #line
+                        len += #line
+                        break
                     else len += #b
                 else
                     len += b\trailing_line_len!
+                    break if b\is_multiline!
             @_trailing_line_len = len
         return @_trailing_line_len
-            
+    
+    is_multiline: =>
+        if @_is_multiline == nil
+            match = string.match
+            @_is_multiline = false
+            for b in *@bits
+                if type(b) != 'string' or match(b, "\n")
+                    @_is_multiline = true
+                    break
+        return @_is_multiline
+
     concat_append: (values, joiner, wrapping_joiner)=>
         wrapping_joiner or= joiner
         match = string.match
@@ -102,8 +118,7 @@ class Code
                 line_len = #line
             else
                 line_len += #b
-        @__str = nil
-        @_trailing_line_len = nil
+        @dirty!
     
     prepend: (...)=>
         n = select("#",...)
@@ -112,8 +127,7 @@ class Code
             bits[i] = bits[i-n]
         for i=1,n
             bits[i] = select(i, ...)
-        @__str = nil
-        @_trailing_line_len = nil
+        @dirty!
 
 class LuaCode extends Code
     new: (...)=>
@@ -134,8 +148,7 @@ class LuaCode extends Code
             unless seen[var]
                 @free_vars[#@free_vars+1] = var
                 seen[var] = true
-        @__str = nil
-        @_trailing_line_len = nil
+        @dirty!
     
     remove_free_vars: (vars)=>
         return unless #vars > 0
@@ -154,8 +167,7 @@ class LuaCode extends Code
             for b in *lua.bits
                 if type(b) != 'string'
                     stack[#stack+1] = b
-        @__str = nil
-        @_trailing_line_len = nil
+        @dirty!
 
     declare_locals: (to_declare=nil)=>
         if to_declare == nil
