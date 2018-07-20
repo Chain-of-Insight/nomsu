@@ -874,27 +874,22 @@ do
       return error("Unknown type: " .. tostring(tree.type))
     end
   end
-  NomsuCompiler.tree_to_nomsu = function(self, tree, consumed_comments)
-    if consumed_comments == nil then
-      consumed_comments = nil
+  NomsuCompiler.tree_to_nomsu = function(self, tree, comments)
+    if comments == nil then
+      comments = nil
     end
-    consumed_comments = consumed_comments or { }
-    local pop_comments
-    pop_comments = function(pos, prefix, suffix)
-      if prefix == nil then
-        prefix = ''
-      end
-      if suffix == nil then
-        suffix = ''
-      end
+    if not (comments) then
+      local visited
+      comments, visited = { }, { }
       local find_comments
       find_comments = function(t)
         if t.comments and t.source.filename == tree.source.filename then
           local _list_0 = t.comments
           for _index_0 = 1, #_list_0 do
             local c = _list_0[_index_0]
-            if not (consumed_comments[c]) then
-              coroutine.yield(c)
+            if not (visited[c]) then
+              insert(comments, c)
+              visited[c] = true
             end
           end
         end
@@ -905,14 +900,26 @@ do
           end
         end
       end
+      find_comments(tree)
+      table.sort(comments, function(a, b)
+        return (a.pos > b.pos)
+      end)
+    end
+    local pop_comments
+    pop_comments = function(pos, prefix, suffix)
+      if prefix == nil then
+        prefix = ''
+      end
+      if suffix == nil then
+        suffix = ''
+      end
       local nomsu = NomsuCode(tree.source)
-      for comment in coroutine.wrap(function()
-        return find_comments(tree)
-      end) do
+      for i = #comments, 1, -1 do
+        local comment = comments[i]
         if comment.pos > pos then
           break
         end
-        consumed_comments[comment] = true
+        comments[i] = nil
         nomsu:append("#" .. (gsub(comment.comment, "\n", "\n    ")) .. "\n")
         if comment.comment:match("^\n.") then
           nomsu:append("\n")
@@ -927,26 +934,26 @@ do
     end
     local recurse
     recurse = function(t)
-      return self:tree_to_nomsu(t, consumed_comments)
+      return self:tree_to_nomsu(t, comments)
     end
     local _exp_0 = tree.type
     if "FileChunks" == _exp_0 then
       local nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
-      for i, chunk in ipairs(tree) do
-        if i > 1 then
+      for chunk_no, chunk in ipairs(tree) do
+        if chunk_no > 1 then
           nomsu:append("\n\n" .. tostring(("~"):rep(80)) .. "\n\n")
         end
         nomsu:append(pop_comments(chunk.source.start))
         if chunk.type == "Block" then
-          for j, line in ipairs(chunk) do
+          for line_no, line in ipairs(chunk) do
             nomsu:append(pop_comments(line.source.start, '\n'))
             local line_nomsu = recurse(line)
             nomsu:append(line_nomsu)
-            if j < #chunk then
+            if line_no < #chunk then
               nomsu:append(line_nomsu:is_multiline() and "\n\n" or "\n")
             end
           end
-          nomsu:append(pop_comments(tree.source.stop, '\n'))
+          nomsu:append(pop_comments(chunk.source.stop, '\n'))
         else
           nomsu:append(recurse(chunk))
         end
@@ -1050,7 +1057,6 @@ do
               if j > 1 then
                 nomsu:append("\n")
               end
-              line = gsub(line, "\\", "\\\\")
               if #line > 1.25 * MAX_LINE then
                 local remainder = line
                 while #remainder > 0 do
@@ -1126,16 +1132,15 @@ do
           nomsu:append(item_nomsu)
         elseif #tostring(item_nomsu) <= MAX_LINE then
           if nomsu:trailing_line_len() > 0 then
-            nomsu:append("\n")
+            nomsu:append("\n", pop_comments(item_nomsu.source.start))
           end
           nomsu:append(item_nomsu)
         else
           item_nomsu = recurse(item)
-          local _exp_1 = item.type
-          if "List" == _exp_1 or "Dict" == _exp_1 or "Text" == _exp_1 or "Block" == _exp_1 or "EscapedNomsu" == _exp_1 then
-            nomsu:append(item_nomsu)
+          if item.type == "Action" then
+            nomsu:append("(..)\n    ", pop_comments(item_nomsu.source.start), item_nomsu)
           else
-            nomsu:append("(..)\n    ", item_nomsu)
+            nomsu:append(item_nomsu)
           end
           if i < #tree then
             nomsu:append("\n")
@@ -1163,16 +1168,15 @@ do
           nomsu:append(item_nomsu)
         elseif #tostring(item_nomsu) <= MAX_LINE then
           if nomsu:trailing_line_len() > 0 then
-            nomsu:append("\n")
+            nomsu:append("\n", pop_comments(item_nomsu.source.start))
           end
           nomsu:append(item_nomsu)
         else
           item_nomsu = recurse(item)
-          local _exp_1 = item.type
-          if "List" == _exp_1 or "Dict" == _exp_1 or "Text" == _exp_1 or "Block" == _exp_1 or "EscapedNomsu" == _exp_1 then
-            nomsu:append(item_nomsu)
+          if item.type == "Action" then
+            nomsu:append("(..)\n    ", pop_comments(item_nomsu.source.start), item_nomsu)
           else
-            nomsu:append("(..)\n    ", item_nomsu)
+            nomsu:append(item_nomsu)
           end
           if i < #tree then
             nomsu:append("\n")
