@@ -16,7 +16,7 @@ for %path in %args:
     if (%path is "-i"): %inplace = (yes)
     for file %filename in %path:
         %tree = (parse (read file %filename) from %filename)
-        %uptree = (%tree upgraded from %tree.version to (Nomsu version))
+        %uptree = (%tree upgraded)
         %text = "#!/usr/bin/env nomsu -V\(Nomsu version)\n\(%uptree as nomsu)"
         if:
             %inplace:
