@@ -1,7 +1,8 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #..
     Tests for the stuff defined in core/control_flow.nom
 use "core"
+
 assume (all of [inf, pi, tau, golden ratio, e]) or barf "math constants failed"
 %nan = (NaN)
 assume (%nan != %nan) or barf "NaN failed"

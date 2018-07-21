@@ -1,3 +1,4 @@
+#!/usr/bin/env nomsu -V2.5.4.3
 #!/usr/bin/env Nomsu -V2.4.4.3
 use "core"
 use "compatibility"
@@ -8,25 +9,30 @@ use "lib/os.nom"
 if (%args.1 is "-i"):
     %inplace = (yes)
     remove index 1 from %args
+
 if (%args.1 is "-t"):
     use "lib/consolecolor.nom"
     %test = (yes)
     remove index 1 from %args
+
 for %path in %args:
     if (%path is "-i"): %inplace = (yes)
     for file %filename in %path:
         %tree = (parse (read file %filename) from %filename)
         %uptree = (%tree upgraded)
-        %text = "#!/usr/bin/env nomsu -V\(Nomsu version)\n\(%uptree as nomsu)"
+        %text = ".."
+            #!/usr/bin/env nomsu -V\(Nomsu version)
+            \(%uptree as nomsu)
+        
         if:
             %inplace:
                 say "Upgraded \%filename"
                 write %text to file %filename
+            
             %test:
                 if (%uptree == %tree):
                     say (dim "\%filename will not be changed")
                 ..else:
                     say (bright "\%filename will be changed")
-            else:
-                say %text
-
+            
+            else: say %text

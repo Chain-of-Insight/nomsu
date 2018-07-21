@@ -1,8 +1,9 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This file defines some actions for hashing files and looking up files by hash.
 
 use "core"
+
 action [file with hash %hash]:
     lua> ".."
         local Hash = require("openssl.digest")
@@ -21,6 +22,7 @@ action [hash %, sha1 %]:
     %hashlib = (=lua "require('openssl.digest')")
     %hash = (=lua "\%hashlib.new('sha1'):final(\%)")
     return (..)
-        =lua "\%hash:gsub('.', function(c) return string.format('%02x', string.byte(c)) end)"
+        =lua ".."
+            \%hash:gsub('.', function(c) return string.format('%02x', string.byte(c)) end)
 
 parse [hash of file %filename] as (sha1 (=lua "io.open(\%filename):read('*a')"))

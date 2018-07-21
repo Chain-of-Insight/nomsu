@@ -1,8 +1,9 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This file contains the implementation of an Object-Oriented programming system.
 
 use "core"
+
 compile [@, me] to (Lua value "self")
 compile [method %actions %body] to:
     %lua = (compile as (action %actions %body))
@@ -12,7 +13,10 @@ compile [method %actions %body] to:
         to %lua write "\nclass.\(% as lua id) = \(% as lua id)"
     
     return (..)
-        Lua "do -- Method: \(%actions.(1).stub)\n    \%lua\nend"
+        Lua ".."
+            do -- Method: \(%actions.(1).stub)
+                \%lua
+            end
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -1,8 +1,9 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     Tests for the stuff defined in core/metaprogramming.nom
 
 use "core"
+
 compile [five] to (Lua value "5")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -41,16 +42,24 @@ parse [V] as (five)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 assume ((V) == 5) or barf "Parse as compile action failed."
-parse [swap %x and %y] as (do (: %tmp = %x; %x = %y; %y = %tmp))
+parse [swap %x and %y] as (..)
+    do:
+        %tmp = %x
+        %x = %y
+        %y = %tmp
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-set {%1: 1, %2: 2}
+set {%1:1, %2:2}
 swap %1 and %2
-assume ((%1 == 2) and (%2 == 1)) or barf "'parse % as %' failed on 'swap % and %'"
-set {%tmp: 1, %tmp2: 2}
+assume ((%1 == 2) and (%2 == 1)) or barf ".."
+    'parse % as %' failed on 'swap % and %'
+
+set {%tmp:1, %tmp2:2}
 swap %tmp and %tmp2
-assume ((%tmp == 2) and (%tmp2 == 1)) or barf "'parse % as %' variable mangling failed."
+assume ((%tmp == 2) and (%tmp2 == 1)) or barf ".."
+    'parse % as %' variable mangling failed.
+
 
 #
     remove action (foo %)
@@ -58,10 +67,14 @@ assume ((%tmp == 2) and (%tmp2 == 1)) or barf "'parse % as %' variable mangling 
     ..and if it succeeds: barf "Failed to delete action"
 
 assume ((\(5 + 5) as value) == 10) or barf "%tree as value failed."
-assume ("\(\(foo %x) as nomsu)" == "foo %x") or barf "action source code failed."
-assume ("\(\(%x) as nomsu)" == "%x") or barf "var source code failed."
+assume ("\(\(foo %x) as nomsu)" == "foo %x") or barf ".."
+    action source code failed.
+
+assume ("\(\%x as nomsu)" == "%x") or barf "var source code failed."
 assume ((type of {}) == "table") or barf "type of failed."
-assume ("\(\(%x) as lua identifier)" == "_x") or barf "converting to identifier failed."
+assume ("\(\%x as lua identifier)" == "_x") or barf ".."
+    converting to identifier failed.
+
 assume ((run "return 99") == 99) or barf "run % failed."
 %code = (Lua "global_x = true;")
 lua> %code

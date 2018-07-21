@@ -1,8 +1,9 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This file contains basic error reporting code
 
 use "core/metaprogramming.nom"
+
 compile [traceback] to (Lua value "debug.traceback()")
 compile [traceback %] to (Lua value "debug.traceback('', \(% as lua expr))")
 compile [barf] to (Lua "error(nil, 0);")

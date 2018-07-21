@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 use "core"
 use "compatibility/compatibility.nom"
 
@@ -8,23 +8,26 @@ upgrade %tree to "2" as:
         %true_body = (%tree.3 upgraded)
         unless (%true_body is "Block" syntax tree):
             %true_body = (=lua "Block(\%true_body.source, \%true_body)")
+        
         %false_body = (%tree.5 upgraded)
         unless (%false_body is "Block" syntax tree):
             %false_body = (=lua "Block(\%false_body.source, \%false_body)")
+        
         return (..)
-            \(if %cond %true_body else %false_body)
-            ..with vars {..}
+            \(if %cond %true_body else %false_body) with vars {..}
                 cond:%tree.2 upgraded, true_body:%true_body, false_body:%false_body
     
     %need_blocks = [..]
         "if % %", "unless % %", "for % in % %", "for % = % in % %", "repeat while % %"
-        "repeat % times %", "repeat %", "repeat until % %", "for % in % to % by % %",
-        "for % in % to % via % %", "for % in % to % %", "for % % in % %", "do %"
-        "for % in recursive % %", "test %", "with % %", "result of %"
+        "repeat % times %", "repeat %", "repeat until % %", "for % in % to % by % %"
+        "for % in % to % via % %", "for % in % to % %", "for % % in % %"
+        "do %", "for % in recursive % %", "test %", "with % %", "result of %"
+    
     for %n in %need_blocks:
         if (%tree.stub is %n):
             %bits = (((% upgraded) if (% is syntax tree) else %) for % in %tree)
             unless ((last in %bits) is "Block" syntax tree):
                 %body = (last in %bits)
                 %bits.(length of %bits) = (=lua "Block(\%body.source, \%body)")
+            
             return (=lua "Action(\%tree.source, unpack(\%bits))")

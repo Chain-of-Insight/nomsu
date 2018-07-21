@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
@@ -32,13 +32,14 @@ lua> ".."
 
 lua> ".."
     nomsu.COMPILE_ACTIONS["compile % to %"] = function(nomsu, tree, \%actions, \%body)
-        local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end))}
+        local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(\
+    ..a)) end))}
         local lua = LuaCode(tree.source, "nomsu.COMPILE_ACTIONS[", repr(\%actions[1].stub),
             "] = ", \(compile as (%args -> %body)))
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) \
-    ..end))}
+            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return tostring(nomsu:compile(\
+    ..a)) end))}
             lua:append("\\nnomsu.COMPILE_ACTIONS[", repr(alias.stub), "] = ")
             if utils.equivalent(\%args, \%alias_args) then
                 lua:append("nomsu.COMPILE_ACTIONS[", repr(\%actions[1].stub), "]")
@@ -108,8 +109,7 @@ compile [parse %actions as %body] to (..)
             elseif replacements[t[1]] then
                 return replacements[t[1]]
             else
-                return t.type.."("..repr(tostring(t.source))..", "..repr(t[1].." \\0").."..string.format('%X', \
-        ..__MANGLE_INDEX))"
+                return t.type.."("..repr(tostring(t.source))..", "..repr(t[1].." \\0").."..string.format('%X', __MANGLE_INDEX))"
             end
         end
         local \%new_body = LuaCode(\%body.source,
@@ -191,7 +191,8 @@ compile [%lua <-write %code, to %lua write %code] to (..)
     Lua "\(%lua as lua expr):append(\(%code as lua expr));"
 
 compile [to %lua write %code joined by %glue] to (..)
-    Lua "\(%lua as lua expr):concat_append(\(%code as lua expr), \(%glue as lua expr));"
+    Lua ".."
+        \(%lua as lua expr):concat_append(\(%code as lua expr), \(%glue as lua expr));
 
 compile [quote %s] to (Lua value "repr(\(%s as lua expr))")
 compile [type of %obj] to (Lua value "type(\(%obj as lua expr))")
@@ -200,11 +201,15 @@ compile [parse %text] to (..)
 
 compile [parse %text from %filename] to (..)
     Lua value ".."
-        nomsu:parse(NomsuCode(Source(\(%filename as lua expr), 1, #\(%text as lua expr)), \(%text as lua expr)))
+        nomsu:parse(NomsuCode(Source(\(%filename as lua expr), 1, #\(%text as lua expr)), \(..)
+            %text as lua expr
+        ..))
 
 compile [run %nomsu_code] to (..)
     Lua value ".."
-        nomsu:run(\(%nomsu_code as lua expr), \(=lua "repr(tostring(\(%nomsu_code.source)))"))
+        nomsu:run(\(%nomsu_code as lua expr), \(..)
+            =lua "repr(tostring(\(%nomsu_code.source)))"
+        ..)
 
 action [run tree %tree, %tree as value] (lua> "return nomsu:run(\%tree)")
 compile [compile %block, compiled %block, %block compiled] to (..)

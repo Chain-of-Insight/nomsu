@@ -1,10 +1,11 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #..
     Tests for the stuff defined in core/operators.nom
 use "core"
-set {%x: 10, %y: 20}
+
+set {%x:10, %y:20}
 assume ((%x == 10) and (%y == 20)) or barf "mutli-assignment failed."
-set {%x: %y, %y: %x}
+set {%x:%y, %y:%x}
 assume ((%y == 10) and (%x == 20)) or barf "swapping vars failed."
 % = [..]
     %x < %y, %x <= %y, %x > %y, %x >= %y, %x == %y, %x is %y, %x != %y, %x isn't %y
@@ -12,30 +13,34 @@ assume ((%y == 10) and (%x == 20)) or barf "swapping vars failed."
 
 assume ({} is {}) or barf "Equality check failed."
 assume (({} 's id) is not ({} 's id)) or barf "Identity check failed."
-set {%foozle: "outer", %y: "outer"}
+set {%foozle:"outer", %y:"outer"}
 action [set global x local y]:
     external %foozle = "inner"
     %y = "inner"
 
 set global x local y
 assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
-set {%foozle: "outer", %y: "outer"}
+set {%foozle:"outer", %y:"outer"}
 action [set global x local y] (..)
     with external [%foozle]:
         %foozle = "inner"
         %y = "inner"
 
 set global x local y
-assume ((%foozle == "inner") and (%y == "outer")) or barf "'with external' failed."
-set {%x: 1, %y: 2}
-with {%z: nil, %x: 999}:
+assume ((%foozle == "inner") and (%y == "outer")) or barf ".."
+    'with external' failed.
+
+set {%x:1, %y:2}
+with {%z:nil, %x:999}:
     %z = 999
     assume (%z == 999) or barf "'with' failed."
     assume (%x == 999) or barf "'with' assignment failed."
 
 assume (%x == 1) or barf "'with' scoping failed"
 assume (%z == (nil)) or barf "'with' scoping failed"
-assume ((1 + 2 * 3 - 4 / 2 ^ 2) == 6) or barf "math expressions not working properly"
+assume ((1 + 2 * 3 - 4 / 2 ^ 2) == 6) or barf ".."
+    math expressions not working properly
+
 assume ((5 wrapped around 2) == 1) or barf "mod not working"
 assume (1 <= 2 < 3) or barf "chained operator fail."
 %value = -999
@@ -43,7 +48,9 @@ action [flipflop]:
     external %value = (- %value)
     return %value
 
-assume (not (1 < (flipflop) < 1)) or barf "3-way inequality evaluated middle term twice"
+assume (not (1 < (flipflop) < 1)) or barf ".."
+    3-way inequality evaluated middle term twice
+
 assume (((yes) and (yes)) == (yes))
 action [barfer] (barf "short circuiting failed")
 assume (((no) and (barfer)) == (no))

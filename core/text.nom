@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -20,7 +20,8 @@ compile [..]
     %text with %sub instead of %patt, %text with %patt replaced by %sub
     %text s/ %patt / %sub
 ..to (..)
-    Lua value "((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))"
+    Lua value ".."
+        ((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))
 
 action [lines in %text, lines of %text] (..)
     lua> ".."
@@ -49,7 +50,8 @@ compile [%expr for %match in %text matching %patt] to (..)
         end)()
 
 compile [%text matches %pattern] to (..)
-    Lua value "(\(%text as lua expr):match(\(%pattern as lua expr)) and true or false)"
+    Lua value ".."
+        (\(%text as lua expr):match(\(%pattern as lua expr)) and true or false)
 
 
 # Text literals

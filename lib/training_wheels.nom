@@ -1,9 +1,10 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This file contains a set of definitions that bring some familiar language features
     from other languages into nomsu (e.g. "==" and "continue")
 
 use "core"
+
 parse [%a == %b] as (%a = %b)
 parse [%a == %b] as (%a is %b)
 parse [%a ~= %b, %a != %b, %a <> %b] as (%a is not %b)
@@ -35,7 +36,9 @@ compile [function %args %body, lambda %args %body] to:
     to %lua write ")\n    "
     %body = (%body as lua)
     lua> "\%body:convert_to_statements('return ');"
-    for % in %args.value: lua> "\%body:remove_free_vars(\%);"
+    for % in %args.value:
+        lua> "\%body:remove_free_vars(\%);"
+    
     to %lua write %body
     to %lua write "\nend)"
     return %lua

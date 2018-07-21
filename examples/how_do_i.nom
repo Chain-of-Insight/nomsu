@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -56,10 +56,12 @@ say ".."
     Or, two backlashes will be treated as a single backslash, no matter what follows,
     like this: \\%foobar <- won't insert any values
     
-    If you need to split a long line without inserting a newline, you can end a line \
-    ..with backslash and start the next line with two periods, like that.
+    If you need to split a long line without inserting a newline, you can end a line with backslash and start the next line \
+    ..with two periods, like that.
     
-    Similarly, you can put a long interpolated indented value like: \(1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9) between a backslash and two periods.
+    Similarly, you can put a long interpolated indented value like: \(..)
+        1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
+    .. between a backslash and two periods.
 
 say "Single-line text can contain escape sequences like \", \\, \000, and \n"
 
@@ -81,8 +83,8 @@ say %my_list.1
 say (length of %my_list)
 
 # How do I define a dictionary/hash map?
-%my_dict = {x: 99, y: 101}
-%my_dict = {x: 101, y: 2, "99 bottles": 99, 653: 292}
+%my_dict = {x:99, y:101}
+%my_dict = {x:101, y:2, "99 bottles":99, 653:292}
 
 # How do I use a dict?
 # Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
@@ -90,41 +92,59 @@ say %my_dict.x
 %my_dict.x = 9999
 
 # How do I do conditional branching?
-if (1 < 10): say "1 is indeed < 10"
-if (1 > 10): say "this won't print"
-..else: say "this will print"
+if (1 < 10):
+    say "1 is indeed < 10"
+
+if (1 > 10):
+    say "this won't print"
+..else:
+    say "this will print"
 
 
 # There's no "elseif", so for longer conditionals, a "when" branch is the best option
-when:
-    * (3 > 6)
-    * (3 > 5)
-    * (3 > 4): say "this won't print"
-    * (3 > 3): say "this won't print"
-    * (3 > 2): say "this will print"
-    *else: say "this is the default case"
+if:
+    (3 > 6) (3 > 5) (3 > 4):
+        say "this won't print"
+    
+    (3 > 3):
+        say "this won't print"
+    
+    (3 > 2):
+        say "this will print"
+    
+    else:
+        say "this is the default case"
 
 
 # How do I do a switch statement?
-when 3 = ?:
-    * 0
-    * 1
-    * 2: say "this won't print"
-    * 3: say "this will print"
-    *else: say "this won't print"
+if 3 is:
+    0 1 2:
+        say "this won't print"
+    
+    3:
+        say "this will print"
+    
+    else:
+        say "this won't print"
 
 
 # How do I loop over a list (a foreach loop)?
 %list = [1, 2, 3]
-for %x in %list: say "For %x loop #\%x"
+for %x in %list:
+    say "For %x loop #\%x"
+
 
 # How do I loop over a number range?
 # This is inclusive, so it will loop over 1,2, and 3
-for %i in 1 to 3: say "For %i in 1 to 3 loop #\%i"
+for %i in 1 to 3:
+    say "For %i in 1 to 3 loop #\%i"
+
 
 # This will print 0,2, and 4
 for %even in 0 to 5 by 2: say "Even #\%even"
-for %backwards in 3 to 1 by -1: say "Backwards #\%backwards"
+for %backwards in 3 to 1 by -1:
+    say "Backwards #\%backwards"
+
 
 # How do I do a 'while' loop?
 %x = 1
@@ -182,7 +202,8 @@ action [..]
     I hate %worse_things more than %better_things
     I think %worse_things are worse than %better_things
     I like %better_things more than %worse_things
-..: say "\(%better_things capitalized) rule and \%worse_things drool!"
+..:
+    say "\(%better_things capitalized) rule and \%worse_things drool!"
 
 I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"
@@ -208,7 +229,7 @@ action [>> %foo_bar $$$^ --> % @&_~-^-~_~-^ %1 !]:
 >> "wow" $$$^ --> "so flexible!" @&_~-^-~_~-^ "even numbers can be variables!" !
 
 # There's also full unicode support
-%こんにちは = "\227\129\147\227\130\147\227\129\171\227\129\161\227\129\175"
+%こんにちは = "こんにちは"
 action [% と言う] "\%世界"
 say (%こんにちは と言う)
 
@@ -228,7 +249,9 @@ say (2 + 3)
 say (2 + 3)
 
 # If you need to keep going after an indented region, you can start the next line with ".."
-say both "Very long first argument that needs its own line" and also "short second arg"
+say both "Very long first argument that needs its own line" and also ".."
+    short second arg
+
 action [my favorite number] (21 + 2)
 
 # This can be nested:
@@ -236,9 +259,7 @@ say both (my favorite number) and also "foo"
 
 # Macros: 
 # The "lua> %" and "=lua %" macros can be used to write raw lua code: 
-action [say the time] (..)
-    lua> "io.write(\"The OS time is: \", os.time(), \"\\n\");"
-
+action [say the time] (lua> "io.write(\"The OS time is: \", os.time(), \"\\n\");")
 say the time
 say "Math expression result is: \(=lua "(1 + 2*3 + 3*4)^2")"
 
@@ -251,7 +272,10 @@ parse [if %condition is untrue %body] as (if (not %condition) %body)
 
 # Or to transform nomsu code into custom lua code using "compile % to %"
 compile [if %condition on opposite day %body] to (..)
-    Lua "if not \(%condition as lua expr) then\n    \(%body as lua statements)\nend"
+    Lua ".."
+        if not \(%condition as lua expr) then
+            \(%body as lua statements)
+        end
 
 
 # Constants can be defined as macros
@@ -277,11 +301,11 @@ if (1 > (TWENTY)) on opposite day:
 # How do I use an action as a value?
 # Well... it's always *possible* to fall back to Lua behavior for something like this:
 action [best of %items according to %key_fn]:
-    set {%best: nil, %best_key: nil}
+    set {%best:nil, %best_key:nil}
     for %item in %items:
         %key = (=lua "\%key_fn(\%item)")
         if ((%best is (nil)) or (%key > %best_key)):
-            set {%best: %item, %best_key: %key}
+            set {%best:%item, %best_key:%key}
     
     return %best
 
@@ -293,11 +317,11 @@ say (best of [2, -3, 4, -8] according to ([%x] -> (%x * %x)))
     want to use:
 parse [best of %items where %item_var has score %key_expr] as (..)
     result of:
-        set {%best: nil, %best_key: nil}
+        set {%best:nil, %best_key:nil}
         for %item_var in %items:
             %key = %key_expr
             if ((%best is (nil)) or (%key > %best_key)):
-                set {%best: %item_var, %best_key: %key}
+                set {%best:%item_var, %best_key:%key}
         
         return %best
 

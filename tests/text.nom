@@ -1,43 +1,46 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #..
     Tests for the stuff defined in core/text.nom
 use "core"
+
 assume ((["x", "y"] joined with ",") == "x,y") or barf "joined with failed"
 assume ((["x", "y"] joined) == "xy") or barf "joined failed"
 assume (("asdf" capitalized) == "Asdf") or barf "capitalized failed"
-assume (("asdf" with "X" instead of "s") == "aXdf") or barf "substitution failed"
-assume (..)
-    "\n" == (newline)
-..or barf "Text literals failed."
+assume (("asdf" with "X" instead of "s") == "aXdf") or barf ".."
+    substitution failed
 
+assume ("\n" == (newline)) or barf "Text literals failed."
 assume (("x" + "y") == "xy")
 assume (..)
     (..)
-        lines in "one\ntwo"
+        lines in ".."
+            one
+            two
     ..== ["one", "two"]
 
 parse [アクション %spec %body] as (action %spec %body)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-%こんにちは = "\227\129\147\227\130\147\227\129\171\227\129\161\227\129\175"
-アクション [% と言う] "\(%)\228\184\150\231\149\140"
-assume (..)
-    (%こんにちは と言う) == ".."
-        こんにちは世界
-..or barf "Unicode doesn't work"
+%こんにちは = "こんにちは"
+アクション [% と言う] "\(%)世界"
+assume ((%こんにちは と言う) == "こんにちは世界") or barf ".."
+    Unicode doesn't work
 
 %s = "one two\\nthreefour"
-assume (..)
-    %s == "one two\\nthreefour"
-..or barf "%s = \(quote %s), not \(quote "one two\\nthreefour")"
+assume (%s == "one two\\nthreefour") or barf ".."
+    %s = \(quote %s), not \(quote "one two\\nthreefour")
 
 %s = "list:\[1, 2, 3]"
 assume (%s == "list:[1, 2, 3]")
 assume ("foo = \(1 + 2)!" == "foo = 3!")
 assume (..)
-    "one\ntwo"
-    ..== "one\ntwo"
+    ".."
+        one
+        two
+    ..== ".."
+        one
+        two
 
 assume ("nogap" == "nogap")
 

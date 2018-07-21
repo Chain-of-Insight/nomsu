@@ -1,8 +1,9 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This file defines some actions that interact with the operating system and filesystem.
 
 use "core"
+
 action [path of Nomsu file %filename]:
     lua> "for i,f in files.walk(\%filename) do return f end"
     barf "Could not find file: \%filename"
@@ -37,7 +38,10 @@ action [..]
     write to file %filename %text, to file %filename write %text
     write %text to file %filename
 ..:
-    lua> "local file = io.open(\%filename, 'w')\nfile:write(\%text)\nfile:close()"
+    lua> ".."
+        local file = io.open(\%filename, 'w')
+        file:write(\%text)
+        file:close()
 
 action [line number of %pos in %str] (=lua "files.get_line_number(\%str, \%pos)")
 action [line %line_num in %str] (=lua "files.get_line(\%str, \%line_num)")

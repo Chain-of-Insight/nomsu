@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This file contains definitions of operators like "+" and "and".
 
@@ -75,9 +75,13 @@ compile [set %assignments] to:
                 end
             end)
             local target_lua = \(%target as lua)
-            if not target_lua.is_value then error("Invalid target for assignment: "..\(%target as text)) end
+            if not target_lua.is_value then error("Invalid target for assignment: "..\(..)
+            %target as text
+        ..) end
             local value_lua = \(%value as lua)
-            if not value_lua.is_value then error("Invalid value for assignment: "..\(%value as text)) end
+            if not value_lua.is_value then error("Invalid value for assignment: "..\(..)
+            %value as text
+        ..) end
             if \%target.type == "Var" then
                 lhs:add_free_vars({tostring(target_lua)})
             end
@@ -135,7 +139,10 @@ compile [with %assignments %body] to:
         \%lua:prepend("local ", lhs, " = ", rhs, ";\\n")
     
     return (..)
-        Lua "do\n    \%lua\nend -- 'with' block"
+        Lua ".."
+            do
+                \%lua
+            end -- 'with' block
 
 
 # Math Operators
@@ -199,7 +206,9 @@ compile [%x ARSHIFT %shift, %x >> %shift] to (..)
 # Unary operators
 compile [- %] to (Lua value "(- \(% as lua expr))")
 compile [not %] to (Lua value "(not \(% as lua expr))")
-test: assume ((length of [1, 2, 3]) == 3)
+test:
+    assume ((length of [1, 2, 3]) == 3)
+
 compile [length of %list, || %list ||] to (Lua value "(#\(%list as lua expr))")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5
+#!/usr/bin/env nomsu -V2.5.4.3
 use "core"
 use "lib/os.nom"
 
@@ -8,7 +8,9 @@ action [upgrade to %version via %upgrade_fn]:
 
 %ACTION_UPGRADES = {}
 action [upgrade action %stub to %version via %upgrade_fn]:
-    unless (%ACTION_UPGRADES.%version): %ACTION_UPGRADES.%version = []
+    unless %ACTION_UPGRADES.%version:
+        %ACTION_UPGRADES.%version = []
+    
     %ACTION_UPGRADES.%version.%stub = %upgrade_fn
 
 parse [upgrade %tree to %version as %body] as (..)
@@ -19,21 +21,31 @@ compile [upgrade action %action to %version as %body] to:
     for %i in 1 to (length of %action):
         if (%action.%i.type is "Var"):
             %replacements.(%action.%i.1) = "\(\%tree as lua id)[\%i]"
+    
     local action [make tree %t]:
         when:
             (%t is "Var" syntax tree):
-                if (%replacements.(%t.1)):
+                if %replacements.(%t.1):
                     return %replacements.(%t.1)
                 ..else:
-                    return "\(%t.type)(\(quote "\(%t.source)"), \(quote "\(%t.1) \0\(=lua "string.format('%X', __MANGLE_INDEX)")"))"
+                    return ".."
+                        \(%t.type)(\(quote "\(%t.source)"), \(..)
+                            quote "\(%t.1) \000\(=lua "string.format('%X', __MANGLE_INDEX)")"
+                        ..)
+            
             (%t is syntax tree):
                 %args = ((make tree %) for % in %t)
                 add "\(\%tree as lua id).source" to %args at index 1
                 return "\(%t.type)(\(%args joined with ", "))"
-            else: return (quote "\%t")
+            
+            else:
+                return (quote "\%t")
+    
     return (..)
         Lua ".."
-            A_upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(\%tree as lua id))
+            A_upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
+                \%tree as lua id
+            ..)
                 __MANGLE_INDEX = (__MANGLE_INDEX or 0) + 1
                 return \(make tree %body)
             end)
@@ -44,8 +56,12 @@ action [..]
 ..:
     local action [%ver as list] ((% as number) for % in %ver matching "[0-9]+")
     %versions = {}
-    for %v = % in %UPGRADES: %versions.%v = (yes)
-    for %v = % in %ACTION_UPGRADES: %versions.%v = (yes)
+    for %v = % in %UPGRADES:
+        %versions.%v = (yes)
+    
+    for %v = % in %ACTION_UPGRADES:
+        %versions.%v = (yes)
+    
     %versions = ((keys in %versions) sorted by % -> (% as list))
     for %ver in %versions:
         if ((%ver as list) <= (%start_version as list)): do next %ver
@@ -55,6 +71,7 @@ action [..]
                 %tree with % -> (..)
                     if ((% is "Action" syntax tree) and %ACTION_UPGRADES.%ver.(%.stub)):
                         return (call %ACTION_UPGRADES.%ver.(%.stub) with [%])
+        
         if %UPGRADES.%ver:
             %tree = (call %UPGRADES.%ver with [%tree])
     
@@ -68,7 +85,9 @@ parse [%tree upgraded from %start_version] as (..)
 parse [%tree upgraded to %end_version] as (..)
     %tree upgraded from (%tree.version or (Nomsu version)) to %end_version
 
-parse [%tree upgraded] as (%tree upgraded from (%tree.version or (Nomsu version)) to (Nomsu version))
+parse [%tree upgraded] as (..)
+    %tree upgraded from (%tree.version or (Nomsu version)) to (Nomsu version)
+
 action [use %path from version %version] (..)
     for file %filename in %path:
         if (=lua "LOADED[\%filename]"): do next %filename

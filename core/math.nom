@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     This file defines some common math literals and functions
 
@@ -34,9 +34,7 @@ compile [arc tangent %y / %x, atan2 %y %x] to (..)
     Lua value "math.atan2(\(%y as lua expr), \(%x as lua expr))"
 
 compile [hyperbolic sine %, sinh %] to (Lua value "math.sinh(\(% as lua expr))")
-compile [hyperbolic cosine %, cosh %] to (..)
-    Lua value "math.cosh(\(% as lua expr))"
-
+compile [hyperbolic cosine %, cosh %] to (Lua value "math.cosh(\(% as lua expr))")
 compile [hyperbolic tangent %, tanh %] to (..)
     Lua value "math.tanh(\(% as lua expr))"
 
@@ -87,41 +85,45 @@ action [avg of %items, average of %items] (=lua "(utils.sum(\%items)/#\%items)")
 compile [min of %items, smallest of %items, lowest of %items] to (..)
     Lua value "utils.min(\(%items as lua expr))"
 
-compile [max of %items, biggest of %items, largest of %items, highest of %items]
-..to (Lua value "utils.max(\(%items as lua expr))")
+compile [max of %items, biggest of %items, largest of %items, highest of %items] to
+..(Lua value "utils.max(\(%items as lua expr))")
 
 parse [min of %items by %item = %value_expr] as (..)
     result of:
-        set {%best: nil, %best_key: nil}
+        set {%best:nil, %best_key:nil}
         for %item in %items:
             %key = %value_expr
             if ((%best == (nil)) or (%key < %best_key)):
-                set {%best: %item, %best_key: %key}
+                set {%best:%item, %best_key:%key}
         
         return %best
 
 parse [max of %items by %item = %value_expr] as (..)
     result of:
-        set {%best: nil, %best_key: nil}
+        set {%best:nil, %best_key:nil}
         for %item in %items:
             %key = %value_expr
             if ((%best == (nil)) or (%key > %best_key)):
-                set {%best: %item, %best_key: %key}
+                set {%best:%item, %best_key:%key}
         
         return %best
 
 
 # Random functions
 action [seed random with %] (..)
-    lua> "math.randomseed(\%);\nfor i=1,20 do math.random(); end"
+    lua> ".."
+        math.randomseed(\%);
+        for i=1,20 do math.random(); end
 
 parse [seed random] as (seed random with (=lua "os.time()"))
 compile [random number, random, rand] to (Lua value "math.random()")
 compile [random int %n, random integer %n, randint %n] to (..)
     Lua value "math.random(\(%n as lua expr))"
 
-compile [random from %low to %high, random number from %low to %high, rand %low %high]
+compile [..]
+    random from %low to %high, random number from %low to %high
+    rand %low %high
 ..to (Lua value "math.random(\(%low as lua expr), \(%high as lua expr))")
 
-action [random choice from %elements, random choice %elements, random %elements]
-..(=lua "\%elements[math.random(#\%elements)]")
+action [random choice from %elements, random choice %elements, random %elements] (..)
+    =lua "\%elements[math.random(#\%elements)]"

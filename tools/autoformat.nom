@@ -1,6 +1,7 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 use "core"
 use "lib/os.nom"
+
 %args = (command line args)
 %inplace = (no)
 if (%args.1 is "-i"):
@@ -13,5 +14,6 @@ for %path in %args:
             #!/usr/bin/env nomsu -V\(Nomsu version)
             \((parse (read file %filename) from %filename) as nomsu)
         
-        if %inplace: write %formatted to file %filename
+        if %inplace:
+            write %formatted to file %filename
         ..else: say %formatted

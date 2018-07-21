@@ -1,9 +1,10 @@
-#!/usr/bin/env nomsu -V2.4.4.3
+#!/usr/bin/env nomsu -V2.5.4.3
 #
     Tests for the stuff defined in lib/os.nom
 
 use "core"
 use "lib/os.nom"
+
 %lines = (lines in (read file "tests/os.nom"))
 assume (%lines.3 == "    Tests for the stuff defined in lib/os.nom")
 %n = 0
