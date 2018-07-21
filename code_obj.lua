@@ -83,7 +83,9 @@ do
     dirty = function(self)
       self.__str = nil
       self._trailing_line_len = nil
-      self._is_multiline = nil
+      if self._is_multiline == false then
+        self._is_multiline = nil
+      end
     end,
     append = function(self, ...)
       local n = select("#", ...)
@@ -100,6 +102,9 @@ do
             break
           end
           bits[#bits + 1] = b
+          if b.is_code then
+            b.dirty = error
+          end
           if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
             b = repr(b)
           end
@@ -153,6 +158,9 @@ do
           end
         end
         bits[#bits + 1] = b
+        if b.is_code then
+          b.dirty = error
+        end
         local b_str = tostring(b)
         local line = match(b_str, "\n([^\n]*)$")
         if line then
@@ -170,7 +178,11 @@ do
         bits[i] = bits[i - n]
       end
       for i = 1, n do
-        bits[i] = select(i, ...)
+        local b = select(i, ...)
+        bits[i] = b
+        if b.is_code then
+          b.dirty = error
+        end
       end
       return self:dirty()
     end

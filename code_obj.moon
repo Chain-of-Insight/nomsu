@@ -55,7 +55,8 @@ class Code
     dirty: =>
         @__str = nil
         @_trailing_line_len = nil
-        @_is_multiline = nil
+        -- Multi-line only goes from false->true, since there is no API for removing bits
+        @_is_multiline = nil if @_is_multiline == false
             
     append: (...)=>
         n = select("#",...)
@@ -67,6 +68,7 @@ class Code
             assert(not Source\is_instance(b), "code bit is a Source")
             if b == '' then continue
             bits[#bits+1] = b
+            b.dirty = error if b.is_code
             if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
                 b = repr(b)
         @dirty!
@@ -104,6 +106,7 @@ class Code
                 else
                     bits[#bits+1] = joiner
             bits[#bits+1] = b
+            b.dirty = error if b.is_code
             b_str = tostring(b)
             line = match(b_str, "\n([^\n]*)$")
             if line
@@ -118,7 +121,9 @@ class Code
         for i=#bits+n,n+1,-1
             bits[i] = bits[i-n]
         for i=1,n
-            bits[i] = select(i, ...)
+            b = select(i, ...)
+            bits[i] = b
+            b.dirty = error if b.is_code
         @dirty!
 
 class LuaCode extends Code
