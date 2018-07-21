@@ -776,7 +776,7 @@ do
           nomsu:append(arg_nomsu)
         end
         if check then
-          check(len + #tostring(nomsu), tree)
+          check(len, nomsu, tree)
         end
       end
       return nomsu
@@ -787,19 +787,19 @@ do
       end
       local nomsu = NomsuCode(tree.source, "\\", inner_nomsu)
       if check then
-        check(len + #tostring(nomsu), tree)
+        check(len, nomsu, tree)
       end
       return nomsu
     elseif "Block" == _exp_0 then
-      if check then
-        check(len, tree)
-      end
       local nomsu = NomsuCode(tree.source, ":")
+      if check then
+        check(len, nomsu, tree)
+      end
       for i, line in ipairs(tree) do
         nomsu:append(i == 1 and " " or "; ")
         nomsu:append(recurse(line, nomsu, i == 1 or i < #tree))
         if check then
-          check(len + #tostring(nomsu), tree)
+          check(len, nomsu, tree)
         end
       end
       if #tree > 1 or parenthesize_blocks then
@@ -826,7 +826,7 @@ do
             nomsu:append("\\", interp_nomsu)
           end
           if check then
-            check(len + #tostring(nomsu), tree)
+            check(len, nomsu, tree)
           end
         end
         return nomsu
@@ -840,7 +840,7 @@ do
         end
         nomsu:append(recurse(item, nomsu))
         if check then
-          check(len + #tostring(nomsu), tree)
+          check(len, nomsu, tree)
         end
       end
       nomsu:append("]")
@@ -853,7 +853,7 @@ do
         end
         nomsu:append(recurse(entry, nomsu))
         if check then
-          check(len + #tostring(nomsu), tree)
+          check(len, nomsu, tree)
         end
       end
       nomsu:append("}")
@@ -879,7 +879,7 @@ do
         nomsu:append(value_nomsu)
       end
       if check then
-        check(len + #tostring(nomsu), tree)
+        check(len, nomsu, tree)
       end
       return nomsu
     elseif "IndexChain" == _exp_0 then
@@ -900,7 +900,7 @@ do
         end
         nomsu:append(bit_nomsu)
         if check then
-          check(len + #tostring(nomsu), tree)
+          check(len, nomsu, tree)
         end
       end
       return nomsu
@@ -990,11 +990,31 @@ do
       end
       local space = MAX_LINE - pos
       local inline
-      for len, tree in coroutine.wrap(function()
+      for prefix, nomsu, tree in coroutine.wrap(function()
         inline = self:tree_to_inline_nomsu(t, false, coroutine.yield)
       end) do
-        if len > MAX_LINE or (tree.type == "Block" and #tree > 1) then
+        local len = #tostring(nomsu)
+        if prefix + len > MAX_LINE then
           break
+        end
+        if tree.type == "Block" and (#tree > 1 or len > 20) then
+          break
+        end
+        if tree.type == "Text" then
+          if (function()
+            local found_nl = false
+            for i, b in ipairs(tree) do
+              if i == 1 and type(b) == 'string' then
+                b = b:match('^[\n]*(.*)')
+              end
+              found_nl = found_nl or (type(b) == 'string' and b:match('\n'))
+              if found_nl and (type(b) ~= 'string' or b:match('[^\n]')) then
+                return true
+              end
+            end
+          end)() then
+            break
+          end
         end
       end
       if inline and #tostring(inline) <= space then
@@ -1008,6 +1028,7 @@ do
     end
     local _exp_0 = tree.type
     if "FileChunks" == _exp_0 then
+      local setup = nil
       local nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
       for chunk_no, chunk in ipairs(tree) do
         if chunk_no > 1 then
@@ -1016,6 +1037,12 @@ do
         nomsu:append(pop_comments(chunk.source.start))
         if chunk.type == "Block" then
           for line_no, line in ipairs(chunk) do
+            if setup == nil then
+              setup = line.type == "Action" and line.stub == "use %"
+            elseif setup and not (line.type == "Action" and line.stub == "use %") then
+              nomsu:append("\n", pop_comments(line.source.start))
+              setup = false
+            end
             nomsu:append(pop_comments(line.source.start, '\n'))
             local line_nomsu = self:tree_to_nomsu(line, pop_comments)
             nomsu:append(line_nomsu)
@@ -1027,6 +1054,7 @@ do
         else
           nomsu:append(recurse(chunk))
         end
+        setup = false
       end
       nomsu:append(pop_comments(tree.source.stop, '\n'))
       return nomsu
@@ -1128,6 +1156,9 @@ do
       end
       local nomsu = NomsuCode(tree.source)
       add_text(nomsu, tree)
+      if nomsu:is_multiline() and tostring(nomsu):match("\n$") then
+        nomsu:append('\\("")')
+      end
       return NomsuCode(tree.source, '".."\n    ', nomsu)
     elseif "List" == _exp_0 then
       assert(#tree > 0)

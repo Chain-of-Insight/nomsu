@@ -102,6 +102,7 @@ indented_text (Text):
     '".."' eol %nl {%nl*} {:curr_indent: indent :}
         (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
     (!! [^%nl]+ -> "Unexpected character while parsing Text" !!)?
+-- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
 indented_plain_text (Text):
     {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
         (%nl+ (=curr_indent -> ""))* ~}
