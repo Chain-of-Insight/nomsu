@@ -23,7 +23,8 @@ eol_comment:
 section_division: ("~")^+3 eol
 
 inline_block (Block):
-    ":" %ws* ((inline_statement (%ws* ";" %ws* inline_statement)*) / !(eol nl_indent))
+    "(" %ws* inline_block  %ws* ")"
+    / ":" %ws* ((inline_statement (%ws* ";" %ws* inline_statement)*) / !(eol nl_indent))
 chunk (Block):
     statement (nl_nodent statement)*
 indented_block (Block):
@@ -35,8 +36,8 @@ inline_statement: (inline_action / inline_expression)
 noindex_inline_expression:
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
     / ( "("
-            %ws* (inline_block / inline_action / inline_expression) %ws*
-            (%ws* ',' %ws* (inline_block / inline_action / inline_expression) %ws*)*
+            %ws* (inline_action / inline_expression) %ws*
+            (%ws* ',' %ws* (inline_action / inline_expression) %ws*)*
         (")"
             / (!! eol -> 'Line ended without finding a closing )-parenthesis' !!)
             / (!! [^%nl]+ -> 'Unexpected character while parsing subexpression' !!)
@@ -44,13 +45,13 @@ noindex_inline_expression:
       )
 inline_expression: index_chain / noindex_inline_expression 
 indented_expression:
-    indented_text / indented_nomsu / indented_list / indented_dict / indented_block / ({|
+    indented_text / indented_nomsu / indented_list / indented_dict / ({|
         "(..)" nl_indent
             (action / expression) (nl_nodent comment)*
             (eol / (!! [^%nl]+ -> "Unexpected character while parsing indented expression" !!))
     |} -> unpack)
 expression:
-    inline_expression / indented_expression / inline_block 
+    inline_expression / indented_expression
 
 inline_nomsu (EscapedNomsu): "\" inline_expression
 indented_nomsu (EscapedNomsu):
@@ -62,13 +63,15 @@ index_chain (IndexChain):
 -- Actions need either at least 1 word, or at least 2 tokens
 inline_action (Action):
     !section_division
-    (   (inline_expression (%ws* (inline_expression / word))+)
-      / (word              (%ws* (inline_expression / word))*))
+    (   (inline_arg (%ws* (inline_arg / word))+)
+      / (word       (%ws* (inline_arg / word))*))
     (%ws* inline_block)?
+inline_arg: inline_expression / inline_block
 action (Action):
     !section_division
-    (  (expression ((nl_nodent "..")? %ws* (expression / word))+)
-     / (word       ((nl_nodent "..")? %ws* (expression / word))*))
+    (  (arg  ((nl_nodent "..")? %ws* (arg / word))+)
+     / (word ((nl_nodent "..")? %ws* (arg / word))*))
+arg: expression / inline_block / indented_block
 
 word: !number { %operator_char+ / %ident_char+ }
 
@@ -86,8 +89,8 @@ inline_text_interpolation:
     "\" (
         variable / inline_list / inline_dict / inline_text
         / ("("
-            %ws* (inline_block / inline_action / inline_expression) %ws*
-            (%ws* ',' %ws* (inline_block / inline_action / inline_expression) %ws*)*
+            %ws* (inline_action / inline_expression) %ws*
+            (%ws* ',' %ws* (inline_action / inline_expression) %ws*)*
         (")"
          / (!! eol -> 'Line ended without finding a closing )-parenthesis' !!)
          / (!! [^%nl]+ -> 'Unexpected character while parsing Text interpolation' !!)))
@@ -124,7 +127,7 @@ indented_list (List):
 list_line:
       (inline_list_item %ws* "," %ws*)+ eol
     / (inline_list_item %ws* "," %ws*)* (action / expression) eol
-inline_list_item: inline_block / inline_action / inline_expression
+inline_list_item: inline_action / inline_expression
 
 inline_dict (Dict):
     !('{..}')
