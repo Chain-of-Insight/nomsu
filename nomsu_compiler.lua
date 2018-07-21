@@ -1001,9 +1001,13 @@ do
           break
         end
         if tree.type == "Text" then
-          if (function()
+          local check_for_nl
+          check_for_nl = function(tree)
             local found_nl = false
             for i, b in ipairs(tree) do
+              if type(b) ~= 'string' and b.type == "Text" and check_for_nl(b) then
+                return true
+              end
               if i == 1 and type(b) == 'string' then
                 b = b:match('^[\n]*(.*)')
               end
@@ -1012,7 +1016,8 @@ do
                 return true
               end
             end
-          end)() then
+          end
+          if check_for_nl(tree) then
             break
           end
         end
