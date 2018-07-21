@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.3.4.3
+#!/usr/bin/env nomsu -V2.5
 use "core"
 use "lib/os.nom"
 
@@ -42,7 +42,7 @@ action [..]
     %tree upgraded from %start_version to %end_version
     %tree upgraded to %end_version from %start_version
 ..:
-    local action [%ver as list] ((% as number) for % where %ver matches "[0-9]+")
+    local action [%ver as list] ((% as number) for % in %ver matching "[0-9]+")
     %versions = {}
     for %v = % in %UPGRADES: %versions.%v = (yes)
     for %v = % in %ACTION_UPGRADES: %versions.%v = (yes)

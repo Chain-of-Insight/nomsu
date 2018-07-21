@@ -30,7 +30,7 @@ action [lines in %text, lines of %text] (..)
         end
         return result
 
-compile [for %match where %text matches %patt %body] to (..)
+compile [for %match in %text matching %patt %body] to (..)
     Lua ".."
         for \(%match as lua expr) in \(%text as lua expr):gmatch(\(%patt as lua expr)) do
             \(%body as lua statements)
@@ -38,7 +38,7 @@ compile [for %match where %text matches %patt %body] to (..)
         end
         \(compile as (===stop %match ===))
 
-compile [%expr for %match where %text matches %patt] to (..)
+compile [%expr for %match in %text matching %patt] to (..)
     Lua value ".."
         (function()
             local ret = list{}
