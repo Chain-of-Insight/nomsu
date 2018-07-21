@@ -525,14 +525,13 @@ with NomsuCompiler
                 return nomsu
 
             when "Text"
-                make_text = (tree)->
-                    nomsu = NomsuCode(tree.source)
+                add_text = (nomsu, tree)->
                     for i, bit in ipairs tree
                         if type(bit) == 'string'
-                            bit = Parser.inline_escape(bit)
-                            nomsu\append bit
+                            escaped = Parser.inline_escape(bit)
+                            nomsu\append Parser.inline_escape(bit)
                         elseif bit.type == "Text"
-                            nomsu\append(make_text(bit))
+                            add_text(nomsu, bit)
                         else
                             interp_nomsu = recurse(bit, nomsu)
                             if bit.type != "Var" and bit.type != "List" and bit.type != "Dict"
@@ -541,8 +540,9 @@ with NomsuCompiler
                                 interp_nomsu\parenthesize!
                             nomsu\append "\\", interp_nomsu
                         check(len, nomsu, tree) if check
-                    return nomsu
-                return NomsuCode(tree.source, '"', make_text(tree), '"')
+                nomsu = NomsuCode(tree.source)
+                add_text(nomsu, tree)
+                return NomsuCode(tree.source, '"', nomsu, '"')
 
             when "List"
                 nomsu = NomsuCode(tree.source, "[")
@@ -720,6 +720,8 @@ with NomsuCompiler
                 return NomsuCode(tree.source, ":\n    ", nomsu)
 
             when "Text"
+                -- Multi-line text has more generous wrap margins
+                max_line = math.floor(1.5*MAX_LINE)
                 add_text = (nomsu, tree)->
                     for i, bit in ipairs tree
                         if type(bit) == 'string'
@@ -728,12 +730,12 @@ with NomsuCompiler
                             for j, line in ipairs bit_lines
                                 if j > 1
                                     nomsu\append "\n"
-                                elseif #line > 10 and nomsu\trailing_line_len! > MAX_LINE
+                                elseif #line > 10 and nomsu\trailing_line_len! > max_line
                                     nomsu\append "\\\n.."
 
                                 while #line > 0
-                                    space = MAX_LINE - nomsu\trailing_line_len!
-                                    split = find(line, " ", space, true)
+                                    space = max_line - nomsu\trailing_line_len!
+                                    split = find(line, "[%p%s]", space)
                                     if not split or split > space + 10
                                         split = space + 10
                                     if #line - split < 10

@@ -807,15 +807,14 @@ do
       end
       return nomsu
     elseif "Text" == _exp_0 then
-      local make_text
-      make_text = function(tree)
-        local nomsu = NomsuCode(tree.source)
+      local add_text
+      add_text = function(nomsu, tree)
         for i, bit in ipairs(tree) do
           if type(bit) == 'string' then
-            bit = Parser.inline_escape(bit)
-            nomsu:append(bit)
+            local escaped = Parser.inline_escape(bit)
+            nomsu:append(Parser.inline_escape(bit))
           elseif bit.type == "Text" then
-            nomsu:append(make_text(bit))
+            add_text(nomsu, bit)
           else
             local interp_nomsu = recurse(bit, nomsu)
             if bit.type ~= "Var" and bit.type ~= "List" and bit.type ~= "Dict" then
@@ -829,9 +828,10 @@ do
             check(len, nomsu, tree)
           end
         end
-        return nomsu
       end
-      return NomsuCode(tree.source, '"', make_text(tree), '"')
+      local nomsu = NomsuCode(tree.source)
+      add_text(nomsu, tree)
+      return NomsuCode(tree.source, '"', nomsu, '"')
     elseif "List" == _exp_0 then
       local nomsu = NomsuCode(tree.source, "[")
       for i, item in ipairs(tree) do
@@ -1109,6 +1109,7 @@ do
       nomsu:append(pop_comments(tree.source.stop, '\n'))
       return NomsuCode(tree.source, ":\n    ", nomsu)
     elseif "Text" == _exp_0 then
+      local max_line = math.floor(1.5 * MAX_LINE)
       local add_text
       add_text = function(nomsu, tree)
         for i, bit in ipairs(tree) do
@@ -1118,12 +1119,12 @@ do
             for j, line in ipairs(bit_lines) do
               if j > 1 then
                 nomsu:append("\n")
-              elseif #line > 10 and nomsu:trailing_line_len() > MAX_LINE then
+              elseif #line > 10 and nomsu:trailing_line_len() > max_line then
                 nomsu:append("\\\n..")
               end
               while #line > 0 do
-                local space = MAX_LINE - nomsu:trailing_line_len()
-                local split = find(line, " ", space, true)
+                local space = max_line - nomsu:trailing_line_len()
+                local split = find(line, "[%p%s]", space)
                 if not split or split > space + 10 then
                   split = space + 10
                 end
