@@ -1,7 +1,7 @@
 local lpeg = require('lpeg')
 local re = require('re')
 local utils = require('utils')
-local files = require('files')
+local Files = require('files')
 local repr, stringify, equivalent
 repr, stringify, equivalent = utils.repr, utils.stringify, utils.equivalent
 colors = require('consolecolors')
@@ -174,7 +174,7 @@ do
     utils = utils,
     lpeg = lpeg,
     re = re,
-    files = files,
+    Files = Files,
     next = next,
     unpack = unpack,
     setmetatable = setmetatable,
@@ -226,16 +226,17 @@ do
     __mode = "k"
   })
   NomsuCompiler.LOADED = { }
+  NomsuCompiler.TESTS = { }
   NomsuCompiler.AST = AST
   NomsuCompiler.compile_error = function(self, source, err_format_string, ...)
     err_format_string = err_format_string:gsub("%%[^s]", "%%%1")
-    local file = files.read(source.filename)
-    local line_starts = files.get_line_starts(file)
-    local line_no = files.get_line_number(file, source.start)
+    local file = Files.read(source.filename)
+    local line_starts = Files.get_line_starts(file)
+    local line_no = Files.get_line_number(file, source.start)
     local line_start = line_starts[line_no]
     local src = colored.dim(file:sub(line_start, source.start - 1))
     src = src .. colored.underscore(colored.bright(colored.red(file:sub(source.start, source.stop - 1))))
-    local end_of_line = (line_starts[files.get_line_number(file, source.stop) + 1] or 0) - 1
+    local end_of_line = (line_starts[Files.get_line_number(file, source.stop) + 1] or 0) - 1
     src = src .. colored.dim(file:sub(source.stop, end_of_line - 1))
     src = '    ' .. src:gsub('\n', '\n    ')
     local err_msg = err_format_string:format(src, ...)
@@ -343,14 +344,27 @@ do
     ["use %"] = function(self, tree, _path)
       if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string' then
         local path = _path[1]
-        for _, f in files.walk(path) do
+        for _, f in Files.walk(path) do
           self:run_file(f)
         end
       end
-      return LuaCode(tree.source, "for i,f in files.walk(", self:compile(_path), ") do nomsu:run_file(f) end")
+      return LuaCode(tree.source, "for i,f in Files.walk(", self:compile(_path), ") do nomsu:run_file(f) end")
+    end,
+    ["tests"] = function(self, tree)
+      return LuaCode.Value(tree.source, "TESTS")
     end,
     ["test %"] = function(self, tree, _body)
-      return LuaCode("")
+      local test_str = table.concat((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_0 = 1, #_body do
+          local line = _body[_index_0]
+          _accum_0[_len_0] = tostring(self:tree_to_nomsu(line))
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)(), "\n")
+      return LuaCode(tree.source, "TESTS[" .. tostring(repr(tostring(tree.source))) .. "] = ", repr(test_str))
     end
   }, {
     __index = function(self, stub)
@@ -370,8 +384,8 @@ do
     if type(source) == 'string' then
       source = Source:from_string(source)
     end
-    if not files.read(source.filename) then
-      files.spoof(source.filename, to_run)
+    if not Files.read(source.filename) then
+      Files.spoof(source.filename, to_run)
     end
     local tree
     if AST.is_syntax_tree(to_run) then
@@ -423,14 +437,14 @@ do
     insert(_running_files, filename)
     local ret = nil
     if match(filename, "%.lua$") then
-      local file = assert(files.read(filename), "Could not find file: " .. tostring(filename))
+      local file = assert(Files.read(filename), "Could not find file: " .. tostring(filename))
       ret = self:run_lua(file, Source(filename, 1, #file))
     elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$") then
       local ran_lua
       if self.can_optimize(filename) then
         local lua_filename = gsub(filename, "%.nom$", ".lua")
         do
-          local file = files.read(lua_filename)
+          local file = Files.read(lua_filename)
           if file then
             ret = self:run_lua(file, Source(lua_filename, 1, #file))
             ran_lua = true
@@ -438,7 +452,7 @@ do
         end
       end
       if not (ran_lua) then
-        local file = files.read(filename)
+        local file = Files.read(filename)
         if not file then
           error("File does not exist: " .. tostring(filename), 0)
         end
@@ -462,7 +476,7 @@ do
       local line_numbered_lua = concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        for i, line in ipairs(files.get_lines(lua_string)) do
+        for i, line in ipairs(Files.get_lines(lua_string)) do
           _accum_0[_len_0] = format("%3d|%s", i, line)
           _len_0 = _len_0 + 1
         end
@@ -474,13 +488,13 @@ do
     local source_key = tostring(source)
     if not (SOURCE_MAP[source_key]) then
       local map = { }
-      local file = files.read(source.filename)
+      local file = Files.read(source.filename)
       if not file then
         error("Failed to find file: " .. tostring(source.filename))
       end
       local nomsu_str = tostring(file:sub(source.start, source.stop))
       local lua_line = 1
-      local nomsu_line = files.get_line_number(file, source.start)
+      local nomsu_line = Files.get_line_number(file, source.start)
       local map_sources
       map_sources = function(s)
         if type(s) == 'string' then
@@ -490,7 +504,7 @@ do
           end
         else
           if s.source and s.source.filename == source.filename then
-            nomsu_line = files.get_line_number(file, s.source.start)
+            nomsu_line = Files.get_line_number(file, s.source.start)
           end
           local _list_0 = s.bits
           for _index_0 = 1, #_list_0 do
@@ -624,7 +638,7 @@ do
           local bit_lua = self:compile(bit)
           if not (bit_lua.is_value) then
             local src = '    ' .. gsub(tostring(recurse(bit)), '\n', '\n    ')
-            local line = tostring(bit.source.filename) .. ":" .. tostring(files.get_line_number(files.read(bit.source.filename), bit.source.start))
+            local line = tostring(bit.source.filename) .. ":" .. tostring(Files.get_line_number(Files.read(bit.source.filename), bit.source.start))
             self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
           if #lua.bits > 0 then
@@ -1115,7 +1129,7 @@ do
         for i, bit in ipairs(tree) do
           if type(bit) == 'string' then
             bit = Parser.escape(bit)
-            local bit_lines = files.get_lines(bit)
+            local bit_lines = Files.get_lines(bit)
             for j, line in ipairs(bit_lines) do
               if j > 1 then
                 nomsu:append("\n")

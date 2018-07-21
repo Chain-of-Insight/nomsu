@@ -17,8 +17,8 @@ OPTIONS
     -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available).
     -v Verbose: print compiled lua code.
     -c Compile the input files into a .lua files.
+    -e Execute the specified string.
     -s Check the input files for syntax errors.
-    -t Run tests.
     -I <file> Add an additional input file or directory.
     -d <debugger> Attempt to use the specified debugger to wrap the main body of execution.
     -h/--help Print this message.
@@ -34,6 +34,7 @@ ok, _ = pcall ->
 if not ok
     print("Error: unable to find the 'lpeg' Lua module. Please install LPEG either from http://www.inf.puc-rio.br/~roberto/lpeg/re.html or, if you use luarocks: `luarocks install lpeg`")
     os.exit(EXIT_FAILURE)
+Files = require "files"
 Errhand = require "error_handling"
 NomsuCompiler = require "nomsu_compiler"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
@@ -44,31 +45,37 @@ if not arg or debug.getinfo(2).func == require
     return NomsuCompiler
 
 file_queue = {}
+sep = "\0"
 parser = re.compile([[
-    args <- {| (flag ";")* (({~ file ~} -> add_file) ";")? {:nomsu_args: {| ({[^;]*} ";")* |} :} ";"? |} !.
+    args <- {| (flag %sep)* (({~ file ~} -> add_file) %sep)? {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
     flag <-
         {:optimized: ("-O" -> true) :}
-      / ("-I" (";")? ({~ file ~} -> add_file))
+      / ("-I" %sep? ({~ file ~} -> add_file))
+      / ("-e" %sep? (({} {~ file ~}) -> add_exec_string))
       / ({:check_syntax: ("-s" -> true):})
       / ({:compile: ("-c" -> true):})
-      / {:run_tests: ("-t" -> true) :}
+      / ({:compile: ("-c" -> true):})
       / {:verbose: ("-v" -> true) :}
       / {:help: (("-h" / "--help") -> true) :}
       / {:version: ("--version" -> true) :}
-      / {:debugger: ("-d" (";")? {([^;])*}) :}
-      / {:requested_version: "-V" ((";")? {([0-9.])+})? :}
-    file <- ("-" -> "stdin") / {[^;]+}
+      / {:debugger: ("-d" %sep? {(!%sep .)*}) :}
+      / {:requested_version: "-V" (%sep? {([0-9.])+})? :}
+    file <- ("-" -> "stdin") / {(!%sep .)+}
 ]], {
     true: -> true
+    sep: lpeg.P(sep)
     add_file: (f)-> table.insert(file_queue, f)
+    add_exec_string: (pos, s)->
+        name = "command line arg @#{pos}.nom"
+        Files.spoof(name, s)
+        table.insert(file_queue, name)
 })
-arg_string = table.concat(arg, ";")..";"
+arg_string = table.concat(arg, sep)..sep
 args = parser\match(arg_string)
 if not args or args.help
     print usage
     os.exit(EXIT_FAILURE)
 
-files = require "files"
 nomsu = NomsuCompiler
 nomsu.arg = NomsuCompiler.list(args.nomsu_args)
 
@@ -93,9 +100,9 @@ FILE_CACHE = setmetatable {}, {
 run = ->
     input_files = {}
     for f in *file_queue
-        unless files.exists(f)
-            error("Could not find: #{f}")
-        for _,filename in files.walk(f)
+        unless Files.exists(f)
+            error("Could not find: '#{f}'")
+        for _,filename in Files.walk(f)
             input_files[filename] = true
 
     nomsu.can_optimize = (f)->
@@ -103,21 +110,14 @@ run = ->
         return false if args.compile and input_files[f]
         return true
 
-    tests = {}
-    if args.run_tests
-        nomsu.COMPILE_ACTIONS["test %"] = (tree, _body)=>
-            unless tests[tree.source.filename] then tests[tree.source.filename] = {}
-            table.insert tests[tree.source.filename], _body
-            return LuaCode ""
-
     get_file_and_source = (filename)->
         local file, source
         if filename == 'stdin'
             file = io.read("*a")
-            files.spoof('stdin', file)
+            Files.spoof('stdin', file)
             source = Source('stdin', 1, #file)
         elseif filename\match("%.nom$")
-            file = files.read(filename)
+            file = Files.read(filename)
             if not file
                 error("File does not exist: #{filename}", 0)
             source = Source(filename, 1, #file)
@@ -141,15 +141,10 @@ run = ->
                 lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
                 if lua_handler and input_files[filename] then lua_handler(tostring(lua))
                 nomsu\run_lua(lua)
-            if args.run_tests and tests[filename] and input_files[filename]
-                for t in *tests[filename]
-                    lua = nomsu\compile(t)
-                    if lua_handler then lua_handler(tostring(lua))
-                    nomsu\run_lua(lua, t.source)
 
     parse_errs = {}
     for f in *file_queue
-        for _,filename in files.walk(f)
+        for _,filename in Files.walk(f)
             continue unless filename == "stdin" or filename\match("%.nom$")
             if args.check_syntax
                 -- Check syntax
@@ -209,7 +204,7 @@ say ".."
             
             buff = table.concat(buff)
             pseudo_filename = "user input #"..repl_line
-            files.spoof(pseudo_filename, buff)
+            Files.spoof(pseudo_filename, buff)
             err_hand = (error_message)->
                 Errhand.print_error error_message
             ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))

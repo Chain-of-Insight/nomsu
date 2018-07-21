@@ -10,6 +10,7 @@ if (%args.1 is "-i"):
 
 for %path in %args:
     for file %filename in %path:
+        unless (%filename matches "%.nom$"): do next %filename
         %formatted = ".."
             #!/usr/bin/env nomsu -V\(Nomsu version)
             \((parse (read file %filename) from %filename) as nomsu)

@@ -12,7 +12,7 @@
 lpeg = require 'lpeg'
 re = require 're'
 utils = require 'utils'
-files = require 'files'
+Files = require 'files'
 {:repr, :stringify, :equivalent} = utils
 export colors, colored
 colors = require 'consolecolors'
@@ -105,7 +105,7 @@ with NomsuCompiler
 
     -- Discretionary/convenience stuff
     to_add = {
-        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re, files:files,
+        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re, Files:Files,
         -- Lua stuff:
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
@@ -122,17 +122,18 @@ with NomsuCompiler
     .Source = Source
     .ALIASES = setmetatable({}, {__mode:"k"})
     .LOADED = {}
+    .TESTS = {}
     .AST = AST
 
     .compile_error = (source, err_format_string, ...)=>
         err_format_string = err_format_string\gsub("%%[^s]", "%%%1")
-        file = files.read(source.filename)
-        line_starts = files.get_line_starts(file)
-        line_no = files.get_line_number(file, source.start)
+        file = Files.read(source.filename)
+        line_starts = Files.get_line_starts(file)
+        line_no = Files.get_line_number(file, source.start)
         line_start = line_starts[line_no]
         src = colored.dim(file\sub(line_start, source.start-1))
         src ..= colored.underscore colored.bright colored.red(file\sub(source.start, source.stop-1))
-        end_of_line = (line_starts[files.get_line_number(file, source.stop) + 1] or 0) - 1
+        end_of_line = (line_starts[Files.get_line_number(file, source.stop) + 1] or 0) - 1
         src ..= colored.dim(file\sub(source.stop, end_of_line-1))
         src = '    '..src\gsub('\n', '\n    ')
         err_msg = err_format_string\format(src, ...)
@@ -222,12 +223,14 @@ with NomsuCompiler
         ["use %"]: (tree, _path)=>
             if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
                 path = _path[1]
-                for _,f in files.walk(path)
+                for _,f in Files.walk(path)
                     @run_file(f)
-            return LuaCode(tree.source, "for i,f in files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
+            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
 
+        ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
         ["test %"]: (tree, _body)=>
-            return LuaCode ""
+            test_str = table.concat [tostring(@tree_to_nomsu(line)) for line in *_body], "\n"
+            LuaCode tree.source, "TESTS[#{repr(tostring(tree.source))}] = ", repr(test_str)
     }, {
         __index: (stub)=>
             if math_expression\match(stub)
@@ -237,7 +240,7 @@ with NomsuCompiler
     .run = (to_run, source=nil, version=nil)=>
         source or= to_run.source or Source(to_run, 1, #to_run)
         if type(source) == 'string' then source = Source\from_string(source)
-        if not files.read(source.filename) then files.spoof(source.filename, to_run)
+        if not Files.read(source.filename) then Files.spoof(source.filename, to_run)
         tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source, version)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
@@ -271,16 +274,16 @@ with NomsuCompiler
         insert _running_files, filename
         ret = nil
         if match(filename, "%.lua$")
-            file = assert(files.read(filename), "Could not find file: #{filename}")
+            file = assert(Files.read(filename), "Could not find file: #{filename}")
             ret = @run_lua file, Source(filename, 1, #file)
         elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$")
             ran_lua = if @.can_optimize(filename) -- Look for precompiled version
                 lua_filename = gsub(filename, "%.nom$", ".lua")
-                if file = files.read(lua_filename)
+                if file = Files.read(lua_filename)
                     ret = @run_lua file, Source(lua_filename, 1, #file)
                     true
             unless ran_lua
-                file = files.read(filename)
+                file = Files.read(filename)
                 if not file
                     error("File does not exist: #{filename}", 0)
                 ret = @run file, Source(filename,1,#file)
@@ -297,19 +300,19 @@ with NomsuCompiler
         run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
         if not run_lua_fn
             line_numbered_lua = concat(
-                [format("%3d|%s",i,line) for i, line in ipairs files.get_lines(lua_string)],
+                [format("%3d|%s",i,line) for i, line in ipairs Files.get_lines(lua_string)],
                 "\n")
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack line_numbered_lua}\n\n#{err}", 0)
         source or= lua.source
         source_key = tostring(source)
         unless SOURCE_MAP[source_key]
             map = {}
-            file = files.read(source.filename)
+            file = Files.read(source.filename)
             if not file
                 error "Failed to find file: #{source.filename}"
             nomsu_str = tostring(file\sub(source.start, source.stop))
             lua_line = 1
-            nomsu_line = files.get_line_number(file, source.start)
+            nomsu_line = Files.get_line_number(file, source.start)
             map_sources = (s)->
                 if type(s) == 'string'
                     for nl in s\gmatch("\n")
@@ -317,7 +320,7 @@ with NomsuCompiler
                         lua_line += 1
                 else
                     if s.source and s.source.filename == source.filename
-                        nomsu_line = files.get_line_number(file, s.source.start)
+                        nomsu_line = Files.get_line_number(file, s.source.start)
                     for b in *s.bits do map_sources(b)
             map_sources(lua)
             map[lua_line] or= nomsu_line
@@ -387,7 +390,7 @@ with NomsuCompiler
                     bit_lua = @compile(bit)
                     unless bit_lua.is_value
                         src = '    '..gsub(tostring(recurse(bit)), '\n','\n    ')
-                        line = "#{bit.source.filename}:#{files.get_line_number(files.read(bit.source.filename), bit.source.start)}"
+                        line = "#{bit.source.filename}:#{Files.get_line_number(Files.read(bit.source.filename), bit.source.start)}"
                         @compile_error bit.source,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
                     if #lua.bits > 0 then lua\append ".."
@@ -726,7 +729,7 @@ with NomsuCompiler
                     for i, bit in ipairs tree
                         if type(bit) == 'string'
                             bit = Parser.escape(bit)
-                            bit_lines = files.get_lines(bit)
+                            bit_lines = Files.get_lines(bit)
                             for j, line in ipairs bit_lines
                                 if j > 1
                                     nomsu\append "\n"
