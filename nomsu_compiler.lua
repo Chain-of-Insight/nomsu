@@ -1002,7 +1002,7 @@ do
       end
       local indented = self:tree_to_nomsu(t, pop_comments, space)
       if t.type == "Action" and not (tree.type == "Block" or tree.type == "FileChunks") then
-        indented:prepend("(..)\n    ", pop_comments(t.source.start))
+        indented = NomsuCode(t.source, "(..)\n    ", pop_comments(t.source.start), indented)
       end
       return indented
     end

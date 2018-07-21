@@ -636,8 +636,7 @@ with NomsuCompiler
             return inline if inline and #tostring(inline) <= space
             indented = @tree_to_nomsu(t, pop_comments, space)
             if t.type == "Action" and not (tree.type == "Block" or tree.type == "FileChunks")
-                indented\prepend("(..)\n    ", pop_comments(t.source.start))
-            --return inline if inline and #tostring(indented) <= #tostring(inline) + 10
+                indented = NomsuCode(t.source, "(..)\n    ", pop_comments(t.source.start), indented)
             return indented
 
         switch tree.type
