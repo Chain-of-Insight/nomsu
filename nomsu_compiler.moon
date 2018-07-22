@@ -407,14 +407,7 @@ with NomsuCompiler
 
             when "List"
                 lua = LuaCode.Value tree.source, "list{"
-                items = {}
-                for i, item in ipairs tree
-                    item_lua = @compile(item)
-                    unless item_lua.is_value
-                        @compile_error item.source,
-                            "Cannot use:\n%s\nas a list item, since it's not an expression."
-                    items[i] = item_lua
-                lua\concat_append(items, ", ", ",\n  ")
+                lua\concat_append([@compile(e) for e in *tree], ", ", ",\n  ")
                 lua\append "}"
                 return lua
 
@@ -546,22 +539,13 @@ with NomsuCompiler
                 add_text(nomsu, tree)
                 return NomsuCode(tree.source, '"', nomsu, '"')
 
-            when "List"
-                nomsu = NomsuCode(tree.source, "[")
+            when "List", "Dict"
+                nomsu = NomsuCode(tree.source, (tree.type == "List" and "[" or "{"))
                 for i, item in ipairs tree
                     nomsu\append ", " if i > 1
                     nomsu\append recurse(item, nomsu)
                     check(len, nomsu, tree) if check
-                nomsu\append "]"
-                return nomsu
-            
-            when "Dict"
-                nomsu = NomsuCode(tree.source, "{")
-                for i, entry in ipairs tree
-                    nomsu\append ", " if i > 1
-                    nomsu\append recurse(entry, nomsu)
-                    check(len, nomsu, tree) if check
-                nomsu\append "}"
+                nomsu\append(tree.type == "List" and "]" or "}")
                 return nomsu
             
             when "DictEntry"
@@ -766,11 +750,10 @@ with NomsuCompiler
                     nomsu\append '\\("")' -- Need to specify where the text ends
                 return NomsuCode(tree.source, '".."\n    ', nomsu)
 
-            when "List"
+            when "List", "Dict"
                 assert #tree > 0
                 nomsu = NomsuCode(tree.source, pop_comments(tree[1].source.start))
                 for i, item in ipairs tree
-                    assert item.type != "Block", "Didn't expect to find a Block inside a list"
                     nomsu\append(pop_comments(item.source.start)) if nomsu\trailing_line_len! == 0
                     inline_nomsu = @tree_to_inline_nomsu(item)
                     item_nomsu = #tostring(inline_nomsu) <= MAX_LINE and inline_nomsu or recurse(item, #tostring(nomsu)\match('[^\n]*$'))
@@ -778,21 +761,10 @@ with NomsuCompiler
                     if i < #tree
                         nomsu\append((item_nomsu\is_multiline! or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE) and '\n' or ', ')
                 nomsu\append pop_comments(tree.source.stop, '\n')
-                return NomsuCode(tree.source, "[..]\n    ", nomsu)
-            
-            when "Dict"
-                assert #tree > 0
-                nomsu = NomsuCode(tree.source, pop_comments(tree[1].source.start))
-                for i, item in ipairs tree
-                    assert item.type == "DictEntry", "Only expected to find DictEntry items in a Dict"
-                    nomsu\append(pop_comments(item.source.start)) if nomsu\trailing_line_len! == 0
-                    inline_nomsu = @tree_to_inline_nomsu(item)
-                    item_nomsu = #tostring(inline_nomsu) <= MAX_LINE and inline_nomsu or recurse(item, #tostring(nomsu)\match('[^\n]*$'))
-                    nomsu\append item_nomsu
-                    if i < #tree
-                        nomsu\append((item_nomsu\is_multiline! or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE) and '\n' or ', ')
-                nomsu\append pop_comments(tree.source.stop, '\n')
-                return NomsuCode(tree.source, "{..}\n    ", nomsu)
+                return if tree.type == "List" then
+                    NomsuCode(tree.source, "[..]\n    ", nomsu)
+                else
+                    NomsuCode(tree.source, "{..}\n    ", nomsu)
             
             when "DictEntry"
                 key, value = tree[1], tree[2]

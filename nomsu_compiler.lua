@@ -666,15 +666,16 @@ do
       return lua
     elseif "List" == _exp_0 then
       local lua = LuaCode.Value(tree.source, "list{")
-      local items = { }
-      for i, item in ipairs(tree) do
-        local item_lua = self:compile(item)
-        if not (item_lua.is_value) then
-          self:compile_error(item.source, "Cannot use:\n%s\nas a list item, since it's not an expression.")
+      lua:concat_append((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_0 = 1, #tree do
+          local e = tree[_index_0]
+          _accum_0[_len_0] = self:compile(e)
+          _len_0 = _len_0 + 1
         end
-        items[i] = item_lua
-      end
-      lua:concat_append(items, ", ", ",\n  ")
+        return _accum_0
+      end)(), ", ", ",\n  ")
       lua:append("}")
       return lua
     elseif "Dict" == _exp_0 then
@@ -846,8 +847,8 @@ do
       local nomsu = NomsuCode(tree.source)
       add_text(nomsu, tree)
       return NomsuCode(tree.source, '"', nomsu, '"')
-    elseif "List" == _exp_0 then
-      local nomsu = NomsuCode(tree.source, "[")
+    elseif "List" == _exp_0 or "Dict" == _exp_0 then
+      local nomsu = NomsuCode(tree.source, (tree.type == "List" and "[" or "{"))
       for i, item in ipairs(tree) do
         if i > 1 then
           nomsu:append(", ")
@@ -857,20 +858,7 @@ do
           check(len, nomsu, tree)
         end
       end
-      nomsu:append("]")
-      return nomsu
-    elseif "Dict" == _exp_0 then
-      local nomsu = NomsuCode(tree.source, "{")
-      for i, entry in ipairs(tree) do
-        if i > 1 then
-          nomsu:append(", ")
-        end
-        nomsu:append(recurse(entry, nomsu))
-        if check then
-          check(len, nomsu, tree)
-        end
-      end
-      nomsu:append("}")
+      nomsu:append(tree.type == "List" and "]" or "}")
       return nomsu
     elseif "DictEntry" == _exp_0 then
       local key, value = tree[1], tree[2]
@@ -1183,11 +1171,10 @@ do
         nomsu:append('\\("")')
       end
       return NomsuCode(tree.source, '".."\n    ', nomsu)
-    elseif "List" == _exp_0 then
+    elseif "List" == _exp_0 or "Dict" == _exp_0 then
       assert(#tree > 0)
       local nomsu = NomsuCode(tree.source, pop_comments(tree[1].source.start))
       for i, item in ipairs(tree) do
-        assert(item.type ~= "Block", "Didn't expect to find a Block inside a list")
         if nomsu:trailing_line_len() == 0 then
           nomsu:append(pop_comments(item.source.start))
         end
@@ -1199,24 +1186,11 @@ do
         end
       end
       nomsu:append(pop_comments(tree.source.stop, '\n'))
-      return NomsuCode(tree.source, "[..]\n    ", nomsu)
-    elseif "Dict" == _exp_0 then
-      assert(#tree > 0)
-      local nomsu = NomsuCode(tree.source, pop_comments(tree[1].source.start))
-      for i, item in ipairs(tree) do
-        assert(item.type == "DictEntry", "Only expected to find DictEntry items in a Dict")
-        if nomsu:trailing_line_len() == 0 then
-          nomsu:append(pop_comments(item.source.start))
-        end
-        local inline_nomsu = self:tree_to_inline_nomsu(item)
-        local item_nomsu = #tostring(inline_nomsu) <= MAX_LINE and inline_nomsu or recurse(item, #tostring(nomsu):match('[^\n]*$'))
-        nomsu:append(item_nomsu)
-        if i < #tree then
-          nomsu:append((item_nomsu:is_multiline() or nomsu:trailing_line_len() + #tostring(item_nomsu) >= MAX_LINE) and '\n' or ', ')
-        end
+      if tree.type == "List" then
+        return NomsuCode(tree.source, "[..]\n    ", nomsu)
+      else
+        return NomsuCode(tree.source, "{..}\n    ", nomsu)
       end
-      nomsu:append(pop_comments(tree.source.stop, '\n'))
-      return NomsuCode(tree.source, "{..}\n    ", nomsu)
     elseif "DictEntry" == _exp_0 then
       local key, value = tree[1], tree[2]
       local nomsu
