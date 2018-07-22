@@ -100,6 +100,17 @@ for _index_0 = 1, #types do
       end
       return replacement
     end
+    cls.__eq = function(self, other)
+      if type(self) ~= type(other) or #self ~= #other or getmetatable(self) ~= getmetatable(other) then
+        return false
+      end
+      for i = 1, #self do
+        if self[i] ~= other[i] then
+          return false
+        end
+      end
+      return true
+    end
   end
   AST[name] = setmetatable(cls, {
     __tostring = function(self)

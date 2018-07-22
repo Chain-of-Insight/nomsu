@@ -74,12 +74,13 @@ do
     local err_line = files.get_line(src, line_no)
     local next_line = files.get_line(src, line_no + 1)
     local i = err_pos - files.get_line_starts(src)[line_no]
+    local j = i + (end_pos - start_pos)
     local pointer = ("-"):rep(i) .. "^"
     err_msg = colored.bright(colored.yellow(colored.onred((err_msg or "Parse error") .. " at " .. tostring(userdata.source.filename) .. ":" .. tostring(line_no) .. ":")))
     if #prev_line > 0 then
       err_msg = err_msg .. ("\n" .. colored.dim(prev_line))
     end
-    err_line = colored.white(err_line:sub(1, i)) .. colored.bright(colored.red(err_line:sub(i + 1, i + 1))) .. colored.dim(err_line:sub(i + 2, -1))
+    err_line = colored.white(err_line:sub(1, i)) .. colored.bright(colored.red(err_line:sub(i + 1, j + 1))) .. colored.dim(err_line:sub(j + 2, -1))
     err_msg = err_msg .. "\n" .. tostring(err_line) .. "\n" .. tostring(colored.red(pointer))
     if #next_line > 0 then
       err_msg = err_msg .. ("\n" .. colored.dim(next_line))
@@ -150,6 +151,7 @@ Parser.parse = function(nomsu_code, source, version)
   end
   source = source or nomsu_code.source
   nomsu_code = tostring(nomsu_code)
+  source = source or Source("string: " .. nomsu_code, 1, #nomsu_code)
   version = version or nomsu_code:match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
   local syntax_version = version and tonumber(version:match("^[0-9]+")) or Parser.version
   local userdata = {
