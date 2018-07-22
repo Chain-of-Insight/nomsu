@@ -1,8 +1,8 @@
 -- Nomsu version 2
 file:
     {:curr_indent: ' '* :}
-    (file_chunks / chunk / (comment? blank_lines? (inline_block / indented_block)))?
-    blank_lines?
+    (((action / expression / inline_block / indented_block) eol !.)
+     / file_chunks / blank_lines / '')
     %ws* (!! .+ -> "Parse error" !!)?
 
 shebang: "#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^%nl]*
@@ -10,16 +10,12 @@ shebang: "#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^
 file_chunks (FileChunks):
     {:curr_indent: ' '* :}
     shebang? comment? blank_lines?
-    chunk (nl_nodent section_division nl_nodent chunk)+
+    (top_block (nl_nodent section_division top_block)*)
     blank_lines?
-
-chunk:
-    top_block / (comment? blank_lines? statement)
 
 top_block (Block):
     {:curr_indent: ' '* :}
-    shebang? comment? blank_lines?
-    statement (nl_nodent statement)+
+    comment? blank_lines? statement (nl_nodent statement)*
 
 nodent: =curr_indent !(" ")
 indent: =curr_indent "    "

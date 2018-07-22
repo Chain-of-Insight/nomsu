@@ -70,19 +70,21 @@ do
     end
     local err_pos = start_pos
     local line_no = files.get_line_number(src, err_pos)
-    local prev_line = line_no == 1 and "" or files.get_line(src, line_no - 1)
+    local prev_line = line_no == 1 and nil or files.get_line(src, line_no - 1)
     local err_line = files.get_line(src, line_no)
     local next_line = files.get_line(src, line_no + 1)
     local i = err_pos - files.get_line_starts(src)[line_no]
     local j = i + (end_pos - start_pos)
     local pointer = ("-"):rep(i) .. "^"
     err_msg = colored.bright(colored.yellow(colored.onred((err_msg or "Parse error") .. " at " .. tostring(userdata.source.filename) .. ":" .. tostring(line_no) .. ":")))
-    if #prev_line > 0 then
+    if prev_line then
       err_msg = err_msg .. ("\n" .. colored.dim(prev_line))
     end
-    err_line = colored.white(err_line:sub(1, i)) .. colored.bright(colored.red(err_line:sub(i + 1, j + 1))) .. colored.dim(err_line:sub(j + 2, -1))
-    err_msg = err_msg .. "\n" .. tostring(err_line) .. "\n" .. tostring(colored.red(pointer))
-    if #next_line > 0 then
+    if err_line then
+      err_line = colored.white(err_line:sub(1, i)) .. colored.bright(colored.red(err_line:sub(i + 1, j + 1))) .. colored.dim(err_line:sub(j + 2, -1))
+      err_msg = err_msg .. "\n" .. tostring(err_line) .. "\n" .. tostring(colored.red(pointer))
+    end
+    if next_line then
       err_msg = err_msg .. ("\n" .. colored.dim(next_line))
     end
     seen_errors[start_pos] = err_msg
@@ -160,11 +162,8 @@ Parser.parse = function(nomsu_code, source, version)
     comments = { }
   }
   local tree = Parser.patterns[syntax_version]:match(nomsu_code, nil, userdata)
-  if not (tree) then
+  if not tree or type(tree) == 'number' then
     error("In file " .. tostring(colored.blue(tostring(source or "<unknown>"))) .. " failed to parse:\n" .. tostring(colored.onyellow(colored.black(nomsu_code))))
-  end
-  if type(tree) == 'number' then
-    return nil
   end
   if next(userdata.errors) then
     local keys

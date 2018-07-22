@@ -229,7 +229,15 @@ Files.get_line_number = function(str, pos)
 end
 Files.get_line = function(str, line_no)
   local line_starts = Files.get_line_starts(str)
-  return str:sub(line_starts[line_no] or 1, (line_starts[line_no + 1] or 1) - 2)
+  local start = line_starts[line_no]
+  if not (start) then
+    return 
+  end
+  local stop = line_starts[line_no + 1]
+  if not (stop) then
+    return 
+  end
+  return str:sub(start, stop - 2)
 end
 local get_lines = re.compile([[    lines <- {| line (%nl line)* |}
     line <- {[^%nl]*}

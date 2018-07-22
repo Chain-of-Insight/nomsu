@@ -667,7 +667,7 @@ with NomsuCompiler
                             elseif setup and not (line.type == "Action" and line.stub == "use %")
                                 nomsu\append "\n", pop_comments(line.source.start)
                                 setup = false
-                            nomsu\append pop_comments(line.source.start, '\n')
+                            nomsu\append pop_comments(line.source.start, tostring(nomsu)\match("\n\n$") and "" or "\n")
                             line_nomsu = @tree_to_nomsu(line, pop_comments)
                             nomsu\append line_nomsu
                             nomsu\append(line_nomsu\is_multiline! and "\n\n" or "\n") if line_no < #chunk
@@ -676,6 +676,7 @@ with NomsuCompiler
                         nomsu\append recurse(chunk)
                     setup = false
                 nomsu\append pop_comments(tree.source.stop, '\n')
+                nomsu\append('\n') unless tostring(nomsu)\match("\n$")
                 return nomsu
 
             when "Action"
@@ -717,7 +718,7 @@ with NomsuCompiler
                     line_nomsu = recurse(line)
                     nomsu\append line_nomsu
                     if i < #tree
-                        nomsu\append(line_nomsu\is_multiline! and "\n\n" or "\n")
+                        nomsu\append(tostring(line_nomsu)\match('\n[^\n]*\n') and "\n\n" or "\n")
                 nomsu\append pop_comments(tree.source.stop, '\n')
                 return NomsuCode(tree.source, ":\n    ", nomsu)
 

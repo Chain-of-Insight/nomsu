@@ -1062,7 +1062,7 @@ do
               nomsu:append("\n", pop_comments(line.source.start))
               setup = false
             end
-            nomsu:append(pop_comments(line.source.start, '\n'))
+            nomsu:append(pop_comments(line.source.start, tostring(nomsu):match("\n\n$") and "" or "\n"))
             local line_nomsu = self:tree_to_nomsu(line, pop_comments)
             nomsu:append(line_nomsu)
             if line_no < #chunk then
@@ -1076,6 +1076,9 @@ do
         setup = false
       end
       nomsu:append(pop_comments(tree.source.stop, '\n'))
+      if not (tostring(nomsu):match("\n$")) then
+        nomsu:append('\n')
+      end
       return nomsu
     elseif "Action" == _exp_0 then
       local pos, next_space = tree.source.start, ''
@@ -1117,7 +1120,7 @@ do
         local line_nomsu = recurse(line)
         nomsu:append(line_nomsu)
         if i < #tree then
-          nomsu:append(line_nomsu:is_multiline() and "\n\n" or "\n")
+          nomsu:append(tostring(line_nomsu):match('\n[^\n]*\n') and "\n\n" or "\n")
         end
       end
       nomsu:append(pop_comments(tree.source.stop, '\n'))
