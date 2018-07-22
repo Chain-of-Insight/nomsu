@@ -4,6 +4,9 @@
 
 use "core"
 
+test:
+    path of Nomsu file "lib/os.nom"
+
 action [path of Nomsu file %filename]:
     lua> "for i,f in Files.walk(\%filename) do return f end"
     barf "Could not find file: \%filename"
@@ -15,7 +18,13 @@ action [sh> %cmd]:
         result:close()
         return contents
 
+test:
+    read file "lib/os.nom"
+
 action [read file %filename] (=lua "Files.read(\%filename)")
+test:
+    for file %f in "core": do nothing
+
 compile [for file %f in %path %body] to (..)
     Lua ".."
         for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
@@ -43,8 +52,18 @@ action [..]
         file:write(\%text)
         file:close()
 
+test:
+    assume ((line number of 3 in "x\ny") == 2)
+
 action [line number of %pos in %str] (=lua "Files.get_line_number(\%str, \%pos)")
+test:
+    assume ((line 2 in "one\ntwo\nthree") == "two")
+
 action [line %line_num in %str] (=lua "Files.get_line(\%str, \%line_num)")
+
+test:
+    assume (source lines of \(this))
+
 action [source lines of %tree]:
     %source = (%tree.source if (%tree is syntax tree) else %tree)
     %file = (read file %source.filename)

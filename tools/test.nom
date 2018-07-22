@@ -8,9 +8,13 @@ if (%args.1 == "-v"):
     remove index 1 from %args
     %verbose = (yes)
 
+# Make sure all the files get run
+for %path in (command line args):
+    for file %filename in %path:
+        if (%filename matches "%.nom$"): use %filename
+
 %tests = ((=lua "Source:from_string(\%s)") = %t for %s = %t in (tests))
 for %path in (command line args):
-    if (%path is "-i"): %inplace = (yes)
     for file %filename in %path:
         unless (%filename matches "%.nom$"): do next %filename
         %file_tests = []

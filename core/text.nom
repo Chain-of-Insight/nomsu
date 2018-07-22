@@ -5,7 +5,34 @@
 
 use "core/metaprogramming.nom"
 
+test:
+    assume (("x" + "y") == "xy")
+    %s = "list:\[1, 2, 3]"
+    assume (%s == "list:[1, 2, 3]")
+    assume ("foo = \(1 + 2)!" == "foo = 3!")
+    assume (..)
+        ".."
+            one
+            two
+        ..== "one\ntwo"
+    assume (..)
+        ".."
+            no\
+            ..gap
+        ..== "nogap"
+    parse [アクション %spec %body] as (action %spec %body)
+
+test:
+    %こんにちは = "こんにちは"
+    アクション [% と言う] "\(%)世界"
+    assume ((%こんにちは と言う) == "こんにちは世界") or barf ".."
+        Unicode doesn't work
+
 # Text functions
+test:
+    assume ((["x", "y"] joined with ",") == "x,y") or barf "joined with failed"
+    assume ((["x", "y"] joined) == "xy") or barf "joined failed"
+
 action [%texts joined with %glue] (..)
     lua> ".."
         local text_bits = {}
@@ -13,15 +40,29 @@ action [%texts joined with %glue] (..)
         return table.concat(text_bits, \%glue)
 
 parse [joined %texts, %texts joined] as (%texts joined with "")
+test:
+    assume (("asdf" capitalized) == "Asdf") or barf "capitalized failed"
+
 compile [capitalized %text, %text capitalized] to (..)
     Lua value "((\(%text as lua expr)):gsub('%l', string.upper, 1))"
 
+test:
+    assume (("asdf" with "X" instead of "s") == "aXdf") or barf ".."
+        substitution failed
 compile [..]
     %text with %sub instead of %patt, %text with %patt replaced by %sub
     %text s/ %patt / %sub
 ..to (..)
     Lua value ".."
         ((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))
+
+test:
+    assume (..)
+        (..)
+            lines in ".."
+                one
+                two
+        ..== ["one", "two"]
 
 action [lines in %text, lines of %text] (..)
     lua> ".."
@@ -55,6 +96,9 @@ compile [%text matches %pattern] to (..)
 
 compile [%text matching %pattern] to (..)
     Lua value "\(%text as lua expr):match(\(%pattern as lua expr))"
+
+test:
+    assume ("\n" == (newline)) or barf "Text literals failed."
 
 # Text literals
 lua> ".."

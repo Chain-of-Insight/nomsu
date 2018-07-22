@@ -4,6 +4,47 @@
 
 use "core"
 
+test:
+    object "Dog":
+        (class Dog).genus = "Canus"
+        method [initialize %] (%.barks or= 0)
+        method [bark, woof]:
+            %barks = ("Bark!" for % in 1 to (me).barks)
+            return (%barks joined with " ")
+        
+        method [get pissed off] ((me).barks += 1)
+
+    %d = (new Dog {barks:2})
+    as %d:
+        assume ((me) == %d)
+        assume ((me).barks == 2)
+        assume ((bark) == "Bark! Bark!")
+        assume ((woof) == "Bark! Bark!")
+        get pissed off
+        assume ((me).barks == 3)
+        assume ((bark) == "Bark! Bark! Bark!")
+        assume ((me).genus == "Canus")
+
+    assume ("\(%d.class)" == "Dog")
+    assume (%d.genus == "Canus")
+    assume (%d.barks == 3)
+    as (new Dog) (assume ((me).barks == 0) or barf "Default initializer failed")
+    as (new Dog {barks:1}) (assume ((bark) == "Bark!"))
+    action [foo] (as (new Dog {barks:23}) (return (me).barks))
+    assume ((foo) == 23) or barf "Oops, \(foo) != 23"
+    as (new Dog {barks:101}):
+        try (as (new Dog {barks:8}) (barf)) and if it succeeds (barf)
+        assume ((me).barks == 101) or barf ".."
+            Error in nested 'as % %' failed to properly reset 'self'
+
+    object "Corgi" extends (class Dog) (method [sploot] "splooted")
+    %corg = (new Corgi)
+    assume (%corg.barks == 0)
+    as (new Corgi {barks:1}):
+        assume ((sploot) == "splooted") or barf "subclass method failed"
+        assume ((bark) == "Bark!") or barf "inheritance failed"
+        assume ((woof) == "Bark!")
+
 compile [@, me] to (Lua value "self")
 compile [method %actions %body] to:
     %lua = (compile as (action %actions %body))
