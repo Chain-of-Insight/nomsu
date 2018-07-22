@@ -46,7 +46,6 @@ table.fork = (t, values)-> setmetatable(values or {}, {__index:t})
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
--- Add a ((%x foo %y) where {x:"asdf", y:"fdsa"}) compile-time action for substitution
 -- Re-implement nomsu-to-lua comment translation?
 
 -- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
