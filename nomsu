@@ -1,15 +1,15 @@
 #!/bin/bash
 while getopts ':V:L' flag; do
   case "${flag}" in
-    V) VERSION="${OPTARG/./\.}\\b" ;;
+    V) VERSION=$OPTARG ;;
     L) LIST="YES" ;;
   esac
 done
 
 if [[ $VERSION ]]; then
-    candidates=$(ls $(dirname $BASH_SOURCE) | grep "^nomsu$VERSION[0-9.]*$")
+    candidates=$(find $(dirname $BASH_SOURCE) -maxdepth 1 -name "nomsu$VERSION*")
 else
-    candidates=$(ls $(dirname $BASH_SOURCE) | grep "^nomsu[0-9.]\+$")
+    candidates=$(find $(dirname $BASH_SOURCE) -maxdepth 1 -name "nomsu[0-9]*")
 fi
 
 if [[ $LIST ]]; then
@@ -18,7 +18,7 @@ if [[ $LIST ]]; then
 fi
 
 if [[ $candidates ]]; then
-    eval $(dirname $BASH_SOURCE)/$(echo "$candidates" | sort -V | tail -n 1) $@
+    "$(echo "$candidates" | sort -V | tail -n 1)" "$@"
 else
     echo "Failed to find a Nomsu version matching the regex: \"nomsu$VERSION\""
     echo "The versions available are:"
