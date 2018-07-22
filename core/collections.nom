@@ -29,7 +29,6 @@ test:
 action [%item is in %list, %list contains %item, %list has %item]:
     for %key = %value in %list:
         if (%key is %item): return (yes)
-    
     return (no)
 
 test:
@@ -41,7 +40,6 @@ action [..]
 ..:
     for %key = %value in %list:
         if (%key is %item): return (no)
-    
     return (yes)
 
 test:
@@ -94,7 +92,6 @@ parse [%expression for %item in %iterable] as (..)
         %comprehension = []
         for %item in %iterable:
             add %expression to %comprehension
-        
         return %comprehension
 
 parse [..]
@@ -105,7 +102,6 @@ parse [..]
         %comprehension = []
         for %index in %start to %stop via %step:
             add %expression to %comprehension
-        
         return %comprehension
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -127,9 +123,7 @@ parse [..]
         %comprehension = []
         for %key = %value in %iterable:
             add %expression to %comprehension
-        
         return %comprehension
-
 
 # Dict comprehensions
 test:
@@ -141,7 +135,6 @@ parse [%key = %value for %item in %iterable, %key %value for %item in %iterable]
         %comprehension = {}
         for %item in %iterable:
             %comprehension.%key = %value
-        
         return %comprehension
 
 test:
@@ -155,7 +148,6 @@ parse [..]
         %comprehension = {}
         for %src_key = %src_value in %iterable:
             %comprehension.%key = %value
-        
         return %comprehension
 
 parse [..]
@@ -166,7 +158,6 @@ parse [..]
         %comprehension = {}
         for %item in %start to %stop via %step:
             %comprehension.%key = %value
-        
         return %comprehension
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -186,7 +177,6 @@ action [%lists flattened]:
     %flat = []
     for %list in %lists:
         for %item in %list: add %item to %flat
-    
     return %flat
 
 test:
@@ -221,7 +211,6 @@ compile [%dict with fallback %key -> %value] to (..)
             self[\(%key as lua expr)] = value
             return value
         end})
-
 
 # Sorting
 test:

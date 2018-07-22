@@ -20,10 +20,8 @@ compile [with local %locals %body, with local %locals do %body] to:
         
         "List":
             declare locals ("\(% as lua)" for % in %locals) in %body_lua
-        
         "Var" "Action":
             declare locals ["\(%locals as lua)"] in %body_lua
-        
         else:
             compile error at %locals.source "Unexpected locals: %s"
     

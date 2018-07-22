@@ -10,7 +10,8 @@ use "core/collections.nom"
 
 # Literals:
 test:
-    assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf "math constants failed"
+    assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf ".."
+        math constants failed
     %nan = (NaN)
     assume (%nan != %nan) or barf "NaN failed"
 
@@ -62,7 +63,6 @@ compile [log % base %base, log base %base of %] to (..)
 compile [floor %] to (Lua value "math.floor(\(% as lua expr))")
 compile [ceiling %, ceil %] to (Lua value "math.ceil(\(% as lua expr))")
 compile [round %, % rounded] to (Lua value "math.floor(\(% as lua expr) + .5)")
-
 test:
     assume ((463 to the nearest 100) == 500) or barf "rounding failed"
     assume ((2.6 to the nearest 0.25) == 2.5) or barf "rounding failed"
@@ -70,12 +70,10 @@ test:
 action [%n to the nearest %rounder] (..)
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 
-
 # Any/all/none
 compile [all of %items, all %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.all(\(%items as lua expr))")
-    
     %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses joined with " and "))")
 
@@ -83,7 +81,6 @@ parse [not all of %items, not all %items] as (not (all of %items))
 compile [any of %items, any %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.any(\(%items as lua expr))")
-    
     %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses joined with " or "))")
 
@@ -91,14 +88,12 @@ parse [none of %items, none %items] as (not (any of %items))
 compile [sum of %items, sum %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.sum(\(%items as lua expr))")
-    
     %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses joined with " + "))")
 
 compile [product of %items, product %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.product(\(%items as lua expr))")
-    
     %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses joined with " * "))")
 
@@ -132,7 +127,6 @@ parse [max of %items by %item = %value_expr] as (..)
                 set {%best:%item, %best_key:%key}
         
         return %best
-
 
 # Random functions
 action [seed random with %] (..)

@@ -76,7 +76,6 @@ compile [..]
                     end
                 end)())
 
-
 # GOTOs
 test:
     %i = 0
@@ -106,13 +105,13 @@ test:
         %x += 1
         if (yes): do next
         barf "Failed to 'do next'"
-
+    
     assume (%x == 20)
     repeat while (%x < 30):
         %x += 1
         if (yes): do next repeat
         barf "Failed to 'do next repeat'"
-
+    
     assume (%x == 30)
 
 compile [do next repeat] to (Lua "goto continue_repeat")
@@ -125,10 +124,8 @@ compile [repeat while %condition %body] to:
     
     if (%body has subtree \(do next)):
         to %lua write "\n    ::continue::"
-
     if (%body has subtree \(do next repeat)):
         to %lua write "\n    ::continue_repeat::"
-
     to %lua write "\nend --while-loop"
     if (%body has subtree \(stop repeating)):
         %lua = (..)
@@ -142,7 +139,6 @@ compile [repeat while %condition %body] to:
 
 parse [repeat %body] as (repeat while (yes) %body)
 parse [repeat until %condition %body] as (repeat while (not %condition) %body)
-
 test:
     %x = 0
     repeat 10 times: %x += 1
@@ -156,10 +152,8 @@ compile [repeat %n times %body] to:
     
     if (%body has subtree \(do next)):
         to %lua write "\n    ::continue::"
-
     if (%body has subtree \(do next repeat)):
         to %lua write "\n    ::continue_repeat::"
-    
     to %lua write "\nend --numeric for-loop"
     if (%body has subtree \(stop repeating)):
         %lua = (..)
@@ -185,19 +179,21 @@ compile [===next %var ===, ---next %var ---, ***next %var ***] to (..)
 test:
     %nums = []
     for %x in 1 to 5: add %x to %nums
-    assume (%nums == [1,2,3,4,5])
+    assume (%nums == [1, 2, 3, 4, 5])
     %nums = []
     for %x in 1 to 5 via 2: add %x to %nums
-    assume (%nums == [1,3,5])
+    assume (%nums == [1, 3, 5])
     %nums = []
     for %outer in 1 to 100:
         for %inner in %outer to (%outer + 2):
             if (%inner == 2):
                 add -2 to %nums
                 do next %inner
+            
             add %inner to %nums
             if (%inner == 5): stop %outer
-    assume (%nums == [1,-2,3,-2,3,4,3,4,5])
+    
+    assume (%nums == [1, -2, 3, -2, 3, 4, 3, 4, 5])
 
 # Numeric range for loops
 compile [..]
@@ -208,20 +204,17 @@ compile [..]
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
         compile error at %var.source "Loop expected variable, not: %s"
-    
     %lua = (..)
         Lua ".."
             for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(..)
                 %step as lua expr
             .. do
                 \(%body as lua statements)
-
+    
     if (%body has subtree \(do next)):
         to %lua write "\n    ::continue::"
-    
     if (%body has subtree (\(do next %v) with vars {v:%var})):
         to %lua write "\n    \(compile as (===next %var ===))"
-    
     to %lua write "\nend --numeric for-loop"
     if (%body has subtree (\(stop %v) with vars {v:%var})):
         %lua = (..)
@@ -239,7 +232,7 @@ parse [for %var in %start to %stop %body] as (..)
     for %var in %start to %stop via 1 %body
 
 test:
-    %a = [10,20,30,40,50]
+    %a = [10, 20, 30, 40, 50]
     %b = []
     for %x in %a: add %x to %b
     assume (%a == %b)
@@ -248,7 +241,8 @@ test:
         if (%x == 10): do next %x
         if (%x == 50): stop %x
         add %x to %b
-    assume (%b == [20,30,40])
+    
+    assume (%b == [20, 30, 40])
 
 # For-each loop (lua's "ipairs()")
 compile [for %var in %iterable %body] to:
@@ -256,7 +250,6 @@ compile [for %var in %iterable %body] to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
         compile error at %var.source "Loop expected variable, not: %s"
-    
     %lua = (..)
         Lua ".."
             for i,\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
@@ -264,10 +257,8 @@ compile [for %var in %iterable %body] to:
     
     if (%body has subtree \(do next)):
         to %lua write "\n    ::continue::"
-
     if (%body has subtree (\(do next %v) with vars {v:%var})):
         to %lua write (Lua "\n\(compile as (===next %var ===))")
-    
     to %lua write "\nend --foreach-loop"
     if (%body has subtree (\(stop %v) with vars {v:%var})):
         %lua = (..)
@@ -286,6 +277,7 @@ test:
         if (%k == "a"): do next %k
         if (%v == 20): do next %v
         add "\%k = \%v" to %result
+    
     assume ((%result sorted) == ["c = 30", "d = 40", "e = 50"])
 
 # Dict iteration (lua's "pairs()")
@@ -296,34 +288,27 @@ compile [..]
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%key.type is "Var"):
         compile error at %key.source "Loop expected variable, not: %s"
-    
     unless (%value.type is "Var"):
         compile error at %value.source "Loop expected variable, not: %s"
-    
     %lua = (..)
         Lua ".."
             for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(..)
                 %iterable as lua expr
             ..) do
                 \(%body as lua statements)
-
+    
     if (%body has subtree \(do next)):
         to %lua write "\n    ::continue::"
-    
     if (%body has subtree (\(do next %v) with vars {v:%key})):
         to %lua write (Lua "\n\(compile as (===next %key ===))")
-    
     if (%body has subtree (\(do next %v) with vars {v:%value})):
         to %lua write (Lua "\n\(compile as (===next %value ===))")
-    
     to %lua write "\nend --foreach-loop"
     %stop_labels = (Lua "")
     if (%body has subtree (\(stop %v) with vars {v:%key})):
         to %stop_labels write "\n\(compile as (===stop %key ===))"
-    
     if (%body has subtree (\(stop %v) with vars {v:%value})):
         to %stop_labels write "\n\(compile as (===stop %value ===))"
-    
     if ((length of "\%stop_labels") > 0):
         %lua = (..)
             Lua ".."
@@ -337,11 +322,15 @@ compile [..]
 
 test:
     if:
-        (1 == 2) (100 < 0): barf "bad conditional"
-        (1 == 0) (1 == 1) (%not_a_variable.x): do nothing
-        (1 == 1): barf "bad conditional"
-        (1 == 2): barf "bad conditional"
-        else: barf "bad conditional"
+        (1 == 2) (100 < 0):
+            barf "bad conditional"
+        (1 == 0) (1 == 1) %not_a_variable.x: do nothing
+        (1 == 1):
+            barf "bad conditional"
+        (1 == 2):
+            barf "bad conditional"
+        else:
+            barf "bad conditional"
 
 # Multi-branch conditional (if..elseif..else)
 compile [if %body, when %body] to:
@@ -350,7 +339,6 @@ compile [if %body, when %body] to:
     %else_allowed = (yes)
     unless (%body.type is "Block"):
         compile error at %body.source "'if' expected a Block, but got: %s"
-    
     for %line in %body:
         unless (..)
             ((%line.type is "Action") and ((length of %line) >= 2)) and (..)
@@ -364,7 +352,6 @@ compile [if %body, when %body] to:
         if ((%line.1 is "else") and ((length of %line) == 2)):
             unless %else_allowed:
                 compile error at %line.source "Can't have two 'else' blocks"
-            
             unless ((length of "\%code") > 0):
                 compile error at %line.source ".."
                     Can't have an 'else' block without a preceeding condition
@@ -385,7 +372,6 @@ compile [if %body, when %body] to:
                 
                 if (%i > 1):
                     to %code write " or "
-                
                 to %code write (%line.%i as lua expr)
             
             to %code write ".."
@@ -396,16 +382,18 @@ compile [if %body, when %body] to:
     
     if ((length of "\%code") == 0):
         compile error at %body.source "'if' block has an empty body"
-    
     to %code write "\nend --when"
     return %code
 
 test:
     if 5 is:
-        1 2 3: barf "bad switch statement"
+        1 2 3:
+            barf "bad switch statement"
         4 5: do nothing
-        5 6: barf "bad switch statement"
-        else: barf "bad switch statement"
+        5 6:
+            barf "bad switch statement"
+        else:
+            barf "bad switch statement"
 
 # Switch statement
 compile [if %branch_value is %body, when %branch_value is %body] to:
@@ -414,7 +402,6 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
     %else_allowed = (yes)
     unless (%body.type is "Block"):
         compile error at %body.source "'if' expected a Block, but got: %s"
-    
     for %line in %body:
         unless (..)
             ((%line.type is "Action") and ((length of %line) >= 2)) and (..)
@@ -428,7 +415,6 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
         if ((%line.1 is "else") and ((length of %line) == 2)):
             unless %else_allowed:
                 compile error at %line.source "Can't have two 'else' blocks"
-            
             unless ((length of "\%code") > 0):
                 compile error at %line.source ".."
                     Can't have an 'else' block without a preceeding condition
@@ -449,7 +435,6 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
                 
                 if (%i > 1):
                     to %code write " or "
-                
                 to %code write "branch_value == \(%line.%i as lua expr)"
             
             to %code write ".."
@@ -460,7 +445,6 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
     
     if ((length of "\%code") == 0):
         compile error at %body.source "'if % is % %' block has an empty body"
-    
     to %code write "\nend --when"
     return (..)
         Lua ".."
@@ -468,7 +452,6 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
                 local branch_value = \(%branch_value as lua expr)
                 \%code
             end --if % is
-
 
 # Do/finally
 compile [do %action] to (..)
@@ -483,9 +466,9 @@ test:
         do:
             %d.x = "bad"
             barf
-        ..then always:
-            %d.x = "good"
+        ..then always: %d.x = "good"
     ..and if it barfs: do nothing
+    
     assume (%d.x == "good")
 
 compile [do %action then always %final_action] to (..)
@@ -502,11 +485,10 @@ compile [do %action then always %final_action] to (..)
         end
 
 test:
-    assume ((result of: return 99) == 99)
+    assume ((result of (: return 99)) == 99)
 
 # Inline thunk:
 compile [result of %body] to (Lua value "(\(compile as ([] -> %body)))()")
-
 test:
     %t = [1, [2, [[3], 4], 5, [[[6]]]]]
     %flat = []
@@ -514,7 +496,7 @@ test:
         if ((type of %) is "table"):
             for %2 in %: recurse % on %2
         ..else: add % to %flat
-
+    
     assume ((sorted %flat) == [1, 2, 3, 4, 5, 6])
 
 # Recurion control flow
@@ -522,7 +504,6 @@ compile [for %var in recursive %structure %body] to (..)
     with local compile actions:
         compile [recurse %v on %x] to (..)
             Lua "table.insert(stack\(%v as lua id), \(%x as lua expr))"
-        
         %lua = (..)
             Lua ".."
                 do
@@ -530,17 +511,13 @@ compile [for %var in recursive %structure %body] to (..)
                     while #stack\(%var as lua id) > 0 do
                         \(%var as lua expr) = table.remove(stack\(%var as lua id), 1)
                         \(%body as lua statements)
-
+        
         if (%body has subtree \(do next)):
             to %lua write "\n        ::continue::"
-
         if (%body has subtree (\(do next %v) with vars {v:%var})):
             to %lua write "\n        \(compile as (===next %var ===))"
-
         to %lua write "\n    end -- Recursive loop"
         if (%body has subtree (\(stop %v) with vars {v:%var})):
             to %lua write "\n        \(compile as (===stop %var ===))"
-
         to %lua write "\nend -- Recursive scope"
-
         return %lua

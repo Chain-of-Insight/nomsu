@@ -30,10 +30,13 @@ lua> ".."
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-test: compile [five] to (Lua value "5")
+test:
+    compile [five] to (Lua value "5")
+
 test:
     assume ((five) == 5) or barf "Compile to expression failed."
     compile [loc x] to (Lua "local _x = 99;")
+
 test:
     lua> "do"
     loc x
@@ -43,6 +46,7 @@ test:
     compile [asdf] to:
         %tmp = ""
         return (Lua %tmp)
+
 test:
     asdf
     assume (%tmp is (nil)) or barf "compile to is leaking variables"
@@ -81,18 +85,16 @@ compile [call %fn with %args] to (..)
         return lua
 
 test:
-    local action [foo %x]:
-        return "outer"
-
+    local action [foo %x]: return "outer"
     with local [action (foo %)]:
         local action [foo %x]:
             %y = (%x + 1)
             return %y
-
+        
         assume ((foo 10) == 11) or barf "Action didn't work."
         assume (%y is (nil)) or barf "Action leaked a local into globals."
         parse [baz %] as (foo %)
-
+    
     assume ((foo 1) == "outer")
 
 compile [local action %actions %body] to (..)
@@ -137,7 +139,6 @@ test:
     assume ((action (say %)) == (=lua "A_say_1"))
 
 compile [action %action] to (Lua value (%action as lua id))
-
 test:
     parse [swap %x and %y] as (..)
         do:
@@ -150,7 +151,6 @@ test:
     swap %1 and %2
     assume ((%1 == 2) and (%2 == 1)) or barf ".."
         'parse % as %' failed on 'swap % and %'
-
     set {%tmp:1, %tmp2:2}
     swap %tmp and %tmp2
     assume ((%tmp == 2) and (%tmp2 == 1)) or barf ".."
@@ -270,10 +270,14 @@ compile [to %lua write %code joined by %glue] to (..)
         \(%lua as lua expr):concat_append(\(%code as lua expr), \(%glue as lua expr));
 
 test:
-    assume ((quote "one\n\"two\"") == "\"one\\n\\\"two\\\"\"")
+    assume (..)
+        (..)
+            quote ".."
+                one
+                "two"
+        ..== "\"one\\n\\\"two\\\"\""
 
 compile [quote %s] to (Lua value "repr(\(%s as lua expr))")
-
 test:
     assume ((type of {}) == "table") or barf "type of failed."
 
@@ -284,9 +288,7 @@ compile [type of %obj] to (Lua value "type(\(%obj as lua expr))")
 test:
     assume ((parse "foo %") == \(foo %))
 
-compile [parse %text] to (..)
-    Lua value "nomsu:parse(\(%text as lua expr))"
-
+compile [parse %text] to (Lua value "nomsu:parse(\(%text as lua expr))")
 compile [parse %text from %filename] to (..)
     Lua value ".."
         nomsu:parse(NomsuCode(Source(\(%filename as lua expr), 1, #\(%text as lua expr)), \(..)
@@ -296,7 +298,8 @@ compile [parse %text from %filename] to (..)
 test:
     assume ((run "return (2 + 99)") == 101)
     external %passed = (no)
-    run \: external %passed = (yes)
+    run \:
+        external %passed = (yes)
     assume %passed
 
 compile [run %nomsu_code] to (..)
@@ -312,13 +315,11 @@ action [run tree %tree, %tree as value] (lua> "return nomsu:run(\%tree)")
 compile [compile %block, compiled %block, %block compiled] to (..)
     Lua value "nomsu:compile(\(%block as lua))"
 
-
 # Return statement is wrapped in a do..end block because Lua is unhappy if you
     put code after a return statement, unless you wrap it in a block.
 compile [return] to (Lua "do return; end")
 compile [return %return_value] to (..)
     Lua "do return \(%return_value as lua expr) end"
-
 
 # Literals
 compile [yes] to (Lua value "true")

@@ -41,7 +41,6 @@ say %one_two
     
     The text will continue until the indentation ends, skipping trailing newlines.
 
-
 # How do I put values inside text? (AKA string formatting, string interpolation)
 say ".."
     Text can contain a backslash followed by a variable, list, dict, or parenthesized
@@ -100,51 +99,40 @@ if (1 > 10):
 ..else:
     say "this will print"
 
-
 # There's no "elseif", so for longer conditionals, a "when" branch is the best option
 if:
     (3 > 6) (3 > 5) (3 > 4):
         say "this won't print"
-    
     (3 > 3):
         say "this won't print"
-    
     (3 > 2):
         say "this will print"
-    
     else:
         say "this is the default case"
-
 
 # How do I do a switch statement?
 if 3 is:
     0 1 2:
         say "this won't print"
-    
     3:
         say "this will print"
-    
     else:
         say "this won't print"
-
 
 # How do I loop over a list (a foreach loop)?
 %list = [1, 2, 3]
 for %x in %list:
     say "For %x loop #\%x"
 
-
 # How do I loop over a number range?
 # This is inclusive, so it will loop over 1,2, and 3
 for %i in 1 to 3:
     say "For %i in 1 to 3 loop #\%i"
 
-
 # This will print 0,2, and 4
 for %even in 0 to 5 by 2: say "Even #\%even"
 for %backwards in 3 to 1 by -1:
     say "Backwards #\%backwards"
-
 
 # How do I do a 'while' loop?
 %x = 1
@@ -157,14 +145,12 @@ repeat until (%x > 3):
     say "repeat until loop #\%x"
     %x += 1
 
-
 # How do I do an infinite loop?
 %x = 1
 repeat:
     say "repeat loop #\%x"
     %x += 1
     if (%x > 3): stop repeating
-
 
 # How do I do a 'goto'?
 do:
@@ -175,7 +161,6 @@ do:
     if (%x <= 3): go to %again
     say "finished going to"
 
-
 # How do I define a function/method/procedure?
 # In nomsu, they're called "action"s, and they can be declared like this:
 action [say both %first and also %second]:
@@ -183,7 +168,6 @@ action [say both %first and also %second]:
     
     # Function arguments are accessed just like variables
     say %second
-
 
 # Actions can use "return" to return a value early
 action [first fibonacci above %n]:
@@ -277,7 +261,6 @@ compile [if %condition on opposite day %body] to (..)
             \(%body as lua statements)
         end
 
-
 # Constants can be defined as macros
 parse [TWENTY] as 20
 
@@ -296,7 +279,6 @@ if (1 > (TWENTY)) is untrue:
 if (1 > (TWENTY)) on opposite day:
     say "Lua compiling macros work!"
     say "It looks like a keyword, but there's no magic here!"
-
 
 # How do I use an action as a value?
 # Well... it's always *possible* to fall back to Lua behavior for something like this:

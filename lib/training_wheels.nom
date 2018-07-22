@@ -38,7 +38,6 @@ compile [function %args %body, lambda %args %body] to:
     lua> "\%body:convert_to_statements('return ');"
     for % in %args.value:
         lua> "\%body:remove_free_vars(\%);"
-    
     to %lua write %body
     to %lua write "\nend)"
     return %lua

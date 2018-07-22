@@ -10,30 +10,23 @@ upgrade %tree to "2.4" as:
             %new_lines = []
             %body = (..)
                 (%tree.2 upgraded) if (%tree.2 is "Block" syntax tree) else [%tree.2 upgraded]
-            
             for %line in %body:
                 if:
                     (not (%line is syntax tree)):
                         compile error at %tree.source "WUT: %s"
-                    
                     (not (%line is "Action" syntax tree)):
                         add %line to %new_lines
-                    
                     (%line.stub is "* %"):
                         add %line.2 to %conditions
-                    
                     (%line.stub == "* else %"):
                         add (\(else %block) with vars {block:%line.3}) to %new_lines
-                    
                     (%line.stub != "* % %"):
                         add %line to %new_lines
-                    
                     else:
                         add %line.2 to %conditions
                         %action = %line.3
                         unless (%action is "Block" syntax tree):
                             %action = (=lua "Block(\%action.source, \%action)")
-                        
                         add %action to %conditions
                         add (=lua "Action(\%conditions[1].source, unpack(\%conditions))") to %new_lines
                         %conditions = []
@@ -46,27 +39,21 @@ upgrade %tree to "2.4" as:
             %new_lines = []
             %body = (..)
                 (%tree.5 upgraded) if (%tree.5 is "Block" syntax tree) else [%tree.5 upgraded]
-            
             for %line in %body:
                 if:
                     (not (%line is "Action" syntax tree)):
                         add %line to %new_lines
-                    
                     (%line.stub is "* %"):
                         add %line.2 to %values
-                    
                     (%line.stub == "* else %"):
                         add (\(else %block) with vars {block:%line.3}) to %new_lines
-                    
                     (%line.stub != "* % %"):
                         add %line to %new_lines
-                    
                     else:
                         add %line.2 to %values
                         %action = %line.3
                         unless (%action is "Block" syntax tree):
                             %action = (=lua "Block(\%action.source, \%action)")
-                        
                         add %action to %values
                         add (=lua "Action(\%values[1].source, unpack(\%values))") to %new_lines
                         %values = []

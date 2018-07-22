@@ -11,7 +11,6 @@ compile [method %actions %body] to:
     declare locals in %lua
     for % in %actions:
         to %lua write "\nclass.\(% as lua id) = \(% as lua id)"
-    
     return (..)
         Lua ".."
             do -- Method: \(%actions.(1).stub)

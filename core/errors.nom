@@ -14,7 +14,6 @@ compile [compile error at %source %msg] to (..)
 compile [assume %condition] to:
     lua> ".."
         local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition))
-    
     return (..)
         Lua ".."
             if not \(%condition as lua expr) then
@@ -37,7 +36,7 @@ test:
         %x = 2
         do (barf) then always: %x = 3
     ..and if it barfs: do nothing
-
+    
     assume (%x == 3) or barf "do/then always failed"
 
 # Try/except

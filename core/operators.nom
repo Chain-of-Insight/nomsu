@@ -16,7 +16,6 @@ compile [%a is %b, %a == %b] to (..)
 compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to (..)
     Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
 
-
 # For strict identity checking, use (%x's id) is (%y's id)
 lua> ".."
     do
@@ -59,12 +58,10 @@ compile [%var = %value] to:
         end
         return lua
 
-
 # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
 compile [set %assignments] to:
     assume (%assignments.type is "Dict") or barf ".."
         Expected a Dict for the assignments part of '<- %' statement, not \%assignments
-    
     lua> ".."
         local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
         for i, item in ipairs(\%assignments) do
@@ -107,7 +104,6 @@ compile [with external %externs %body] to:
     %body_lua = (%body as lua statements)
     lua> ".."
         \%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))
-    
     return %body_lua
 
 compile [with %assignments %body] to:
@@ -144,11 +140,9 @@ compile [with %assignments %body] to:
                 \%lua
             end -- 'with' block
 
-
 # Math Operators
 compile [%x wrapped around %y, %x mod %y] to (..)
     Lua value "(\(%x as lua expr) % \(%y as lua expr))"
-
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
@@ -176,7 +170,6 @@ parse [%x > %y >= %z] as (..)
 parse [%x >= %y >= %z] as (..)
     =lua "(function(x,y,z) return x >= y and y >= z; end)(\%x,\%y,\%z)"
 
-
 # TODO: optimize for common case where x,y,z are all either variables or number literals
 # Boolean Operators
 compile [%x and %y] to (Lua value "(\(%x as lua expr) and \(%y as lua expr))")
@@ -201,7 +194,6 @@ compile [%x RSHIFT %shift, %x >>> %shift] to (..)
 compile [%x ARSHIFT %shift, %x >> %shift] to (..)
     Lua value "(\(%x as lua expr) >> \(%shift as lua expr))"
 
-
 # TODO: implement OR, XOR, AND for multiple operands?
 # Unary operators
 compile [- %] to (Lua value "(- \(% as lua expr))")
@@ -209,7 +201,9 @@ compile [not %] to (Lua value "(not \(% as lua expr))")
 test:
     assume ((length of [1, 2, 3]) == 3)
 
-compile [length of %list, len %list, || %list ||] to (Lua value "(#\(%list as lua expr))")
+compile [length of %list, len %list, || %list ||] to (..)
+    Lua value "(#\(%list as lua expr))"
+
 compile [%list is empty] to (Lua value "(#\(%list as lua expr) == 0)")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

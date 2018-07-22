@@ -54,9 +54,7 @@ compile [%text matches %pattern] to (..)
         (\(%text as lua expr):match(\(%pattern as lua expr)) and true or false)
 
 compile [%text matching %pattern] to (..)
-    Lua value ".."
-        \(%text as lua expr):match(\(%pattern as lua expr))
-
+    Lua value "\(%text as lua expr):match(\(%pattern as lua expr))"
 
 # Text literals
 lua> ".."

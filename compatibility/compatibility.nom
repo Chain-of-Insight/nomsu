@@ -10,7 +10,6 @@ action [upgrade to %version via %upgrade_fn]:
 action [upgrade action %stub to %version via %upgrade_fn]:
     unless %ACTION_UPGRADES.%version:
         %ACTION_UPGRADES.%version = []
-    
     %ACTION_UPGRADES.%version.%stub = %upgrade_fn
 
 parse [upgrade %tree to %version as %body] as (..)
@@ -58,10 +57,8 @@ action [..]
     %versions = {}
     for %v = % in %UPGRADES:
         %versions.%v = (yes)
-    
     for %v = % in %ACTION_UPGRADES:
         %versions.%v = (yes)
-    
     %versions = ((keys in %versions) sorted by % -> (% as list))
     for %ver in %versions:
         if ((%ver as list) <= (%start_version as list)): do next %ver

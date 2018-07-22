@@ -8,11 +8,9 @@ upgrade %tree to "2" as:
         %true_body = (%tree.3 upgraded)
         unless (%true_body is "Block" syntax tree):
             %true_body = (=lua "Block(\%true_body.source, \%true_body)")
-        
         %false_body = (%tree.5 upgraded)
         unless (%false_body is "Block" syntax tree):
             %false_body = (=lua "Block(\%false_body.source, \%false_body)")
-        
         return (..)
             \(if %cond %true_body else %false_body) with vars {..}
                 cond:%tree.2 upgraded, true_body:%true_body, false_body:%false_body
