@@ -46,17 +46,18 @@ NOMSU_DEFS = with {}
         err_pos = start_pos
         line_no = files.get_line_number(src, err_pos)
         --src = files.read(userdata.source.filename)
-        prev_line = line_no == 1 and "" or files.get_line(src, line_no-1)
+        prev_line = line_no == 1 and nil or files.get_line(src, line_no-1)
         err_line = files.get_line(src, line_no)
         next_line = files.get_line(src, line_no+1)
         i = err_pos-files.get_line_starts(src)[line_no]
         j = i + (end_pos-start_pos)
         pointer = ("-")\rep(i) .. "^"
         err_msg = colored.bright colored.yellow colored.onred (err_msg or "Parse error").." at #{userdata.source.filename}:#{line_no}:"
-        if #prev_line > 0 then err_msg ..= "\n"..colored.dim(prev_line)
-        err_line = colored.white(err_line\sub(1, i))..colored.bright(colored.red(err_line\sub(i+1,j+1)))..colored.dim(err_line\sub(j+2,-1))
-        err_msg ..= "\n#{err_line}\n#{colored.red pointer}"
-        if #next_line > 0 then err_msg ..= "\n"..colored.dim(next_line)
+        if prev_line then err_msg ..= "\n"..colored.dim(prev_line)
+        if err_line
+            err_line = colored.white(err_line\sub(1, i))..colored.bright(colored.red(err_line\sub(i+1,j+1)))..colored.dim(err_line\sub(j+2,-1))
+            err_msg ..= "\n#{err_line}\n#{colored.red pointer}"
+        if next_line then err_msg ..= "\n"..colored.dim(next_line)
         seen_errors[start_pos] = err_msg
         return true
 
@@ -110,10 +111,8 @@ Parser.parse = (nomsu_code, source=nil, version=nil)->
         errors: {}, :source, comments: {}
     }
     tree = Parser.patterns[syntax_version]\match(nomsu_code, nil, userdata)
-    unless tree
+    if not tree or type(tree) == 'number'
         error "In file #{colored.blue tostring(source or "<unknown>")} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
-    if type(tree) == 'number'
-        return nil
 
     if next(userdata.errors)
         keys = [k for k,v in pairs(userdata.errors)]

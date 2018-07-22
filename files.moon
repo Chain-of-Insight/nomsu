@@ -143,7 +143,11 @@ Files.get_line_number = (str, pos)->
 
 Files.get_line = (str, line_no)->
     line_starts = Files.get_line_starts(str)
-    return str\sub(line_starts[line_no] or 1, (line_starts[line_no+1] or 1) - 2)
+    start = line_starts[line_no]
+    return unless start
+    stop = line_starts[line_no+1]
+    return unless stop
+    return str\sub(start, stop - 2)
 
 get_lines = re.compile([[
     lines <- {| line (%nl line)* |}
