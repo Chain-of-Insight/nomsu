@@ -25,9 +25,9 @@ all: build optimize
 .PHONY: test
 test: build optimize
 	@echo "\033[1;4mRunning unoptimized tests...\033[0m"
-	@$(LUA_BIN) nomsu.lua tests
+	@$(LUA_BIN) nomsu.lua tools/test.nom $(CORE_NOM_FILES) $(LIB_NOM_FILES)
 	@echo "\n\033[1;4mRunning optimized tests...\033[0m"
-	@$(LUA_BIN) nomsu.lua -O tests
+	@$(LUA_BIN) nomsu.lua -O tools/test.nom $(CORE_NOM_FILES) $(LIB_NOM_FILES)
 
 %.lua: %.moon
 	@moonc $<
