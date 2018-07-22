@@ -40,6 +40,11 @@ for name in *types
                 replacement = (@__class)(@source, unpack(replacements))
             replacement.comments = [c for c in *@comments] if @comments
             return replacement
+        .__eq = (other)=>
+            return false if type(@) != type(other) or #@ != #other or getmetatable(@) != getmetatable(other)
+            for i=1,#@
+                return false if @[i] != other[i]
+            return true
 
     AST[name] = setmetatable cls,
         __tostring: => @name
