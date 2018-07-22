@@ -1,11 +1,25 @@
 -- Nomsu version 2
-file (FileChunks):
+file:
     {:curr_indent: ' '* :}
-    ("#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^%nl]*)?
-    comment? blank_lines?
-    (chunk (nl_nodent section_division nl_nodent chunk)*)?
+    (file_chunks / chunk / (comment? blank_lines? (inline_block / indented_block)))?
     blank_lines?
     %ws* (!! .+ -> "Parse error" !!)?
+
+shebang: "#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^%nl]*
+
+file_chunks (FileChunks):
+    {:curr_indent: ' '* :}
+    shebang? comment? blank_lines?
+    chunk (nl_nodent section_division nl_nodent chunk)+
+    blank_lines?
+
+chunk:
+    top_block / (comment? blank_lines? statement)
+
+top_block (Block):
+    {:curr_indent: ' '* :}
+    shebang? comment? blank_lines?
+    statement (nl_nodent statement)+
 
 nodent: =curr_indent !(" ")
 indent: =curr_indent "    "
@@ -25,14 +39,13 @@ section_division: ("~")^+3 eol
 inline_block:
     "(" %ws* inline_block  %ws* ")" / raw_inline_block
 raw_inline_block (Block):
-    "(" %ws* inline_block  %ws* ")"
-    / ":" %ws* ((inline_statement (%ws* ";" %ws* inline_statement)*) / !(eol nl_indent))
-chunk (Block):
-    statement (nl_nodent statement)*
+    ":" %ws* ((inline_statement (%ws* ";" %ws* inline_statement)*) / !(eol nl_indent))
 indented_block (Block):
     ":" eol nl_indent statement (nl_nodent statement)* (%nl (%ws* %nl)* nodent comment)*
 
-statement: (action / expression) (eol / (!! [^%nl]+ -> "Unexpected character while parsing line" !!))
+statement:
+    (action / expression) (eol / (!! [^%nl]+ -> "Unexpected code while parsing line" !!))
+
 inline_statement: (inline_action / inline_expression)
 
 noindex_inline_expression:
@@ -42,7 +55,7 @@ noindex_inline_expression:
             (%ws* ',' %ws* (inline_action / inline_expression) %ws*)*
         (")"
             / (!! eol -> 'Line ended without finding a closing )-parenthesis' !!)
-            / (!! [^%nl]+ -> 'Unexpected character while parsing subexpression' !!)
+            / (!! [^%nl]+ -> 'Unexpected code while parsing subexpression' !!)
         )
       )
 inline_expression: index_chain / noindex_inline_expression 
@@ -50,14 +63,15 @@ indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict / ({|
         "(..)" nl_indent
             (action / expression) (nl_nodent comment)*
-            (eol / (!! [^%nl]+ -> "Unexpected character while parsing indented expression" !!))
+            (eol / (!! [^%nl]+ -> "Unexpected code while parsing indented expression" !!))
     |} -> unpack)
+    / (nl_indent (!! [^%nl]* -> "Unexpected indentation. Perhaps you meant to put a ':' or '(..)' on the previous line?" !!) (nl_nodent [^%nl]*)*)
 expression:
     inline_expression / indented_expression
 
-inline_nomsu (EscapedNomsu): "\" inline_expression
+inline_nomsu (EscapedNomsu): "\" (inline_expression / inline_block)
 indented_nomsu (EscapedNomsu):
-    "\" (noindex_inline_expression / indented_expression)
+    "\" (noindex_inline_expression / inline_block / indented_expression / indented_block)
 
 index_chain (IndexChain):
     noindex_inline_expression ("." (text_word / noindex_inline_expression))+
@@ -86,7 +100,7 @@ inline_text (Text):
         / inline_text_interpolation)*
     ('"'
      / (!! eol -> 'Line ended before finding a closing double quotation mark' !!)
-     / (!! [^%nl]+ -> 'Unexpected character while parsing Text' !!))
+     / (!! [^%nl]+ -> 'Unexpected code while parsing Text' !!))
 inline_text_interpolation:
     "\" (
         variable / inline_list / inline_dict / inline_text
@@ -95,13 +109,13 @@ inline_text_interpolation:
             (%ws* ',' %ws* (inline_action / inline_expression) %ws*)*
         (")"
          / (!! eol -> 'Line ended without finding a closing )-parenthesis' !!)
-         / (!! [^%nl]+ -> 'Unexpected character while parsing Text interpolation' !!)))
+         / (!! [^%nl]+ -> 'Unexpected code while parsing Text interpolation' !!)))
     )
 
 indented_text (Text):
     '".."' eol %nl {%nl*} {:curr_indent: indent :}
         (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
-    (!! [^%nl]+ -> "Unexpected character while parsing Text" !!)?
+    (!! [^%nl]+ -> "Unexpected code while parsing Text" !!)?
 -- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
 indented_plain_text (Text):
     {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
@@ -121,12 +135,12 @@ inline_list (List):
         (inline_list_item (%ws* ',' %ws* inline_list_item)* (%ws* ',')?)? %ws*
     ("]" / (","? (
         (!! eol -> "Line ended before finding a closing ]-bracket" !!)
-       /(!! [^%nl]+ -> "Unexpected character while parsing List" !!)
+       /(!! [^%nl]+ -> "Unexpected code while parsing List" !!)
     )))
 indented_list (List):
     "[..]" eol nl_indent
         list_line (nl_nodent list_line)* (nl_nodent comment)*
-    (","? (!! [^%nl]+ -> "Unexpected character while parsing List" !!))?
+    (","? (!! [^%nl]+ -> "Unexpected code while parsing List" !!))?
 list_line:
       (inline_list_item %ws* "," %ws*)+ eol
     / (inline_list_item %ws* "," %ws*)* (action / expression) eol
@@ -138,12 +152,12 @@ inline_dict (Dict):
         (inline_dict_entry (%ws* ',' %ws* inline_dict_entry)*)? %ws*
     ("}" / (","? (
         (!! eol -> "Line ended before finding a closing }-brace" !!)
-      / (!! [^%nl]* -> "Unexpected character while parsing Dictionary" !!)
+      / (!! [^%nl]* -> "Unexpected code while parsing Dictionary" !!)
     )))
 indented_dict (Dict):
     "{..}" eol nl_indent
         dict_line (nl_nodent dict_line)* (nl_nodent comment)*
-    (","? (!! [^%nl]+ -> "Unexpected character while parsing Dictionary" !!))?
+    (","? (!! [^%nl]+ -> "Unexpected code while parsing Dictionary" !!))?
 dict_line:
       (inline_dict_entry %ws* "," %ws*)+ eol
     / (inline_dict_entry %ws* "," %ws*)* dict_entry eol
