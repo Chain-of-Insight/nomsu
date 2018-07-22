@@ -43,6 +43,10 @@ compile [..]
 # Conditional expression (ternary operator)
 #   Note: this uses a function instead of "(condition and if_expr or else_expr)"
     because that breaks if %if_expr is falsey, e.g. "x < 5 and false or 99"
+test:
+    assume ((1 if (yes) else 2) == 1)
+    assume ((1 if (no) else 2) == 2)
+
 compile [..]
     %when_true_expr if %condition else %when_false_expr
     %when_true_expr if %condition otherwise %when_false_expr
@@ -74,31 +78,43 @@ compile [..]
 
 
 # GOTOs
+test:
+    %i = 0
+    === %loop ===
+    %i += 1
+    unless (%i == 10): go to %loop
+    assume (%i == 10)
+
 compile [=== %label ===, --- %label ---, *** %label ***] to (..)
     Lua "::label_\(%label as lua identifier)::"
 
 compile [go to %label] to (Lua "goto label_\(%label as lua identifier)")
 
 # Basic loop control
-compile [do next] to (Lua "continue")
+compile [do next] to (Lua "goto continue")
 compile [stop] to (Lua "break")
 
-# Helper function
-#TODO: do "using % compile %" instead so it's actually a helper function
-compile [%tree has subtree %subtree where %condition] to (..)
-    Lua value ".."
-        (function()
-            for \(%subtree as lua expr) in coroutine.wrap(function() \(%tree as lua expr):map(coroutine.yield) end) do
-                if \(%condition as lua expr) then
-                    return true
-                end
-            end
-            return false
-        end)()
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 # While loops
+test:
+    %x = 0
+    repeat while (%x < 10): %x += 1
+    assume (%x == 10)
+    repeat while (%x < 20): stop
+    repeat while (%x < 20): stop repeating
+    assume (%x == 10)
+    repeat while (%x < 20):
+        %x += 1
+        if (yes): do next
+        barf "Failed to 'do next'"
+
+    assume (%x == 20)
+    repeat while (%x < 30):
+        %x += 1
+        if (yes): do next repeat
+        barf "Failed to 'do next repeat'"
+
+    assume (%x == 30)
+
 compile [do next repeat] to (Lua "goto continue_repeat")
 compile [stop repeating] to (Lua "goto stop_repeat")
 compile [repeat while %condition %body] to:
@@ -107,15 +123,14 @@ compile [repeat while %condition %body] to:
             while \(%condition as lua expr) do
                 \(%body as lua statements)
     
-    if (..)
-        %body has subtree % where ((%.type == "Action") and (%.stub is "do next repeat"))
-    ..:
+    if (%body has subtree \(do next)):
+        to %lua write "\n    ::continue::"
+
+    if (%body has subtree \(do next repeat)):
         to %lua write "\n    ::continue_repeat::"
-    
+
     to %lua write "\nend --while-loop"
-    if (..)
-        %body has subtree % where ((%.type == "Action") and (%.stub is "stop repeating"))
-    ..:
+    if (%body has subtree \(stop repeating)):
         %lua = (..)
             Lua ".."
                 do -- scope of "stop repeating" label
@@ -127,21 +142,26 @@ compile [repeat while %condition %body] to:
 
 parse [repeat %body] as (repeat while (yes) %body)
 parse [repeat until %condition %body] as (repeat while (not %condition) %body)
+
+test:
+    %x = 0
+    repeat 10 times: %x += 1
+    assume (%x == 10)
+
 compile [repeat %n times %body] to:
     %lua = (..)
         Lua ".."
             for i=1,\(%n as lua expr) do
                 \(%body as lua statements)
     
-    if (..)
-        %body has subtree % where ((%.type == "Action") and (%.stub is "do next repeat"))
-    ..:
+    if (%body has subtree \(do next)):
+        to %lua write "\n    ::continue::"
+
+    if (%body has subtree \(do next repeat)):
         to %lua write "\n    ::continue_repeat::"
     
     to %lua write "\nend --numeric for-loop"
-    if (..)
-        %body has subtree % where ((%.type == "Action") and (%.stub is "stop repeating"))
-    ..:
+    if (%body has subtree \(stop repeating)):
         %lua = (..)
             Lua ".."
                 do -- scope of "stop repeating" label
@@ -150,7 +170,6 @@ compile [repeat %n times %body] to:
                 end -- end of "stop repeating" label scope
     
     return %lua
-
 
 # For loop control flow
 compile [stop %var] to (Lua "goto stop_\(%var as lua identifier)")
@@ -162,6 +181,23 @@ compile [===next %var ===, ---next %var ---, ***next %var ***] to (..)
     Lua "::continue_\(%var as lua identifier)::"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test:
+    %nums = []
+    for %x in 1 to 5: add %x to %nums
+    assume (%nums == [1,2,3,4,5])
+    %nums = []
+    for %x in 1 to 5 via 2: add %x to %nums
+    assume (%nums == [1,3,5])
+    %nums = []
+    for %outer in 1 to 100:
+        for %inner in %outer to (%outer + 2):
+            if (%inner == 2):
+                add -2 to %nums
+                do next %inner
+            add %inner to %nums
+            if (%inner == 5): stop %outer
+    assume (%nums == [1,-2,3,-2,3,4,3,4,5])
 
 # Numeric range for loops
 compile [..]
@@ -179,18 +215,15 @@ compile [..]
                 %step as lua expr
             .. do
                 \(%body as lua statements)
+
+    if (%body has subtree \(do next)):
+        to %lua write "\n    ::continue::"
     
-    if (..)
-        %body has subtree % where (..)
-            (%.type == "Action") and ((%.stub is "do next %") and (%.(3).1 == %var.1))
-    ..:
+    if (%body has subtree (\(do next %v) with vars {v:%var})):
         to %lua write "\n    \(compile as (===next %var ===))"
     
     to %lua write "\nend --numeric for-loop"
-    if (..)
-        %body has subtree % where (..)
-            (%.type == "Action") and ((%.stub is "stop %") and (%.(2).1 == %var.1))
-    ..:
+    if (%body has subtree (\(stop %v) with vars {v:%var})):
         %lua = (..)
             Lua ".."
                 do -- scope for stopping for-loop
@@ -205,6 +238,17 @@ compile [..]
 parse [for %var in %start to %stop %body] as (..)
     for %var in %start to %stop via 1 %body
 
+test:
+    %a = [10,20,30,40,50]
+    %b = []
+    for %x in %a: add %x to %b
+    assume (%a == %b)
+    %b = []
+    for %x in %a:
+        if (%x == 10): do next %x
+        if (%x == 50): stop %x
+        add %x to %b
+    assume (%b == [20,30,40])
 
 # For-each loop (lua's "ipairs()")
 compile [for %var in %iterable %body] to:
@@ -218,17 +262,14 @@ compile [for %var in %iterable %body] to:
             for i,\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
                 \(%body as lua statements)
     
-    if (..)
-        %body has subtree % where (..)
-            (%.type == "Action") and ((%.stub is "do next %") and (%.(3).1 == %var.1))
-    ..:
+    if (%body has subtree \(do next)):
+        to %lua write "\n    ::continue::"
+
+    if (%body has subtree (\(do next %v) with vars {v:%var})):
         to %lua write (Lua "\n\(compile as (===next %var ===))")
     
     to %lua write "\nend --foreach-loop"
-    if (..)
-        %body has subtree % where (..)
-            (%.type == "Action") and ((%.stub is "stop %") and (%.(2).1 == %var.1))
-    ..:
+    if (%body has subtree (\(stop %v) with vars {v:%var})):
         %lua = (..)
             Lua ".."
                 do -- scope for stopping for-loop
@@ -238,6 +279,14 @@ compile [for %var in %iterable %body] to:
     
     return %lua
 
+test:
+    %d = {a:10, b:20, c:30, d:40, e:50}
+    %result = []
+    for %k = %v in %d:
+        if (%k == "a"): do next %k
+        if (%v == 20): do next %v
+        add "\%k = \%v" to %result
+    assume ((%result sorted) == ["c = 30", "d = 40", "e = 50"])
 
 # Dict iteration (lua's "pairs()")
 compile [..]
@@ -257,31 +306,22 @@ compile [..]
                 %iterable as lua expr
             ..) do
                 \(%body as lua statements)
+
+    if (%body has subtree \(do next)):
+        to %lua write "\n    ::continue::"
     
-    if (..)
-        %body has subtree % where (..)
-            (%.type == "Action") and ((%.stub is "do next %") and (%.(3).1 == %key.1))
-    ..:
+    if (%body has subtree (\(do next %v) with vars {v:%key})):
         to %lua write (Lua "\n\(compile as (===next %key ===))")
     
-    if (..)
-        %body has subtree % where (..)
-            (%.type == "Action") and ((%.stub is "do next %") and (%.(3).1 == %value.1))
-    ..:
+    if (%body has subtree (\(do next %v) with vars {v:%value})):
         to %lua write (Lua "\n\(compile as (===next %value ===))")
     
     to %lua write "\nend --foreach-loop"
     %stop_labels = (Lua "")
-    if (..)
-        %body has subtree % where (..)
-            (%.type == "Action") and ((%.stub is "stop %") and (%.(2).1 == %key.1))
-    ..:
+    if (%body has subtree (\(stop %v) with vars {v:%key})):
         to %stop_labels write "\n\(compile as (===stop %key ===))"
     
-    if (..)
-        %body has subtree % where (..)
-            (%.type == "Action") and ((%.stub is "stop %") and (%.(2).1 == %value.1))
-    ..:
+    if (%body has subtree (\(stop %v) with vars {v:%value})):
         to %stop_labels write "\n\(compile as (===stop %value ===))"
     
     if ((length of "\%stop_labels") > 0):
@@ -294,6 +334,14 @@ compile [..]
     return %lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+test:
+    if:
+        (1 == 2) (100 < 0): barf "bad conditional"
+        (1 == 0) (1 == 1) (%not_a_variable.x): do nothing
+        (1 == 1): barf "bad conditional"
+        (1 == 2): barf "bad conditional"
+        else: barf "bad conditional"
 
 # Multi-branch conditional (if..elseif..else)
 compile [if %body, when %body] to:
@@ -352,6 +400,12 @@ compile [if %body, when %body] to:
     to %code write "\nend --when"
     return %code
 
+test:
+    if 5 is:
+        1 2 3: barf "bad switch statement"
+        4 5: do nothing
+        5 6: barf "bad switch statement"
+        else: barf "bad switch statement"
 
 # Switch statement
 compile [if %branch_value is %body, when %branch_value is %body] to:
@@ -423,6 +477,17 @@ compile [do %action] to (..)
             \(%action as lua statements)
         end --do
 
+test:
+    %d = {}
+    try:
+        do:
+            %d.x = "bad"
+            barf
+        ..then always:
+            %d.x = "good"
+    ..and if it barfs: do nothing
+    assume (%d.x == "good")
+
 compile [do %action then always %final_action] to (..)
     Lua ".."
         do
@@ -436,9 +501,21 @@ compile [do %action then always %final_action] to (..)
             if not fell_through then return ret end
         end
 
+test:
+    assume ((result of: return 99) == 99)
 
 # Inline thunk:
 compile [result of %body] to (Lua value "(\(compile as ([] -> %body)))()")
+
+test:
+    %t = [1, [2, [[3], 4], 5, [[[6]]]]]
+    %flat = []
+    for % in recursive %t:
+        if ((type of %) is "table"):
+            for %2 in %: recurse % on %2
+        ..else: add % to %flat
+
+    assume ((sorted %flat) == [1, 2, 3, 4, 5, 6])
 
 # Recurion control flow
 compile [for %var in recursive %structure %body] to (..)
@@ -446,14 +523,24 @@ compile [for %var in recursive %structure %body] to (..)
         compile [recurse %v on %x] to (..)
             Lua "table.insert(stack\(%v as lua id), \(%x as lua expr))"
         
-        return (..)
+        %lua = (..)
             Lua ".."
                 do
                     local stack\(%var as lua id) = list{\(%structure as lua expr)}
                     while #stack\(%var as lua id) > 0 do
                         \(%var as lua expr) = table.remove(stack\(%var as lua id), 1)
                         \(%body as lua statements)
-                        \(compile as (===next %var ===))
-                    end
-                    \(compile as (===stop %var ===))
-                end
+
+        if (%body has subtree \(do next)):
+            to %lua write "\n        ::continue::"
+
+        if (%body has subtree (\(do next %v) with vars {v:%var})):
+            to %lua write "\n        \(compile as (===next %var ===))"
+
+        to %lua write "\n    end -- Recursive loop"
+        if (%body has subtree (\(stop %v) with vars {v:%var})):
+            to %lua write "\n        \(compile as (===stop %var ===))"
+
+        to %lua write "\nend -- Recursive scope"
+
+        return %lua

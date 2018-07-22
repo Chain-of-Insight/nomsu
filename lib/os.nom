@@ -45,3 +45,11 @@ action [..]
 
 action [line number of %pos in %str] (=lua "Files.get_line_number(\%str, \%pos)")
 action [line %line_num in %str] (=lua "Files.get_line(\%str, \%line_num)")
+action [source lines of %tree]:
+    %source = (%tree.source if (%tree is syntax tree) else %tree)
+    %file = (read file %source.filename)
+    return (..)
+        (..)
+            (line % in %file) for % in (line number of %source.start in %file) to (..)
+                line number of %source.stop in %file
+        ..joined with "\n"

@@ -9,6 +9,11 @@ use "core/control_flow.nom"
 use "core/collections.nom"
 
 # Literals:
+test:
+    assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf "math constants failed"
+    %nan = (NaN)
+    assume (%nan != %nan) or barf "NaN failed"
+
 compile [infinity, inf] to (Lua value "math.huge")
 compile [not a number, NaN, nan] to (Lua value "(0/0)")
 compile [pi, Pi, PI] to (Lua value "math.pi")
@@ -17,7 +22,18 @@ compile [golden ratio] to (Lua value "((1+math.sqrt(5))/2)")
 compile [e] to (Lua value "math.exp(1)")
 
 # Functions:
+test:
+    assume (("5" as a number) == 5)
+
 compile [% as a number, % as number] to (Lua value "tonumber(\(% as lua expr))")
+test:
+    assume (..)
+        all of [..]
+            abs 5, | 5 |, sqrt 5, √ 5, sine 5, cosine 5, tangent 5, arc sine 5, arc cosine 5
+            arc tangent 5, arc tangent 5 / 10, hyperbolic sine 5, hyperbolic cosine 5
+            hyperbolic tangent 5, e^ 5, ln 5, log base 2 of 5, floor 5, ceiling 5, round 5
+    ..or barf "math functions failed"
+
 compile [absolute value %, | % |, abs %] to (..)
     Lua value "math.abs(\(% as lua expr))"
 
@@ -46,6 +62,11 @@ compile [log % base %base, log base %base of %] to (..)
 compile [floor %] to (Lua value "math.floor(\(% as lua expr))")
 compile [ceiling %, ceil %] to (Lua value "math.ceil(\(% as lua expr))")
 compile [round %, % rounded] to (Lua value "math.floor(\(% as lua expr) + .5)")
+
+test:
+    assume ((463 to the nearest 100) == 500) or barf "rounding failed"
+    assume ((2.6 to the nearest 0.25) == 2.5) or barf "rounding failed"
+
 action [%n to the nearest %rounder] (..)
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 
@@ -87,6 +108,10 @@ compile [min of %items, smallest of %items, lowest of %items] to (..)
 
 compile [max of %items, biggest of %items, largest of %items, highest of %items] to
 ..(Lua value "utils.max(\(%items as lua expr))")
+
+test:
+    assume ((min of [3, -4, 1, 2] by % = (% * %)) == 1)
+    assume ((max of [3, -4, 1, 2] by % = (% * %)) == -4)
 
 parse [min of %items by %item = %value_expr] as (..)
     result of:

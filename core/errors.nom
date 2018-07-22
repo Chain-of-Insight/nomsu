@@ -27,6 +27,18 @@ compile [assume %condition or barf %message] to (..)
             error(\(%message as lua expr), 0)
         end
 
+test:
+    try (barf) and if it succeeds: barf "try failed."
+    %worked = (no)
+    try (barf) and if it barfs: %worked = (yes)
+    assume %worked or barf "try/catch failed"
+    %x = 1
+    try:
+        %x = 2
+        do (barf) then always: %x = 3
+    ..and if it barfs: do nothing
+
+    assume (%x == 3) or barf "do/then always failed"
 
 # Try/except
 compile [..]

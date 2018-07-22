@@ -1,0 +1,27 @@
+#!/usr/bin/env nomsu -V2.4.4.3
+use "core"
+use "lib/os.nom"
+action [print tree %t at indent %indent]:
+    if %t.type is:
+        "Action":
+            say "\(%indent)Action (\(%t.stub)):"
+            for %arg in %t:
+                if (%arg is syntax tree):
+                    print tree %arg at indent "\%indent  "
+        "Number":
+            say "\(%indent)\(%t.1)"
+        "Var":
+            say "\(%indent)%\(%t.1)"
+        else:
+            say "\(%indent)\(%t.type):"
+            for %arg in %t:
+                if:
+                    (%arg is syntax tree):
+                        print tree %arg at indent "\%indent  "
+                    else:
+                        say "\%indent  \(quote %arg)"
+
+for %path in (=lua "arg"):
+    for file %filename in %path:
+        unless (%filename matches "%.nom$"): do next %filename
+        print tree (parse (read file %filename) from %filename) at indent ""
