@@ -5,6 +5,9 @@
 use "core/metaprogramming.nom"
 use "core/errors.nom"
 
+test:
+    assume (all [1 < 2, 2 > 1, 1 <= 2, 2 >= 1, 1 == 1, 1 != 2])
+
 # Comparison Operators
 compile [%x < %y] to (Lua value "(\(%x as lua expr) < \(%y as lua expr))")
 compile [%x > %y] to (Lua value "(\(%x as lua expr) > \(%y as lua expr))")
@@ -17,6 +20,9 @@ compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to (..)
     Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
 
 # For strict identity checking, use (%x's id) is (%y's id)
+test:
+    assume (([] == []) and (([]'s id) != ([]'s id)))
+
 lua> ".."
     do
         local new_uuid = require('uuid')
@@ -38,6 +44,10 @@ compile [% 's id, id of %] to (Lua value "IDS[\(% as lua expr)]")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+test:
+    %x = 10
+    assume (%x == 10)
+
 # Variable assignment operator
 compile [%var = %value] to:
     lua> "local \%var_lua = \(%var as lua)"
@@ -57,6 +67,12 @@ compile [%var = %value] to:
             lua:add_free_vars({tostring(nomsu:compile(\%var))})
         end
         return lua
+
+test:
+    set {%x:10, %y:20}
+    assume ((%x == 10) and (%y == 20)) or barf "mutli-assignment failed."
+    set {%x:%y, %y:%x}
+    assume ((%y == 10) and (%x == 20)) or barf "swapping vars failed."
 
 # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
 compile [set %assignments] to:
@@ -93,6 +109,15 @@ compile [set %assignments] to:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+test:
+    set {%foozle:"outer", %y:"outer"}
+    action [set global x local y]:
+        external %foozle = "inner"
+        %y = "inner"
+
+    set global x local y
+    assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
+
 compile [external %var = %value] to:
     %var_lua = (%var as lua)
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
@@ -100,11 +125,32 @@ compile [external %var = %value] to:
     assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
     return (Lua "\%var_lua = \%value_lua;")
 
+test:
+    set {%foozle:"outer", %y:"outer"}
+    action [set global x local y] (..)
+        with external [%foozle]:
+            %foozle = "inner"
+            %y = "inner"
+
+    set global x local y
+    assume ((%foozle == "inner") and (%y == "outer")) or barf ".."
+        'with external' failed.
+
 compile [with external %externs %body] to:
     %body_lua = (%body as lua statements)
     lua> ".."
         \%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))
     return %body_lua
+
+test:
+    set {%x:1, %y:2}
+    with {%z:nil, %x:999}:
+        %z = 999
+        assume (%z == 999) or barf "'with' failed."
+        assume (%x == 999) or barf "'with' assignment failed."
+
+    assume (%x == 1) or barf "'with' scoping failed"
+    assume (%z == (nil)) or barf "'with' scoping failed"
 
 compile [with %assignments %body] to:
     %lua = (%body as lua statements)
@@ -141,11 +187,22 @@ compile [with %assignments %body] to:
             end -- 'with' block
 
 # Math Operators
+test:
+    assume ((5 wrapped around 2) == 1) or barf "mod not working"
+
 compile [%x wrapped around %y, %x mod %y] to (..)
     Lua value "(\(%x as lua expr) % \(%y as lua expr))"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
+test:
+    %calls = 0
+    local action [one]:
+        external %calls = (%calls + 1)
+        return 1
+    assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
+    assume (%calls == 1) or barf "Three-way comparison evaluated middle value multiple times"
+
 parse [%x < %y < %z] as (..)
     =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"
 
@@ -172,6 +229,12 @@ parse [%x >= %y >= %z] as (..)
 
 # TODO: optimize for common case where x,y,z are all either variables or number literals
 # Boolean Operators
+test:
+    local action [barfer] (barf "short circuiting failed")
+    assume (((no) and (barfer)) == (no))
+    assume ((no) or (yes))
+    assume ((yes) or (barfer))
+
 compile [%x and %y] to (Lua value "(\(%x as lua expr) and \(%y as lua expr))")
 compile [%x or %y] to (Lua value "(\(%x as lua expr) or \(%y as lua expr))")
 
@@ -196,6 +259,10 @@ compile [%x ARSHIFT %shift, %x >> %shift] to (..)
 
 # TODO: implement OR, XOR, AND for multiple operands?
 # Unary operators
+test:
+    assume ((- 5) == -5)
+    assume ((not (yes)) == (no))
+
 compile [- %] to (Lua value "(- \(% as lua expr))")
 compile [not %] to (Lua value "(not \(% as lua expr))")
 test:
@@ -209,6 +276,15 @@ compile [%list is empty] to (Lua value "(#\(%list as lua expr) == 0)")
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Update operators
+test:
+    %x = 1
+    %x += 1
+    assume (%x == 2) or barf "+= failed"
+    %x *= 2
+    assume (%x == 4) or barf "*= failed"
+    wrap %x around 3
+    assume (%x == 1) or barf "wrap around failed"
+
 parse [%var += %] as (%var = (%var + %))
 parse [%var -= %] as (%var = (%var - %))
 parse [%var *= %] as (%var = (%var * %))
