@@ -18,4 +18,6 @@ for %path in %files:
                     say (blue "\%filename:\%line_num:")
                     say (yellow (source lines of %t))
             
-            if (%t is syntax tree) (for %sub in %t (recurse %t on %sub))
+            if (%t is syntax tree):
+                for %sub in %t:
+                    recurse %t on %sub
