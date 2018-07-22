@@ -50,10 +50,11 @@ NOMSU_DEFS = with {}
         err_line = files.get_line(src, line_no)
         next_line = files.get_line(src, line_no+1)
         i = err_pos-files.get_line_starts(src)[line_no]
+        j = i + (end_pos-start_pos)
         pointer = ("-")\rep(i) .. "^"
         err_msg = colored.bright colored.yellow colored.onred (err_msg or "Parse error").." at #{userdata.source.filename}:#{line_no}:"
         if #prev_line > 0 then err_msg ..= "\n"..colored.dim(prev_line)
-        err_line = colored.white(err_line\sub(1, i))..colored.bright(colored.red(err_line\sub(i+1,i+1)))..colored.dim(err_line\sub(i+2,-1))
+        err_line = colored.white(err_line\sub(1, i))..colored.bright(colored.red(err_line\sub(i+1,j+1)))..colored.dim(err_line\sub(j+2,-1))
         err_msg ..= "\n#{err_line}\n#{colored.red pointer}"
         if #next_line > 0 then err_msg ..= "\n"..colored.dim(next_line)
         seen_errors[start_pos] = err_msg
@@ -102,6 +103,7 @@ do
 Parser.parse = (nomsu_code, source=nil, version=nil)->
     source or= nomsu_code.source
     nomsu_code = tostring(nomsu_code)
+    source or= Source("string: "..nomsu_code, 1, #nomsu_code)
     version or= nomsu_code\match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
     syntax_version = version and tonumber(version\match("^[0-9]+")) or Parser.version
     userdata = {
