@@ -68,15 +68,18 @@ print_error = (error_message, start_fn, stop_fn)->
             filename,start,stop = calling_fn.source\match('@([^[]*)%[([0-9]+):([0-9]+)]')
             assert(filename)
             file = files.read(filename)
-            err_line = files.get_line(file, calling_fn.currentline)
-            offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)")))
             -- TODO: get name properly
             name = if calling_fn.name
                 if tmp = calling_fn.name\match("^A_([a-zA-Z0-9_]*)$")
                     "action '#{tmp\gsub("_"," ")\gsub("x([0-9A-F][0-9A-F])", => string.char(tonumber(@, 16)))}'"
                 else "action '#{calling_fn.name}'"
             else "main chunk"
-            line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}")
+
+            if err_line = files.get_line(file, calling_fn.currentline)
+                offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)")))
+                line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}")
+            else
+                line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}")
         else
             ok, file = pcall ->files.read(calling_fn.short_src)
             if not ok then file = nil
@@ -117,9 +120,9 @@ print_error = (error_message, start_fn, stop_fn)->
                     line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline} in #{name or '?'}")
 
             if file
-                err_line = files.get_line(file, line_num)
-                offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)$")))
-                line ..= "\n        "..offending_statement
+                if err_line = files.get_line(file, line_num)
+                    offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)$")))
+                    line ..= "\n        "..offending_statement
         io.stderr\write(line,"\n")
         if calling_fn.istailcall
             io.stderr\write("    #{colored.dim colored.white "  (...tail calls...)"}\n")
