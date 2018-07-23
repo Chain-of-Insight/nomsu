@@ -84,7 +84,7 @@ parse [%tree upgraded to %end_version] as (..)
 parse [%tree upgraded] as (..)
     %tree upgraded from (%tree.version or (Nomsu version)) to (Nomsu version)
 
-action [use %path from version %version] (..)
+action [use %path from version %version]:
     for file %filename in %path:
         if (=lua "LOADED[\%filename]"): do next %filename
         %file = (read file %filename)
