@@ -2,8 +2,6 @@
 #
     This file contains the implementation of an Object-Oriented programming system.
 
-use "core"
-
 test:
     object "Dog":
         (class Dog).genus = "Canus"

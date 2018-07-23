@@ -2,8 +2,6 @@
 #
     This file defines actions for ANSI console color escape codes.
 
-use "core"
-
 test:
     bright "\(green)Color test passed."
 

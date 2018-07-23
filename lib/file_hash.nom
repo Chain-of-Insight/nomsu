@@ -2,8 +2,6 @@
 #
     This file defines some actions for hashing files and looking up files by hash.
 
-use "core"
-
 action [file with hash %hash]:
     lua> ".."
         local Hash = require("openssl.digest")

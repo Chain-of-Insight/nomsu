@@ -53,7 +53,7 @@ end
 local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 local usage = [=[Nomsu Compiler
 
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O] [-v] [-c] [-s] [-t] [-I file] [--help | -h] [--version] [file [nomsu args...]]
+Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O] [-v] [-c] [-s] [-t] [-I file] [--help | -h] [--version] [--no-core] [file [nomsu args...]]
 
 OPTIONS
     -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available).
@@ -65,6 +65,7 @@ OPTIONS
     -d <debugger> Attempt to use the specified debugger to wrap the main body of execution.
     -h/--help Print this message.
     --version Print the version number and exit.
+    --no-core Skip loading the Nomsu core by default.
     -V specify which Nomsu version is desired.
     <file> The Nomsu file to run (can be "-" to use stdin).
 ]=]
@@ -102,6 +103,7 @@ local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file
       / {:verbose: ("-v" -> true) :}
       / {:help: (("-h" / "--help") -> true) :}
       / {:version: ("--version" -> true) :}
+      / {:no_core: ("--no-core" -> true) :}
       / {:debugger: ("-d" %sep? {(!%sep .)*}) :}
       / {:requested_version: "-V" (%sep? {([0-9.])+})? :}
     file <- ("-" -> "stdin") / {(!%sep .)+}
@@ -164,6 +166,13 @@ run = function()
       return false
     end
     return true
+  end
+  if not (args.no_core) then
+    for _, filename in Files.walk('core') do
+      if filename:match("%.nom$") then
+        nomsu:run_file(filename)
+      end
+    end
   end
   local get_file_and_source
   get_file_and_source = function(filename)

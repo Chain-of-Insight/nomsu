@@ -7,10 +7,10 @@
         (including any deeper-level indented text)
     The comment ends when the indentation ends
 # How do I import a file?
-use "core/control_flow.nom"
+use "lib/os.nom"
 
 # How do I import all the files in a directory?
-use "core"
+use "lib"
 
 # How do I print stuff?
 say "Hello world!"
