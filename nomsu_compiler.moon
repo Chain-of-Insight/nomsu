@@ -21,7 +21,7 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring
 unpack or= table.unpack
 {:match, :sub, :gsub, :format, :byte, :find} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-AST = require "nomsu_tree"
+AST = require "syntax_tree"
 Parser = require("parser")
 -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
 -- from lua line number to nomsu line number

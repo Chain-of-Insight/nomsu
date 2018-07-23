@@ -7,7 +7,7 @@ lpeg.setmaxstack 10000
 {:insert, :remove} = table
 files = require 'files'
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-AST = require "nomsu_tree"
+AST = require "syntax_tree"
 
 NOMSU_DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF

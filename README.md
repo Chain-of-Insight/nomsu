@@ -50,7 +50,7 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * `nomsu.peg` - The [Parsing Expression Grammar](https://en.wikipedia.org/wiki/Parsing_expression_grammar) used to define Nomsu's syntax. The format of this file is a slightly modified version of the format accepted by LPEG's `re` module.
 * `nomsu_compiler.moon` - **The actual Nomsu compiler**. This file can be imported and used without going through the regular command line interface (e.g. for applications that want to embed the compiler).
 * `parser.moon` - The Nomsu parser. This file can also be imported and used directly for applications that only need to *parse* Nomsu, not compile it.
-* `nomsu_tree.moon` - Datastructures used for Nomsu ASTs.
+* `syntax_tree.moon` - Datastructures used for Nomsu Abstract Syntax Trees.
 * `code_obj.moon` - Datastructures used for incrementally building generated code, while preserving code origins.
 * `error_handling.moon` - The logic for producing good error messages within Lua that reference the Nomsu source code that led to them.
 * `utils.lua` - A set of utility actions used by nomsu.moon.

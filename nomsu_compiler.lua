@@ -28,7 +28,7 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local AST = require("nomsu_tree")
+local AST = require("syntax_tree")
 local Parser = require("parser")
 SOURCE_MAP = { }
 string.as_lua_id = function(str)
