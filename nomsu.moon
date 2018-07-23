@@ -178,7 +178,6 @@ run = ->
         -- Run in interactive mode (REPL)
         nomsu\run [[
 #!/usr/bin/env nomsu -V2
-use "core"
 use "lib/consolecolor.nom"
 action [quit, exit]: lua> "os.exit(0)"
 action [help]:
