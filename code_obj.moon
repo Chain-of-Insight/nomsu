@@ -51,6 +51,25 @@ class Code
             @source = Source\from_string(@source)
         assert(@source and Source\is_instance(@source), "Source has the wrong type")
         @append(...)
+
+    __tostring: =>
+        if @__str == nil
+            buff, indent = {}, 0
+            {:match, :gsub, :rep} = string
+            for i,b in ipairs @bits
+                if type(b) == 'string'
+                    if spaces = match(b, "\n([ ]*)[^\n]*$")
+                        indent = #spaces
+                else
+                    b = tostring(b)
+                    if indent > 0
+                        b = gsub(b, "\n", "\n"..rep(" ", indent))
+                buff[#buff+1] = b
+            @__str = concat(buff, "")
+        return @__str
+
+    __len: =>
+        #tostring(self)
     
     dirty: =>
         @__str = nil
@@ -126,7 +145,13 @@ class Code
             b.dirty = error if b.is_code
         @dirty!
 
+    parenthesize: =>
+        @prepend "("
+        @append ")"
+
 class LuaCode extends Code
+    __tostring: Code.__tostring
+    __len: Code.__len
     new: (...)=>
         super ...
         @free_vars = {}
@@ -194,25 +219,6 @@ class LuaCode extends Code
             statements\append suffix
         return statements
 
-    __tostring: =>
-        if @__str == nil
-            buff, indent = {}, 0
-            {:match, :gsub, :rep} = string
-            for i,b in ipairs @bits
-                if type(b) == 'string'
-                    if spaces = match(b, "\n([ ]*)[^\n]*$")
-                        indent = #spaces
-                else
-                    b = tostring(b)
-                    if indent > 0
-                        b = gsub(b, "\n", "\n"..rep(" ", indent))
-                buff[#buff+1] = b
-            @__str = concat(buff, "")
-        return @__str
-
-    __len: =>
-        #tostring(self)
-
     make_offset_table: =>
         -- Return a mapping from output (lua) character number to input (nomsu) character number
         lua_to_nomsu, nomsu_to_lua = {}, {}
@@ -233,34 +239,12 @@ class LuaCode extends Code
         }
 
     parenthesize: =>
-        if @is_value
-            @prepend "("
-            @append ")"
-        else
-            error "Cannot parenthesize lua statements"
-
-class NomsuCode extends Code
-    __tostring: =>
-        if @__str == nil
-            buff, indent = {}, 0
-            {:match, :gsub, :rep} = string
-            for i,b in ipairs @bits
-                if type(b) == 'string'
-                    if spaces = match(b, "\n([ ]*)[^\n]*$")
-                        indent = #spaces
-                else
-                    b = tostring(b)
-                    if indent > 0
-                        b = gsub(b, "\n", "\n"..rep(" ", indent))
-                buff[#buff+1] = b
-            @__str = concat(buff, "")
-        return @__str
-
-    __len: =>
-        #tostring(self)
-
-    parenthesize: =>
+        assert @is_value, "Cannot parenthesize lua statements"
         @prepend "("
         @append ")"
+
+class NomsuCode extends Code
+    __tostring: Code.__tostring
+    __len: Code.__len
 
 return {:Code, :NomsuCode, :LuaCode, :Source}
