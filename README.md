@@ -14,6 +14,29 @@ Nomsu's only dependencies are [Lua 5.1 or later](https://www.lua.org/) or [Luaji
 * To run a .nom file with Nomsu code, run `lua nomsu.lua your_file.nom`.
 * The full usage options are avilable via `lua nomsu.lua --help`.
 
+## Examples
+
+There's a more complete set of example code in `examples/how_do_i.nom`, but roughly, Nomsu looks like:
+
+```
+say "Hello"
+
+%my_nums = [5, 23, 42]
+for %num in %my_nums:
+    say "\%num is one of my nums"
+
+action [sing %n bottles of beer]:
+    for %i in %n to 1 by -1:
+        say ".."
+            \%i bottle\("s" if i > 1 else "") of beer on the wall,
+            \%i bottle\("s" if i > 1 else "") of beer!
+            Take one down, pass it around...
+    say "No bottles of beer on the wall. Go to the store, buy some more..."
+    sing %n bottles of beer
+
+sing 99 bottles of beer
+```
+
 ## Compiling/installing
 
 If you enjoy Nomsu so much that you'd like to tinker with it or have it in your system path, there is an included Makefile. This is entirely optional, but you can run `make` to compile any modified .moon or .nom files into .lua files and produce an executable file called `nomsu` that can be run directly. `make test` will run the suite of tests. `sudo make install` will install the compiler on your system. By default, the `nomsu` executable will be put in `/usr/local/bin` and all the necessary support files will be put into `/usr/local/share/nomsu/*` and `/usr/local/lib/nomsu/*`, but you can change the location during installation or via the `PREFIX=/your/path/here` flag. The default build options use the system default `lua`, but this can be changed via `make LUA=luajit` or `make LUA_BIN=/path/to/lua`. To uninstall, simply `make uninstall` and provide the same installation path you did during installation.
@@ -36,7 +59,6 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * `examples/how_do_i.nom` - A simple walkthrough of some of the features of Nomsu, written in Nomsu code. **This is a good place to start.**
 * `core/*.nom` - Core language definitions of stuff like control flow, operators, and metaprogramming, broken down into different files.
 * `lib/*.nom` - Optional language libraries for stuff you might want, like interfacing with the OS, or doing Object Oriented Programming.
-* `tests/*.nom` - A somewhat exhaustive set of minimalist tests for almost every language feature defined in `core/*.nom` and `lib/*.nom`
 * `Makefile` - Rules for building/installing the compiler.
 * `LICENSE` - The software license (MIT).
 * `README.md` - This file.
