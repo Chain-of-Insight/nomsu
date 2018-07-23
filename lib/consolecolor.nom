@@ -16,8 +16,8 @@ test:
 for %name = %colornum in %colors:
     with {%escapecode:"\027[\(%colornum)m"}:
         run ".."
-            #!/usr/bin/env nomsu -V1
-            compile [\%name] to: Lua value (quote \(quote %escapecode))
-            compile [\%name %text] to
+            compile [\%name] to (..)
+                Lua value (quote \(quote %escapecode))
+            compile [\%name %text] to (..)
                 Lua value ".."
                     (\\(quote \(quote %escapecode))..\\(%text as lua expr).."\\27[0m")
