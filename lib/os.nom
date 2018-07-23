@@ -2,8 +2,6 @@
 #
     This file defines some actions that interact with the operating system and filesystem.
 
-use "core"
-
 test:
     path of Nomsu file "lib/os.nom"
 
