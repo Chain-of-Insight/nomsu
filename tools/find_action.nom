@@ -1,4 +1,9 @@
 #!/usr/bin/env nomsu -V2.5.4.3
+#
+    Find an action by its stub. Usage:
+        nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
+    Will print all the code locations and code that uses the stub.
+
 use "lib/os.nom"
 use "lib/consolecolor.nom"
 

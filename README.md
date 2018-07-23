@@ -59,6 +59,8 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * `examples/how_do_i.nom` - A simple walkthrough of some of the features of Nomsu, written in Nomsu code. **This is a good place to start.**
 * `core/*.nom` - Core language definitions of stuff like control flow, operators, and metaprogramming, broken down into different files.
 * `lib/*.nom` - Optional language libraries for stuff you might want, like interfacing with the OS, or doing Object Oriented Programming.
+* `compatibility/*.nom` - Code for automatically upgrading Nomsu code from old versions to the current version.
+* `tools/*.nom` - A set of utilities useful for doing code manipulation actions.
 * `Makefile` - Rules for building/installing the compiler.
 * `LICENSE` - The software license (MIT).
 * `README.md` - This file.

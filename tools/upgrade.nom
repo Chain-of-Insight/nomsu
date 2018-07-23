@@ -1,4 +1,10 @@
 #!/usr/bin/env nomsu -V2.5.4.3
+#
+    Tool to automatically update code from old versions of Nomsu. Usage:
+        nomsu tools/upgrade.nom [-i] file1 file2 directory1 ...
+    If "-i" is the first argument, upgrades will be performed in-place. Otherwise, the
+    upgraded code will be printed.
+
 use "compatibility"
 use "lib/os.nom"
 
