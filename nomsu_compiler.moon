@@ -698,7 +698,7 @@ with NomsuCompiler
             when "Block"
                 nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
                 for i, line in ipairs tree
-                    nomsu\append pop_comments(line.source.start, '\n')
+                    nomsu\append pop_comments(line.source.start, i > 1 and '\n' or '')
                     line_nomsu = recurse(line)
                     nomsu\append line_nomsu
                     if i < #tree

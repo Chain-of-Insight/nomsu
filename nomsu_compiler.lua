@@ -1104,7 +1104,7 @@ do
     elseif "Block" == _exp_0 then
       local nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
       for i, line in ipairs(tree) do
-        nomsu:append(pop_comments(line.source.start, '\n'))
+        nomsu:append(pop_comments(line.source.start, i > 1 and '\n' or ''))
         local line_nomsu = recurse(line)
         nomsu:append(line_nomsu)
         if i < #tree then

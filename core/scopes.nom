@@ -12,13 +12,13 @@ test:
     with local %x:
         %x = "inner"
         assume (%x == "inner")
-
+    
     assume (%x == "outer")
     action [foo] "outer foo"
     with local [action (foo)]:
         action [foo] "inner foo"
         assume ((foo) == "inner foo")
-
+    
     assume ((foo) == "outer foo")
 
 compile [with local %locals %body, with local %locals do %body] to:

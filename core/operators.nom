@@ -114,7 +114,7 @@ test:
     action [set global x local y]:
         external %foozle = "inner"
         %y = "inner"
-
+    
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
 
@@ -131,7 +131,7 @@ test:
         with external [%foozle]:
             %foozle = "inner"
             %y = "inner"
-
+    
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf ".."
         'with external' failed.
@@ -148,7 +148,7 @@ test:
         %z = 999
         assume (%z == 999) or barf "'with' failed."
         assume (%x == 999) or barf "'with' assignment failed."
-
+    
     assume (%x == 1) or barf "'with' scoping failed"
     assume (%z == (nil)) or barf "'with' scoping failed"
 
@@ -200,8 +200,10 @@ test:
     local action [one]:
         external %calls = (%calls + 1)
         return 1
+    
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
-    assume (%calls == 1) or barf "Three-way comparison evaluated middle value multiple times"
+    assume (%calls == 1) or barf ".."
+        Three-way comparison evaluated middle value multiple times
 
 parse [%x < %y < %z] as (..)
     =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"

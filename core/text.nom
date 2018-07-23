@@ -49,6 +49,7 @@ compile [capitalized %text, %text capitalized] to (..)
 test:
     assume (("asdf" with "X" instead of "s") == "aXdf") or barf ".."
         substitution failed
+
 compile [..]
     %text with %sub instead of %patt, %text with %patt replaced by %sub
     %text s/ %patt / %sub

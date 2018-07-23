@@ -62,7 +62,6 @@ compile [..]
                     %when_false_expr as lua expr
                 ..)
     ..else:
-        
         #   Otherwise, need to do an anonymous inline function (yuck, too bad lua 
             doesn't have a proper ternary operator!)
             To see why this is necessary consider: (random()<.5 and false or 99)
@@ -200,7 +199,6 @@ compile [..]
     for %var in %start to %stop by %step %body
     for %var in %start to %stop via %step %body
 ..to:
-    
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
         compile error at %var.source "Loop expected variable, not: %s"
@@ -246,7 +244,6 @@ test:
 
 # For-each loop (lua's "ipairs()")
 compile [for %var in %iterable %body] to:
-    
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
         compile error at %var.source "Loop expected variable, not: %s"
@@ -284,7 +281,6 @@ test:
 compile [..]
     for %key = %value in %iterable %body, for %key %value in %iterable %body
 ..to:
-    
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%key.type is "Var"):
         compile error at %key.source "Loop expected variable, not: %s"

@@ -13,7 +13,7 @@ test:
             return (%barks joined with " ")
         
         method [get pissed off] ((me).barks += 1)
-
+    
     %d = (new Dog {barks:2})
     as %d:
         assume ((me) == %d)
@@ -24,7 +24,7 @@ test:
         assume ((me).barks == 3)
         assume ((bark) == "Bark! Bark! Bark!")
         assume ((me).genus == "Canus")
-
+    
     assume ("\(%d.class)" == "Dog")
     assume (%d.genus == "Canus")
     assume (%d.barks == 3)
@@ -36,7 +36,7 @@ test:
         try (as (new Dog {barks:8}) (barf)) and if it succeeds (barf)
         assume ((me).barks == 101) or barf ".."
             Error in nested 'as % %' failed to properly reset 'self'
-
+    
     object "Corgi" extends (class Dog) (method [sploot] "splooted")
     %corg = (new Corgi)
     assume (%corg.barks == 0)
