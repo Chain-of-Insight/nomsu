@@ -80,6 +80,37 @@ do
   local _class_0
   local _base_0 = {
     is_code = true,
+    __tostring = function(self)
+      if self.__str == nil then
+        local buff, indent = { }, 0
+        local match, gsub, rep
+        do
+          local _obj_0 = string
+          match, gsub, rep = _obj_0.match, _obj_0.gsub, _obj_0.rep
+        end
+        for i, b in ipairs(self.bits) do
+          if type(b) == 'string' then
+            do
+              local spaces = match(b, "\n([ ]*)[^\n]*$")
+              if spaces then
+                indent = #spaces
+              end
+            end
+          else
+            b = tostring(b)
+            if indent > 0 then
+              b = gsub(b, "\n", "\n" .. rep(" ", indent))
+            end
+          end
+          buff[#buff + 1] = b
+        end
+        self.__str = concat(buff, "")
+      end
+      return self.__str
+    end,
+    __len = function(self)
+      return #tostring(self)
+    end,
     dirty = function(self)
       self.__str = nil
       self._trailing_line_len = nil
@@ -185,6 +216,10 @@ do
         end
       end
       return self:dirty()
+    end,
+    parenthesize = function(self)
+      self:prepend("(")
+      return self:append(")")
     end
   }
   _base_0.__index = _base_0
@@ -215,6 +250,8 @@ do
   local _class_0
   local _parent_0 = Code
   local _base_0 = {
+    __tostring = Code.__tostring,
+    __len = Code.__len,
     add_free_vars = function(self, vars)
       if not (#vars > 0) then
         return 
@@ -327,37 +364,6 @@ do
       end
       return statements
     end,
-    __tostring = function(self)
-      if self.__str == nil then
-        local buff, indent = { }, 0
-        local match, gsub, rep
-        do
-          local _obj_0 = string
-          match, gsub, rep = _obj_0.match, _obj_0.gsub, _obj_0.rep
-        end
-        for i, b in ipairs(self.bits) do
-          if type(b) == 'string' then
-            do
-              local spaces = match(b, "\n([ ]*)[^\n]*$")
-              if spaces then
-                indent = #spaces
-              end
-            end
-          else
-            b = tostring(b)
-            if indent > 0 then
-              b = gsub(b, "\n", "\n" .. rep(" ", indent))
-            end
-          end
-          buff[#buff + 1] = b
-        end
-        self.__str = concat(buff, "")
-      end
-      return self.__str
-    end,
-    __len = function(self)
-      return #tostring(self)
-    end,
     make_offset_table = function(self)
       local lua_to_nomsu, nomsu_to_lua = { }, { }
       local walk
@@ -386,12 +392,9 @@ do
       }
     end,
     parenthesize = function(self)
-      if self.is_value then
-        self:prepend("(")
-        return self:append(")")
-      else
-        return error("Cannot parenthesize lua statements")
-      end
+      assert(self.is_value, "Cannot parenthesize lua statements")
+      self:prepend("(")
+      return self:append(")")
     end
   }
   _base_0.__index = _base_0
@@ -439,41 +442,8 @@ do
   local _class_0
   local _parent_0 = Code
   local _base_0 = {
-    __tostring = function(self)
-      if self.__str == nil then
-        local buff, indent = { }, 0
-        local match, gsub, rep
-        do
-          local _obj_0 = string
-          match, gsub, rep = _obj_0.match, _obj_0.gsub, _obj_0.rep
-        end
-        for i, b in ipairs(self.bits) do
-          if type(b) == 'string' then
-            do
-              local spaces = match(b, "\n([ ]*)[^\n]*$")
-              if spaces then
-                indent = #spaces
-              end
-            end
-          else
-            b = tostring(b)
-            if indent > 0 then
-              b = gsub(b, "\n", "\n" .. rep(" ", indent))
-            end
-          end
-          buff[#buff + 1] = b
-        end
-        self.__str = concat(buff, "")
-      end
-      return self.__str
-    end,
-    __len = function(self)
-      return #tostring(self)
-    end,
-    parenthesize = function(self)
-      self:prepend("(")
-      return self:append(")")
-    end
+    __tostring = Code.__tostring,
+    __len = Code.__len
   }
   _base_0.__index = _base_0
   setmetatable(_base_0, _parent_0.__base)

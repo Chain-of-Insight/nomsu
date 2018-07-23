@@ -109,8 +109,6 @@ print_error = function(error_message, start_fn, stop_fn)
           local filename, start, stop = calling_fn.source:match('@([^[]*)%[([0-9]+):([0-9]+)]')
           assert(filename)
           local file = files.read(filename)
-          local err_line = files.get_line(file, calling_fn.currentline)
-          local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)")))
           if calling_fn.name then
             do
               local tmp = calling_fn.name:match("^A_([a-zA-Z0-9_]*)$")
@@ -125,7 +123,15 @@ print_error = function(error_message, start_fn, stop_fn)
           else
             name = "main chunk"
           end
-          line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement))
+          do
+            local err_line = files.get_line(file, calling_fn.currentline)
+            if err_line then
+              local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)")))
+              line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement))
+            else
+              line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name))
+            end
+          end
         else
           local file
           ok, file = pcall(function()
@@ -188,9 +194,13 @@ print_error = function(error_message, start_fn, stop_fn)
             end
           end
           if file then
-            local err_line = files.get_line(file, line_num)
-            local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)$")))
-            line = line .. ("\n        " .. offending_statement)
+            do
+              local err_line = files.get_line(file, line_num)
+              if err_line then
+                local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)$")))
+                line = line .. ("\n        " .. offending_statement)
+              end
+            end
           end
         end
       end
