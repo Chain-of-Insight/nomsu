@@ -48,7 +48,9 @@ if NOMSU_VERSION and NOMSU_PREFIX then
       _len_0 = _len_0 + 1
     end
     return _accum_0
-  end)(), ";")
+  end)(), ";") .. ";."
+else
+  package.nomsupath = "."
 end
 local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 local usage = [=[Nomsu Compiler

@@ -95,7 +95,7 @@ dict = (t)-> setmetatable(t, _dict_mt)
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable({}, {__index: (k)=> if _self = rawget(@, "self") then _self[k] else nil})
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 4
+    .NOMSU_COMPILER_VERSION = 5
     .NOMSU_SYNTAX_VERSION = Parser.version
     ._ENV = NomsuCompiler
     .nomsu = NomsuCompiler
@@ -260,6 +260,7 @@ with NomsuCompiler
 
     _running_files = {} -- For detecting circular imports
     .run_file = (filename)=>
+        -- Filename should be an absolute path, i.e. package.nomsupath will not be searched for it
         if @LOADED[filename]
             return @LOADED[filename]
         -- Check for circular import
@@ -284,7 +285,7 @@ with NomsuCompiler
             unless ran_lua
                 file = Files.read(filename)
                 if not file
-                    error("File does not exist: #{filename}", 0)
+                    error("Tried to run file that does not exist: #{filename}")
                 ret = @run file, Source(filename,1,#file)
         else
             error("Invalid filetype for #{filename}", 0)

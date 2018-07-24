@@ -1,6 +1,7 @@
 local lpeg = require('lpeg')
 local re = require('re')
 local Files = { }
+assert(package.nomsupath, "No package.nomsupath was found")
 local _SPOOFED_FILES = { }
 local _FILE_CACHE = setmetatable({ }, {
   __index = _SPOOFED_FILES
@@ -21,14 +22,6 @@ Files.read = function(filename)
     return Files.spoof('stdin', io.read('*a'))
   end
   local file = io.open(filename)
-  if package.nomsupath and not file then
-    for nomsupath in package.nomsupath:gmatch("[^;]+") do
-      file = io.open(nomsupath .. "/" .. filename)
-      if file then
-        break
-      end
-    end
-  end
   if not (file) then
     return nil
   end
@@ -57,11 +50,9 @@ Files.exists = function(path)
   if not (io.popen("ls " .. tostring(sanitize(path))):close()) then
     return true
   end
-  if package.nomsupath then
-    for nomsupath in package.nomsupath:gmatch("[^;]+") do
-      if not (io.popen("ls " .. tostring(nomsupath) .. "/" .. tostring(sanitize(path))):close()) then
-        return true
-      end
+  for nomsupath in package.nomsupath:gmatch("[^;]+") do
+    if not (io.popen("ls " .. tostring(nomsupath) .. "/" .. tostring(sanitize(path))):close()) then
+      return true
     end
   end
   return false
@@ -75,16 +66,24 @@ browse = function(path)
         path
       }
     else
-      local f = io.popen('find -L "' .. package.nomsupath .. '/' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
-      do
-        local _tbl_0 = { }
-        for line in f:lines() do
-          local _key_0, _val_0 = line
-          _tbl_0[_key_0] = _val_0
+      local result = false
+      for nomsupath in package.nomsupath:gmatch("[^;]+") do
+        local f = io.popen('find -L "' .. nomsupath .. '/' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
+        do
+          local _accum_0 = { }
+          local _len_0 = 1
+          for line in f:lines() do
+            _accum_0[_len_0] = line
+            _len_0 = _len_0 + 1
+          end
+          files = _accum_0
         end
-        files = _tbl_0
+        if f:close() then
+          result = files
+          break
+        end
       end
-      _BROWSE_CACHE[path] = f:close() and files or false
+      _BROWSE_CACHE[path] = result
     end
   end
   return _BROWSE_CACHE[path]
@@ -107,11 +106,9 @@ if ok then
     if path == 'stdin' or raw_file_exists(path) then
       return true
     end
-    if package.nomsupath then
-      for nomsupath in package.nomsupath:gmatch("[^;]+") do
-        if raw_file_exists(nomsupath .. "/" .. path) then
-          return true
-        end
+    for nomsupath in package.nomsupath:gmatch("[^;]+") do
+      if raw_file_exists(nomsupath .. "/" .. path) then
+        return true
       end
     end
     return false
@@ -139,12 +136,21 @@ if ok then
         elseif file_type == 'directory' or file_type == 'link' then
           local files = { }
           for subfile in lfs.dir(filename) do
-            if not (subfile == "." or subfile == "..") then
+            local _continue_0 = false
+            repeat
+              if subfile == "." or subfile == ".." then
+                _continue_0 = true
+                break
+              end
               local _list_0 = (browse(filename .. "/" .. subfile) or { })
               for _index_0 = 1, #_list_0 do
                 local f = _list_0[_index_0]
                 files[#files + 1] = f
               end
+              _continue_0 = true
+            until true
+            if not _continue_0 then
+              break
             end
           end
           _BROWSE_CACHE[filename] = files
@@ -167,14 +173,12 @@ Files.walk = function(path, flush_cache)
   if flush_cache then
     _BROWSE_CACHE = { }
   end
-  local files = browse(path)
-  if package.nomsupath and not files then
-    for nomsupath in package.nomsupath:gmatch("[^;]+") do
-      do
-        files = browse(nomsupath .. "/" .. path)
-        if files then
-          break
-        end
+  local files
+  for nomsupath in package.nomsupath:gmatch("[^;]+") do
+    do
+      files = browse(nomsupath .. "/" .. path)
+      if files then
+        break
       end
     end
   end

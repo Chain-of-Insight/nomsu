@@ -2,6 +2,7 @@
 lpeg = require 'lpeg'
 re = require 're'
 Files = {}
+assert package.nomsupath, "No package.nomsupath was found"
 
 _SPOOFED_FILES = {}
 _FILE_CACHE = setmetatable {}, __index:_SPOOFED_FILES
@@ -19,10 +20,6 @@ Files.read = (filename)->
     if filename == 'stdin'
         return Files.spoof('stdin', io.read('*a'))
     file = io.open(filename)
-    if package.nomsupath and not file
-        for nomsupath in package.nomsupath\gmatch("[^;]+")
-            file = io.open(nomsupath.."/"..filename)
-            break if file
     return nil unless file
     contents = file\read("*a")
     file\close!
@@ -43,9 +40,8 @@ sanitize = (path)->
 Files.exists = (path)->
     return true if _SPOOFED_FILES[path]
     return true unless io.popen("ls #{sanitize(path)}")\close!
-    if package.nomsupath
-        for nomsupath in package.nomsupath\gmatch("[^;]+")
-            return true unless io.popen("ls #{nomsupath}/#{sanitize(path)}")\close!
+    for nomsupath in package.nomsupath\gmatch("[^;]+")
+        return true unless io.popen("ls #{nomsupath}/#{sanitize(path)}")\close!
     return false
 
 browse = (path)->
@@ -54,9 +50,14 @@ browse = (path)->
         _BROWSE_CACHE[path] = if _SPOOFED_FILES[path]
             {path}
         else
-            f = io.popen('find -L "'..package.nomsupath..'/'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
-            files = {line for line in f\lines!}
-            f\close! and files or false
+            result = false
+            for nomsupath in package.nomsupath\gmatch("[^;]+")
+                f = io.popen('find -L "'..nomsupath..'/'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
+                files = [line for line in f\lines!]
+                if f\close!
+                    result = files
+                    break
+            result
     return _BROWSE_CACHE[path]
 
 ok, lfs = pcall(require, "lfs")
@@ -67,9 +68,8 @@ if ok
     Files.exists = (path)->
         return true if _SPOOFED_FILES[path]
         return true if path == 'stdin' or raw_file_exists(path)
-        if package.nomsupath
-            for nomsupath in package.nomsupath\gmatch("[^;]+")
-                return true if raw_file_exists(nomsupath.."/"..path)
+        for nomsupath in package.nomsupath\gmatch("[^;]+")
+            return true if raw_file_exists(nomsupath.."/"..path)
         return false
 
     export browse
@@ -88,9 +88,9 @@ if ok
                 elseif file_type == 'directory' or file_type == 'link'
                     files = {}
                     for subfile in lfs.dir(filename)
-                        unless subfile == "." or subfile == ".."
-                            for f in *(browse(filename.."/"..subfile) or {})
-                                files[#files+1] = f
+                        continue if subfile == "." or subfile == ".."
+                        for f in *(browse(filename.."/"..subfile) or {})
+                            files[#files+1] = f
                     files
                 else false
         return _BROWSE_CACHE[filename]
@@ -102,10 +102,9 @@ Files.walk = (path, flush_cache=false)->
     if flush_cache
         export _BROWSE_CACHE
         _BROWSE_CACHE = {}
-    files = browse(path)
-    if package.nomsupath and not files
-        for nomsupath in package.nomsupath\gmatch("[^;]+")
-            if files = browse(nomsupath.."/"..path) then break
+    local files
+    for nomsupath in package.nomsupath\gmatch("[^;]+")
+        if files = browse(nomsupath.."/"..path) then break
     iter = (files, i)->
         return unless files
         i += 1

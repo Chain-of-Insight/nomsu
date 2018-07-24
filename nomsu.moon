@@ -5,7 +5,9 @@ if NOMSU_VERSION and NOMSU_PREFIX
     partial_vers = [table.concat(ver_bits,'.',1,i) for i=#ver_bits,1,-1]
     package.path = table.concat(["#{NOMSU_PREFIX}/share/nomsu/#{v}/?.lua" for v in *partial_vers],";")..";"..package.path
     package.cpath = table.concat(["#{NOMSU_PREFIX}/lib/nomsu/#{v}/?.so" for v in *partial_vers],";")..";"..package.cpath
-    package.nomsupath = table.concat(["#{NOMSU_PREFIX}/share/nomsu/#{v}" for v in *partial_vers],";")
+    package.nomsupath = table.concat(["#{NOMSU_PREFIX}/share/nomsu/#{v}" for v in *partial_vers],";")..";."
+else
+    package.nomsupath = "."
 
 EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 usage = [=[

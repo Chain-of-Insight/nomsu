@@ -158,7 +158,7 @@ local NomsuCompiler = setmetatable({ }, {
   end
 })
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 4
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 5
   NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
   NomsuCompiler._ENV = NomsuCompiler
   NomsuCompiler.nomsu = NomsuCompiler
@@ -454,7 +454,7 @@ do
       if not (ran_lua) then
         local file = Files.read(filename)
         if not file then
-          error("File does not exist: " .. tostring(filename), 0)
+          error("Tried to run file that does not exist: " .. tostring(filename))
         end
         ret = self:run(file, Source(filename, 1, #file))
       end
