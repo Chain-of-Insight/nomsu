@@ -297,7 +297,7 @@ with NomsuCompiler
 
     .run_lua = (lua, source=nil)=>
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
+        run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", self)
         if not run_lua_fn
             line_numbered_lua = concat(
                 [format("%3d|%s",i,line) for i, line in ipairs Files.get_lines(lua_string)],
