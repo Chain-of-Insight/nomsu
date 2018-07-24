@@ -33,8 +33,8 @@ Specify the desired Nomsu version (defaults to the latest installed version). E.
 .BI \-L
 List the installed versions of Nomsu (if \fB-V\fR is supplied, only print versions that match the requested pattern).
 .TP
-.B \-O
-Run the compiler in optimized mode (use precompiled .lua versions of .nom files, when available)
+.B \-O " level"
+Run the compiler with the given optimization level (default: 1). If \fBlevel\fR is >0, use precompiled .lua versions of .nom files, when available.
 .TP
 .B \-v
 Verbose: print compiled lua code as it's generated for the input files.

@@ -55,10 +55,10 @@ end
 local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 local usage = [=[Nomsu Compiler
 
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O] [-v] [-c] [-s] [-t] [-I file] [--help | -h] [--version] [--no-core] [file [nomsu args...]]
+Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O optimization level] [-v] [-c] [-s] [-t] [-I file] [--help | -h] [--version] [--no-core] [file [nomsu args...]]
 
 OPTIONS
-    -O Run the compiler in optimized mode (use precompiled .lua versions of Nomsu files, when available).
+    -O <level> Run the compiler with the given optimization level (>0: use precompiled .lua versions of Nomsu files, when available).
     -v Verbose: print compiled lua code.
     -c Compile the input files into a .lua files.
     -e Execute the specified string.
@@ -96,7 +96,7 @@ local file_queue = { }
 local sep = "\0"
 local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file) %sep)? {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
     flag <-
-        {:optimized: ("-O" -> true) :}
+        {:optimization: "-O" (%sep? (([0-9]+) -> tonumber))? :}
       / ("-I" %sep? ({~ file ~} -> add_file))
       / ("-e" %sep? (({} {~ file ~}) -> add_exec_string))
       / ({:check_syntax: ("-s" -> true):})
@@ -110,9 +110,12 @@ local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file
       / {:requested_version: "-V" (%sep? {([0-9.])+})? :}
     file <- ("-" -> "stdin") / {(!%sep .)+}
 ]], {
-  ["true"] = function()
+  ["true"] = (function()
     return true
-  end,
+  end),
+  tonumber = (function(self)
+    return tonumber(self)
+  end),
   sep = lpeg.P(sep),
   add_file = function(f)
     return table.insert(file_queue, f)
@@ -161,7 +164,7 @@ run = function()
     end
   end
   nomsu.can_optimize = function(f)
-    if not (args.optimized) then
+    if args.optimization == 0 then
       return false
     end
     if args.compile and input_files[f] then
