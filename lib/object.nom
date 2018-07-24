@@ -45,9 +45,7 @@ test:
 
 compile [@, me] to (Lua value "self")
 compile [method %actions %body] to:
-    %lua = (compile as (action %actions %body))
-    add free vars ((% as lua id) for % in %actions) to %lua
-    declare locals in %lua
+    %lua = (compile as (local action %actions %body))
     for % in %actions:
         to %lua write "\nclass.\(% as lua id) = \(% as lua id)"
     return (..)
@@ -90,7 +88,9 @@ compile [object %classname extends %parent %class_body] to (..)
         
             \(%class_body as lua statements)
         
-            class.__tostring = class["A"..string.as_lua_id("as text")]
+            class.__tostring = class["A"..string.as_lua_id("as text")] or function(inst)
+                return inst.name..getmetatable(dict{}).__tostring(inst)
+            end
         end
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
