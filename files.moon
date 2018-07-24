@@ -4,6 +4,13 @@ re = require 're'
 Files = {}
 assert package.nomsupath, "No package.nomsupath was found"
 
+run_cmd = (cmd)->
+    f = io.popen(cmd)
+    lines = [line for line in f\lines!]
+    return nil unless f\close!
+    return lines
+        
+
 _SPOOFED_FILES = {}
 _FILE_CACHE = setmetatable {}, __index:_SPOOFED_FILES
 _BROWSE_CACHE = {}
@@ -39,9 +46,9 @@ sanitize = (path)->
 
 Files.exists = (path)->
     return true if _SPOOFED_FILES[path]
-    return true unless io.popen("ls #{sanitize(path)}")\close!
+    return true if run_cmd("ls #{sanitize(path)}")
     for nomsupath in package.nomsupath\gmatch("[^;]+")
-        return true unless io.popen("ls #{nomsupath}/#{sanitize(path)}")\close!
+        return true if run_cmd("ls #{nomsupath}/#{sanitize(path)}")
     return false
 
 browse = (path)->
@@ -49,15 +56,7 @@ browse = (path)->
         local files
         _BROWSE_CACHE[path] = if _SPOOFED_FILES[path]
             {path}
-        else
-            result = false
-            for nomsupath in package.nomsupath\gmatch("[^;]+")
-                f = io.popen('find -L "'..nomsupath..'/'..path..'" -not -path "*/\\.*" -type f -name "*.nom"')
-                files = [line for line in f\lines!]
-                if f\close!
-                    result = files
-                    break
-            result
+        else run_cmd('find -L "'..path..'" -not -path "*/\\.*" -type f') or false
     return _BROWSE_CACHE[path]
 
 ok, lfs = pcall(require, "lfs")
@@ -79,23 +78,20 @@ if ok
                 {filename}
             else
                 file_type, err = lfs.attributes(filename, 'mode')
-                if file_type == 'file'
-                    if match(filename, "%.nom$") or match(filename, "%.lua$")
+                switch file_type
+                    when "file", "char device"
                         {filename}
+                    when "directory", "link"
+                        files = {}
+                        for subfile in lfs.dir(filename)
+                            continue if subfile == "." or subfile == ".."
+                            for f in *(browse(filename.."/"..subfile) or {})
+                                files[#files+1] = f
+                        files
                     else false
-                elseif file_type == 'char device'
-                    {filename}
-                elseif file_type == 'directory' or file_type == 'link'
-                    files = {}
-                    for subfile in lfs.dir(filename)
-                        continue if subfile == "." or subfile == ".."
-                        for f in *(browse(filename.."/"..subfile) or {})
-                            files[#files+1] = f
-                    files
-                else false
         return _BROWSE_CACHE[filename]
 else
-    if io.popen('find . -maxdepth 0')\close!
+    unless run_cmd('find . -maxdepth 0')
         error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0
 
 Files.walk = (path, flush_cache=false)->

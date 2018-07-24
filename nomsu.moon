@@ -1,5 +1,13 @@
 #!/usr/bin/env moon
 -- This file contains the command-line Nomsu runner.
+
+EXIT_SUCCESS, EXIT_FAILURE = 0, 1
+
+if _VERSION == "Lua 5.1" and not jit
+    -- Cannot run on Lua5.1 because it doesn't have gotos.
+    print("Sorry, Nomsu does not run on Lua 5.1. Please use LuaJIT 2+ or Lua 5.2+")
+    os.exit(EXIT_FAILURE)
+
 if NOMSU_VERSION and NOMSU_PREFIX
     ver_bits = [ver_bit for ver_bit in NOMSU_VERSION\gmatch("[0-9]+")]
     partial_vers = [table.concat(ver_bits,'.',1,i) for i=#ver_bits,1,-1]
@@ -9,7 +17,6 @@ if NOMSU_VERSION and NOMSU_PREFIX
 else
     package.nomsupath = "."
 
-EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 usage = [=[
 Nomsu Compiler
 

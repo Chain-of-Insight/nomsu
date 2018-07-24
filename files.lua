@@ -2,6 +2,24 @@ local lpeg = require('lpeg')
 local re = require('re')
 local Files = { }
 assert(package.nomsupath, "No package.nomsupath was found")
+local run_cmd
+run_cmd = function(cmd)
+  local f = io.popen(cmd)
+  local lines
+  do
+    local _accum_0 = { }
+    local _len_0 = 1
+    for line in f:lines() do
+      _accum_0[_len_0] = line
+      _len_0 = _len_0 + 1
+    end
+    lines = _accum_0
+  end
+  if not (f:close()) then
+    return nil
+  end
+  return lines
+end
 local _SPOOFED_FILES = { }
 local _FILE_CACHE = setmetatable({ }, {
   __index = _SPOOFED_FILES
@@ -47,11 +65,11 @@ Files.exists = function(path)
   if _SPOOFED_FILES[path] then
     return true
   end
-  if not (io.popen("ls " .. tostring(sanitize(path))):close()) then
+  if run_cmd("ls " .. tostring(sanitize(path))) then
     return true
   end
   for nomsupath in package.nomsupath:gmatch("[^;]+") do
-    if not (io.popen("ls " .. tostring(nomsupath) .. "/" .. tostring(sanitize(path))):close()) then
+    if run_cmd("ls " .. tostring(nomsupath) .. "/" .. tostring(sanitize(path))) then
       return true
     end
   end
@@ -66,24 +84,7 @@ browse = function(path)
         path
       }
     else
-      local result = false
-      for nomsupath in package.nomsupath:gmatch("[^;]+") do
-        local f = io.popen('find -L "' .. nomsupath .. '/' .. path .. '" -not -path "*/\\.*" -type f -name "*.nom"')
-        do
-          local _accum_0 = { }
-          local _len_0 = 1
-          for line in f:lines() do
-            _accum_0[_len_0] = line
-            _len_0 = _len_0 + 1
-          end
-          files = _accum_0
-        end
-        if f:close() then
-          result = files
-          break
-        end
-      end
-      _BROWSE_CACHE[path] = result
+      _BROWSE_CACHE[path] = run_cmd('find -L "' .. path .. '" -not -path "*/\\.*" -type f') or false
     end
   end
   return _BROWSE_CACHE[path]
@@ -121,19 +122,12 @@ if ok then
         }
       else
         local file_type, err = lfs.attributes(filename, 'mode')
-        if file_type == 'file' then
-          if match(filename, "%.nom$") or match(filename, "%.lua$") then
-            _BROWSE_CACHE[filename] = {
-              filename
-            }
-          else
-            _BROWSE_CACHE[filename] = false
-          end
-        elseif file_type == 'char device' then
+        local _exp_0 = file_type
+        if "file" == _exp_0 or "char device" == _exp_0 then
           _BROWSE_CACHE[filename] = {
             filename
           }
-        elseif file_type == 'directory' or file_type == 'link' then
+        elseif "directory" == _exp_0 or "link" == _exp_0 then
           local files = { }
           for subfile in lfs.dir(filename) do
             local _continue_0 = false
@@ -162,7 +156,7 @@ if ok then
     return _BROWSE_CACHE[filename]
   end
 else
-  if io.popen('find . -maxdepth 0'):close() then
+  if not (run_cmd('find . -maxdepth 0')) then
     error("Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0)
   end
 end

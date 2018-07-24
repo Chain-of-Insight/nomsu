@@ -1,3 +1,8 @@
+local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
+if _VERSION == "Lua 5.1" and not jit then
+  print("Sorry, Nomsu does not run on Lua 5.1. Please use LuaJIT 2+ or Lua 5.2+")
+  os.exit(EXIT_FAILURE)
+end
 if NOMSU_VERSION and NOMSU_PREFIX then
   local ver_bits
   do
@@ -52,7 +57,6 @@ if NOMSU_VERSION and NOMSU_PREFIX then
 else
   package.nomsupath = "."
 end
-local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 local usage = [=[Nomsu Compiler
 
 Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O optimization level] [-v] [-c] [-s] [-t] [-I file] [--help | -h] [--version] [--no-core] [file [nomsu args...]]
