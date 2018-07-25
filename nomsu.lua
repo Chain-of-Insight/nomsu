@@ -159,12 +159,24 @@ local run
 run = function()
   local input_files = { }
   for _index_0 = 1, #file_queue do
-    local f = file_queue[_index_0]
-    if not (Files.exists(f)) then
-      error("Could not find: '" .. tostring(f) .. "'")
-    end
-    for _, filename in Files.walk(f) do
-      input_files[filename] = true
+    local _continue_0 = false
+    repeat
+      local f = file_queue[_index_0]
+      if f == 'stdin' then
+        input_files[f] = true
+        _continue_0 = true
+        break
+      end
+      if not (Files.exists(f)) then
+        error("Could not find: '" .. tostring(f) .. "'")
+      end
+      for _, filename in Files.walk(f) do
+        input_files[filename] = true
+      end
+      _continue_0 = true
+    until true
+    if not _continue_0 then
+      break
     end
   end
   nomsu.can_optimize = function(f)
@@ -186,11 +198,7 @@ run = function()
   local get_file_and_source
   get_file_and_source = function(filename)
     local file, source
-    if filename == 'stdin' then
-      file = io.read("*a")
-      Files.spoof('stdin', file)
-      source = Source('stdin', 1, #file)
-    elseif filename:match("%.nom$") then
+    if filename == 'stdin' or filename:match("%.nom$") then
       file = Files.read(filename)
       if not file then
         error("File does not exist: " .. tostring(filename), 0)

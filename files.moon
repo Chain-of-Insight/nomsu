@@ -17,6 +17,7 @@ _BROWSE_CACHE = {}
 
 -- Create a fake file and put it in the cache
 Files.spoof = (filename, contents)->
+    print("SPOOFING #{filename}")
     _SPOOFED_FILES[filename] = contents
     return contents
 
@@ -46,6 +47,7 @@ sanitize = (path)->
 
 Files.exists = (path)->
     return true if _SPOOFED_FILES[path]
+    return true if path == 'stdin'
     return true if run_cmd("ls #{sanitize(path)}")
     for nomsupath in package.nomsupath\gmatch("[^;]+")
         return true if run_cmd("ls #{nomsupath}/#{sanitize(path)}")
@@ -74,7 +76,7 @@ if ok
     export browse
     browse = (filename)->
         unless _BROWSE_CACHE[filename]
-            _BROWSE_CACHE[filename] = if _SPOOFED_FILES[filename]
+            _BROWSE_CACHE[filename] = if _SPOOFED_FILES[filename] or filename == 'stdin'
                 {filename}
             else
                 file_type, err = lfs.attributes(filename, 'mode')
@@ -102,8 +104,11 @@ Files.walk = (path, flush_cache=false)->
         export _BROWSE_CACHE
         _BROWSE_CACHE = {}
     local files
-    for nomsupath in package.nomsupath\gmatch("[^;]+")
-        if files = browse(nomsupath.."/"..path) then break
+    if path == 'stdin'
+        files = {path}
+    else
+        for nomsupath in package.nomsupath\gmatch("[^;]+")
+            if files = browse(nomsupath.."/"..path) then break
     iter = (files, i)->
         return unless files
         i += 1

@@ -26,6 +26,7 @@ local _FILE_CACHE = setmetatable({ }, {
 })
 local _BROWSE_CACHE = { }
 Files.spoof = function(filename, contents)
+  print("SPOOFING " .. tostring(filename))
   _SPOOFED_FILES[filename] = contents
   return contents
 end
@@ -63,6 +64,9 @@ sanitize = function(path)
 end
 Files.exists = function(path)
   if _SPOOFED_FILES[path] then
+    return true
+  end
+  if path == 'stdin' then
     return true
   end
   if run_cmd("ls " .. tostring(sanitize(path))) then
@@ -116,7 +120,7 @@ if ok then
   end
   browse = function(filename)
     if not (_BROWSE_CACHE[filename]) then
-      if _SPOOFED_FILES[filename] then
+      if _SPOOFED_FILES[filename] or filename == 'stdin' then
         _BROWSE_CACHE[filename] = {
           filename
         }
@@ -174,11 +178,17 @@ Files.walk = function(path, flush_cache)
     _BROWSE_CACHE = { }
   end
   local files
-  for nomsupath in package.nomsupath:gmatch("[^;]+") do
-    do
-      files = browse(nomsupath .. "/" .. path)
-      if files then
-        break
+  if path == 'stdin' then
+    files = {
+      path
+    }
+  else
+    for nomsupath in package.nomsupath:gmatch("[^;]+") do
+      do
+        files = browse(nomsupath .. "/" .. path)
+        if files then
+          break
+        end
       end
     end
   end

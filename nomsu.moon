@@ -110,6 +110,9 @@ FILE_CACHE = setmetatable {}, {
 run = ->
     input_files = {}
     for f in *file_queue
+        if f == 'stdin'
+            input_files[f] = true
+            continue
         unless Files.exists(f)
             error("Could not find: '#{f}'")
         for _,filename in Files.walk(f)
@@ -127,11 +130,7 @@ run = ->
 
     get_file_and_source = (filename)->
         local file, source
-        if filename == 'stdin'
-            file = io.read("*a")
-            Files.spoof('stdin', file)
-            source = Source('stdin', 1, #file)
-        elseif filename\match("%.nom$")
+        if filename == 'stdin' or filename\match("%.nom$")
             file = Files.read(filename)
             if not file
                 error("File does not exist: #{filename}", 0)
