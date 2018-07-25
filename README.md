@@ -1,7 +1,7 @@
 # Nomsu
 
 Nomsu (named after **Nom**ic, and its creator, Peter **Su**ber) is a programming language
-designed to be used for playing games of Nomic, or engaging in other similar activities
+designed to be used for playing games of [Nomic](https://en.wikipedia.org/wiki/Nomic), or engaging in other similar activities
 revolving around natural language rule-making and self modification.
 
 ## Dependencies
