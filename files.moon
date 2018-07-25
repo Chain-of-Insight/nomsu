@@ -17,7 +17,6 @@ _BROWSE_CACHE = {}
 
 -- Create a fake file and put it in the cache
 Files.spoof = (filename, contents)->
-    print("SPOOFING #{filename}")
     _SPOOFED_FILES[filename] = contents
     return contents
 

@@ -26,7 +26,6 @@ local _FILE_CACHE = setmetatable({ }, {
 })
 local _BROWSE_CACHE = { }
 Files.spoof = function(filename, contents)
-  print("SPOOFING " .. tostring(filename))
   _SPOOFED_FILES[filename] = contents
   return contents
 end
