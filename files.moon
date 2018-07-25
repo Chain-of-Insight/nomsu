@@ -92,7 +92,10 @@ if ok
         return _BROWSE_CACHE[filename]
 else
     unless run_cmd('find . -maxdepth 0')
-        error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: http://keplerproject.github.io/luafilesystem/ or `luarocks install luafilesystem`)", 0
+        url = if jit
+            'https://github.com/spacewander/luafilesystem'
+        else 'https://github.com/keplerproject/luafilesystem'
+        error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: #{url} or `luarocks install luafilesystem`)", 0
 
 Files.walk = (path, flush_cache=false)->
     if flush_cache
