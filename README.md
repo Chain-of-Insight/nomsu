@@ -28,11 +28,10 @@ for %num in %my_nums:
 action [sing %n bottles of beer]:
     for %i in %n to 1 by -1:
         say ".."
-            \%i bottle\("s" if i > 1 else "") of beer on the wall,
-            \%i bottle\("s" if i > 1 else "") of beer!
+            \%i bottle\("s" if (%i > 1) else "") of beer on the wall,
+            \%i bottle\("s" if (%i > 1) else "") of beer!
             Take one down, pass it around...
     say "No bottles of beer on the wall. Go to the store, buy some more..."
-    sing %n bottles of beer
 
 sing 99 bottles of beer
 ```
