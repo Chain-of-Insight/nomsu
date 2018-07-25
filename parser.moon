@@ -101,10 +101,13 @@ do
         peg_file\close!
         Parser.patterns[version] = re.compile(nomsu_peg, NOMSU_DEFS)
 
+_anon_chunk = 0
 Parser.parse = (nomsu_code, source=nil, version=nil)->
     source or= nomsu_code.source
     nomsu_code = tostring(nomsu_code)
-    source or= Source("string: "..nomsu_code, 1, #nomsu_code)
+    unless source
+        source = Source("anonymous chunk ##{_anon_chunk}", 1, #nomsu_code)
+        _anon_chunk += 1
     version or= nomsu_code\match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
     syntax_version = version and tonumber(version\match("^[0-9]+")) or Parser.version
     userdata = {

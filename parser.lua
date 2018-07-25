@@ -144,6 +144,7 @@ do
     Parser.patterns[version] = re.compile(nomsu_peg, NOMSU_DEFS)
   end
 end
+local _anon_chunk = 0
 Parser.parse = function(nomsu_code, source, version)
   if source == nil then
     source = nil
@@ -153,7 +154,10 @@ Parser.parse = function(nomsu_code, source, version)
   end
   source = source or nomsu_code.source
   nomsu_code = tostring(nomsu_code)
-  source = source or Source("string: " .. nomsu_code, 1, #nomsu_code)
+  if not (source) then
+    source = Source("anonymous chunk #" .. tostring(_anon_chunk), 1, #nomsu_code)
+    _anon_chunk = _anon_chunk + 1
+  end
   version = version or nomsu_code:match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
   local syntax_version = version and tonumber(version:match("^[0-9]+")) or Parser.version
   local userdata = {
