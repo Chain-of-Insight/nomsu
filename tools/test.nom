@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5.4.3
+#!/usr/bin/env nomsu -V2.5.5.4
 #
     Tool to run all tests in a file (i.e. the code block inside a call to 'test %'). Usage:
         nomsu tools/test.nom file1 file2 directory1 ...
