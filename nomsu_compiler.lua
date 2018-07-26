@@ -1159,7 +1159,7 @@ do
               end
             end
             nomsu:append(interp_nomsu)
-            if interp_nomsu:is_multiline() and i < #tree then
+            if interp_nomsu:is_multiline() then
               nomsu:append("\n..")
             end
           end

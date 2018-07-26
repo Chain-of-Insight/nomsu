@@ -743,7 +743,7 @@ with NomsuCompiler
                                 elseif bit.type != "List" and bit.type != "Dict"
                                     interp_nomsu\parenthesize!
                             nomsu\append interp_nomsu
-                            if interp_nomsu\is_multiline! and i < #tree
+                            if interp_nomsu\is_multiline!
                                 nomsu\append "\n.."
                 nomsu = NomsuCode(tree.source)
                 add_text(nomsu, tree)
