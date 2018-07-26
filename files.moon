@@ -103,7 +103,7 @@ Files.walk = (path, flush_cache=false)->
         export _BROWSE_CACHE
         _BROWSE_CACHE = {}
     local files
-    if path == 'stdin'
+    if path == 'stdin' or _SPOOFED_FILES[path]
         files = {path}
     else
         for nomsupath in package.nomsupath\gmatch("[^;]+")

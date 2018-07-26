@@ -177,7 +177,7 @@ Files.walk = function(path, flush_cache)
     _BROWSE_CACHE = { }
   end
   local files
-  if path == 'stdin' then
+  if path == 'stdin' or _SPOOFED_FILES[path] then
     files = {
       path
     }
