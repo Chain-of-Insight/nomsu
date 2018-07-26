@@ -206,28 +206,28 @@ test:
         Three-way comparison evaluated middle value multiple times
 
 parse [%x < %y < %z] as (..)
-    =lua "(function(x,y,z) return x <  y and y <  z; end)(\%x,\%y,\%z)"
+    call ([%a, %b, %c] -> ((%a < %b) and (%b < %c))) with [%x, %y, %z]
 
 parse [%x <= %y < %z] as (..)
-    =lua "(function(x,y,z) return x <= y and y <  z; end)(\%x,\%y,\%z)"
+    call ([%a, %b, %c] -> ((%a <= %b) and (%b < %c))) with [%x, %y, %z]
 
 parse [%x < %y <= %z] as (..)
-    =lua "(function(x,y,z) return x <  y and y <= z; end)(\%x,\%y,\%z)"
+    call ([%a, %b, %c] -> ((%a < %b) and (%b <= %c))) with [%x, %y, %z]
 
 parse [%x <= %y <= %z] as (..)
-    =lua "(function(x,y,z) return x <= y and y <= z; end)(\%x,\%y,\%z)"
+    call ([%a, %b, %c] -> ((%a <= %b) and (%b <= %c))) with [%x, %y, %z]
 
 parse [%x > %y > %z] as (..)
-    =lua "(function(x,y,z) return x >  y and y >  z; end)(\%x,\%y,\%z)"
+    call ([%a, %b, %c] -> ((%a > %b) and (%b > %c))) with [%x, %y, %z]
 
 parse [%x >= %y > %z] as (..)
-    =lua "(function(x,y,z) return x >= y and y >  z; end)(\%x,\%y,\%z)"
+    call ([%a, %b, %c] -> ((%a >= %b) and (%b > %c))) with [%x, %y, %z]
 
 parse [%x > %y >= %z] as (..)
-    =lua "(function(x,y,z) return x >  y and y >= z; end)(\%x,\%y,\%z)"
+    call ([%a, %b, %c] -> ((%a > %b) and (%b >= %c))) with [%x, %y, %z]
 
 parse [%x >= %y >= %z] as (..)
-    =lua "(function(x,y,z) return x >= y and y >= z; end)(\%x,\%y,\%z)"
+    call ([%a, %b, %c] -> ((%a >= %b) and (%b >= %c))) with [%x, %y, %z]
 
 # TODO: optimize for common case where x,y,z are all either variables or number literals
 # Boolean Operators
