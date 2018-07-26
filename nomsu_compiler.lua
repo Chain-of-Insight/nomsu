@@ -891,7 +891,7 @@ do
           nomsu:append(".")
         end
         local bit_nomsu
-        if bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and Parser.is_identifier(bit[1]) then
+        if i > 1 and bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and Parser.is_identifier(bit[1]) then
           bit_nomsu = bit[1]
         else
           bit_nomsu = recurse(bit, nomsu)
