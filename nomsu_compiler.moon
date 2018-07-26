@@ -569,7 +569,7 @@ with NomsuCompiler
                 for i, bit in ipairs tree
                     nomsu\append "." if i > 1
                     local bit_nomsu
-                    bit_nomsu = if bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and Parser.is_identifier(bit[1])
+                    bit_nomsu = if i > 1 and bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and Parser.is_identifier(bit[1])
                         bit[1]
                     else recurse(bit, nomsu)
                     assert bit.type != "Block"
