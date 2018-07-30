@@ -1048,7 +1048,7 @@ do
       local nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
       local should_clump
       should_clump = function(prev_line, line)
-        if prev_line and prev_line.type == "Action" and line.type == "Action" then
+        if prev_line.type == "Action" and line.type == "Action" then
           if prev_line.stub == "use %" then
             return line.stub == "use %"
           end
@@ -1058,11 +1058,8 @@ do
           if line.stub == "test %" then
             return false
           end
-          if recurse(prev_line):is_multiline() then
-            return false
-          end
         end
-        return true
+        return not recurse(prev_line):is_multiline()
       end
       for chunk_no, chunk in ipairs(tree) do
         if chunk_no > 1 then

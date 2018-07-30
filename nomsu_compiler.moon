@@ -650,12 +650,11 @@ with NomsuCompiler
             when "FileChunks"
                 nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
                 should_clump = (prev_line, line)->
-                    if prev_line and prev_line.type == "Action" and line.type == "Action"
+                    if prev_line.type == "Action" and line.type == "Action"
                         if prev_line.stub == "use %" then return line.stub == "use %"
                         if prev_line.stub == "test %" then return true
                         if line.stub == "test %" then return false
-                        return false if recurse(prev_line)\is_multiline!
-                    return true
+                    return not recurse(prev_line)\is_multiline!
                 for chunk_no, chunk in ipairs tree
                     nomsu\append "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1
                     nomsu\append pop_comments(chunk.source.start)
