@@ -53,12 +53,12 @@ compile [bytes %start to %stop of %text] to (..)
 test:
     assume (("asdf" capitalized) == "Asdf")
 compile [capitalized %text, %text capitalized] to (..)
-    Lua value "((\(%text as lua expr)):gsub('%l', string.upper, 1))"
+    Lua value "(\(%text as lua expr)):gsub('%l', string.upper, 1)"
 
 test:
     assume (("asdf" uppercase) == "ASDF")
 compile [uppercase %text, %text uppercase] to (..)
-    Lua value "((\(%text as lua expr)):gsub('%l', string.upper))"
+    Lua value "(\(%text as lua expr)):upper()"
 
 test:
     assume (("asdf" with "X" instead of "s") == "aXdf") or barf ".."
