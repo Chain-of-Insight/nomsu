@@ -42,7 +42,6 @@ test:
         assume ((sploot) == "splooted") or barf "subclass method failed"
         assume ((bark) == "Bark!") or barf "inheritance failed"
         assume ((woof) == "Bark!")
-
 compile [@, me] to (Lua value "self")
 compile [method %actions %body] to:
     %lua = (compile as (local action %actions %body))

@@ -22,7 +22,6 @@ compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to (..)
 # For strict identity checking, use (%x's id) is (%y's id)
 test:
     assume (([] == []) and (([]'s id) != ([]'s id)))
-
 lua> ".."
     do
         local new_uuid = require('uuid')
@@ -117,7 +116,6 @@ test:
     
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
-
 compile [external %var = %value] to:
     %var_lua = (%var as lua)
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
@@ -135,7 +133,6 @@ test:
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf ".."
         'with external' failed.
-
 compile [with external %externs %body] to:
     %body_lua = (%body as lua statements)
     lua> ".."
@@ -151,7 +148,6 @@ test:
     
     assume (%x == 1) or barf "'with' scoping failed"
     assume (%z == (nil)) or barf "'with' scoping failed"
-
 compile [with %assignments %body] to:
     %lua = (%body as lua statements)
     lua> ".."
@@ -189,7 +185,6 @@ compile [with %assignments %body] to:
 # Math Operators
 test:
     assume ((5 wrapped around 2) == 1) or barf "mod not working"
-
 compile [%x wrapped around %y, %x mod %y] to (..)
     Lua value "(\(%x as lua expr) % \(%y as lua expr))"
 
@@ -204,7 +199,6 @@ test:
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
     assume (%calls == 1) or barf ".."
         Three-way comparison evaluated middle value multiple times
-
 parse [%x < %y < %z] as (..)
     call ([%a, %b, %c] -> ((%a < %b) and (%b < %c))) with [%x, %y, %z]
 
@@ -236,7 +230,6 @@ test:
     assume (((no) and (barfer)) == (no))
     assume ((no) or (yes))
     assume ((yes) or (barfer))
-
 compile [%x and %y] to (Lua value "(\(%x as lua expr) and \(%y as lua expr))")
 compile [%x or %y] to (Lua value "(\(%x as lua expr) or \(%y as lua expr))")
 
@@ -292,12 +285,11 @@ compile [%x ARSHIFT %shift, %x >> %shift] to (..)
 test:
     assume ((- 5) == -5)
     assume ((not (yes)) == (no))
-
 compile [- %] to (Lua value "(- \(% as lua expr))")
 compile [not %] to (Lua value "(not \(% as lua expr))")
+
 test:
     assume ((length of [1, 2, 3]) == 3)
-
 compile [length of %list, len %list, || %list ||] to (..)
     Lua value "(#\(%list as lua expr))"
 
@@ -314,7 +306,6 @@ test:
     assume (%x == 4) or barf "*= failed"
     wrap %x around 3
     assume (%x == 1) or barf "wrap around failed"
-
 parse [%var += %] as (%var = (%var + %))
 parse [%var -= %] as (%var = (%var - %))
 parse [%var *= %] as (%var = (%var * %))

@@ -648,26 +648,28 @@ with NomsuCompiler
 
         switch tree.type
             when "FileChunks"
-                setup = nil
                 nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
+                should_clump = (prev_line, line)->
+                    if prev_line and prev_line.type == "Action" and line.type == "Action"
+                        if prev_line.stub == "use %" then return line.stub == "use %"
+                        if prev_line.stub == "test %" then return true
+                        if line.stub == "test %" then return false
+                        return false if recurse(prev_line)\is_multiline!
+                    return true
                 for chunk_no, chunk in ipairs tree
                     nomsu\append "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1
                     nomsu\append pop_comments(chunk.source.start)
                     if chunk.type == "Block"
                         for line_no, line in ipairs chunk
-                            if setup == nil
-                                setup = line.type == "Action" and line.stub == "use %"
-                            elseif setup and not (line.type == "Action" and line.stub == "use %")
-                                nomsu\append "\n", pop_comments(line.source.start)
-                                setup = false
-                            nomsu\append pop_comments(line.source.start, tostring(nomsu)\match("\n\n$") and "" or "\n")
-                            line_nomsu = @tree_to_nomsu(line, pop_comments)
-                            nomsu\append line_nomsu
-                            nomsu\append(line_nomsu\is_multiline! and "\n\n" or "\n") if line_no < #chunk
+                            if line_no > 1
+                                if should_clump(chunk[line_no-1], line)
+                                    nomsu\append "\n", pop_comments(line.source.start, '\n')
+                                else
+                                    nomsu\append "\n\n", pop_comments(line.source.start)
+                            nomsu\append @tree_to_nomsu(line, pop_comments)
                         nomsu\append pop_comments(chunk.source.stop, '\n')
                     else
                         nomsu\append recurse(chunk)
-                    setup = false
                 nomsu\append pop_comments(tree.source.stop, '\n')
                 nomsu\append('\n') unless tostring(nomsu)\match("\n$")
                 return nomsu

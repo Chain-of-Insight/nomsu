@@ -16,7 +16,6 @@ compile [do nothing] to (Lua "")
 test:
     if (no):
         barf "conditional fail"
-
 compile [if %condition %if_body] to (..)
     Lua ".."
         if \(%condition as lua expr) then
@@ -26,7 +25,6 @@ compile [if %condition %if_body] to (..)
 test:
     unless (yes):
         barf "conditional fail"
-
 parse [unless %condition %unless_body] as (if (not %condition) %unless_body)
 compile [..]
     if %condition %if_body else %else_body, unless %condition %else_body else %if_body
@@ -46,7 +44,6 @@ compile [..]
 test:
     assume ((1 if (yes) else 2) == 1)
     assume ((1 if (no) else 2) == 2)
-
 compile [..]
     %when_true_expr if %condition else %when_false_expr
     %when_true_expr if %condition otherwise %when_false_expr
@@ -82,7 +79,6 @@ test:
     %i += 1
     unless (%i == 10): go to %loop
     assume (%i == 10)
-
 compile [=== %label ===, --- %label ---, *** %label ***] to (..)
     Lua "::label_\(%label as lua identifier)::"
 
@@ -112,7 +108,6 @@ test:
         barf "Failed to 'do next repeat'"
     
     assume (%x == 30)
-
 compile [do next repeat] to (Lua "goto continue_repeat")
 compile [stop repeating] to (Lua "goto stop_repeat")
 compile [repeat while %condition %body] to:
@@ -138,11 +133,11 @@ compile [repeat while %condition %body] to:
 
 parse [repeat %body] as (repeat while (yes) %body)
 parse [repeat until %condition %body] as (repeat while (not %condition) %body)
+
 test:
     %x = 0
     repeat 10 times: %x += 1
     assume (%x == 10)
-
 compile [repeat %n times %body] to:
     %lua = (..)
         Lua ".."
@@ -466,7 +461,6 @@ test:
     ..and if it barfs: do nothing
     
     assume (%d.x == "good")
-
 compile [do %action then always %final_action] to (..)
     Lua ".."
         do
@@ -485,6 +479,7 @@ test:
 
 # Inline thunk:
 compile [result of %body] to (Lua value "\(compile as ([] -> %body))()")
+
 test:
     %t = [1, [2, [[3], 4], 5, [[[6]]]]]
     %flat = []

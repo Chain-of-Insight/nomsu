@@ -21,7 +21,6 @@ test:
             ..gap
         ..== "nogap"
     parse [アクション %spec %body] as (action %spec %body)
-
 test:
     %こんにちは = "こんにちは"
     アクション [% と言う] "\(%)世界"
@@ -32,7 +31,6 @@ test:
 test:
     assume ((["x", "y"] joined with ",") == "x,y") or barf "joined with failed"
     assume ((["x", "y"] joined) == "xy") or barf "joined failed"
-
 action [%texts joined with %glue] (..)
     lua> ".."
         local text_bits = {}
@@ -40,15 +38,16 @@ action [%texts joined with %glue] (..)
         return table.concat(text_bits, \%glue)
 
 parse [joined %texts, %texts joined] as (%texts joined with "")
+
 test:
     assume ((byte 2 of "BAR") == 65)
     assume ((bytes 1 to 2 of "BAR") == [66, 65])
-
 compile [byte %i of %text] to (..)
     Lua value "(\(%text as lua expr)):byte(\(%i as lua expr))"
 
 compile [bytes %start to %stop of %text] to (..)
-    Lua value "list{(\(%text as lua expr)):byte(\(%start as lua expr), \(%stop as lua expr))}"
+    Lua value ".."
+        list{(\(%text as lua expr)):byte(\(%start as lua expr), \(%stop as lua expr))}
 
 test:
     assume (("asdf" capitalized) == "Asdf")
@@ -63,7 +62,6 @@ compile [uppercase %text, %text uppercase] to (..)
 test:
     assume (("asdf" with "X" instead of "s") == "aXdf") or barf ".."
         substitution failed
-
 compile [..]
     %text with %sub instead of %patt, %text with %patt replaced by %sub
     %text s/ %patt / %sub
@@ -78,7 +76,6 @@ test:
                 one
                 two
         ..== ["one", "two"]
-
 action [lines in %text, lines of %text] (..)
     lua> ".."
         local result = list{}
@@ -99,7 +96,9 @@ compile [%expr for %match in %text matching %patt] to (..)
     Lua value ".."
         (function()
             local ret = list{}
-            for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(%patt as lua expr)) do
+            for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(..)
+            %patt as lua expr
+        ..) do
                 ret[#ret+1] = \(%expr as lua statements)
             end
             return ret

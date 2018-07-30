@@ -9,7 +9,6 @@ use "lib/base64.nom"
 
 test:
     assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
-
 action [hash %, sha1 %]:
     %hash = (=lua "\%hashlib.new('sha1'):final(\%)")
     return (base64 %hash)
@@ -18,7 +17,6 @@ action [file with hash %hash]:
     for file %filename in ".":
         %contents = (read file %filename)
         %file_hash = (hash %contents)
-        if (%file_hash == %hash):
-            return %filename
+        if (%file_hash == %hash): return %filename
 
 parse [hash of file %filename] as (sha1 (read file %filename))

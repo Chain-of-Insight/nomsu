@@ -1045,8 +1045,25 @@ do
     end
     local _exp_0 = tree.type
     if "FileChunks" == _exp_0 then
-      local setup = nil
       local nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
+      local should_clump
+      should_clump = function(prev_line, line)
+        if prev_line and prev_line.type == "Action" and line.type == "Action" then
+          if prev_line.stub == "use %" then
+            return line.stub == "use %"
+          end
+          if prev_line.stub == "test %" then
+            return true
+          end
+          if line.stub == "test %" then
+            return false
+          end
+          if recurse(prev_line):is_multiline() then
+            return false
+          end
+        end
+        return true
+      end
       for chunk_no, chunk in ipairs(tree) do
         if chunk_no > 1 then
           nomsu:append("\n\n" .. tostring(("~"):rep(80)) .. "\n\n")
@@ -1054,24 +1071,19 @@ do
         nomsu:append(pop_comments(chunk.source.start))
         if chunk.type == "Block" then
           for line_no, line in ipairs(chunk) do
-            if setup == nil then
-              setup = line.type == "Action" and line.stub == "use %"
-            elseif setup and not (line.type == "Action" and line.stub == "use %") then
-              nomsu:append("\n", pop_comments(line.source.start))
-              setup = false
+            if line_no > 1 then
+              if should_clump(chunk[line_no - 1], line) then
+                nomsu:append("\n", pop_comments(line.source.start, '\n'))
+              else
+                nomsu:append("\n\n", pop_comments(line.source.start))
+              end
             end
-            nomsu:append(pop_comments(line.source.start, tostring(nomsu):match("\n\n$") and "" or "\n"))
-            local line_nomsu = self:tree_to_nomsu(line, pop_comments)
-            nomsu:append(line_nomsu)
-            if line_no < #chunk then
-              nomsu:append(line_nomsu:is_multiline() and "\n\n" or "\n")
-            end
+            nomsu:append(self:tree_to_nomsu(line, pop_comments))
           end
           nomsu:append(pop_comments(chunk.source.stop, '\n'))
         else
           nomsu:append(recurse(chunk))
         end
-        setup = false
       end
       nomsu:append(pop_comments(tree.source.stop, '\n'))
       if not (tostring(nomsu):match("\n$")) then

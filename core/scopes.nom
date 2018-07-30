@@ -20,7 +20,6 @@ test:
         assume ((foo) == "inner foo")
     
     assume ((foo) == "outer foo")
-
 compile [with local %locals %body, with local %locals do %body] to:
     %body_lua = (%body as lua statements)
     if %locals.type is:

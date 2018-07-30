@@ -6,6 +6,7 @@
 %b64_str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 %reverse_b64 = (%b64_str.%i = (%i - 1) for %i in 1 to (length of %b64_str))
 %reverse_b64."=" = 0
+
 test:
     %cases = ["", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"]
     for %len = %encoded in %cases:
@@ -16,7 +17,6 @@ test:
         assume ((base64 decode %encoded) == %plain) or barf ".."
             \(quote %encoded) base64 decoded to \(quote (base64 decode %encoded)) \
             ..instead of \(quote %plain)
-
 action [base64 %str, base64 encode %str, %str base64]:
     %chars = []
     for %i in 1 to (length of %str) via 3:
@@ -46,9 +46,9 @@ action [decode base64 %str, %str base64 decoded, base64 decode %str]:
     for %i in 1 to (length of %str) via 4:
         %indices = (%reverse_b64.(%str.%) for % in %i to (%i + 3))
         add (chr ((%indices.1 << 2) + ((%indices.2 & 48) >> 4))) to %chars
-        if (%str.(%i+2) == "="): stop
+        if (%str.(%i + 2) == "="): stop
         add (chr (((%indices.2 & 15) << 4) + ((%indices.3 & 60) >> 2))) to %chars
-        if (%str.(%i+3) == "="): stop
+        if (%str.(%i + 3) == "="): stop
         add (chr (((%indices.3 & 3) << 6) + %indices.4)) to %chars
     
     return (%chars joined)

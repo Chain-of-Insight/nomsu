@@ -32,11 +32,9 @@ lua> ".."
 
 test:
     compile [five] to (Lua value "5")
-
 test:
     assume ((five) == 5) or barf "Compile to expression failed."
     compile [loc x] to (Lua "local _x = 99;")
-
 test:
     lua> "do"
     loc x
@@ -46,11 +44,9 @@ test:
     compile [asdf] to:
         %tmp = ""
         return (Lua %tmp)
-
 test:
     asdf
     assume (%tmp is (nil)) or barf "compile to is leaking variables"
-
 lua> ".."
     nomsu.COMPILE_ACTIONS["compile % to %"] = function(nomsu, tree, \%actions, \%body)
         local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(\
@@ -96,7 +92,6 @@ test:
         parse [baz %] as (foo %)
     
     assume ((foo 1) == "outer")
-
 compile [local action %actions %body] to (..)
     lua> ".."
         local fn_name = "A"..string.as_lua_id(\%actions[1].stub)
@@ -124,11 +119,9 @@ compile [local action %actions %body] to (..)
 test:
     action [baz1]: return "baz1"
     action [baz2] "baz2"
-
 test:
     assume ((baz1) == "baz1")
     assume ((baz2) == "baz2")
-
 compile [action %actions %body] to (..)
     lua> ".."
         local lua = \(compile as (local action %actions %body))
@@ -137,15 +130,14 @@ compile [action %actions %body] to (..)
 
 test:
     assume ((action (say %)) == (=lua "A_say_1"))
-
 compile [action %action] to (Lua value (%action as lua id))
+
 test:
     parse [swap %x and %y] as (..)
         do:
             %tmp = %x
             %x = %y
             %y = %tmp
-
 test:
     set {%1:1, %2:2}
     swap %1 and %2
@@ -155,7 +147,6 @@ test:
     swap %tmp and %tmp2
     assume ((%tmp == 2) and (%tmp2 == 1)) or barf ".."
         'parse % as %' variable mangling failed.
-
 compile [parse %actions as %body] to (..)
     lua> ".."
         local replacements = {}
@@ -207,7 +198,6 @@ compile [remove action %action] to (..)
 test:
     assume ("\(\(foo %x) as nomsu)" == "foo %x") or barf ".."
         action source code failed.
-
 compile [%tree as nomsu] to (..)
     Lua value "nomsu:tree_to_nomsu(\(%tree as lua expr))"
 
@@ -276,18 +266,16 @@ test:
                 one
                 "two"
         ..== "\"one\\n\\\"two\\\"\""
-
 compile [quote %s] to (Lua value "repr(\(%s as lua expr))")
+
 test:
     assume ((type of {}) == "table") or barf "type of failed."
-
 compile [type of %obj] to (Lua value "type(\(%obj as lua expr))")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
     assume ((parse "foo %") == \(foo %))
-
 compile [parse %text] to (Lua value "nomsu:parse(\(%text as lua expr))")
 compile [parse %text from %filename] to (..)
     Lua value ".."
@@ -301,7 +289,6 @@ test:
     run \:
         external %passed = (yes)
     assume %passed
-
 compile [run %nomsu_code] to (..)
     Lua value ".."
         nomsu:run(\(%nomsu_code as lua expr), \(..)
@@ -310,7 +297,6 @@ compile [run %nomsu_code] to (..)
 
 test:
     assume ((\(5 + 5) as value) == 10) or barf "%tree as value failed."
-
 action [run tree %tree, %tree as value] (lua> "return nomsu:run(\%tree)")
 compile [compile %block, compiled %block, %block compiled] to (..)
     Lua value "nomsu:compile(\(%block as lua))"
