@@ -2,25 +2,23 @@
 #
     This file defines some actions for hashing files and looking up files by hash.
 
-action [file with hash %hash]:
-    lua> ".."
-        local Hash = require("openssl.digest")
-        for filename in io.popen('find -L . -not -path "*/\\\\.*" -type f -name "*.nom"'):lines() do
-            local file = io.open(filename)
-            local contents = file:read("*a")
-            file:close()
-            local hash = Hash.new("sha1"):final(contents)
-            local hex = hash:gsub('.', function(c) return string.format('%02x', string.byte(c)) end)
-            if hex == \%hash then
-                return filename
-            end
-        end
+use "lib/os.nom"
+use "lib/base64.nom"
+
+%hashlib = (=lua "require('openssl.digest')")
+
+test:
+    assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
 
 action [hash %, sha1 %]:
-    %hashlib = (=lua "require('openssl.digest')")
     %hash = (=lua "\%hashlib.new('sha1'):final(\%)")
-    return (..)
-        =lua ".."
-            \%hash:gsub('.', function(c) return string.format('%02x', string.byte(c)) end)
+    return (base64 %hash)
 
-parse [hash of file %filename] as (sha1 (=lua "io.open(\%filename):read('*a')"))
+action [file with hash %hash]:
+    for file %filename in ".":
+        %contents = (read file %filename)
+        %file_hash = (hash %contents)
+        if (%file_hash == %hash):
+            return %filename
+
+parse [hash of file %filename] as (sha1 (read file %filename))
