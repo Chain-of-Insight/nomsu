@@ -41,10 +41,24 @@ action [%texts joined with %glue] (..)
 
 parse [joined %texts, %texts joined] as (%texts joined with "")
 test:
-    assume (("asdf" capitalized) == "Asdf") or barf "capitalized failed"
+    assume ((byte 2 of "BAR") == 65)
+    assume ((bytes 1 to 2 of "BAR") == [66, 65])
 
+compile [byte %i of %text] to (..)
+    Lua value "(\(%text as lua expr)):byte(\(%i as lua expr))"
+
+compile [bytes %start to %stop of %text] to (..)
+    Lua value "list{(\(%text as lua expr)):byte(\(%start as lua expr), \(%stop as lua expr))}"
+
+test:
+    assume (("asdf" capitalized) == "Asdf")
 compile [capitalized %text, %text capitalized] to (..)
     Lua value "((\(%text as lua expr)):gsub('%l', string.upper, 1))"
+
+test:
+    assume (("asdf" uppercase) == "ASDF")
+compile [uppercase %text, %text uppercase] to (..)
+    Lua value "((\(%text as lua expr)):gsub('%l', string.upper))"
 
 test:
     assume (("asdf" with "X" instead of "s") == "aXdf") or barf ".."
@@ -75,7 +89,7 @@ action [lines in %text, lines of %text] (..)
 
 compile [for %match in %text matching %patt %body] to (..)
     Lua ".."
-        for \(%match as lua expr) in \(%text as lua expr):gmatch(\(%patt as lua expr)) do
+        for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(%patt as lua expr)) do
             \(%body as lua statements)
             \(compile as (===next %match ===))
         end
@@ -85,7 +99,7 @@ compile [%expr for %match in %text matching %patt] to (..)
     Lua value ".."
         (function()
             local ret = list{}
-            for \(%match as lua expr) in \(%text as lua expr):gmatch(\(%patt as lua expr)) do
+            for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(%patt as lua expr)) do
                 ret[#ret+1] = \(%expr as lua statements)
             end
             return ret
@@ -93,10 +107,10 @@ compile [%expr for %match in %text matching %patt] to (..)
 
 compile [%text matches %pattern] to (..)
     Lua value ".."
-        (\(%text as lua expr):match(\(%pattern as lua expr)) and true or false)
+        ((\(%text as lua expr)):match(\(%pattern as lua expr)) and true or false)
 
 compile [%text matching %pattern] to (..)
-    Lua value "\(%text as lua expr):match(\(%pattern as lua expr))"
+    Lua value "(\(%text as lua expr)):match(\(%pattern as lua expr))"
 
 test:
     assume ("\n" == (newline)) or barf "Text literals failed."
