@@ -2,7 +2,7 @@
 file:
     {:curr_indent: ' '* :}
     (((action / expression / inline_block / indented_block) eol !.)
-     / file_chunks / blank_lines / '')
+     / file_chunks / empty_block)
     %ws* (!! .+ -> "Parse error" !!)?
 
 shebang: "#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^%nl]*
@@ -16,6 +16,10 @@ file_chunks (FileChunks):
 top_block (Block):
     {:curr_indent: ' '* :}
     comment? blank_lines? statement (nl_nodent statement)*
+
+empty_block (Block):
+    {:curr_indent: ' '* :}
+    comment? blank_lines?
 
 nodent: =curr_indent !(" ")
 indent: =curr_indent "    "
@@ -117,9 +121,9 @@ indented_plain_text (Text):
     {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
         (%nl+ (=curr_indent -> ""))* ~}
 text_interpolation:
-    inline_text_interpolation / ("\" indented_expression blank_lines =curr_indent "..")
+    inline_text_interpolation / ("\" indented_expression (blank_lines =curr_indent "..")?)
 
-number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
+number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / "0x" [0-9a-fA-F]+ / ([0-9]+)))-> tonumber)
 
 -- Variables can be nameless (i.e. just %) and can only contain identifier chars.
 -- This ensures you don't get weird parsings of `%x+%y` or `%'s thing`.
