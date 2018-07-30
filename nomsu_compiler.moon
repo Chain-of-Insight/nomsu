@@ -109,11 +109,13 @@ with NomsuCompiler
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
         :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
-        :table, :assert, :dofile, :loadstring, :type, :select, :debug, :math, :io, :load,
+        :table, :assert, :dofile, :loadstring, :type, :select, :math, :io, :load,
         :pairs, :ipairs,
         -- Nomsu types:
         :list, :dict,
     }
+    if jit then to_add.bit = require('bit')
+    elseif _VERSION == "Lua 5.2" then to_add.bit = bit32
     for k,v in pairs(to_add) do NomsuCompiler[k] = v
     for k,v in pairs(AST) do NomsuCompiler[k] = v
     .LuaCode = LuaCode
@@ -230,6 +232,12 @@ with NomsuCompiler
         ["test %"]: (tree, _body)=>
             test_str = table.concat [tostring(@tree_to_nomsu(line)) for line in *_body], "\n"
             LuaCode tree.source, "TESTS[#{repr(tostring(tree.source))}] = ", repr(test_str)
+
+        ["is jit"]: (tree, _code)=>
+            return LuaCode.Value(tree.source, jit and "true" or "false")
+
+        ["Lua version"]: (tree, _code)=>
+            return LuaCode.Value(tree.source, repr(_VERSION))
     }, {
         __index: (stub)=>
             if math_expression\match(stub)
@@ -743,7 +751,7 @@ with NomsuCompiler
                                 elseif bit.type != "List" and bit.type != "Dict"
                                     interp_nomsu\parenthesize!
                             nomsu\append interp_nomsu
-                            if interp_nomsu\is_multiline!
+                            if interp_nomsu\is_multiline! and i < #tree
                                 nomsu\append "\n.."
                 nomsu = NomsuCode(tree.source)
                 add_text(nomsu, tree)

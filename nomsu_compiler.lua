@@ -204,7 +204,6 @@ do
     loadstring = loadstring,
     type = type,
     select = select,
-    debug = debug,
     math = math,
     io = io,
     load = load,
@@ -213,6 +212,11 @@ do
     list = list,
     dict = dict
   }
+  if jit then
+    to_add.bit = require('bit')
+  elseif _VERSION == "Lua 5.2" then
+    to_add.bit = bit32
+  end
   for k, v in pairs(to_add) do
     NomsuCompiler[k] = v
   end
@@ -365,6 +369,12 @@ do
         return _accum_0
       end)(), "\n")
       return LuaCode(tree.source, "TESTS[" .. tostring(repr(tostring(tree.source))) .. "] = ", repr(test_str))
+    end,
+    ["is jit"] = function(self, tree, _code)
+      return LuaCode.Value(tree.source, jit and "true" or "false")
+    end,
+    ["Lua version"] = function(self, tree, _code)
+      return LuaCode.Value(tree.source, repr(_VERSION))
     end
   }, {
     __index = function(self, stub)
@@ -1159,7 +1169,7 @@ do
               end
             end
             nomsu:append(interp_nomsu)
-            if interp_nomsu:is_multiline() then
+            if interp_nomsu:is_multiline() and i < #tree then
               nomsu:append("\n..")
             end
           end
