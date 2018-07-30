@@ -16,6 +16,9 @@ for %path in (command line args):
     for file %filename in %path:
         if (%filename matches "%.nom$"): use %filename
 
+for %path in (command line args):
+    use %path
+
 %tests = ((=lua "Source:from_string(\%s)") = %t for %s = %t in (tests))
 for %path in (command line args):
     for file %filename in %path:
@@ -24,7 +27,7 @@ for %path in (command line args):
         for %src = %test in %tests:
             if (%src.filename == %filename):
                 add {test:%test, source:%src} to %file_tests
-        
+
         unless (%file_tests is empty):
             sort %file_tests by % -> %.source
             lua> "io.write('[ .. ] ', \%filename); io.flush()"
