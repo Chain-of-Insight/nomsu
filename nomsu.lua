@@ -98,11 +98,12 @@ if not arg or debug.getinfo(2).func == require then
 end
 local file_queue = { }
 local sep = "\0"
-local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file) %sep)? {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
+local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: '' -> true :} %sep)?
+        {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
     flag <-
         {:optimization: "-O" (%sep? (([0-9]+) -> tonumber))? :}
       / ("-I" %sep? ({~ file ~} -> add_file))
-      / ("-e" %sep? (({} {~ file ~}) -> add_exec_string))
+      / ("-e" %sep? (({} {~ file ~}) -> add_exec_string) {:exec_strings: '' -> true :})
       / ({:check_syntax: ("-s" -> true):})
       / ({:compile: ("-c" -> true):})
       / ({:compile: ("-c" -> true):})
@@ -283,7 +284,7 @@ run = function()
       end
     end
   end
-  if #file_queue == 0 then
+  if not (args.primary_file or args.exec_strings) then
     nomsu:run([[#!/usr/bin/env nomsu -V2
 use "lib/consolecolor.nom"
 action [quit, exit]: lua> "os.exit(0)"

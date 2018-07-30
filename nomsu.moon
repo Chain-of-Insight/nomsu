@@ -57,11 +57,12 @@ if not arg or debug.getinfo(2).func == require
 file_queue = {}
 sep = "\0"
 parser = re.compile([[
-    args <- {| (flag %sep)* (({~ file ~} -> add_file) %sep)? {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
+    args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: '' -> true :} %sep)?
+        {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
     flag <-
         {:optimization: "-O" (%sep? (([0-9]+) -> tonumber))? :}
       / ("-I" %sep? ({~ file ~} -> add_file))
-      / ("-e" %sep? (({} {~ file ~}) -> add_exec_string))
+      / ("-e" %sep? (({} {~ file ~}) -> add_exec_string) {:exec_strings: '' -> true :})
       / ({:check_syntax: ("-s" -> true):})
       / ({:compile: ("-c" -> true):})
       / ({:compile: ("-c" -> true):})
@@ -181,7 +182,7 @@ run = ->
                 -- Just run the file
                 run_file filename, (args.verbose and print or nil)
 
-    if #file_queue == 0
+    unless args.primary_file or args.exec_strings
         -- Run in interactive mode (REPL)
         nomsu\run [[
 #!/usr/bin/env nomsu -V2
