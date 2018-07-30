@@ -4,8 +4,6 @@
 
 use "core/metaprogramming.nom"
 
-compile [traceback] to (Lua value "debug.traceback()")
-compile [traceback %] to (Lua value "debug.traceback('', \(% as lua expr))")
 compile [barf] to (Lua "error(nil, 0);")
 compile [barf %msg] to (Lua "error(\(%msg as lua expr), 0);")
 compile [compile error at %source %msg] to (..)
