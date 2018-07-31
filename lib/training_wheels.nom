@@ -1,16 +1,12 @@
 #!/usr/bin/env nomsu -V2.5.5.4
 #
     This file contains a set of definitions that bring some familiar language features
-    from other languages into nomsu (e.g. "==" and "continue")
+    from other languages into nomsu (e.g. "||" and "continue")
 
-parse [%a == %b] as (%a = %b)
-parse [%a == %b] as (%a is %b)
-parse [%a ~= %b, %a != %b, %a <> %b] as (%a is not %b)
 parse [%a === %b] as ((%a 's id) is (%b 's id))
 parse [%a !== %b] as ((%a 's id) is not (%b 's id))
-parse [%a mod %b] as (%a wrapped around %b)
 parse [function %names %body, def %names %body] as (action %names %body)
-parse [switch %branch_value %body] as (if %branch_value is: %body)
+parse [switch %branch_value %body] as (if %branch_value is %body)
 parse [None, Null] as (nil)
 parse [True, true] as (yes)
 parse [False, false] as (no)
@@ -19,27 +15,12 @@ parse [%a || %b] as (%a or %b)
 parse [%a && %b] as (%a and %b)
 parse [continue] as (do next)
 parse [break] as (stop)
-parse [let %thing = %value in %action] as (with [%thing = %value] %action)
-parse [print %] as (say %)
+parse [let %thing = %value in %action] as (with local {%thing: %value})
+parse [print %, println %] as (say %)
 parse [error!, panic!, fail!, abort!] as (barf!)
 parse [error %, panic %, fail %, abort %] as (barf %)
+parse [assert %condition] as (assume %condition)
 parse [assert %condition %message] as (assume %condition or barf %message)
 parse [%cond ? %if_true %if_false] as (%if_true if %cond else %if_false)
-compile [function %args %body, lambda %args %body] to:
-    %lua = (Lua value "(function(")
-    for %i = %arg in %args.value:
-        if (%i > 1): to %lua write ", "
-        to %lua write (%arg as lua expr)
-    
-    to %lua write ")\n    "
-    %body = (%body as lua)
-    lua> "\%body:convert_to_statements('return ');"
-    for % in %args.value:
-        lua> "\%body:remove_free_vars(\%);"
-    to %lua write %body
-    to %lua write "\nend)"
-    return %lua
-
-parse [function %name %args %body] as (%name = (function %args %body))
-compile [call %fn %args] to (..)
-    Lua value "\(%fn as lua expr)(unpack(\(%args as lua expr)))"
+parse [lambda %args %body] as (%args -> %body)
+parse [function %name %args %body] as (%name = (%args -> %body))
