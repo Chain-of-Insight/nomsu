@@ -1,3 +1,3 @@
 #!/usr/bin/env nomsu -V2.5.5.4
 # This file sets the current library version.
-lua> "NOMSU_LIB_VERSION = 4"
+lua> "NOMSU_LIB_VERSION = 5"
