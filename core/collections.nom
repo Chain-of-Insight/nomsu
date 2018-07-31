@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5.5.4
+#!/usr/bin/env nomsu -V2.5.5.5
 #
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5.5.4
+#!/usr/bin/env nomsu -V2.5.5.5
 #
     This file contains a set of definitions that bring some familiar language features
     from other languages into nomsu (e.g. "||" and "continue")
@@ -15,7 +15,7 @@ parse [%a || %b] as (%a or %b)
 parse [%a && %b] as (%a and %b)
 parse [continue] as (do next)
 parse [break] as (stop)
-parse [let %thing = %value in %action] as (with local {%thing: %value})
+parse [let %thing = %value in %action] as (with local {%thing:%value})
 parse [print %, println %] as (say %)
 parse [error!, panic!, fail!, abort!] as (barf!)
 parse [error %, panic %, fail %, abort %] as (barf %)
