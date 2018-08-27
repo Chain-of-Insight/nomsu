@@ -46,7 +46,7 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 
 * `nomsu` - A shell script that selects between different installed versions of Nomsu (using the `-V` flag). You can use this script to, for example, run `nomsu -V 1.2 your_script.nom` to run with the latest version of Nomsu that matches `1.2.?.?`. All flags and arguments are passed along to whichever Nomsu compiler is chosen.
 * `nomsu.moon` - The source code for the Nomsu command line runner. This handles launching the compiler and running the REPL.
-* `nomsu.peg` - The [Parsing Expression Grammar](https://en.wikipedia.org/wiki/Parsing_expression_grammar) used to define Nomsu's syntax. The format of this file is a slightly modified version of the format accepted by LPEG's `re` module.
+* `nomsu.*.peg` - The [Parsing Expression Grammar](https://en.wikipedia.org/wiki/Parsing_expression_grammar) used to define each version of Nomsu's syntax. The format of this file is a slightly modified version of the format accepted by LPEG's `re` module.
 * `nomsu_compiler.moon` - **The actual Nomsu compiler**. This file can be imported and used without going through the regular command line interface (e.g. for applications that want to embed the compiler).
 * `parser.moon` - The Nomsu parser. This file can also be imported and used directly for applications that only need to *parse* Nomsu, not compile it.
 * `syntax_tree.moon` - Datastructures used for Nomsu Abstract Syntax Trees.

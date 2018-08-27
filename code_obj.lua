@@ -132,13 +132,13 @@ do
             _continue_0 = true
             break
           end
-          bits[#bits + 1] = b
           if b.is_code then
             b.dirty = error
           end
           if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
             b = repr(b)
           end
+          bits[#bits + 1] = b
           _continue_0 = true
         until true
         if not _continue_0 then
@@ -210,10 +210,13 @@ do
       end
       for i = 1, n do
         local b = select(i, ...)
-        bits[i] = b
         if b.is_code then
           b.dirty = error
         end
+        if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
+          b = repr(b)
+        end
+        bits[i] = b
       end
       return self:dirty()
     end,

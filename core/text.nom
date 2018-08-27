@@ -124,7 +124,7 @@ lua> ".."
         };
         for name, e in pairs(escapes) do
             local lua = "'"..e.."'"
-            nomsu.COMPILE_ACTIONS[name] = function(nomsu, tree)
+            COMPILE_ACTIONS[name] = function(nomsu, tree)
                 return LuaCode.Value(tree.source, lua)
             end
         end

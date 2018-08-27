@@ -206,10 +206,10 @@ compile [..]
     
     if (%body has subtree \(do next)):
         to %lua write "\n    ::continue::"
-    if (%body has subtree (\(do next %v) with vars {v:%var})):
+    if (%body has subtree \(do next %var)):
         to %lua write "\n    \(compile as (===next %var ===))"
     to %lua write "\nend --numeric for-loop"
-    if (%body has subtree (\(stop %v) with vars {v:%var})):
+    if (%body has subtree \(stop %var)):
         %lua = (..)
             Lua ".."
                 do -- scope for stopping for-loop
@@ -249,10 +249,10 @@ compile [for %var in %iterable %body] to:
     
     if (%body has subtree \(do next)):
         to %lua write "\n    ::continue::"
-    if (%body has subtree (\(do next %v) with vars {v:%var})):
+    if (%body has subtree \(do next %var)):
         to %lua write (Lua "\n\(compile as (===next %var ===))")
     to %lua write "\nend --foreach-loop"
-    if (%body has subtree (\(stop %v) with vars {v:%var})):
+    if (%body has subtree \(stop %var)):
         %lua = (..)
             Lua ".."
                 do -- scope for stopping for-loop
@@ -290,15 +290,15 @@ compile [..]
     
     if (%body has subtree \(do next)):
         to %lua write "\n    ::continue::"
-    if (%body has subtree (\(do next %v) with vars {v:%key})):
+    if (%body has subtree \(do next %key)):
         to %lua write (Lua "\n\(compile as (===next %key ===))")
-    if (%body has subtree (\(do next %v) with vars {v:%value})):
+    if (%body has subtree \(do next %value)):
         to %lua write (Lua "\n\(compile as (===next %value ===))")
     to %lua write "\nend --foreach-loop"
     %stop_labels = (Lua "")
-    if (%body has subtree (\(stop %v) with vars {v:%key})):
+    if (%body has subtree \(stop %key)):
         to %stop_labels write "\n\(compile as (===stop %key ===))"
-    if (%body has subtree (\(stop %v) with vars {v:%value})):
+    if (%body has subtree \(stop %value)):
         to %stop_labels write "\n\(compile as (===stop %value ===))"
     if ((length of "\%stop_labels") > 0):
         %lua = (..)
@@ -505,10 +505,10 @@ compile [for %var in recursive %structure %body] to (..)
         
         if (%body has subtree \(do next)):
             to %lua write "\n        ::continue::"
-        if (%body has subtree (\(do next %v) with vars {v:%var})):
+        if (%body has subtree \(do next %var)):
             to %lua write "\n        \(compile as (===next %var ===))"
         to %lua write "\n    end -- Recursive loop"
-        if (%body has subtree (\(stop %v) with vars {v:%var})):
+        if (%body has subtree \(stop %var)):
             to %lua write "\n        \(compile as (===stop %var ===))"
         to %lua write "\nend -- Recursive scope"
         return %lua

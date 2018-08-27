@@ -40,11 +40,15 @@ for _index_0 = 1, #types do
       return getmetatable(x) == self
     end
     cls.__tostring = function(self)
-      return tostring(self.type) .. "(" .. tostring(repr(tostring(self.source))) .. ", " .. tostring(concat((function()
+      local args = {
+        tostring(self.source),
+        unpack(self)
+      }
+      return tostring(self.type) .. "(" .. tostring(concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        for _index_1 = 1, #self do
-          local v = self[_index_1]
+        for _index_1 = 1, #args do
+          local v = args[_index_1]
           _accum_0[_len_0] = repr(v)
           _len_0 = _len_0 + 1
         end
@@ -114,7 +118,7 @@ for _index_0 = 1, #types do
   end
   AST[name] = setmetatable(cls, {
     __tostring = function(self)
-      return self.name
+      return self.__name
     end,
     __call = function(self, source, ...)
       if type(source) == 'string' then

@@ -145,7 +145,9 @@ dict = function(t)
   return setmetatable(t, _dict_mt)
 end
 local MAX_LINE = 80
-local NomsuCompiler = setmetatable({ }, {
+local NomsuCompiler = setmetatable({
+  name = "Nomsu"
+}, {
   __index = function(self, k)
     do
       local _self = rawget(self, "self")
@@ -155,13 +157,14 @@ local NomsuCompiler = setmetatable({ }, {
         return nil
       end
     end
+  end,
+  __tostring = function(self)
+    return self.name
   end
 })
 do
   NomsuCompiler.NOMSU_COMPILER_VERSION = 5
   NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
-  NomsuCompiler._ENV = NomsuCompiler
-  NomsuCompiler.nomsu = NomsuCompiler
   NomsuCompiler.parse = function(self, ...)
     return Parser.parse(...)
   end
@@ -226,9 +229,6 @@ do
   NomsuCompiler.LuaCode = LuaCode
   NomsuCompiler.NomsuCode = NomsuCode
   NomsuCompiler.Source = Source
-  NomsuCompiler.ALIASES = setmetatable({ }, {
-    __mode = "k"
-  })
   NomsuCompiler.LOADED = { }
   NomsuCompiler.TESTS = { }
   NomsuCompiler.AST = AST
@@ -335,13 +335,13 @@ do
     end,
     ["lua > %"] = function(self, tree, _code)
       if _code.type ~= "Text" then
-        return LuaCode(tree.source, "nomsu:run_lua(", self:compile(_code), ");")
+        return LuaCode(tree.source, "_ENV:run_lua(", self:compile(_code), ");")
       end
       return add_lua_bits(self, "statements", _code)
     end,
     ["= lua %"] = function(self, tree, _code)
       if _code.type ~= "Text" then
-        return LuaCode.Value(tree.source, "nomsu:run_lua(", self:compile(_code), ":as_statements('return '))")
+        return LuaCode.Value(tree.source, "_ENV:run_lua(", self:compile(_code), ":as_statements('return '))")
       end
       return add_lua_bits(self, "value", _code)
     end,
@@ -352,7 +352,7 @@ do
           self:run_file(f)
         end
       end
-      return LuaCode(tree.source, "for i,f in Files.walk(", self:compile(_path), ") do nomsu:run_file(f) end")
+      return LuaCode(tree.source, "for i,f in Files.walk(", self:compile(_path), ") do _ENV:run_file(f) end")
     end,
     ["tests"] = function(self, tree)
       return LuaCode.Value(tree.source, "TESTS")
@@ -581,7 +581,11 @@ do
           end
           local arg_lua = self:compile(tok)
           if not (arg_lua.is_value) then
-            self:compile_error(tok.source, "Cannot use:\n%s\nas an argument to %s, since it's not an expression, it produces: %s", stub, repr(arg_lua))
+            if tok.type == "Block" then
+              self:compile_error(tok.source, ("Cannot compile action '" .. tostring(stub) .. "' with a Block as an argument.\n" .. "Maybe there should be a compile-time action with that name that isn't being found?"))
+            else
+              self:compile_error(tok.source, "Cannot use:\n%s\nas an argument to '%s', since it's not an expression, it produces: %s", stub, repr(arg_lua))
+            end
           end
           insert(args, arg_lua)
           _continue_0 = true
@@ -594,26 +598,29 @@ do
       lua:append(")")
       return lua
     elseif "EscapedNomsu" == _exp_0 then
-      local make_tree
-      make_tree = function(t)
-        if not (AST.is_syntax_tree(t)) then
-          return repr(t)
-        end
-        local bits
+      local lua = LuaCode.Value(tree.source, tree[1].type, "(")
+      local bits
+      if tree[1].type == "EscapedNomsu" then
+        bits = {
+          self:compile(tree[1])
+        }
+      else
         do
           local _accum_0 = { }
           local _len_0 = 1
-          for _index_0 = 1, #t do
-            local bit = t[_index_0]
-            _accum_0[_len_0] = make_tree(bit)
+          local _list_0 = tree[1]
+          for _index_0 = 1, #_list_0 do
+            local bit = _list_0[_index_0]
+            _accum_0[_len_0] = AST.is_syntax_tree(bit) and self:compile(bit) or repr(bit)
             _len_0 = _len_0 + 1
           end
           bits = _accum_0
         end
-        insert(bits, 1, repr(tostring(t.source)))
-        return t.type .. "(" .. concat(bits, ", ") .. ")"
       end
-      return LuaCode.Value(tree.source, make_tree(tree[1]))
+      insert(bits, 1, repr(tostring(tree[1].source)))
+      lua:concat_append(bits, ", ")
+      lua:append(")")
+      return lua
     elseif "Block" == _exp_0 then
       local lua = LuaCode(tree.source)
       lua:concat_append((function()
@@ -647,7 +654,7 @@ do
           end
           local bit_lua = self:compile(bit)
           if not (bit_lua.is_value) then
-            local src = '    ' .. gsub(tostring(recurse(bit)), '\n', '\n    ')
+            local src = '    ' .. gsub(tostring(self:compile(bit)), '\n', '\n    ')
             local line = tostring(bit.source.filename) .. ":" .. tostring(Files.get_line_number(Files.read(bit.source.filename), bit.source.start))
             self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end

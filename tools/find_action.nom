@@ -16,7 +16,7 @@ for %path in %files:
         %file = (read file %filename)
         %tree = (parse %file from %filename)
         for %t in recursive %tree:
-            if (%t is "Action" syntax tree) (..)
+            if (%t is "Action" syntax tree):
                 if (%t.stub is %stub):
                     %line_num = (line number of %t.source.start in %file)
                     say (blue "\%filename:\%line_num:")

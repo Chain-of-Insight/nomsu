@@ -35,23 +35,34 @@ test:
         assume ((me).barks == 101) or barf ".."
             Error in nested 'as % %' failed to properly reset 'self'
     
-    object "Corgi" extends (class Dog) (method [sploot] "splooted")
+    object "Corgi" extends (class Dog):
+        method [sploot] "splooted"
+        method [bark, woof]:
+            %barks = ("Yip!" for % in 1 to (me).barks)
+            return (%barks joined with " ")
+
     %corg = (new Corgi)
     assume (%corg.barks == 0)
     as (new Corgi {barks:1}):
         assume ((sploot) == "splooted") or barf "subclass method failed"
-        assume ((bark) == "Bark!") or barf "inheritance failed"
-        assume ((woof) == "Bark!")
+        assume ((bark) == "Yip!") or barf "inheritance failed"
+        assume ((woof) == "Yip!")
+    
+    as (new Dog {barks:2}):
+        assume ((bark) == "Bark! Bark!")
+
 compile [@, me] to (Lua value "self")
 compile [method %actions %body] to:
-    %lua = (compile as (local action %actions %body))
+    %lua = (\(local action \[%actions.1] %body) as lua)
+    declare locals in %lua
     for % in %actions:
-        to %lua write "\nclass.\(% as lua id) = \(% as lua id)"
-    return (..)
+        to %lua write "\n\(\%class as lua id).\(% as lua id) = \(%actions.1 as lua id)"
+    %lua = (..)
         Lua ".."
             do -- Method: \(%actions.(1).stub)
                 \%lua
             end
+    return %lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -64,33 +75,35 @@ parse [as %instance %body] as (..)
             barf %msg
         ..or if it succeeds: (me) = %old_self
 
-compile [object %classname extends %parent %class_body] to (..)
-    Lua ".."
-        do
-            local class = {name=\(%classname as lua expr)}
-            setmetatable(class, {
-                __index=\(%parent as lua expr),
-                __tostring=function(cls) return cls.name end,
-                __call=function(cls, inst)
-                    inst = setmetatable(inst or {}, cls)
-                    if cls.A_initialize_1 then
-                        cls.A_initialize_1(inst)
-                    end
-                    return inst
-                end,
-            })
-            _ENV["A"..string.as_lua_id("new "..class.name)] = class
-            _ENV["A"..string.as_lua_id("new "..class.name.." 1")] = class
-            _ENV["A"..string.as_lua_id("class "..class.name)] = function() return class end
-            class.__index = class
-            class.class = class
-        
-            \(%class_body as lua statements)
-        
-            class.__tostring = class["A"..string.as_lua_id("as text")] or function(inst)
-                return inst.name..getmetatable(dict{}).__tostring(inst)
+compile [object %classname extends %parent %class_body] to:
+    %class = (\%class as lua id)
+    return (..)
+        Lua ".."
+            do
+                local \%class = {name=\(%classname as lua expr)}
+                setmetatable(\%class, {
+                    __index=\(%parent as lua expr),
+                    __tostring=function(cls) return cls.name end,
+                    __call=function(cls, inst)
+                        inst = setmetatable(inst or {}, cls)
+                        if cls.A_initialize_1 then
+                            cls.A_initialize_1(inst)
+                        end
+                        return inst
+                    end,
+                })
+                _ENV["A"..string.as_lua_id("new "..\%class.name)] = \%class
+                _ENV["A"..string.as_lua_id("new "..\%class.name.." 1")] = \%class
+                _ENV["A"..string.as_lua_id("class "..\%class.name)] = function() return \%class end
+                \%class.__index = \%class
+                \%class.class = \%class
+            
+                \(%class_body as lua statements)
+            
+                \%class.__tostring = \%class["A"..string.as_lua_id("as text")] or function(inst)
+                    return inst.name..getmetatable(dict{}).__tostring(inst)
+                end
             end
-        end
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

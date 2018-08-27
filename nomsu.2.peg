@@ -5,7 +5,7 @@ file:
      / file_chunks / empty_block)
     %ws* (!! .+ -> "Parse error" !!)?
 
-shebang: "#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^%nl]*
+shebang: {:shebang: "#!" (!"nomsu" [^%nl])* "nomsu" %ws+ "-V" %ws* {:version: [0-9.]+ :} [^%nl]* :}
 
 file_chunks (FileChunks):
     {:curr_indent: ' '* :}

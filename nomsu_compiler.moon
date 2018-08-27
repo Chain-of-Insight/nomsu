@@ -93,12 +93,12 @@ _dict_mt =
 dict = (t)-> setmetatable(t, _dict_mt)
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
-NomsuCompiler = setmetatable({}, {__index: (k)=> if _self = rawget(@, "self") then _self[k] else nil})
+NomsuCompiler = setmetatable {name:"Nomsu"},
+    __index: (k)=> if _self = rawget(@, "self") then _self[k] else nil
+    __tostring: => @name
 with NomsuCompiler
     .NOMSU_COMPILER_VERSION = 5
     .NOMSU_SYNTAX_VERSION = Parser.version
-    ._ENV = NomsuCompiler
-    .nomsu = NomsuCompiler
     .parse = (...)=> Parser.parse(...)
     .can_optimize = -> false
 
@@ -121,7 +121,6 @@ with NomsuCompiler
     .LuaCode = LuaCode
     .NomsuCode = NomsuCode
     .Source = Source
-    .ALIASES = setmetatable({}, {__mode:"k"})
     .LOADED = {}
     .TESTS = {}
     .AST = AST
@@ -213,12 +212,12 @@ with NomsuCompiler
 
         ["lua > %"]: (tree, _code)=>
             if _code.type != "Text"
-                return LuaCode tree.source, "nomsu:run_lua(", @compile(_code), ");"
+                return LuaCode tree.source, "_ENV:run_lua(", @compile(_code), ");"
             return add_lua_bits(@, "statements", _code)
 
         ["= lua %"]: (tree, _code)=>
             if _code.type != "Text"
-                return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(_code), ":as_statements('return '))"
+                return LuaCode.Value tree.source, "_ENV:run_lua(", @compile(_code), ":as_statements('return '))"
             return add_lua_bits(@, "value", _code)
 
         ["use %"]: (tree, _path)=>
@@ -226,7 +225,7 @@ with NomsuCompiler
                 path = _path[1]
                 for _,f in Files.walk(path)
                     @run_file(f)
-            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
+            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(_path), ") do _ENV:run_file(f) end")
 
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
         ["test %"]: (tree, _body)=>
@@ -362,22 +361,28 @@ with NomsuCompiler
                     if type(tok) == "string" then continue
                     arg_lua = @compile(tok)
                     unless arg_lua.is_value
-                        @compile_error tok.source,
-                            "Cannot use:\n%s\nas an argument to %s, since it's not an expression, it produces: %s",
-                            stub, repr arg_lua
+                        if tok.type == "Block"
+                            @compile_error tok.source,
+                                ("Cannot compile action '#{stub}' with a Block as an argument.\n"..
+                                 "Maybe there should be a compile-time action with that name that isn't being found?")
+
+                        else
+                            @compile_error tok.source,
+                                "Cannot use:\n%s\nas an argument to '%s', since it's not an expression, it produces: %s",
+                                stub, repr arg_lua
                     insert args, arg_lua
                 lua\concat_append args, ", "
                 lua\append ")"
                 return lua
 
             when "EscapedNomsu"
-                make_tree = (t)->
-                    unless AST.is_syntax_tree(t)
-                        return repr(t)
-                    bits = [make_tree(bit) for bit in *t]
-                    insert bits, 1, repr(tostring t.source)
-                    return t.type.."("..concat(bits, ", ")..")"
-                return LuaCode.Value tree.source, make_tree(tree[1])
+                lua = LuaCode.Value tree.source, tree[1].type, "("
+                bits = if tree[1].type == "EscapedNomsu" then {@compile(tree[1])}
+                else [AST.is_syntax_tree(bit) and @compile(bit) or repr(bit) for bit in *tree[1]]
+                insert bits, 1, repr(tostring tree[1].source)
+                lua\concat_append bits, ", "
+                lua\append ")"
+                return lua
             
             when "Block"
                 lua = LuaCode(tree.source)
@@ -397,7 +402,7 @@ with NomsuCompiler
                         string_buffer = ""
                     bit_lua = @compile(bit)
                     unless bit_lua.is_value
-                        src = '    '..gsub(tostring(recurse(bit)), '\n','\n    ')
+                        src = '    '..gsub(tostring(@compile(bit)), '\n','\n    ')
                         line = "#{bit.source.filename}:#{Files.get_line_number(Files.read(bit.source.filename), bit.source.start)}"
                         @compile_error bit.source,
                             "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."

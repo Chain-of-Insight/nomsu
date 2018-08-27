@@ -20,7 +20,6 @@ if (%args.1 is "-t"):
     remove index 1 from %args
 
 for %path in %args:
-    if (%path is "-i"): %inplace = (yes)
     for file %filename in %path:
         unless (%filename matches "%.nom$"): do next %filename
         %tree = (parse (read file %filename) from %filename)

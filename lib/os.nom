@@ -43,6 +43,7 @@ action [..]
     write to file %filename %text, to file %filename write %text
     write %text to file %filename
 ..:
+    assume (%filename != "stdin") or barf "Cannot write to stdin"
     lua> ".."
         local file = io.open(\%filename, 'w')
         file:write(\%text)

@@ -19,7 +19,9 @@ for name in *types
         .__name = name
         .type = name
         .is_instance = (x)=> getmetatable(x) == @
-        .__tostring = => "#{@type}(#{repr tostring(@source)}, #{concat([repr(v) for v in *@], ', ')})"
+        .__tostring = =>
+            args = {tostring(@source), unpack(@)}
+            "#{@type}(#{concat([repr(v) for v in *args], ', ')})"
         .map = (fn)=>
             replacement = fn(@)
             if replacement == false then return nil
@@ -47,7 +49,7 @@ for name in *types
             return true
 
     AST[name] = setmetatable cls,
-        __tostring: => @name
+        __tostring: => @__name
         __call: (source, ...)=>
             if type(source) == 'string'
                 source = Source\from_string(source)

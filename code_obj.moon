@@ -86,10 +86,10 @@ class Code
             assert(b, "code bit is nil")
             assert(not Source\is_instance(b), "code bit is a Source")
             if b == '' then continue
-            bits[#bits+1] = b
             b.dirty = error if b.is_code
             if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
                 b = repr(b)
+            bits[#bits+1] = b
         @dirty!
     
     trailing_line_len: =>
@@ -141,8 +141,10 @@ class Code
             bits[i] = bits[i-n]
         for i=1,n
             b = select(i, ...)
-            bits[i] = b
             b.dirty = error if b.is_code
+            if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
+                b = repr(b)
+            bits[i] = b
         @dirty!
 
     parenthesize: =>

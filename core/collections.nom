@@ -191,11 +191,16 @@ test:
     assume (({} with fallback % -> (% + 1)).10 == 11)
 compile [%dict with fallback %key -> %value] to (..)
     Lua value ".."
-        setmetatable(\(%dict as lua expr), {__index=function(self, \(%key as lua expr))
-            local value = \(%value as lua expr)
-            self[\(%key as lua expr)] = value
-            return value
-        end})
+        (function(d)
+            local mt = {}
+            for k,v in pairs(getmetatable(d) or {}) do mt[k] = v end
+            mt.__index = function(self, \(%key as lua expr))
+                local value = \(%value as lua expr)
+                self[\(%key as lua expr)] = value
+                return value
+            end
+            return setmetatable(d, mt)
+        end)(\(%dict as lua expr))
 
 # Sorting
 test:

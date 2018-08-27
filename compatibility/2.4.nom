@@ -55,7 +55,7 @@ upgrade %tree to "2.4" as:
                         add %line.2 to %values
                         %action = %line.3
                         unless (%action is "Block" syntax tree):
-                            %action = (=lua "Block(\%action.source, \%action)")
+                            %action = \(: %action)
                         add %action to %values
                         add (=lua "Action(\%values[1].source, unpack(\%values))") to %new_lines
                         %values = []
