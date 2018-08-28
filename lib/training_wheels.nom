@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5.5.5
+#!/usr/bin/env nomsu -V3.5.5.6
 #
     This file contains a set of definitions that bring some familiar language features
     from other languages into nomsu (e.g. "||" and "continue")

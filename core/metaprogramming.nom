@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5.5.5
+#!/usr/bin/env nomsu -V3.5.5.6
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
@@ -334,8 +334,8 @@ compile [type of %obj] to (Lua value "type(\(%obj as lua expr))")
 test:
     assume ((parse "foo %") == \(foo \%))
     %a = (parse "\\1")
-    %b = \\1
-    assume ((parse "\\1") == \\1)
+    %b = \(\(1))
+    assume ((parse "\\1") == \(\(1)))
 compile [parse %text] to (Lua value "nomsu:parse(\(%text as lua expr))")
 compile [parse %text from %filename] to (..)
     Lua value ".."
@@ -356,7 +356,7 @@ compile [run %nomsu_code] to (..)
         ..)
 
 test:
-    assume ((\(\5 + \5) as value) == 10) or barf "%tree as value failed."
+    assume ((\(\(5) + \(5)) as value) == 10) or barf "%tree as value failed."
 action [run tree %tree, %tree as value] (lua> "return nomsu:run(\%tree)")
 compile [compile %block, compiled %block, %block compiled] to (..)
     Lua value "nomsu:compile(\(%block as lua))"

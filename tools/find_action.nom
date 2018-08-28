@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5.5.5
+#!/usr/bin/env nomsu -V3.5.5.6
 #
     Find an action by its stub. Usage:
         nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
@@ -8,7 +8,7 @@ use "lib/os.nom"
 use "lib/consolecolor.nom"
 
 %stub = (command line args).1
-say "Looking for stub: \%stub (from \(command line args))"
+say "Looking for stub: \%stub..."
 %files = ((command line args).% for % in 2 to (|| (command line args) ||))
 for %path in %files:
     for file %filename in %path:

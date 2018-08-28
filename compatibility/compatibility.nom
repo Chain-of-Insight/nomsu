@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5.5.5
+#!/usr/bin/env nomsu -V3.5.5.6
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -9,10 +9,8 @@ use "lib/os.nom"
 action [upgrade to %version via %upgrade_fn]:
     %UPGRADES.%version = %upgrade_fn
 
-%ACTION_UPGRADES = {}
+%ACTION_UPGRADES = ({} with fallback % -> [])
 action [upgrade action %stub to %version via %upgrade_fn]:
-    unless %ACTION_UPGRADES.%version:
-        %ACTION_UPGRADES.%version = []
     %ACTION_UPGRADES.%version.%stub = %upgrade_fn
 
 parse [upgrade %tree to %version as %body] as (..)
