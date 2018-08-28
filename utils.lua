@@ -23,32 +23,34 @@ local function size(t)
     return n
 end
 
-local function repr(x, depth)
+local repr_behavior = function(x)
+    local mt = getmetatable(x)
+    if mt then
+        local fn = rawget(mt, "__repr")
+        if fn then return fn(x) end
+    end
+end
+local function repr(x, mt_behavior)
     -- Create a string representation of the object that is close to the lua code that will
     -- reproduce the object (similar to Python's "repr" function)
-    depth = depth or 10
-    if depth == 0 then return "..." end
-    depth = depth - 1
+    mt_behavior = mt_behavior or repr_behavior
     local x_type = type(x)
     if x_type == 'table' then
-        if getmetatable(x) then
-            -- If this object has a weird metatable, then don't pretend like it's a regular table
-            return tostring(x)
-        else
-            local ret = {}
-            local i = 1
-            for k, v in pairs(x) do
-                if k == i then
-                    ret[#ret+1] = repr(x[i], depth)
-                    i = i + 1
-                elseif type(k) == 'string' and match(k,"[_a-zA-Z][_a-zA-Z0-9]*") then
-                    ret[#ret+1] = k.."= "..repr(v,depth)
-                else
-                    ret[#ret+1] = "["..repr(k,depth).."]= "..repr(v,depth)
-                end
+        local ret = mt_behavior(x)
+        if ret then return ret end
+        local ret = {}
+        local i = 1
+        for k, v in pairs(x) do
+            if k == i then
+                ret[#ret+1] = repr(v, mt_behavior)
+                i = i + 1
+            elseif type(k) == 'string' and match(k,"[_a-zA-Z][_a-zA-Z0-9]*") then
+                ret[#ret+1] = k.."= "..repr(v, mt_behavior)
+            else
+                ret[#ret+1] = "["..repr(k, mt_behavior).."]= "..repr(v, mt_behavior)
             end
-            return "{"..table.concat(ret, ", ").."}"
         end
+        return "{"..table.concat(ret, ", ").."}"
     elseif x_type == 'string' then
         local escaped = gsub(x, "\\", "\\\\")
         escaped = gsub(escaped, "\n", "\\n")
@@ -60,11 +62,18 @@ local function repr(x, depth)
     end
 end
 
+local stringify_behavior = function(x)
+    local mt = getmetatable(x)
+    if mt then
+        local fn = rawget(mt, "__tostring")
+        if fn then return fn(x) end
+    end
+end
 local function stringify(x)
     if type(x) == 'string' then
         return x
     else
-        return repr(x)
+        return repr(x, stringify_behavior)
     end
 end
 

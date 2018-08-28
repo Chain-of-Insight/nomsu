@@ -29,20 +29,17 @@ export SOURCE_MAP
 SOURCE_MAP = {}
 
 string.as_lua_id = (str)->
-    argnum = 0
     -- Cut up escape-sequence-like chunks
     str = gsub str, "x([0-9A-F][0-9A-F])", "x\0%1"
     -- Alphanumeric unchanged, spaces to underscores, and everything else to hex escape sequences
     str = gsub str, "%W", (c)->
         if c == ' ' then '_'
-        elseif c == '%' then
-            argnum += 1
-            tostring(argnum)
         else format("x%02X", byte(c))
     return '_'..str
 
 table.map = (fn)=> [fn(v) for _,v in ipairs(@)]
 table.fork = (t, values)-> setmetatable(values or {}, {__index:t})
+table.copy = (t)-> setmetatable({k,v for k,v in pairs(t)}, getmetatable(t))
 
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
@@ -99,6 +96,7 @@ NomsuCompiler = setmetatable {name:"Nomsu"},
 with NomsuCompiler
     .NOMSU_COMPILER_VERSION = 5
     .NOMSU_SYNTAX_VERSION = Parser.version
+    .nomsu = NomsuCompiler
     .parse = (...)=> Parser.parse(...)
     .can_optimize = -> false
 
@@ -142,7 +140,7 @@ with NomsuCompiler
     -- This is a bit of a hack, but this code handles arbitrarily complex
     -- math expressions like 2*x + 3^2 without having to define a single
     -- action for every possibility.
-    math_expression = re.compile [[ ([+-] " ")* "%" (" " [*/^+-] (" " [+-])* " %")+ !. ]]
+    math_expression = re.compile [[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]]
 
     add_lua_bits = (val_or_stmt, code)=>
         cls = val_or_stmt == "value" and LuaCode.Value or LuaCode
@@ -167,7 +165,7 @@ with NomsuCompiler
         if code.type != "Text"
             return LuaCode.Value(code.source, cls_str, repr(tostring(code.source)), ", ", @compile(code), ")")
         add_bit_lua = (lua, bit_lua)->
-            bit_leading_len = #(tostring(bit_lua)\match("^[^\n]*"))
+            bit_leading_len = #(bit_lua\match("^[^\n]*"))
             lua\append(lua\trailing_line_len! + bit_leading_len > MAX_LINE and ",\n    " or ", ")
             lua\append(bit_lua)
         operate_on_text = (text)->
@@ -204,31 +202,31 @@ with NomsuCompiler
                     lua\append " "
             return lua
 
-        ["Lua %"]: (tree, _code)=>
+        ["Lua 1"]: (tree, _code)=>
             return add_lua_string_bits(@, 'statements', _code)
     
-        ["Lua value %"]: (tree, _code)=>
+        ["Lua value 1"]: (tree, _code)=>
             return add_lua_string_bits(@, 'value', _code)
 
-        ["lua > %"]: (tree, _code)=>
+        ["lua > 1"]: (tree, _code)=>
             if _code.type != "Text"
-                return LuaCode tree.source, "_ENV:run_lua(", @compile(_code), ");"
+                return LuaCode tree.source, "nomsu:run_lua(", @compile(_code), ");"
             return add_lua_bits(@, "statements", _code)
 
-        ["= lua %"]: (tree, _code)=>
+        ["= lua 1"]: (tree, _code)=>
             if _code.type != "Text"
-                return LuaCode.Value tree.source, "_ENV:run_lua(", @compile(_code), ":as_statements('return '))"
+                return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(_code), ":as_statements('return '))"
             return add_lua_bits(@, "value", _code)
 
-        ["use %"]: (tree, _path)=>
+        ["use 1"]: (tree, _path)=>
             if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
                 path = _path[1]
                 for _,f in Files.walk(path)
                     @run_file(f)
-            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(_path), ") do _ENV:run_file(f) end")
+            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
 
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
-        ["test %"]: (tree, _body)=>
+        ["test 1"]: (tree, _body)=>
             test_str = table.concat [tostring(@tree_to_nomsu(line)) for line in *_body], "\n"
             LuaCode tree.source, "TESTS[#{repr(tostring(tree.source))}] = ", repr(test_str)
 
@@ -304,7 +302,7 @@ with NomsuCompiler
 
     .run_lua = (lua, source=nil)=>
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", self)
+        run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
         if not run_lua_fn
             line_numbered_lua = concat(
                 [format("%3d|%s",i,line) for i, line in ipairs Files.get_lines(lua_string)],
@@ -317,7 +315,8 @@ with NomsuCompiler
             file = Files.read(source.filename)
             if not file
                 error "Failed to find file: #{source.filename}"
-            nomsu_str = tostring(file\sub(source.start, source.stop))
+            nomsu_str = file\sub(source.start, source.stop)
+            assert type(nomsu_str) == 'string'
             lua_line = 1
             nomsu_line = Files.get_line_number(file, source.start)
             map_sources = (s)->
@@ -373,15 +372,28 @@ with NomsuCompiler
                     insert args, arg_lua
                 lua\concat_append args, ", "
                 lua\append ")"
+                if tree.target
+                    target_lua = @compile(tree.target)
+                    lua\prepend(target_lua, ":")
                 return lua
 
             when "EscapedNomsu"
-                lua = LuaCode.Value tree.source, tree[1].type, "("
-                bits = if tree[1].type == "EscapedNomsu" then {@compile(tree[1])}
-                else [AST.is_syntax_tree(bit) and @compile(bit) or repr(bit) for bit in *tree[1]]
-                insert bits, 1, repr(tostring tree[1].source)
-                lua\concat_append bits, ", "
-                lua\append ")"
+                lua = LuaCode.Value tree.source, tree[1].type, "{"
+                needs_comma, i = false, 1
+                for k,v in pairs(AST.is_syntax_tree(tree[1], "EscapedNomsu") and tree or tree[1])
+                    if needs_comma then lua\append ", "
+                    else needs_comma = true
+                    if k == i
+                        i += 1
+                    elseif type(k) == 'string' and match(k,"[_a-zA-Z][_a-zA-Z0-9]*")
+                        lua\append(k, "= ")
+                    else
+                        lua\append("[", (AST.is_syntax_tree(k) and @compile(k) or repr(k)), "]= ")
+                    if k == "source"
+                        lua\append repr(tostring(v))
+                    else
+                        lua\append(AST.is_syntax_tree(v) and @compile(v) or repr(v))
+                lua\append "}"
                 return lua
             
             when "Block"
@@ -442,7 +454,7 @@ with NomsuCompiler
                     @compile_error tree[2].source,
                         "Cannot use:\n%s\nas a dict value, since it's not an expression."
                 -- TODO: support arbitrary words here, like operators and unicode
-                key_str = match(tostring(key_lua), [=[["']([a-zA-Z_][a-zA-Z0-9_]*)['"]]=])
+                key_str = match(tostring(key_lua), [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
                 return if key_str
                     LuaCode tree.source, key_str,"=",value_lua
                 elseif sub(tostring(key_lua),1,1) == "["
@@ -502,6 +514,8 @@ with NomsuCompiler
 
             when "Action"
                 nomsu = NomsuCode(tree.source)
+                if tree.target
+                    nomsu\append @tree_to_inline_nomsu(tree.target), "::"
                 for i,bit in ipairs tree
                     if type(bit) == "string"
                         clump_words = (type(tree[i-1]) == 'string' and Parser.is_operator(bit) != Parser.is_operator(tree[i-1]))
@@ -509,7 +523,7 @@ with NomsuCompiler
                         nomsu\append bit
                     else
                         arg_nomsu = recurse(bit, nomsu, parenthesize_blocks or (i == 1 or i < #tree))
-                        nomsu\append " " unless tostring(arg_nomsu)\match("^:") or i == 1
+                        nomsu\append " " unless arg_nomsu\match("^:") or i == 1
                         arg_nomsu\parenthesize! if bit.type == "Action"
                         nomsu\append arg_nomsu
                     check(len, nomsu, tree) if check
@@ -656,9 +670,9 @@ with NomsuCompiler
                 nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
                 should_clump = (prev_line, line)->
                     if prev_line.type == "Action" and line.type == "Action"
-                        if prev_line.stub == "use %" then return line.stub == "use %"
-                        if prev_line.stub == "test %" then return true
-                        if line.stub == "test %" then return false
+                        if prev_line.stub == "use 1" then return line.stub == "use 1"
+                        if prev_line.stub == "test 1" then return true
+                        if line.stub == "test 1" then return false
                     return not recurse(prev_line)\is_multiline!
                 for chunk_no, chunk in ipairs tree
                     nomsu\append "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1
@@ -675,12 +689,14 @@ with NomsuCompiler
                     else
                         nomsu\append recurse(chunk)
                 nomsu\append pop_comments(tree.source.stop, '\n')
-                nomsu\append('\n') unless tostring(nomsu)\match("\n$")
+                nomsu\append('\n') unless nomsu\match("\n$")
                 return nomsu
 
             when "Action"
                 pos, next_space = tree.source.start, ''
                 nomsu = NomsuCode(tree.source, pop_comments(pos))
+                if tree.target
+                    nomsu\append @tree_to_nomsu(tree.target), "::"
                 for i,bit in ipairs tree
                     if next_space == "\n.." or (next_space == " " and nomsu\trailing_line_len! > MAX_LINE)
                         nomsu\append "\n", pop_comments(pos), '..'
@@ -692,12 +708,12 @@ with NomsuCompiler
                         nomsu\append bit
                         next_space = ' '
                     elseif bit.type == "Block"
-                        nomsu\append(recurse(bit, #tostring(nomsu)\match('[^\n]*$')))
+                        nomsu\append(recurse(bit, #nomsu\match('[^\n]*$')))
                         pos = bit.source.stop
                         next_space = inline and " " or "\n.."
                     else
                         nomsu\append next_space
-                        bit_nomsu = recurse(bit, #tostring(nomsu)\match('[^\n]*$'))
+                        bit_nomsu = recurse(bit, #nomsu\match('[^\n]*$'))
                         if bit.type == "Action" and not bit_nomsu\is_multiline!
                             bit_nomsu\parenthesize!
                         nomsu\append bit_nomsu
@@ -717,7 +733,7 @@ with NomsuCompiler
                     line_nomsu = recurse(line)
                     nomsu\append line_nomsu
                     if i < #tree
-                        nomsu\append(tostring(line_nomsu)\match('\n[^\n]*\n') and "\n\n" or "\n")
+                        nomsu\append(line_nomsu\match('\n[^\n]*\n') and "\n\n" or "\n")
                 nomsu\append pop_comments(tree.source.stop, '\n')
                 return NomsuCode(tree.source, ":\n    ", nomsu)
 
@@ -749,7 +765,7 @@ with NomsuCompiler
                             add_text(nomsu, bit)
                         else
                             nomsu\append "\\"
-                            interp_nomsu = recurse(bit, #tostring(nomsu)\match('[^\n]*$'))
+                            interp_nomsu = recurse(bit, #nomsu\match('[^\n]*$'))
                             unless interp_nomsu\is_multiline!
                                 if bit.type == "Var"
                                     if type(tree[i+1]) == 'string' and not match(tree[i+1], "^[ \n\t,.:;#(){}[%]]")
@@ -761,7 +777,7 @@ with NomsuCompiler
                                 nomsu\append "\n.."
                 nomsu = NomsuCode(tree.source)
                 add_text(nomsu, tree)
-                if nomsu\is_multiline! and tostring(nomsu)\match("\n$")
+                if nomsu\is_multiline! and nomsu\match("\n$")
                     nomsu\append '\\("")' -- Need to specify where the text ends
                 return NomsuCode(tree.source, '".."\n    ', nomsu)
 
@@ -771,7 +787,7 @@ with NomsuCompiler
                 for i, item in ipairs tree
                     nomsu\append(pop_comments(item.source.start)) if nomsu\trailing_line_len! == 0
                     inline_nomsu = @tree_to_inline_nomsu(item)
-                    item_nomsu = #tostring(inline_nomsu) <= MAX_LINE and inline_nomsu or recurse(item, #tostring(nomsu)\match('[^\n]*$'))
+                    item_nomsu = #tostring(inline_nomsu) <= MAX_LINE and inline_nomsu or recurse(item, #nomsu\match('[^\n]*$'))
                     nomsu\append item_nomsu
                     if i < #tree
                         nomsu\append((item_nomsu\is_multiline! or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE) and '\n' or ', ')

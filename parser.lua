@@ -113,7 +113,7 @@ setmetatable(NOMSU_DEFS, {
   end
 })
 local Parser = {
-  version = 2,
+  version = 3,
   patterns = { }
 }
 do

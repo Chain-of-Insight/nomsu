@@ -10,7 +10,7 @@ AST.is_syntax_tree = (n, t=nil)->
     type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
 
 types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
-    "IndexChain", "Action", "FileChunks"}
+    "IndexChain", "Action", "FileChunks", "Method"}
 for name in *types
     cls = {}
     with cls
@@ -19,49 +19,57 @@ for name in *types
         .__name = name
         .type = name
         .is_instance = (x)=> getmetatable(x) == @
-        .__tostring = =>
-            args = {tostring(@source), unpack(@)}
-            "#{@type}(#{concat([repr(v) for v in *args], ', ')})"
+        .__tostring = => "#{@type}#{repr @, ((x)-> Source\is_instance(x) and tostring(x) or nil)}"
+        .__repr = => "#{@type}#{repr @, ((x)-> Source\is_instance(x) and tostring(x) or nil)}"
         .map = (fn)=>
             replacement = fn(@)
             if replacement == false then return nil
             if replacement
-                -- Clone the replacement, but give it a proper source
-                replacement = (replacement.__class)(@source, unpack(replacement))
+                -- Clone the replacement, so we can give it a proper source/comments
+                if AST.is_syntax_tree(replacement)
+                    replacement = setmetatable {k,v for k,v in pairs replacement}, getmetatable(replacement)
+                    replacement.source = @source
+                    replacement.comments = {unpack(@comments)} if @comments
             else
-                replacements = {}
+                replacement = {source:@source, comments:@comments and {unpack(@comments)}}
                 changes = false
-                for i,v in ipairs(@)
-                    replacements[#replacements+1] = v
+                for k,v in pairs(@)
+                    replacement[k] = v
                     if AST.is_syntax_tree(v)
                         r = v\map(fn)
                         continue if r == v or r == nil
                         changes = true
-                        replacements[#replacements] = r
+                        replacement[k] = r
                 return @ unless changes
-                replacement = (@__class)(@source, unpack(replacements))
-            replacement.comments = [c for c in *@comments] if @comments
+                replacement = setmetatable replacement, getmetatable(@)
             return replacement
         .__eq = (other)=>
             return false if type(@) != type(other) or #@ != #other or getmetatable(@) != getmetatable(other)
             for i=1,#@
                 return false if @[i] != other[i]
+            return false if @target != other.target
             return true
 
     AST[name] = setmetatable cls,
         __tostring: => @__name
-        __call: (source, ...)=>
-            if type(source) == 'string'
-                source = Source\from_string(source)
-            for i=1,select('#', ...) do assert(select(i,...))
-            assert(Source\is_instance(source))
-            inst = {:source, ...}
-            setmetatable(inst, @)
-            if inst.__init then inst\__init!
-            return inst
+        __call: (t)=>
+            if type(t.source) == 'string'
+                t.source = Source\from_string(t.source)
+            else
+                assert(Source\is_instance(t.source))
+            setmetatable(t, @)
+            if t.__init then t\__init!
+            return t
 
 AST.Action.__init = =>
-    stub_bits = [type(a) == 'string' and a or '%' for a in *@]
+    stub_bits = {}
+    arg_i = 1
+    for a in *@
+        if type(a) == 'string'
+            stub_bits[#stub_bits+1] = a
+        else
+            stub_bits[#stub_bits+1] = tostring(arg_i)
+            arg_i += 1
     @stub = concat stub_bits, " "
 
 AST.Action.get_args = =>

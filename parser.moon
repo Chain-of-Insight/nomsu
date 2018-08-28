@@ -74,7 +74,7 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
     return make_node
 })
 
-Parser = {version:2, patterns:{}}
+Parser = {version:3, patterns:{}}
 do
     -- Just for cleanliness, I put the language spec in its own file using a slightly modified
     -- version of the lpeg.re syntax.

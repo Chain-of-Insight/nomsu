@@ -3,6 +3,7 @@
 -- indentation levels.
 {:insert, :remove, :concat} = table
 {:repr} = require 'utils'
+unpack or= table.unpack
 local LuaCode, NomsuCode, Source
 
 class Source
@@ -16,11 +17,9 @@ class Source
 
     @is_instance: (x)=> type(x) == 'table' and x.__class == @
 
-    __tostring: =>
-        if @stop
-            "@#{@filename}[#{@start}:#{@stop}]"
-        else
-            "@#{@filename}[#{@start}]"
+    __tostring: => "@#{@filename}[#{@start}#{@stop and ':'..@stop or ''}]"
+
+    __repr: => "Source(#{repr @filename}, #{@start}#{@stop and ', '..@stop or ''})"
     
     __eq: (other)=>
         getmetatable(@) == getmetatable(other) and @filename == other.filename and @start == other.start and @stop == other.stop
@@ -68,8 +67,14 @@ class Code
             @__str = concat(buff, "")
         return @__str
 
-    __len: =>
-        #tostring(self)
+    __repr: =>
+        "#{@__class.__name}(#{concat {repr(tostring(@source)), unpack([repr(b) for b in *@bits])}, ", "})"
+
+    __len: => #tostring(@)
+    
+    match: (...)=> tostring(@)\match(...)
+
+    gmatch: (...)=> tostring(@)\gmatch(...)
     
     dirty: =>
         @__str = nil
@@ -126,8 +131,8 @@ class Code
                     bits[#bits+1] = joiner
             bits[#bits+1] = b
             b.dirty = error if b.is_code
-            b_str = tostring(b)
-            line = match(b_str, "\n([^\n]*)$")
+            b = tostring(b)
+            line = match(b, "\n([^\n]*)$")
             if line
                 line_len = #line
             else
@@ -153,6 +158,7 @@ class Code
 
 class LuaCode extends Code
     __tostring: Code.__tostring
+    __repr: Code.__repr
     __len: Code.__len
     new: (...)=>
         super ...
@@ -247,6 +253,7 @@ class LuaCode extends Code
 
 class NomsuCode extends Code
     __tostring: Code.__tostring
+    __repr: Code.__repr
     __len: Code.__len
 
 return {:Code, :NomsuCode, :LuaCode, :Source}

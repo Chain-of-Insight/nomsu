@@ -26,7 +26,8 @@ local types = {
   "DictEntry",
   "IndexChain",
   "Action",
-  "FileChunks"
+  "FileChunks",
+  "Method"
 }
 for _index_0 = 1, #types do
   local name = types[_index_0]
@@ -40,20 +41,14 @@ for _index_0 = 1, #types do
       return getmetatable(x) == self
     end
     cls.__tostring = function(self)
-      local args = {
-        tostring(self.source),
-        unpack(self)
-      }
-      return tostring(self.type) .. "(" .. tostring(concat((function()
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_1 = 1, #args do
-          local v = args[_index_1]
-          _accum_0[_len_0] = repr(v)
-          _len_0 = _len_0 + 1
-        end
-        return _accum_0
-      end)(), ', ')) .. ")"
+      return tostring(self.type) .. tostring(repr(self, (function(x)
+        return Source:is_instance(x) and tostring(x) or nil
+      end)))
+    end
+    cls.__repr = function(self)
+      return tostring(self.type) .. tostring(repr(self, (function(x)
+        return Source:is_instance(x) and tostring(x) or nil
+      end)))
     end
     cls.map = function(self, fn)
       local replacement = fn(self)
@@ -61,14 +56,33 @@ for _index_0 = 1, #types do
         return nil
       end
       if replacement then
-        replacement = (replacement.__class)(self.source, unpack(replacement))
+        if AST.is_syntax_tree(replacement) then
+          replacement = setmetatable((function()
+            local _tbl_0 = { }
+            for k, v in pairs(replacement) do
+              _tbl_0[k] = v
+            end
+            return _tbl_0
+          end)(), getmetatable(replacement))
+          replacement.source = self.source
+          if self.comments then
+            replacement.comments = {
+              unpack(self.comments)
+            }
+          end
+        end
       else
-        local replacements = { }
+        replacement = {
+          source = self.source,
+          comments = self.comments and {
+            unpack(self.comments)
+          }
+        }
         local changes = false
-        for i, v in ipairs(self) do
+        for k, v in pairs(self) do
           local _continue_0 = false
           repeat
-            replacements[#replacements + 1] = v
+            replacement[k] = v
             if AST.is_syntax_tree(v) then
               local r = v:map(fn)
               if r == v or r == nil then
@@ -76,7 +90,7 @@ for _index_0 = 1, #types do
                 break
               end
               changes = true
-              replacements[#replacements] = r
+              replacement[k] = r
             end
             _continue_0 = true
           until true
@@ -87,20 +101,7 @@ for _index_0 = 1, #types do
         if not (changes) then
           return self
         end
-        replacement = (self.__class)(self.source, unpack(replacements))
-      end
-      if self.comments then
-        do
-          local _accum_0 = { }
-          local _len_0 = 1
-          local _list_0 = self.comments
-          for _index_1 = 1, #_list_0 do
-            local c = _list_0[_index_1]
-            _accum_0[_len_0] = c
-            _len_0 = _len_0 + 1
-          end
-          replacement.comments = _accum_0
-        end
+        replacement = setmetatable(replacement, getmetatable(self))
       end
       return replacement
     end
@@ -113,6 +114,9 @@ for _index_0 = 1, #types do
           return false
         end
       end
+      if self.target ~= other.target then
+        return false
+      end
       return true
     end
   end
@@ -120,37 +124,31 @@ for _index_0 = 1, #types do
     __tostring = function(self)
       return self.__name
     end,
-    __call = function(self, source, ...)
-      if type(source) == 'string' then
-        source = Source:from_string(source)
+    __call = function(self, t)
+      if type(t.source) == 'string' then
+        t.source = Source:from_string(t.source)
+      else
+        assert(Source:is_instance(t.source))
       end
-      for i = 1, select('#', ...) do
-        assert(select(i, ...))
+      setmetatable(t, self)
+      if t.__init then
+        t:__init()
       end
-      assert(Source:is_instance(source))
-      local inst = {
-        source = source,
-        ...
-      }
-      setmetatable(inst, self)
-      if inst.__init then
-        inst:__init()
-      end
-      return inst
+      return t
     end
   })
 end
 AST.Action.__init = function(self)
-  local stub_bits
-  do
-    local _accum_0 = { }
-    local _len_0 = 1
-    for _index_0 = 1, #self do
-      local a = self[_index_0]
-      _accum_0[_len_0] = type(a) == 'string' and a or '%'
-      _len_0 = _len_0 + 1
+  local stub_bits = { }
+  local arg_i = 1
+  for _index_0 = 1, #self do
+    local a = self[_index_0]
+    if type(a) == 'string' then
+      stub_bits[#stub_bits + 1] = a
+    else
+      stub_bits[#stub_bits + 1] = tostring(arg_i)
+      arg_i = arg_i + 1
     end
-    stub_bits = _accum_0
   end
   self.stub = concat(stub_bits, " ")
 end

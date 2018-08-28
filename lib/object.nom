@@ -1,111 +1,112 @@
-#!/usr/bin/env nomsu -V2.5.5.5
+#!/usr/bin/env nomsu -V3
 #
     This file contains the implementation of an Object-Oriented programming system.
 
 test:
     object "Dog":
-        (class Dog).genus = "Canus"
-        method [initialize %] (%.barks or= 0)
-        method [bark, woof]:
-            %barks = ("Bark!" for % in 1 to (me).barks)
+        (Dog).genus = "Canus"
+        my action [set up]:
+            %me.barks or= 0
+        my action [bark, woof]:
+            %barks = ("Bark!" for % in 1 to %me.barks)
             return (%barks joined with " ")
-        
-        method [get pissed off] ((me).barks += 1)
+        my action [get pissed off]:
+            %me.barks += 1
     
     %d = (new Dog {barks:2})
-    as %d:
-        assume ((me) == %d)
-        assume ((me).barks == 2)
-        assume ((bark) == "Bark! Bark!")
-        assume ((woof) == "Bark! Bark!")
-        get pissed off
-        assume ((me).barks == 3)
-        assume ((bark) == "Bark! Bark! Bark!")
-        assume ((me).genus == "Canus")
-    
+    assume (%d.barks == 2)
+    assume ((%d::bark) == "Bark! Bark!")
+    assume ((%d::woof) == "Bark! Bark!")
+    %d::get pissed off
+    assume (%d.barks == 3)
+    assume ((%d::bark) == "Bark! Bark! Bark!")
+    assume (%d.genus == "Canus")
     assume ("\(%d.class)" == "Dog")
     assume (%d.genus == "Canus")
     assume (%d.barks == 3)
-    as (new Dog) (assume ((me).barks == 0) or barf "Default initializer failed")
-    as (new Dog {barks:1}) (assume ((bark) == "Bark!"))
-    action [foo] (as (new Dog {barks:23}) (return (me).barks))
-    assume ((foo) == 23) or barf "Oops, \(foo) != 23"
-    as (new Dog {barks:101}):
-        try (as (new Dog {barks:8}) (barf)) and if it succeeds (barf)
-        assume ((me).barks == 101) or barf ".."
-            Error in nested 'as % %' failed to properly reset 'self'
+    %d2 = (new Dog)
+    assume (%d2.barks == 0) or barf "Default initializer failed"
+    with {%d:new Dog {barks:1}}: assume ((%d::bark) == "Bark!")
     
-    object "Corgi" extends (class Dog):
-        method [sploot] "splooted"
-        method [bark, woof]:
-            %barks = ("Yip!" for % in 1 to (me).barks)
+    object "Corgi" extends (Dog):
+        my action [sploot] "splooted"
+        my action [bark, woof]:
+            %barks = ("Yip!" for % in 1 to %me.barks)
             return (%barks joined with " ")
 
     %corg = (new Corgi)
     assume (%corg.barks == 0)
-    as (new Corgi {barks:1}):
-        assume ((sploot) == "splooted") or barf "subclass method failed"
-        assume ((bark) == "Yip!") or barf "inheritance failed"
-        assume ((woof) == "Yip!")
+    with {%d:new Corgi {barks:1}}:
+        assume ((%d::sploot) == "splooted") or barf "subclass method failed"
+        assume ((%d::bark) == "Yip!") or barf "inheritance failed"
+        assume ((%d::woof) == "Yip!")
     
-    as (new Dog {barks:2}):
-        assume ((bark) == "Bark! Bark!")
+    with {%d:new Dog {barks:2}}:
+        assume ((%d::bark) == "Bark! Bark!")
 
-compile [@, me] to (Lua value "self")
-compile [method %actions %body] to:
-    %lua = (\(local action \[%actions.1] %body) as lua)
-    declare locals in %lua
-    for % in %actions:
-        to %lua write "\n\(\%class as lua id).\(% as lua id) = \(%actions.1 as lua id)"
-    %lua = (..)
-        Lua ".."
-            do -- Method: \(%actions.(1).stub)
-                \%lua
+compile [my action %actions %body] to:
+    lua> ".."
+        local fn_name = "A"..string.as_lua_id(\%actions[1].stub)
+        local \%args = table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end)
+        table.insert(\%args, \(\%me as lua id))
+        local lua = LuaCode(tree.source, "class.", fn_name, " = ", \(compile as (%args -> %body)))
+        for i=2,#\%actions do
+            local alias = \%actions[i]
+            local alias_name = "A"..string.as_lua_id(alias.stub)
+            local \%alias_args = table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) end)
+            table.insert(\%alias_args, \(\%me as lua id))
+            lua:append("\\nclass.", alias_name, " = ")
+            if utils.equivalent(\%args, \%alias_args) then
+                lua:append("class.", fn_name)
+            else
+                lua:append("function(")
+                lua:concat_append(\%alias_args, ", ")
+                lua:append(")\\n    return class.", fn_name, "(")
+                lua:concat_append(\%args, ", ")
+                lua:append(")\\nend")
             end
-    return %lua
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-parse [as %instance %body] as (..)
-    result of:
-        %old_self = (me)
-        (me) = %instance
-        try %body and if it barfs %msg:
-            (me) = %old_self
-            barf %msg
-        ..or if it succeeds: (me) = %old_self
+        end
+        return lua
 
 compile [object %classname extends %parent %class_body] to:
-    %class = (\%class as lua id)
     return (..)
         Lua ".."
             do
-                local \%class = {name=\(%classname as lua expr)}
-                setmetatable(\%class, {
+                local class = {name=\(%classname as lua expr)}
+                setmetatable(class, {
                     __index=\(%parent as lua expr),
                     __tostring=function(cls) return cls.name end,
                     __call=function(cls, inst)
                         inst = setmetatable(inst or {}, cls)
-                        if cls.A_initialize_1 then
-                            cls.A_initialize_1(inst)
+                        if inst.A_set_up then
+                            inst:A_set_up()
                         end
                         return inst
                     end,
                 })
-                _ENV["A"..string.as_lua_id("new "..\%class.name)] = \%class
-                _ENV["A"..string.as_lua_id("new "..\%class.name.." 1")] = \%class
-                _ENV["A"..string.as_lua_id("class "..\%class.name)] = function() return \%class end
-                \%class.__index = \%class
-                \%class.class = \%class
-            
-                \(%class_body as lua statements)
-            
-                \%class.__tostring = \%class["A"..string.as_lua_id("as text")] or function(inst)
+                nomsu["A"..string.as_lua_id("new "..class.name)] = class
+                nomsu["A"..string.as_lua_id("new "..class.name.." 1")] = class
+                nomsu["A"..string.as_lua_id(class.name)] = function() return class end
+                class.__index = class
+                class.class = class
+                class.__tostring = function(inst)
                     return inst.name..getmetatable(dict{}).__tostring(inst)
                 end
-            end
+            
+                \(%class_body as lua statements)
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                local metamethod_map = {["as text"]="__tostring", ["clean up"]="__gc",
+                    ["+ 1"]="__add", ["- 1"]="__sub", ["* 1"]="__mul", ["/ 1"]="__div",
+                    ["-"]="__unm", ["// 1"]="__idiv", ["mod 1"]="__mod", ["^ 1"]="__pow",
+                    ["& 1"]="__band", ["| 1"]="__bor", ["~ 1"]="__bxor", ["~"]="__bnot",
+                    ["<< 1"]="__bshl", [">> 1"]="__bshr", ["== 1"]="__eq", ["< 1"]="__lt",
+                    ["<= 1"]="__le", ["set 1 = 2"]="__newindex", ["length"]="__len",
+                    ["__ipairs"]="__ipairs", ["__pairs"]="__pairs",
+                }
+                for stub,metamethod in pairs(metamethod_map) do
+                    class[metamethod] = class["A"..string.as_lua_id(stub)]
+                end
+            end
 
 parse [object %classname %class_body] as (..)
     object %classname extends (nil) %class_body

@@ -5,16 +5,16 @@ do
 end
 local repr
 repr = require('utils').repr
+local unpack = unpack or table.unpack
 local LuaCode, NomsuCode, Source
 do
   local _class_0
   local _base_0 = {
     __tostring = function(self)
-      if self.stop then
-        return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. ":" .. tostring(self.stop) .. "]"
-      else
-        return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. "]"
-      end
+      return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. tostring(self.stop and ':' .. self.stop or '') .. "]"
+    end,
+    __repr = function(self)
+      return "Source(" .. tostring(repr(self.filename)) .. ", " .. tostring(self.start) .. tostring(self.stop and ', ' .. self.stop or '') .. ")"
     end,
     __eq = function(self, other)
       return getmetatable(self) == getmetatable(other) and self.filename == other.filename and self.start == other.start and self.stop == other.stop
@@ -108,8 +108,30 @@ do
       end
       return self.__str
     end,
+    __repr = function(self)
+      return tostring(self.__class.__name) .. "(" .. tostring(concat({
+        repr(tostring(self.source)),
+        unpack((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          local _list_0 = self.bits
+          for _index_0 = 1, #_list_0 do
+            local b = _list_0[_index_0]
+            _accum_0[_len_0] = repr(b)
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)())
+      }, ", ")) .. ")"
+    end,
     __len = function(self)
       return #tostring(self)
+    end,
+    match = function(self, ...)
+      return tostring(self):match(...)
+    end,
+    gmatch = function(self, ...)
+      return tostring(self):gmatch(...)
     end,
     dirty = function(self)
       self.__str = nil
@@ -192,8 +214,8 @@ do
         if b.is_code then
           b.dirty = error
         end
-        local b_str = tostring(b)
-        local line = match(b_str, "\n([^\n]*)$")
+        b = tostring(b)
+        local line = match(b, "\n([^\n]*)$")
         if line then
           line_len = #line
         else
@@ -254,6 +276,7 @@ do
   local _parent_0 = Code
   local _base_0 = {
     __tostring = Code.__tostring,
+    __repr = Code.__repr,
     __len = Code.__len,
     add_free_vars = function(self, vars)
       if not (#vars > 0) then
@@ -446,6 +469,7 @@ do
   local _parent_0 = Code
   local _base_0 = {
     __tostring = Code.__tostring,
+    __repr = Code.__repr,
     __len = Code.__len
   }
   _base_0.__index = _base_0
