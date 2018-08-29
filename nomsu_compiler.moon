@@ -35,7 +35,7 @@ string.as_lua_id = (str)->
     str = gsub str, "%W", (c)->
         if c == ' ' then '_'
         else format("x%02X", byte(c))
-    return '_'..str
+    return str
 
 table.map = (fn)=> [fn(v) for _,v in ipairs(@)]
 table.fork = (t, values)-> setmetatable(values or {}, {__index:t})
@@ -338,8 +338,8 @@ with NomsuCompiler
 
     .compile = (tree)=>
         if tree.version
-            if get_version = @['A'..string.as_lua_id("Nomsu version")]
-                if upgrade = @['A'..string.as_lua_id("1 upgraded from 2 to 3")]
+            if get_version = @['A_'..string.as_lua_id("Nomsu version")]
+                if upgrade = @['A_'..string.as_lua_id("1 upgraded from 2 to 3")]
                     tree = upgrade(tree, tree.version, get_version!)
         switch tree.type
             when "Action"
@@ -354,7 +354,12 @@ with NomsuCompiler
                             "Compile-time action:\n%s\nfailed to produce any Lua"
                     return ret
 
-                lua = LuaCode.Value(tree.source, "A",string.as_lua_id(stub),"(")
+                lua = LuaCode.Value(tree.source)
+                if tree.target
+                    lua\append @compile(tree.target), ":"
+                else
+                    lua\append "A_"
+                lua\append(string.as_lua_id(stub),"(")
                 args = {}
                 for i, tok in ipairs tree
                     if type(tok) == "string" then continue
@@ -372,9 +377,6 @@ with NomsuCompiler
                     insert args, arg_lua
                 lua\concat_append args, ", "
                 lua\append ")"
-                if tree.target
-                    target_lua = @compile(tree.target)
-                    lua\prepend(target_lua, ":")
                 return lua
 
             when "EscapedNomsu"
@@ -496,7 +498,7 @@ with NomsuCompiler
                 return LuaCode.Value(tree.source, tostring(tree[1]))
 
             when "Var"
-                return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
+                return LuaCode.Value(tree.source, "_", string.as_lua_id(tree[1]))
 
             when "FileChunks"
                 error("Cannot convert FileChunks to a single block of lua, since each chunk's "..

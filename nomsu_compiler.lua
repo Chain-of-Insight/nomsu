@@ -40,7 +40,7 @@ string.as_lua_id = function(str)
       return format("x%02X", byte(c))
     end
   end)
-  return '_' .. str
+  return str
 end
 table.map = function(self, fn)
   local _accum_0 = { }
@@ -540,10 +540,10 @@ do
   NomsuCompiler.compile = function(self, tree)
     if tree.version then
       do
-        local get_version = self['A' .. string.as_lua_id("Nomsu version")]
+        local get_version = self['A_' .. string.as_lua_id("Nomsu version")]
         if get_version then
           do
-            local upgrade = self['A' .. string.as_lua_id("1 upgraded from 2 to 3")]
+            local upgrade = self['A_' .. string.as_lua_id("1 upgraded from 2 to 3")]
             if upgrade then
               tree = upgrade(tree, tree.version, get_version())
             end
@@ -577,7 +577,13 @@ do
           return ret
         end
       end
-      local lua = LuaCode.Value(tree.source, "A", string.as_lua_id(stub), "(")
+      local lua = LuaCode.Value(tree.source)
+      if tree.target then
+        lua:append(self:compile(tree.target), ":")
+      else
+        lua:append("A_")
+      end
+      lua:append(string.as_lua_id(stub), "(")
       local args = { }
       for i, tok in ipairs(tree) do
         local _continue_0 = false
@@ -603,10 +609,6 @@ do
       end
       lua:concat_append(args, ", ")
       lua:append(")")
-      if tree.target then
-        local target_lua = self:compile(tree.target)
-        lua:prepend(target_lua, ":")
-      end
       return lua
     elseif "EscapedNomsu" == _exp_0 then
       local lua = LuaCode.Value(tree.source, tree[1].type, "{")
@@ -769,7 +771,7 @@ do
     elseif "Number" == _exp_0 then
       return LuaCode.Value(tree.source, tostring(tree[1]))
     elseif "Var" == _exp_0 then
-      return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
+      return LuaCode.Value(tree.source, "_", string.as_lua_id(tree[1]))
     elseif "FileChunks" == _exp_0 then
       return error("Cannot convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     else

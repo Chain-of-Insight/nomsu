@@ -44,7 +44,7 @@ test:
         assume ((%d::bark) == "Bark! Bark!")
 compile [my action %actions %body] to:
     lua> ".."
-        local fn_name = "A"..string.as_lua_id(\%actions[1].stub)
+        local fn_name = string.as_lua_id(\%actions[1].stub)
         local \%args = table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end)
         table.insert(\%args, \(\%me as lua id))
         local lua = LuaCode(tree.source, "class.", fn_name, " = ", \(..)
@@ -52,7 +52,7 @@ compile [my action %actions %body] to:
         ..)
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local alias_name = "A"..string.as_lua_id(alias.stub)
+            local alias_name = string.as_lua_id(alias.stub)
             local \%alias_args = table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) end)
             table.insert(\%alias_args, \(\%me as lua id))
             lua:append("\\nclass.", alias_name, " = ")
@@ -78,15 +78,15 @@ compile [object %classname extends %parent %class_body] to:
                     __tostring=function(cls) return cls.name end,
                     __call=function(cls, inst)
                         inst = setmetatable(inst or {}, cls)
-                        if inst.A_set_up then
-                            inst:A_set_up()
+                        if inst.set_up then
+                            inst:set_up()
                         end
                         return inst
                     end,
                 })
-                nomsu["A"..string.as_lua_id("new "..class.name)] = class
-                nomsu["A"..string.as_lua_id("new "..class.name.." 1")] = class
-                nomsu["A"..string.as_lua_id(class.name)] = function() return class end
+                nomsu["A_"..string.as_lua_id("new "..class.name)] = class
+                nomsu["A_"..string.as_lua_id("new "..class.name.." 1")] = class
+                nomsu["A_"..string.as_lua_id(class.name)] = function() return class end
                 class.__index = class
                 class.class = class
                 class.__tostring = function(inst)
@@ -104,7 +104,7 @@ compile [object %classname extends %parent %class_body] to:
                     ["__ipairs"]="__ipairs", ["__pairs"]="__pairs",
                 }
                 for stub,metamethod in pairs(metamethod_map) do
-                    class[metamethod] = class["A"..string.as_lua_id(stub)]
+                    class[metamethod] = class[string.as_lua_id(stub)]
                 end
             end
 
