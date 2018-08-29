@@ -1,0 +1,8 @@
+#!/usr/bin/env nomsu -V3.5.5.6
+#
+    This file defines upgrades from Nomsu <3.5.5.6 to Nomsu 3.5.5.6
+
+use "compatibility/compatibility.nom"
+
+upgrade action "traceback" to "3.5.5.6" via ([%] -> (barf "'traceback' has been deprecated"))
+upgrade action "traceback 1" to "3.5.5.6" via ([%] -> (barf "'traceback 1' has been deprecated"))
