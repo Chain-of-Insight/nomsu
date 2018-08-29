@@ -1,0 +1,40 @@
+#!/usr/bin/env nomsu -V2.5.5.5
+#
+    Tool to find and replace one tree with another.
+        nomsu tools/replace.nom [-i] tree_to_replace replacement file1 file2 directory1 ...
+    If "-i" is the first argument, replacements will be performed in-place. Otherwise, the
+    upgraded code will be printed.
+
+use "lib/os.nom"
+
+%args = (command line args)
+%inplace = (no)
+if (%args.1 is "-i"):
+    %inplace = (yes)
+    remove index 1 from %args
+
+if ((length of %args) < 3):
+    say "Usage: nomsu tools/replace.nom [-i] tree_to_replace replacement files..."
+    lua> "os.exit(1)"
+
+%pattern = (parse (remove index 1 from %args))
+%replacement = (parse (remove index 1 from %args))
+for %path in %args:
+    for file %filename in %path:
+        unless (any [%filename matches "%.nom$", %filename == "-", %filename == "stdin"]):
+            do next %filename
+        %tree = (parse (read file %filename) from %filename)
+        %tree2 = (%tree with %pattern ~> %replacement)
+        if (%tree2 == %tree):
+            say "No changes in \%filename"
+            do next %filename
+
+        %text = ".."
+            #!/usr/bin/env nomsu -V\(%tree.version or (Nomsu version))
+            \(%tree2 as nomsu)
+        
+        if:
+            %inplace:
+                say "Replaced in \%filename"
+                write %text to file %filename
+            else: say %text
