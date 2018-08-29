@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.5.5.6
+#!/usr/bin/env nomsu -V3.6.5.6
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -33,20 +33,22 @@ compile [upgrade action %actions to %version as %body] to:
                         return %replacements.(%t.1)
                     ..else:
                         return ".."
-                            \(%t.type)(\(quote "\(%t.source)"), \(..)
+                            \(%t.type){source=\(quote "\(%t.source)"), \(..)
                                 quote "\(%t.1) \000\(=lua "string.format('%X', __MANGLE_INDEX)")"
-                            ..)
+                            ..}
                 
                 (%t is syntax tree):
                     %args = ((make tree %) for % in %t)
-                    add "\(\%tree as lua id).source" to %args at index 1
-                    return "\(%t.type)(\(%args joined with ", "))"
+                    add "source=\(\%tree as lua id).source" to %args at index 1
+                    if %t.target:
+                        add "target=\(make tree %t.target)" to %args at index 1
+                    return "\(%t.type){\(%args joined with ", ")}"
                 
                 else:
                     return (quote "\%t")
         
-        unless ("\%lua" == ""): to %lua write "\n"
-        to %lua write (..)
+        unless ("\%lua" == ""): %lua::append "\n"
+        %lua::append (..)
             Lua ".."
                 A_upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
                     \%tree as lua id
