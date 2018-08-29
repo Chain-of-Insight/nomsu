@@ -11,7 +11,7 @@ use "lib/os.nom"
 %inplace = (no)
 if (%args.1 is "-i"):
     %inplace = (yes)
-    remove index 1 from %args
+    %args::remove index 1
 
 for %path in %args:
     for file %filename in %path:

@@ -80,6 +80,14 @@ _list_mt =
             elseif @[i] < other[i] then return true
             elseif @[i] > other[i] then return false
         return true
+    __index:
+        add_1: insert
+        append_1: insert
+        add_1_at_index_2: (t,x,i)-> insert(t,i,x)
+        at_index_1_add_2: insert
+        pop: table.remove
+        remove_last: table.remove
+        remove_index_1: table.remove
 
 list = (t)-> setmetatable(t, _list_mt)
 

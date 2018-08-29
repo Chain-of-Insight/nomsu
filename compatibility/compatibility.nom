@@ -39,9 +39,9 @@ compile [upgrade action %actions to %version as %body] to:
                 
                 (%t is syntax tree):
                     %args = ((make tree %) for % in %t)
-                    add "source=\(\%tree as lua id).source" to %args at index 1
+                    %args::add "source=\(\%tree as lua id).source"
                     if %t.target:
-                        add "target=\(make tree %t.target)" to %args at index 1
+                        %args::add "target=\(make tree %t.target)"
                     return "\(%t.type){\(%args joined with ", ")}"
                 
                 else:

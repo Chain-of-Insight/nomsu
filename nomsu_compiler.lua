@@ -125,7 +125,18 @@ local _list_mt = {
       end
     end
     return true
-  end
+  end,
+  __index = {
+    add_1 = insert,
+    append_1 = insert,
+    add_1_at_index_2 = function(t, x, i)
+      return insert(t, i, x)
+    end,
+    at_index_1_add_2 = insert,
+    pop = table.remove,
+    remove_last = table.remove,
+    remove_index_1 = table.remove
+  }
 }
 local list
 list = function(t)

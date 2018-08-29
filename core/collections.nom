@@ -58,9 +58,9 @@ test:
     %list = [1, 2, 3, 4, 5]
     append 6 to %list
     assume ((last in %list) is 6)
-    pop from %list
+    %list::pop
     assume ((last in %list) is 5)
-    remove index 1 from %list
+    %list::remove index 1
     assume ((first in %list) is 2)
 compile [..]
     append %item to %list, add %item to %list, to %list add %item, to %list append %item
@@ -85,7 +85,7 @@ parse [%expression for %item in %iterable] as (..)
     result of:
         %comprehension = []
         for %item in %iterable:
-            add %expression to %comprehension
+            %comprehension::add %expression
         return %comprehension
 
 parse [..]
@@ -95,7 +95,7 @@ parse [..]
     result of:
         %comprehension = []
         for %index in %start to %stop via %step:
-            add %expression to %comprehension
+            %comprehension::add %expression
         return %comprehension
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -114,7 +114,7 @@ parse [..]
     result of:
         %comprehension = []
         for %key = %value in %iterable:
-            add %expression to %comprehension
+            %comprehension::add %expression
         return %comprehension
 
 # Dict comprehensions
@@ -164,7 +164,7 @@ test:
 action [%lists flattened]:
     %flat = []
     for %list in %lists:
-        for %item in %list: add %item to %flat
+        for %item in %list: %flat::add %item
     return %flat
 
 test:
@@ -240,7 +240,7 @@ action [unique %items]:
     %seen = {}
     for % in %items:
         unless %seen.%:
-            add % to %unique
+            %unique::add %
             %seen.% = (yes)
     
     return %unique

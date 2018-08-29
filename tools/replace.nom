@@ -11,14 +11,14 @@ use "lib/os.nom"
 %inplace = (no)
 if (%args.1 is "-i"):
     %inplace = (yes)
-    remove index 1 from %args
+    %args::remove index 1
 
 if ((length of %args) < 3):
     say "Usage: nomsu tools/replace.nom [-i] tree_to_replace replacement files..."
     lua> "os.exit(1)"
 
-%pattern = (parse (remove index 1 from %args))
-%replacement = (parse (remove index 1 from %args))
+%pattern = (parse (%args::remove index 1))
+%replacement = (parse (%args::remove index 1))
 for %path in %args:
     for file %filename in %path:
         unless (any [%filename matches "%.nom$", %filename == "-", %filename == "stdin"]):
@@ -28,7 +28,7 @@ for %path in %args:
         if (%tree2 == %tree):
             say "No changes in \%filename"
             do next %filename
-
+        
         %text = ".."
             #!/usr/bin/env nomsu -V\(%tree.version or (Nomsu version))
             \(%tree2 as nomsu)
@@ -37,4 +37,5 @@ for %path in %args:
             %inplace:
                 say "Replaced in \%filename"
                 write %text to file %filename
+            
             else: say %text

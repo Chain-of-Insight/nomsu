@@ -12,7 +12,7 @@ test:
             -> 5
             repeat 3 times: -> 6
     
-    for % in coroutine %co: add % to %nums
+    for % in coroutine %co: %nums::add %
     assume (%nums == [4, 5, 6, 6, 6]) or barf "Coroutine iteration failed"
 compile [coroutine %body, generator %body] to (..)
     Lua value ".."
