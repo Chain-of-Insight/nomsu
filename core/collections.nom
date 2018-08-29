@@ -56,25 +56,12 @@ compile [number of keys in %list] to (..)
 
 test:
     %list = [1, 2, 3, 4, 5]
-    append 6 to %list
+    %list::add 6
     assume ((last in %list) is 6)
     %list::pop
     assume ((last in %list) is 5)
     %list::remove index 1
     assume ((first in %list) is 2)
-compile [..]
-    append %item to %list, add %item to %list, to %list add %item, to %list append %item
-..to (Lua "table.insert(\(%list as lua expr), \(%item as lua expr))")
-
-compile [add %item to %list at index %i] to (..)
-    Lua ".."
-        table.insert(\(%list as lua expr), \(%i as lua expr), \(%item as lua expr))
-
-compile [pop from %list, remove last from %list] to (..)
-    Lua value "table.remove(\(%list as lua expr))"
-
-compile [remove index %index from %list] to (..)
-    Lua value "table.remove(\(%list as lua expr), \(%index as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
