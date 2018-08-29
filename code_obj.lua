@@ -505,12 +505,12 @@ do
   end
   NomsuCode = _class_0
 end
-Code.__base.append_1 = Code.__base.append
-Code.__base.append_1_joined_by_2 = Code.__base.concat_append
-Code.__base.prepend_1 = Code.__base.prepend
-Code.__base.declare_locals_1 = Code.__base.declare_locals
-Code.__base.remove_free_vars_1 = Code.__base.remove_free_vars
-Code.__base.add_free_vars_1 = Code.__base.add_free_vars
+Code.__base.append_1 = assert(Code.__base.append)
+Code.__base.append_1_joined_by_2 = assert(Code.__base.concat_append)
+Code.__base.prepend_1 = assert(Code.__base.prepend)
+LuaCode.__base.declare_locals_1 = assert(LuaCode.__base.declare_locals)
+LuaCode.__base.remove_free_vars_1 = assert(LuaCode.__base.remove_free_vars)
+LuaCode.__base.add_free_vars_1 = assert(LuaCode.__base.add_free_vars)
 return {
   Code = Code,
   NomsuCode = NomsuCode,

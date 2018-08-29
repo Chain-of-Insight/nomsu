@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.5.5.6
+#!/usr/bin/env nomsu -V3.6.5.6
 #
     This file contains definitions pertaining to variable scoping
 
@@ -29,12 +29,12 @@ compile [with local %locals %body, with local %locals do %body] to:
                     \(compile as (<- %locals))
                     \%body_lua
             
-            declare locals ("\(%.1 as lua)" for % in %locals) in %body_lua
+            %body_lua::declare locals ("\(%.1 as lua)" for % in %locals)
         
         "List":
-            declare locals ("\(% as lua)" for % in %locals) in %body_lua
+            %body_lua::declare locals ("\(% as lua)" for % in %locals)
         "Var" "Action":
-            declare locals ["\(%locals as lua)"] in %body_lua
+            %body_lua::declare locals ["\(%locals as lua)"]
         else:
             compile error at %locals.source "Unexpected locals: %s"
     

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.5.5.6
+#!/usr/bin/env nomsu -V3.6.5.6
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -117,10 +117,10 @@ compile [repeat while %condition %body] to:
                 \(%body as lua statements)
     
     if (%body has subtree \(do next)):
-        to %lua write "\n    ::continue::"
+        %lua::append "\n    ::continue::"
     if (%body has subtree \(do next repeat)):
-        to %lua write "\n    ::continue_repeat::"
-    to %lua write "\nend --while-loop"
+        %lua::append "\n    ::continue_repeat::"
+    %lua::append "\nend --while-loop"
     if (%body has subtree \(stop repeating)):
         %lua = (..)
             Lua ".."
@@ -145,10 +145,10 @@ compile [repeat %n times %body] to:
                 \(%body as lua statements)
     
     if (%body has subtree \(do next)):
-        to %lua write "\n    ::continue::"
+        %lua::append "\n    ::continue::"
     if (%body has subtree \(do next repeat)):
-        to %lua write "\n    ::continue_repeat::"
-    to %lua write "\nend --numeric for-loop"
+        %lua::append "\n    ::continue_repeat::"
+    %lua::append "\nend --numeric for-loop"
     if (%body has subtree \(stop repeating)):
         %lua = (..)
             Lua ".."
@@ -205,10 +205,10 @@ compile [..]
                 \(%body as lua statements)
     
     if (%body has subtree \(do next)):
-        to %lua write "\n    ::continue::"
+        %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %var)):
-        to %lua write "\n    \(compile as (===next %var ===))"
-    to %lua write "\nend --numeric for-loop"
+        %lua::append "\n    \(compile as (===next %var ===))"
+    %lua::append "\nend --numeric for-loop"
     if (%body has subtree \(stop %var)):
         %lua = (..)
             Lua ".."
@@ -248,10 +248,10 @@ compile [for %var in %iterable %body] to:
                 \(%body as lua statements)
     
     if (%body has subtree \(do next)):
-        to %lua write "\n    ::continue::"
+        %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %var)):
-        to %lua write (Lua "\n\(compile as (===next %var ===))")
-    to %lua write "\nend --foreach-loop"
+        %lua::append (Lua "\n\(compile as (===next %var ===))")
+    %lua::append "\nend --foreach-loop"
     if (%body has subtree \(stop %var)):
         %lua = (..)
             Lua ".."
@@ -289,17 +289,17 @@ compile [..]
                 \(%body as lua statements)
     
     if (%body has subtree \(do next)):
-        to %lua write "\n    ::continue::"
+        %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %key)):
-        to %lua write (Lua "\n\(compile as (===next %key ===))")
+        %lua::append (Lua "\n\(compile as (===next %key ===))")
     if (%body has subtree \(do next %value)):
-        to %lua write (Lua "\n\(compile as (===next %value ===))")
-    to %lua write "\nend --foreach-loop"
+        %lua::append (Lua "\n\(compile as (===next %value ===))")
+    %lua::append "\nend --foreach-loop"
     %stop_labels = (Lua "")
     if (%body has subtree \(stop %key)):
-        to %stop_labels write "\n\(compile as (===stop %key ===))"
+        %stop_labels::append "\n\(compile as (===stop %key ===))"
     if (%body has subtree \(stop %value)):
-        to %stop_labels write "\n\(compile as (===stop %value ===))"
+        %stop_labels::append "\n\(compile as (===stop %value ===))"
     if ((length of "\%stop_labels") > 0):
         %lua = (..)
             Lua ".."
@@ -347,14 +347,14 @@ compile [if %body, when %body] to:
                 compile error at %line.source ".."
                     Can't have an 'else' block without a preceeding condition
             
-            to %code write ".."
+            %code::append ".."
                 
                 else
                     \(%action as lua statements)
             
             %else_allowed = (no)
         ..else:
-            to %code write "\%clause "
+            %code::append "\%clause "
             for %i in 1 to ((length of %line) - 1):
                 unless (%line.%i is syntax tree):
                     compile error at %line.source ".."
@@ -362,10 +362,10 @@ compile [if %body, when %body] to:
                         %s
                 
                 if (%i > 1):
-                    to %code write " or "
-                to %code write (%line.%i as lua expr)
+                    %code::append " or "
+                %code::append (%line.%i as lua expr)
             
-            to %code write ".."
+            %code::append ".."
                  then
                     \(%action as lua statements)
             
@@ -373,7 +373,7 @@ compile [if %body, when %body] to:
     
     if ((length of "\%code") == 0):
         compile error at %body.source "'if' block has an empty body"
-    to %code write "\nend --when"
+    %code::append "\nend --when"
     return %code
 
 test:
@@ -410,14 +410,14 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
                 compile error at %line.source ".."
                     Can't have an 'else' block without a preceeding condition
             
-            to %code write ".."
+            %code::append ".."
                 
                 else
                     \(%action as lua statements)
             
             %else_allowed = (no)
         ..else:
-            to %code write "\%clause "
+            %code::append "\%clause "
             for %i in 1 to ((length of %line) - 1):
                 unless (%line.%i is syntax tree):
                     compile error at %line.source ".."
@@ -425,10 +425,10 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
                         %s
                 
                 if (%i > 1):
-                    to %code write " or "
-                to %code write "branch_value == \(%line.%i as lua expr)"
+                    %code::append " or "
+                %code::append "branch_value == \(%line.%i as lua expr)"
             
-            to %code write ".."
+            %code::append ".."
                  then
                     \(%action as lua statements)
             
@@ -436,7 +436,7 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
     
     if ((length of "\%code") == 0):
         compile error at %body.source "'if % is % %' block has an empty body"
-    to %code write "\nend --when"
+    %code::append "\nend --when"
     return (..)
         Lua ".."
             do --if % is
@@ -504,11 +504,11 @@ compile [for %var in recursive %structure %body] to (..)
                         \(%body as lua statements)
         
         if (%body has subtree \(do next)):
-            to %lua write "\n        ::continue::"
+            %lua::append "\n        ::continue::"
         if (%body has subtree \(do next %var)):
-            to %lua write "\n        \(compile as (===next %var ===))"
-        to %lua write "\n    end -- Recursive loop"
+            %lua::append "\n        \(compile as (===next %var ===))"
+        %lua::append "\n    end -- Recursive loop"
         if (%body has subtree \(stop %var)):
-            to %lua write "\n        \(compile as (===stop %var ===))"
-        to %lua write "\nend -- Recursive scope"
+            %lua::append "\n        \(compile as (===stop %var ===))"
+        %lua::append "\nend -- Recursive scope"
         return %lua

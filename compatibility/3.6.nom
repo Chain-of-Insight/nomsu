@@ -1,21 +1,20 @@
-#!/usr/bin/env nomsu -V3
+#!/usr/bin/env nomsu -V3.6.5.6
 #
     This file defines upgrades from Nomsu <3.6 to 3.6
 
 use "compatibility/compatibility.nom"
 
-upgrade action (to %1 write %2) to "3.6" as (..)
-    %1::append %2
-upgrade action (%1 <-write %2) to "3.6" as (..)
-    %1::append %2
+upgrade action (to %1 write %2) to "3.6" as (%1::append %2)
+upgrade action (%1 <-write %2) to "3.6" as (%1::append %2)
 upgrade action (to %1 write %2 joined by %3) to "3.6" as (..)
     %1::append %2 joined by %3
-upgrade action (declare locals in %lua) to "3.6" as (..)
-    %lua::declare locals
+
+upgrade action (declare locals in %lua) to "3.6" as (%lua::declare locals)
 upgrade action (declare locals %locs in %lua) to "3.6" as (..)
     %lua::declare locals %locs
+
 upgrade action (add free vars %vars to %lua) to "3.6" as (..)
     %lua::add free vars %vars
+
 upgrade action (remove free vars %vars from %lua) to "3.6" as (..)
     %lua::remove free vars %vars
-

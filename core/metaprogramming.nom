@@ -297,25 +297,6 @@ action [%tree with %patt ~> %replacement]:
             end)
         end)
 
-compile [declare locals in %code] to (..)
-    Lua value "\(%code as lua expr):declare_locals()"
-
-compile [declare locals %locals in %code] to (..)
-    Lua value "\(%code as lua expr):declare_locals(\(%locals as lua expr))"
-
-compile [add free vars %vars to %code] to (..)
-    Lua "\(%code as lua expr):add_free_vars(\(%vars as lua expr));"
-
-compile [remove free vars %vars from %code] to (..)
-    Lua "\(%code as lua expr):remove_free_vars(\(%vars as lua expr));"
-
-compile [%lua <-write %code, to %lua write %code] to (..)
-    Lua "\(%lua as lua expr):append(\(%code as lua expr));"
-
-compile [to %lua write %code joined by %glue] to (..)
-    Lua ".."
-        \(%lua as lua expr):concat_append(\(%code as lua expr), \(%glue as lua expr));
-
 test:
     assume (..)
         (..)

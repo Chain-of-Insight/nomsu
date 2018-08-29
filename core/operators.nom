@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.5.5.6
+#!/usr/bin/env nomsu -V3.6.5.6
 #
     This file contains definitions of operators like "+" and "and".
 
@@ -21,7 +21,7 @@ compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to (..)
 
 # For strict identity checking, use (%x's id) is (%y's id)
 test:
-    assume (([] == []) and (([]'s id) != ([]'s id)))
+    assume (([] == []) and (([] 's id) != ([] 's id)))
 lua> ".."
     do
         local new_uuid = require('uuid')
@@ -238,7 +238,7 @@ compile [%x or %y] to (Lua value "(\(%x as lua expr) or \(%y as lua expr))")
 # Bitwise Operators
 # TODO: implement OR, XOR, AND for multiple operands?
 test:
-    assume ((~5) == -6)
+    assume ((~ 5) == -6)
     assume ((1 | 4) == 5)
     assume ((1 ~ 3) == 2)
     assume ((1 & 3) == 1)
