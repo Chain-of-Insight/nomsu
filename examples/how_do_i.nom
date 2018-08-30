@@ -79,7 +79,10 @@ say %my_list.1
 
 # List entries can be modified like this:
 %my_list.1 = "ONE!!!"
-say (size of %my_list)
+
+# Or appended to/removed from:
+%my_list::add "extra item"
+%my_list::pop
 
 # How do I define a dictionary/hash map?
 %my_dict = {x:99, y:101}
@@ -310,36 +313,3 @@ parse [best of %items where %item_var has score %key_expr] as (..)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 say (best of [2, -3, 4, -8] where %x has score (%x * %x))
-#   The first example generates code that looks like:
-    
-        A_best_of_1_according_to_2 = function(items, key_fn)
-            local best, best_key = nil, nil
-            for _, item in ipairs(items) do
-                local key = key_fn(item)
-                if best == nil or key > best_key then
-                    best, best_key = item, key
-                end
-            end
-            return best
-        end
-        print(A_best_of_1_according_to_2({2,-3,4,-8}, function(x)
-            return x * x
-        end))
-    
-    But the second example produces something more like:
-    
-        print((function()
-            local best, best_key = nil, nil
-            for _, x in ipairs({1,-2,3,-4}) do
-                local key = x * x
-                if best == nil or key > best_key then
-                    best, best_key = x, key
-                end
-            end
-            return best
-        end)())
-    
-    Notice that the second example has inlined the key function, so that in the inner loop,
-    the code only has to do a multiplication, instead of calling a function that does the
-    multiplication. In addition to being more efficient, it's also more powerful and
-    flexible for the language to allow you to define syntax that manipulates expressions.
