@@ -153,14 +153,6 @@ for _index_0 = 1, #types do
     end
   })
 end
-AST.Block.__init = function(self)
-  for _index_0 = 1, #self do
-    local a = self[_index_0]
-    if not AST.is_syntax_tree(a) then
-      require('ldt').breakpoint()
-    end
-  end
-end
 AST.Action.__init = function(self)
   local stub_bits = { }
   local arg_i = 1
