@@ -6,7 +6,7 @@ revolving around natural language rule-making and self modification.
 
 ## Dependencies
 
-Nomsu's only dependencies are [Lua 5.2+](https://www.lua.org/) or [Luajit 2.0+](http://luajit.org/) and [LPEG](http://www.inf.puc-rio.br/~roberto/lpeg/) (`luarocks install lpeg`). Nomsu's compiler was written in [Moonscript](http://moonscript.org/), but all of the .moon files have been compiled into lua for convenience, so Moonscript is not a dependency. Optionally, if luafilesystem ([Lua version](https://github.com/keplerproject/luafilesystem) or [LuaJIT version](https://github.com/spacewander/luafilesystem)) is installed, it will be used. Otherwise Nomsu will fall back to using system commands (`find` and `ls`), which is slower and a bit less safe. Nomsu has been tested on Mac and Linux, but not Windows.
+Nomsu's only dependencies are [Lua 5.2+](https://www.lua.org/) (or [Luajit 2.0+](http://luajit.org/), compiled with `XCFLAGS=-DLUAJIT_ENABLE_LUA52COMPAT` for Lua 5.2 compatibility) and [LPEG](http://www.inf.puc-rio.br/~roberto/lpeg/) (`luarocks install lpeg`). Nomsu's compiler was written in [Moonscript](http://moonscript.org/), but all of the .moon files have been compiled into lua for convenience, so Moonscript is not a dependency. Optionally, if luafilesystem ([Lua version](https://github.com/keplerproject/luafilesystem) or [LuaJIT version](https://github.com/spacewander/luafilesystem)) is installed, it will be used. Otherwise Nomsu will fall back to using system commands (`find` and `ls`), which is slower and a bit less safe. Nomsu has been tested on Mac and Linux, but not Windows.
 
 ## Usage
 

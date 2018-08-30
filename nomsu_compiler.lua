@@ -4,6 +4,11 @@ local utils = require('utils')
 local Files = require('files')
 local repr, stringify, equivalent
 repr, stringify, equivalent = utils.repr, utils.stringify, utils.equivalent
+local list, dict
+do
+  local _obj_0 = require('containers')
+  list, dict = _obj_0.list, _obj_0.dict
+end
 colors = require('consolecolors')
 colored = setmetatable({ }, {
   __index = function(_, color)
@@ -82,84 +87,6 @@ do
     end
   end
 end
-local _list_mt = {
-  __eq = equivalent,
-  __tostring = function(self)
-    return "[" .. concat((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      for _index_0 = 1, #self do
-        local b = self[_index_0]
-        _accum_0[_len_0] = repr(b)
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)(), ", ") .. "]"
-  end,
-  __lt = function(self, other)
-    assert(type(self) == 'table' and type(other) == 'table', "Incompatible types for comparison")
-    for i = 1, math.max(#self, #other) do
-      if not self[i] and other[i] then
-        return true
-      elseif self[i] and not other[i] then
-        return false
-      elseif self[i] < other[i] then
-        return true
-      elseif self[i] > other[i] then
-        return false
-      end
-    end
-    return false
-  end,
-  __le = function(self, other)
-    assert(type(self) == 'table' and type(other) == 'table', "Incompatible types for comparison")
-    for i = 1, math.max(#self, #other) do
-      if not self[i] and other[i] then
-        return true
-      elseif self[i] and not other[i] then
-        return false
-      elseif self[i] < other[i] then
-        return true
-      elseif self[i] > other[i] then
-        return false
-      end
-    end
-    return true
-  end,
-  __index = {
-    add_1 = insert,
-    append_1 = insert,
-    add_1_at_index_2 = function(t, x, i)
-      return insert(t, i, x)
-    end,
-    at_index_1_add_2 = insert,
-    pop = table.remove,
-    remove_last = table.remove,
-    remove_index_1 = table.remove
-  }
-}
-local list
-list = function(t)
-  return setmetatable(t, _list_mt)
-end
-local _dict_mt = {
-  __eq = equivalent,
-  __tostring = function(self)
-    return "{" .. concat((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      for k, v in pairs(self) do
-        _accum_0[_len_0] = tostring(repr(k)) .. ": " .. tostring(repr(v))
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)(), ", ") .. "}"
-  end
-}
-local dict
-dict = function(t)
-  return setmetatable(t, _dict_mt)
-end
 local MAX_LINE = 80
 local NomsuCompiler = setmetatable({
   name = "Nomsu"
@@ -232,10 +159,21 @@ do
     list = list,
     dict = dict
   }
-  if jit then
-    to_add.bit = require('bit')
-  elseif _VERSION == "Lua 5.2" then
-    to_add.bit = bit32
+  if _VERSION == "Lua 5.4" then
+    to_add.ipairs = function(x)
+      do
+        local mt = getmetatable(x)
+        if mt then
+          if mt.__ipairs then
+            return mt.__ipairs(x)
+          end
+        end
+      end
+      return ipairs(x)
+    end
+  end
+  if jit or _VERSION == "Lua 5.2" then
+    to_add.bit = require("bitops")
   end
   for k, v in pairs(to_add) do
     NomsuCompiler[k] = v
@@ -591,6 +529,9 @@ do
       local lua = LuaCode.Value(tree.source)
       if tree.target then
         lua:append(self:compile(tree.target), ":")
+        if string.as_lua_id(stub):match("^[0-9]") then
+          lua:append("_")
+        end
       else
         lua:append("A_")
       end

@@ -10,9 +10,10 @@ PREFIX=
 UNINSTALL_VERSION=
 # ========= You shouldn't need to mess with any of these variables below ================
 
-MOON_FILES= code_obj.moon error_handling.moon files.moon nomsu.moon nomsu_compiler.moon syntax_tree.moon parser.moon
+MOON_FILES= code_obj.moon error_handling.moon files.moon nomsu.moon nomsu_compiler.moon \
+			syntax_tree.moon parser.moon containers.moon
 LUA_FILES= code_obj.lua consolecolors.lua error_handling.lua files.lua nomsu.lua nomsu_compiler.lua \
-		   syntax_tree.lua parser.lua utils.lua uuid.lua
+		   syntax_tree.lua parser.lua containers.lua utils.lua uuid.lua
 CORE_NOM_FILES= $(wildcard core/*.nom)
 CORE_LUA_FILES= $(patsubst %.nom,%.lua,$(CORE_NOM_FILES))
 LIB_NOM_FILES= $(wildcard lib/*.nom)

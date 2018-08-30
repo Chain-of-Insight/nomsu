@@ -7,63 +7,37 @@ use "core/metaprogramming.nom"
 use "core/control_flow.nom"
 use "core/operators.nom"
 
-# List/dict functions:
-# Indexing
-test:
-    assume ((2 nd to last in [1, 2, 3, 4, 5]) is 4)
-compile [..]
-    %index st to last in %list, %index nd to last in %list
-    %index rd to last in %list, %index th to last in %list
-..to (Lua value "utils.nth_to_last(\(%list as lua expr), \(%index as lua expr))")
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-parse [last in %list] as (1 st to last in %list)
-parse [first in %list] as %list.1
-
-# Membership testing
-test:
-    assume (3 is in [1, 2, 3, 4, 5])
-action [%item is in %list, %list contains %item, %list has %item]:
-    for %key = %value in %list:
-        if (%key is %item): return (yes)
-    return (no)
-
-test:
-    assume (99 isn't in [1, 2, 3])
-action [..]
-    %item isn't in %list, %item is not in %list, %list doesn't contain %item
-    %list does not contain %item, %list doesn't have %item, %list does not have %item
-..:
-    for %key = %value in %list:
-        if (%key is %item): return (no)
-    return (yes)
-
-test:
-    assume ({x:no} has key "x")
-parse [%list has key %index, %list has index %index] as (%list.%index != (nil))
-
-test:
-    assume ({x:no} doesn't have key "y")
-    assume (not ({x:no} doesn't have key "x"))
-parse [..]
-    %list doesn't have key %index, %list does not have key %index
-    %list doesn't have index %index, %list does not have index %index
-..as (%list.%index == (nil))
-
-compile [number of keys in %list] to (..)
-    Lua value "utils.size(\(%list as lua expr))"
-
+# List functionality:
 test:
     %list = [1, 2, 3, 4, 5]
+    %visited = {}
+    for %i = %x in %list: %visited.%i = (yes)
+    assume (%visited == {1:yes, 2:yes, 3:yes, 4:yes, 5:yes})
+    %visited = {}
+    for %x in %list: %visited.%x = (yes)
+    assume (%visited == {1:yes, 2:yes, 3:yes, 4:yes, 5:yes})
+    assume ((%list::2 nd to last) == 4)
+    assume ((%list::first) == 1)
+    assume (%list::has 3)
+    assume ((%list::index of 3) == 3)
+    assume ((size of %list) == 5)
     %list::add 6
-    assume ((last in %list) is 6)
+    assume ((%list::last) == 6)
     %list::pop
-    assume ((last in %list) is 5)
+    assume ((%list::last) == 5)
     %list::remove index 1
-    assume ((first in %list) is 2)
+    assume ((%list::first) == 2)
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Dict functionality
+test:
+    %dict = {x:1, y:2, z:3}
+    assume ((size of %dict) == 3)
+    assume ((% for % in {x:1}) == [{key:"x", value:1}])
+    assume (({key:%k, value:%v} for %k = %v in {x:1}) == [{key:"x", value:1}])
+    assume (({x:1, y:1} + {y:10, z:10}) == {x:1, y:11, z:10})
+    assume (({x:1, y:1} | {y:10, z:10}) == {x:1, y:1, z:10})
+    assume (({x:1, y:1} & {y:10, z:10}) == {y:1})
+    assume (({x:1, y:1} ~ {y:10, z:10}) == {x:1, z:10})
 
 # List Comprehension
 test:

@@ -49,6 +49,10 @@ compile [bytes %start to %stop of %text] to (..)
     Lua value ".."
         list{(\(%text as lua expr)):byte(\(%start as lua expr), \(%stop as lua expr))}
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+action [bytes of %text] (bytes 1 to (=lua "#\%text") of %text)
+
 test:
     assume (("asdf" capitalized) == "Asdf")
 compile [capitalized %text, %text capitalized] to (..)

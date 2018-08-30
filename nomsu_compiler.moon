@@ -14,6 +14,7 @@ re = require 're'
 utils = require 'utils'
 Files = require 'files'
 {:repr, :stringify, :equivalent} = utils
+{:list, :dict} = require 'containers'
 export colors, colored
 colors = require 'consolecolors'
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
@@ -57,46 +58,6 @@ do
         if type(i) == 'number' then return sub(@, i, i)
         elseif type(i) == 'table' then return sub(@, i[1], i[2])
 
--- List and Dict classes to provide basic equality/tostring functionality for the tables
--- used in Nomsu. This way, they retain a notion of whether they were originally lists or dicts.
-_list_mt =
-    __eq:equivalent
-    -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
-    __tostring: =>
-        "["..concat([repr(b) for b in *@], ", ").."]"
-    __lt: (other)=>
-        assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
-        for i=1,math.max(#@, #other)
-            if not @[i] and other[i] then return true
-            elseif @[i] and not other[i] then return false
-            elseif @[i] < other[i] then return true
-            elseif @[i] > other[i] then return false
-        return false
-    __le: (other)=>
-        assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
-        for i=1,math.max(#@, #other)
-            if not @[i] and other[i] then return true
-            elseif @[i] and not other[i] then return false
-            elseif @[i] < other[i] then return true
-            elseif @[i] > other[i] then return false
-        return true
-    __index:
-        add_1: insert
-        append_1: insert
-        add_1_at_index_2: (t,x,i)-> insert(t,i,x)
-        at_index_1_add_2: insert
-        pop: table.remove
-        remove_last: table.remove
-        remove_index_1: table.remove
-
-list = (t)-> setmetatable(t, _list_mt)
-
-_dict_mt =
-    __eq:equivalent
-    __tostring: =>
-        "{"..concat(["#{repr(k)}: #{repr(v)}" for k,v in pairs @], ", ").."}"
-dict = (t)-> setmetatable(t, _dict_mt)
-
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable {name:"Nomsu"},
     __index: (k)=> if _self = rawget(@, "self") then _self[k] else nil
@@ -120,8 +81,13 @@ with NomsuCompiler
         -- Nomsu types:
         :list, :dict,
     }
-    if jit then to_add.bit = require('bit')
-    elseif _VERSION == "Lua 5.2" then to_add.bit = bit32
+    if _VERSION == "Lua 5.4"
+        to_add.ipairs = (x)->
+            if mt = getmetatable(x)
+                if mt.__ipairs then return mt.__ipairs(x)
+            return ipairs(x)
+    if jit or _VERSION == "Lua 5.2"
+        to_add.bit = require("bitops")
     for k,v in pairs(to_add) do NomsuCompiler[k] = v
     for k,v in pairs(AST) do NomsuCompiler[k] = v
     .LuaCode = LuaCode
@@ -365,6 +331,8 @@ with NomsuCompiler
                 lua = LuaCode.Value(tree.source)
                 if tree.target
                     lua\append @compile(tree.target), ":"
+                    if string.as_lua_id(stub)\match("^[0-9]")
+                        lua\append "_"
                 else
                     lua\append "A_"
                 lua\append(string.as_lua_id(stub),"(")

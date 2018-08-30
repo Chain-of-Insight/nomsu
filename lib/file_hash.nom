@@ -5,13 +5,38 @@
 use "lib/os.nom"
 use "lib/base64.nom"
 
-%hashlib = (=lua "require('openssl.digest')")
+lua> ".."
+    local \%use_sha1, \%hashlib = pcall(require, 'openssl.digest')
 
 test:
-    assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
-action [hash %, sha1 %]:
-    %hash = (=lua "\%hashlib.new('sha1'):final(\%)")
-    return (base64 %hash)
+    assume ((hash "hello world") == (hash "hello world"))
+    assume ((hash "hello world") != (hash "goodbye")) or barf ".."
+        Hash collision:
+            (hash "hello world") = \(hash "hello world")
+            (hash "goodbye") = \(hash "goodbye")
+    assume (..)
+        (..)
+            hash ".."
+                This is a really long string meant to stress test the hashing function and
+                ensure that it's not overflowing with long inputs.
+        ..!= "inf"
+    assume ((hash "\0") != (hash "\0\0\0\0\0")) or barf "Incorrect hashing of null strings"
+    if %use_sha1:
+        assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
+if %use_sha1:
+    action [hash %]:
+        %hash = (=lua "\%hashlib.new('sha1'):final(\%)")
+        return (base64 %hash)
+..else:
+    # TODO: remove warning?
+    say "\027[31;1mWARNING: OpenSSL module not found. Defaulting to a non-cryptographically secure hash function.\027[0m"
+    action [hash %]:
+        %bytes = (bytes of %)
+        %hash = (%bytes.1 << 7)
+        for %i in 2 to (size of %bytes):
+            %hash = ((1000003 * %hash) ~ %bytes.%i)
+        %hash = (%hash ~ (size of %bytes))
+        return "\%hash"
 
 action [file with hash %hash]:
     for file %filename in ".":
@@ -19,4 +44,4 @@ action [file with hash %hash]:
         %file_hash = (hash %contents)
         if (%file_hash == %hash): return %filename
 
-parse [hash of file %filename] as (sha1 (read file %filename))
+parse [hash of file %filename] as (hash (read file %filename))
