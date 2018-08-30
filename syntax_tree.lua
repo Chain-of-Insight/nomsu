@@ -70,6 +70,12 @@ for _index_0 = 1, #types do
               unpack(self.comments)
             }
           end
+          do
+            local init = replacement.__init
+            if init then
+              init(replacement)
+            end
+          end
         end
       else
         replacement = {
@@ -102,6 +108,12 @@ for _index_0 = 1, #types do
           return self
         end
         replacement = setmetatable(replacement, getmetatable(self))
+        do
+          local init = replacement.__init
+          if init then
+            init(replacement)
+          end
+        end
       end
       return replacement
     end
@@ -131,12 +143,23 @@ for _index_0 = 1, #types do
         assert(Source:is_instance(t.source))
       end
       setmetatable(t, self)
-      if t.__init then
-        t:__init()
+      do
+        local init = t.__init
+        if init then
+          init(t)
+        end
       end
       return t
     end
   })
+end
+AST.Block.__init = function(self)
+  for _index_0 = 1, #self do
+    local a = self[_index_0]
+    if not AST.is_syntax_tree(a) then
+      require('ldt').breakpoint()
+    end
+  end
 end
 AST.Action.__init = function(self)
   local stub_bits = { }

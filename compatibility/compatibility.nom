@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.6.5.6
+#!/usr/bin/env nomsu -V3.7
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -9,7 +9,7 @@ use "lib/os.nom"
 action [upgrade to %version via %upgrade_fn]:
     %UPGRADES.%version = %upgrade_fn
 
-%ACTION_UPGRADES = ({} with fallback % -> [])
+%ACTION_UPGRADES = ({} with fallback % -> {})
 action [upgrade action %stub to %version via %upgrade_fn]:
     %ACTION_UPGRADES.%version.%stub = %upgrade_fn
 
@@ -18,43 +18,48 @@ parse [upgrade %tree to %version as %body] as (..)
 
 compile [upgrade action %actions to %version as %body] to:
     if (%actions is "Action" syntax tree):
-        %actions = [%actions]
+        %actions = \[%actions]
     %lua = (Lua "")
     for %action in %actions:
         %replacements = {}
-        for %i in 1 to (length of %action):
+        for %i in 1 to (size of %action):
             if (%action.%i.type is "Var"):
                 %replacements.(%action.%i.1) = "\(\%tree as lua id)[\%i]"
         
+        %needs_mangle = (no)
         local action [make tree %t]:
             when:
                 (%t is "Var" syntax tree):
                     if %replacements.(%t.1):
                         return %replacements.(%t.1)
                     ..else:
+                        external %needs_mangle = (yes)
                         return ".."
                             \(%t.type){source=\(quote "\(%t.source)"), \(..)
                                 quote "\(%t.1) \000\(=lua "string.format('%X', __MANGLE_INDEX)")"
                             ..}
                 
                 (%t is syntax tree):
-                    %args = ((make tree %) for % in %t)
-                    %args::add "source=\(\%tree as lua id).source"
-                    if %t.target:
-                        %args::add "target=\(make tree %t.target)"
+                    %args = []
+                    for %k = %v in %t:
+                        if ((type of %k) == "number"):
+                            %args::add (make tree %v)
+                        ..else:
+                            %args::add "\%k=\(make tree %v)"
                     return "\(%t.type){\(%args joined with ", ")}"
                 
                 else:
-                    return (quote "\%t")
+                    return (quote %t)
         
         unless ("\%lua" == ""): %lua::append "\n"
+        %retval = (make tree %body)
         %lua::append (..)
             Lua ".."
                 A_upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
                     \%tree as lua id
                 ..)
-                    __MANGLE_INDEX = (__MANGLE_INDEX or 0) + 1
-                    return \(make tree %body)
+                    \("__MANGLE_INDEX = (__MANGLE_INDEX or 0) + 1\n    " if (%needs_mangle) else "")\
+                ..return \%retval
                 end)
     
     return %lua

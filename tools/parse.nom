@@ -9,6 +9,9 @@ action [print tree %t at indent %indent]:
     if %t.type is:
         "Action":
             say "\(%indent)Action (\(%t.stub)):"
+            if %t.target:
+                say "\(%indent)  Target:"
+                print tree %t.target at indent "\%indent    "
             for %arg in %t:
                 if (%arg is syntax tree):
                     print tree %arg at indent "\%indent  "

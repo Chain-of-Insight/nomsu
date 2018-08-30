@@ -30,6 +30,7 @@ for name in *types
                     replacement = setmetatable {k,v for k,v in pairs replacement}, getmetatable(replacement)
                     replacement.source = @source
                     replacement.comments = {unpack(@comments)} if @comments
+                    if init = replacement.__init then init(replacement)
             else
                 replacement = {source:@source, comments:@comments and {unpack(@comments)}}
                 changes = false
@@ -42,6 +43,7 @@ for name in *types
                         replacement[k] = r
                 return @ unless changes
                 replacement = setmetatable replacement, getmetatable(@)
+                if init = replacement.__init then init(replacement)
             return replacement
         .__eq = (other)=>
             return false if type(@) != type(other) or #@ != #other or getmetatable(@) != getmetatable(other)
@@ -58,7 +60,7 @@ for name in *types
             else
                 assert(Source\is_instance(t.source))
             setmetatable(t, @)
-            if t.__init then t\__init!
+            if init = t.__init then init(t)
             return t
 
 AST.Action.__init = =>
