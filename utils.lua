@@ -55,7 +55,7 @@ local function repr(x, mt_behavior)
         local escaped = gsub(x, "\\", "\\\\")
         escaped = gsub(escaped, "\n", "\\n")
         escaped = gsub(escaped, '"', '\\"')
-        escaped = gsub(escaped, "[%c%z]", function(c) return "\\"..c:byte() end)
+        escaped = gsub(escaped, "[%c%z]", function(c) return ("\\%03d"):format(c:byte()) end)
         return '"'..escaped..'"'
     else
         return tostring(x)
