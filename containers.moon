@@ -50,6 +50,10 @@ _list_mt =
                 if x == item
                     return i
             return nil
+    -- TODO: remove this safety check to get better performance?
+    __newindex: (k,v)=>
+        assert type(k) == 'number', "List indices must be numbers"
+        rawset(@, k, v)
 
 list = (t)-> setmetatable(t, _list_mt)
 

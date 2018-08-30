@@ -107,7 +107,11 @@ local _list_mt = {
       end
       return nil
     end
-  }
+  },
+  __newindex = function(self, k, v)
+    assert(type(k) == 'number', "List indices must be numbers")
+    return rawset(self, k, v)
+  end
 }
 list = function(t)
   return setmetatable(t, _list_mt)
