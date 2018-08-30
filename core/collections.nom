@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.6.5.6
+#!/usr/bin/env nomsu -V3.7.5.6
 #
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.
@@ -11,10 +11,12 @@ use "core/operators.nom"
 test:
     %list = [1, 2, 3, 4, 5]
     %visited = {}
-    for %i = %x in %list: %visited.%i = (yes)
+    for %i = %x in %list:
+        %visited.%i = (yes)
     assume (%visited == {1:yes, 2:yes, 3:yes, 4:yes, 5:yes})
     %visited = {}
-    for %x in %list: %visited.%x = (yes)
+    for %x in %list:
+        %visited.%x = (yes)
     assume (%visited == {1:yes, 2:yes, 3:yes, 4:yes, 5:yes})
     assume ((%list::2 nd to last) == 4)
     assume ((%list::first) == 1)

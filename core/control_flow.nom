@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.6.5.6
+#!/usr/bin/env nomsu -V3.7.5.6
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -300,7 +300,7 @@ compile [..]
         %stop_labels::append "\n\(compile as (===stop %key ===))"
     if (%body has subtree \(stop %value)):
         %stop_labels::append "\n\(compile as (===stop %value ===))"
-    if ((length of "\%stop_labels") > 0):
+    if ((size of "\%stop_labels") > 0):
         %lua = (..)
             Lua ".."
                 do -- scope for stopping for % = % loop
@@ -332,18 +332,18 @@ compile [if %body, when %body] to:
         compile error at %body.source "'if' expected a Block, but got: %s"
     for %line in %body:
         unless (..)
-            ((%line.type is "Action") and ((length of %line) >= 2)) and (..)
-                %line.(length of %line) is "Block" syntax tree
+            ((%line.type is "Action") and ((size of %line) >= 2)) and (..)
+                %line.(size of %line) is "Block" syntax tree
         ..:
             compile error at %line.source ".."
                 Invalid line for 'if', each line should contain conditional expressions followed by a block, or "else" followed by a block:
                 %s
         
-        %action = %line.(length of %line)
-        if ((%line.1 is "else") and ((length of %line) == 2)):
+        %action = %line.(size of %line)
+        if ((%line.1 is "else") and ((size of %line) == 2)):
             unless %else_allowed:
                 compile error at %line.source "Can't have two 'else' blocks"
-            unless ((length of "\%code") > 0):
+            unless ((size of "\%code") > 0):
                 compile error at %line.source ".."
                     Can't have an 'else' block without a preceeding condition
             
@@ -355,7 +355,7 @@ compile [if %body, when %body] to:
             %else_allowed = (no)
         ..else:
             %code::append "\%clause "
-            for %i in 1 to ((length of %line) - 1):
+            for %i in 1 to ((size of %line) - 1):
                 unless (%line.%i is syntax tree):
                     compile error at %line.source ".."
                         Invalid condition for 'if' statement:
@@ -371,7 +371,7 @@ compile [if %body, when %body] to:
             
             %clause = "\nelseif"
     
-    if ((length of "\%code") == 0):
+    if ((size of "\%code") == 0):
         compile error at %body.source "'if' block has an empty body"
     %code::append "\nend --when"
     return %code
@@ -395,18 +395,18 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
         compile error at %body.source "'if' expected a Block, but got: %s"
     for %line in %body:
         unless (..)
-            ((%line.type is "Action") and ((length of %line) >= 2)) and (..)
-                %line.(length of %line) is "Block" syntax tree
+            ((%line.type is "Action") and ((size of %line) >= 2)) and (..)
+                %line.(size of %line) is "Block" syntax tree
         ..:
             compile error at %line.source ".."
                 Invalid line for 'if % is % %', each line should contain expressions followed by a block, or "else" followed by a block:
                 %s
         
-        %action = %line.(length of %line)
-        if ((%line.1 is "else") and ((length of %line) == 2)):
+        %action = %line.(size of %line)
+        if ((%line.1 is "else") and ((size of %line) == 2)):
             unless %else_allowed:
                 compile error at %line.source "Can't have two 'else' blocks"
-            unless ((length of "\%code") > 0):
+            unless ((size of "\%code") > 0):
                 compile error at %line.source ".."
                     Can't have an 'else' block without a preceeding condition
             
@@ -418,7 +418,7 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
             %else_allowed = (no)
         ..else:
             %code::append "\%clause "
-            for %i in 1 to ((length of %line) - 1):
+            for %i in 1 to ((size of %line) - 1):
                 unless (%line.%i is syntax tree):
                     compile error at %line.source ".."
                         Invalid condition for 'if' statement:
@@ -434,7 +434,7 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
             
             %clause = "\nelseif"
     
-    if ((length of "\%code") == 0):
+    if ((size of "\%code") == 0):
         compile error at %body.source "'if % is % %' block has an empty body"
     %code::append "\nend --when"
     return (..)

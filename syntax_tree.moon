@@ -10,7 +10,7 @@ AST.is_syntax_tree = (n, t=nil)->
     type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
 
 types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
-    "IndexChain", "Action", "FileChunks", "Method"}
+    "IndexChain", "Action", "FileChunks"}
 for name in *types
     cls = {}
     with cls

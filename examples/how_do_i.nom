@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.6.5.6
+#!/usr/bin/env nomsu -V3.7.5.6
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -79,7 +79,7 @@ say %my_list.1
 
 # List entries can be modified like this:
 %my_list.1 = "ONE!!!"
-say (length of %my_list)
+say (size of %my_list)
 
 # How do I define a dictionary/hash map?
 %my_dict = {x:99, y:101}

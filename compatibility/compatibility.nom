@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7
+#!/usr/bin/env nomsu -V3.7.5.6
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -45,11 +45,11 @@ compile [upgrade action %actions to %version as %body] to:
                         if ((type of %k) == "number"):
                             %args::add (make tree %v)
                         ..else:
-                            %args::add "\%k=\(make tree %v)"
+                            %args::add "\(%k)=\(make tree %v)"
+                    
                     return "\(%t.type){\(%args joined with ", ")}"
                 
-                else:
-                    return (quote %t)
+                else: return (quote %t)
         
         unless ("\%lua" == ""): %lua::append "\n"
         %retval = (make tree %body)

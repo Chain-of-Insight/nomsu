@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7
+#!/usr/bin/env nomsu -V3.7.5.6
 #
     This file defines upgrades from Nomsu <3.7 to 3.7
 
@@ -10,15 +10,17 @@ upgrade action [%index rd to last in %list] to "3.7" as (%list::%index rd to las
 upgrade action [%index th to last in %list] to "3.7" as (%list::%index rd th last)
 upgrade action [last in %list] to "3.7" as (%list::last)
 upgrade action [first in %list] to "3.7" as (%list::first)
-upgrade action [%item is in %list, %list contains %item, %list has %item] to "3.7" as (..)
-    %list::has %item
+upgrade action [%item is in %list, %list contains %item, %list has %item]
+..to "3.7" as (%list::has %item)
 
 upgrade action [..]
     %item isn't in %list, %item is not in %list, %list doesn't contain %item
     %list does not contain %item, %list doesn't have %item, %list does not have %item
 ..to "3.7" as (not (%list::has %item))
 
-upgrade action [%list has key %index, %list has index %index] to "3.7" as (%list.%index != (nil))
+upgrade action [%list has key %index, %list has index %index] to "3.7" as (..)
+    %list.%index != (nil)
+
 upgrade action [..]
     %list doesn't have key %index, %list does not have key %index
     %list doesn't have index %index, %list does not have index %index

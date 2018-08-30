@@ -1,12 +1,11 @@
-#!/usr/bin/env nomsu -V3.6.5.6
+#!/usr/bin/env nomsu -V3.7.5.6
 #
     This file defines some actions for hashing files and looking up files by hash.
 
 use "lib/os.nom"
 use "lib/base64.nom"
 
-lua> ".."
-    local \%use_sha1, \%hashlib = pcall(require, 'openssl.digest')
+lua> "local \%use_sha1, \%hashlib = pcall(require, 'openssl.digest')"
 
 test:
     assume ((hash "hello world") == (hash "hello world"))
@@ -14,13 +13,16 @@ test:
         Hash collision:
             (hash "hello world") = \(hash "hello world")
             (hash "goodbye") = \(hash "goodbye")
+    
     assume (..)
         (..)
             hash ".."
                 This is a really long string meant to stress test the hashing function and
                 ensure that it's not overflowing with long inputs.
         ..!= "inf"
-    assume ((hash "\0") != (hash "\0\0\0\0\0")) or barf "Incorrect hashing of null strings"
+    
+    assume ((hash "\000") != (hash "\000\000\000\000\000")) or barf ".."
+        Incorrect hashing of null strings
     if %use_sha1:
         assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
 if %use_sha1:

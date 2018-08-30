@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V2.5.5.5
+#!/usr/bin/env nomsu -V3.7.5.6
 #
     Tool to find and replace one tree with another.
         nomsu tools/replace.nom [-i] tree_to_replace replacement file1 file2 directory1 ...
@@ -13,7 +13,7 @@ if (%args.1 is "-i"):
     %inplace = (yes)
     %args::remove index 1
 
-if ((length of %args) < 3):
+if ((size of %args) < 3):
     say "Usage: nomsu tools/replace.nom [-i] tree_to_replace replacement files..."
     lua> "os.exit(1)"
 
