@@ -29,6 +29,7 @@ test:
     assume ((%list::last) == 5)
     %list::remove index 1
     assume ((%list::first) == 2)
+    assume (([1, 2] + [3, 4]) == [1, 2, 3, 4])
 
 # Dict functionality
 test:
