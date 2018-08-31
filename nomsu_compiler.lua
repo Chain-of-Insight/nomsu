@@ -37,7 +37,8 @@ local AST = require("syntax_tree")
 local Parser = require("parser")
 SOURCE_MAP = { }
 string.as_lua_id = function(str)
-  str = gsub(str, "x([0-9A-F][0-9A-F])", "x\0%1")
+  str = gsub(str, "^\0*$", "%1\0")
+  str = gsub(str, "x([0-9A-F][0-9A-F])", "x78%1")
   str = gsub(str, "%W", function(c)
     if c == ' ' then
       return '_'
@@ -45,16 +46,19 @@ string.as_lua_id = function(str)
       return format("x%02X", byte(c))
     end
   end)
+  str = str:gsub("^_*%d", "_%1")
   return str
 end
-table.map = function(self, fn)
-  local _accum_0 = { }
-  local _len_0 = 1
-  for _, v in ipairs(self) do
-    _accum_0[_len_0] = fn(v)
-    _len_0 = _len_0 + 1
-  end
-  return _accum_0
+table.map = function(t, fn)
+  return setmetatable((function()
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _, v in ipairs(t) do
+      _accum_0[_len_0] = fn(v)
+      _len_0 = _len_0 + 1
+    end
+    return _accum_0
+  end)(), getmetatable(t))
 end
 table.fork = function(t, values)
   return setmetatable(values or { }, {
@@ -106,7 +110,7 @@ local NomsuCompiler = setmetatable({
   end
 })
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 5
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 6
   NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
   NomsuCompiler.nomsu = NomsuCompiler
   NomsuCompiler.parse = function(self, ...)
@@ -489,10 +493,10 @@ do
   NomsuCompiler.compile = function(self, tree)
     if tree.version then
       do
-        local get_version = self['A_' .. string.as_lua_id("Nomsu version")]
+        local get_version = self[string.as_lua_id("Nomsu version")]
         if get_version then
           do
-            local upgrade = self['A_' .. string.as_lua_id("1 upgraded from 2 to 3")]
+            local upgrade = self[string.as_lua_id("1 upgraded from 2 to 3")]
             if upgrade then
               tree = upgrade(tree, tree.version, get_version())
             end
@@ -529,11 +533,6 @@ do
       local lua = LuaCode.Value(tree.source)
       if tree.target then
         lua:append(self:compile(tree.target), ":")
-        if string.as_lua_id(stub):match("^[0-9]") then
-          lua:append("_")
-        end
-      else
-        lua:append("A_")
       end
       lua:append(string.as_lua_id(stub), "(")
       local args = { }

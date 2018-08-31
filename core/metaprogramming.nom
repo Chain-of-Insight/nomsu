@@ -94,13 +94,13 @@ test:
     assume ((foo 1) == "outer")
 compile [local action %actions %body] to:
     lua> ".."
-        local fn_name = "A_"..string.as_lua_id(\%actions[1].stub)
+        local fn_name = string.as_lua_id(\%actions[1].stub)
         local \%args = table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end)
         local lua = LuaCode(tree.source, fn_name, " = ", \(compile as (%args -> %body)))
         lua:add_free_vars({fn_name})
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local alias_name = "A_"..string.as_lua_id(alias.stub)
+            local alias_name = string.as_lua_id(alias.stub)
             lua:add_free_vars({alias_name})
             local \%alias_args = table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) end)
             lua:append("\\n", alias_name, " = ")
@@ -125,11 +125,11 @@ test:
 compile [action %actions %body] to (..)
     lua> ".."
         local lua = \(compile as (local action %actions %body))
-        lua:remove_free_vars(table.map(\%actions, function(a) return "A_"..string.as_lua_id(a.stub) end))
+        lua:remove_free_vars(table.map(\%actions, function(a) return string.as_lua_id(a.stub) end))
         return lua
 
 test:
-    assume ((action (say %)) == (=lua "A_say_1"))
+    assume ((action (say %)) == (=lua "say_1"))
 compile [action %action] to (Lua value (%action as lua id))
 
 test:
@@ -209,7 +209,7 @@ compile [%tree as lua return] to (..)
     Lua value "nomsu:compile(\(%tree as lua expr)):as_statements('return ')"
 
 compile [remove action %action] to (..)
-    Lua "A_\(=lua "string.as_lua_id(\(%action.stub))") = nil"
+    Lua "\(=lua "string.as_lua_id(\(%action.stub))") = nil"
 
 test:
     assume ("\(\(foo \%x) as nomsu)" == "foo %x") or barf ".."
@@ -224,7 +224,7 @@ action [%var as lua identifier, %var as lua id] (..)
     lua> ".."
         if type(\%var) == 'string' then return string.as_lua_id(\%var)
         elseif \%var.type == 'Var' then return "_"..string.as_lua_id(\%var[1])
-        elseif \%var.type == 'Action' then return "A_"..string.as_lua_id(\%var.stub)
+        elseif \%var.type == 'Action' then return string.as_lua_id(\%var.stub)
         end
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

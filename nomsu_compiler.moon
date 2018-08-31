@@ -29,16 +29,27 @@ Parser = require("parser")
 export SOURCE_MAP
 SOURCE_MAP = {}
 
+-- Convert an arbitrary string into a valid Lua identifier. This function is injective,
+-- but not idempotent, i.e. if (x != y) then (as_lua_id(x) != as_lua_id(y)),
+-- but as_lua_id(x) is not necessarily equal to as_lua_id(as_lua_id(x))
 string.as_lua_id = (str)->
-    -- Cut up escape-sequence-like chunks
-    str = gsub str, "x([0-9A-F][0-9A-F])", "x\0%1"
-    -- Alphanumeric unchanged, spaces to underscores, and everything else to hex escape sequences
+    -- Empty strings are not valid lua identifiers, so treat them like "\0",
+    -- and treat "\0" as "\0\0", etc. to preserve injectivity.
+    str = gsub str, "^\0*$", "%1\0"
+    -- Escape 'x' when it precedes something that looks like an uppercase hex sequence.
+    -- This way, all Lua IDs can be unambiguously reverse-engineered, but normal usage
+    -- of 'x' won't produce ugly Lua IDs.
+    -- i.e. "x" -> "x", "oxen" -> "oxen", but "Hex2Dec" -> "Hex782Dec" and "He-ec" -> "Hex2Dec"
+    str = gsub str, "x([0-9A-F][0-9A-F])", "x78%1"
+    -- Map spaces to underscores, and everything else non-alphanumeric to hex escape sequences
     str = gsub str, "%W", (c)->
         if c == ' ' then '_'
         else format("x%02X", byte(c))
+    -- Lua IDs can't start with numbers, so map "1" -> "_1", "_1" -> "__1", etc.
+    str = str\gsub "^_*%d", "_%1"
     return str
 
-table.map = (fn)=> [fn(v) for _,v in ipairs(@)]
+table.map = (t, fn)-> setmetatable([fn(v) for _,v in ipairs(t)], getmetatable(t))
 table.fork = (t, values)-> setmetatable(values or {}, {__index:t})
 table.copy = (t)-> setmetatable({k,v for k,v in pairs(t)}, getmetatable(t))
 
@@ -63,7 +74,7 @@ NomsuCompiler = setmetatable {name:"Nomsu"},
     __index: (k)=> if _self = rawget(@, "self") then _self[k] else nil
     __tostring: => @name
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 5
+    .NOMSU_COMPILER_VERSION = 6
     .NOMSU_SYNTAX_VERSION = Parser.version
     .nomsu = NomsuCompiler
     .parse = (...)=> Parser.parse(...)
@@ -312,8 +323,8 @@ with NomsuCompiler
 
     .compile = (tree)=>
         if tree.version
-            if get_version = @['A_'..string.as_lua_id("Nomsu version")]
-                if upgrade = @['A_'..string.as_lua_id("1 upgraded from 2 to 3")]
+            if get_version = @[string.as_lua_id("Nomsu version")]
+                if upgrade = @[string.as_lua_id("1 upgraded from 2 to 3")]
                     tree = upgrade(tree, tree.version, get_version!)
         switch tree.type
             when "Action"
@@ -331,10 +342,6 @@ with NomsuCompiler
                 lua = LuaCode.Value(tree.source)
                 if tree.target
                     lua\append @compile(tree.target), ":"
-                    if string.as_lua_id(stub)\match("^[0-9]")
-                        lua\append "_"
-                else
-                    lua\append "A_"
                 lua\append(string.as_lua_id(stub),"(")
                 args = {}
                 for i, tok in ipairs tree
