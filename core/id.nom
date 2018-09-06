@@ -25,7 +25,7 @@ set %id_by_obj's metatable to {..}
             %obj_by_id.%id = %key
             return %id
 
-local action [uuid]:
+action [uuid]:
     # Set all the other bits to randomly (or pseudo-randomly) chosen values.
     %bytes = [..]
         randint (2^(4*8)), # time-low
