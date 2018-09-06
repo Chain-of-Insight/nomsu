@@ -139,9 +139,10 @@ test:
     repeat 10 times: %x += 1
     assume (%x == 10)
 compile [repeat %n times %body] to:
+    define mangler
     %lua = (..)
         Lua ".."
-            for i=1,\(%n as lua expr) do
+            for \(mangle "i")=1,\(%n as lua expr) do
                 \(%body as lua statements)
     
     if (%body has subtree \(do next)):
@@ -242,9 +243,10 @@ compile [for %var in %iterable %body] to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
         compile error at %var.source "Loop expected variable, not: %s"
+    define mangler
     %lua = (..)
         Lua ".."
-            for i,\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
+            for \(mangle "i"),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
                 \(%body as lua statements)
     
     if (%body has subtree \(do next)):
@@ -391,6 +393,7 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
     %code = (Lua "")
     %clause = "if"
     %else_allowed = (yes)
+    define mangler
     unless (%body.type is "Block"):
         compile error at %body.source "'if' expected a Block, but got: %s"
     for %line in %body:
@@ -426,7 +429,7 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
                 
                 if (%i > 1):
                     %code::append " or "
-                %code::append "branch_value == \(%line.%i as lua expr)"
+                %code::append "\(mangle "branch value") == \(%line.%i as lua expr)"
             
             %code::append ".."
                  then
@@ -440,7 +443,7 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
     return (..)
         Lua ".."
             do --if % is
-                local branch_value = \(%branch_value as lua expr)
+                local \(mangle "branch value") = \(%branch_value as lua expr)
                 \%code
             end --if % is
 
@@ -461,18 +464,20 @@ test:
     ..and if it barfs: do nothing
     
     assume (%d.x == "good")
-compile [do %action then always %final_action] to (..)
-    Lua ".."
-        do
-            local fell_through = false
-            local ok, ret = pcall(function()
-                \(%action as lua statements)
-                fell_through = true
-            end)
-            \(%final_action as lua statements)
-            if not ok then error(ret, 0) end
-            if not fell_through then return ret end
-        end
+compile [do %action then always %final_action] to:
+    define mangler
+    return (..)
+        Lua ".."
+            do
+                local \(mangle "fell_through") = false
+                local \(mangle "ok"), \(mangle "ret") = pcall(function()
+                    \(%action as lua statements)
+                    \(mangle "fell_through") = true
+                end)
+                \(%final_action as lua statements)
+                if not \(mangle "ok") then error(ret, 0) end
+                if not \(mangle "fell_through") then return ret end
+            end
 
 test:
     assume ((result of (: return 99)) == 99)
@@ -493,14 +498,15 @@ test:
 # Recurion control flow
 compile [for %var in recursive %structure %body] to (..)
     with local compile actions:
+        define mangler
         compile [recurse %v on %x] to (..)
-            Lua "table.insert(stack\(%v as lua id), \(%x as lua expr))"
+            Lua "table.insert(\(mangle "stack \(%v.1)"), \(%x as lua expr))"
         %lua = (..)
             Lua ".."
                 do
-                    local stack\(%var as lua id) = list{\(%structure as lua expr)}
-                    while #stack\(%var as lua id) > 0 do
-                        \(%var as lua expr) = table.remove(stack\(%var as lua id), 1)
+                    local \(mangle "stack \(%var.1)") = _List{\(%structure as lua expr)}
+                    while #\(mangle "stack \(%var.1)") > 0 do
+                        \(%var as lua expr) = table.remove(\(mangle "stack \(%var.1)"), 1)
                         \(%body as lua statements)
         
         if (%body has subtree \(do next)):

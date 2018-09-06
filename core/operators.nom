@@ -19,28 +19,6 @@ compile [%a is %b, %a == %b] to (..)
 compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to (..)
     Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
 
-# For strict identity checking, use (%x's id) is (%y's id)
-test:
-    assume (([] == []) and (([] 's id) != ([] 's id)))
-lua> ".."
-    do
-        local new_uuid = require('uuid')
-        local NaN_surrogate = {}
-        local nil_surrogate = {}
-        IDS = setmetatable({}, {
-            __mode = "k",
-            __index = function(self, key)
-                if key == nil then return self[nil_surrogate]
-                elseif key ~= key then return self[NaN_surrogate] end
-                local id = new_uuid()
-                self[key] = id
-                return id
-            end
-        })
-    end
-
-compile [% 's id, id of %] to (Lua value "IDS[\(% as lua expr)]")
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:

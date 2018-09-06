@@ -14,7 +14,7 @@ re = require 're'
 utils = require 'utils'
 Files = require 'files'
 {:repr, :stringify, :equivalent} = utils
-{:list, :dict} = require 'containers'
+{:List, :Dict} = require 'containers'
 export colors, colored
 colors = require 'consolecolors'
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
@@ -33,9 +33,9 @@ SOURCE_MAP = {}
 -- but not idempotent, i.e. if (x != y) then (as_lua_id(x) != as_lua_id(y)),
 -- but as_lua_id(x) is not necessarily equal to as_lua_id(as_lua_id(x))
 string.as_lua_id = (str)->
-    -- Empty strings are not valid lua identifiers, so treat them like "\0",
-    -- and treat "\0" as "\0\0", etc. to preserve injectivity.
-    str = gsub str, "^\0*$", "%1\0"
+    -- Empty strings are not valid lua identifiers, so treat them like "\3",
+    -- and treat "\3" as "\3\3", etc. to preserve injectivity.
+    str = gsub str, "^\3*$", "%1\3"
     -- Escape 'x' when it precedes something that looks like an uppercase hex sequence.
     -- This way, all Lua IDs can be unambiguously reverse-engineered, but normal usage
     -- of 'x' won't produce ugly Lua IDs.
@@ -74,7 +74,7 @@ NomsuCompiler = setmetatable {name:"Nomsu"},
     __index: (k)=> if _self = rawget(@, "self") then _self[k] else nil
     __tostring: => @name
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 6
+    .NOMSU_COMPILER_VERSION = 7
     .NOMSU_SYNTAX_VERSION = Parser.version
     .nomsu = NomsuCompiler
     .parse = (...)=> Parser.parse(...)
@@ -90,7 +90,7 @@ with NomsuCompiler
         :table, :assert, :dofile, :loadstring, :type, :select, :math, :io, :load,
         :pairs, :ipairs,
         -- Nomsu types:
-        :list, :dict,
+        _List:List, _Dict:Dict,
     }
     if _VERSION == "Lua 5.4"
         to_add.ipairs = (x)->
@@ -187,38 +187,37 @@ with NomsuCompiler
                     lua\append " "
             return lua
 
-        ["Lua 1"]: (tree, _code)=>
-            return add_lua_string_bits(@, 'statements', _code)
+        ["Lua 1"]: (tree, code)=>
+            return add_lua_string_bits(@, 'statements', code)
     
-        ["Lua value 1"]: (tree, _code)=>
-            return add_lua_string_bits(@, 'value', _code)
+        ["Lua value 1"]: (tree, code)=>
+            return add_lua_string_bits(@, 'value', code)
 
-        ["lua > 1"]: (tree, _code)=>
-            if _code.type != "Text"
-                return LuaCode tree.source, "nomsu:run_lua(", @compile(_code), ");"
-            return add_lua_bits(@, "statements", _code)
+        ["lua > 1"]: (tree, code)=>
+            if code.type != "Text"
+                return LuaCode tree.source, "nomsu:run_lua(", @compile(code), ");"
+            return add_lua_bits(@, "statements", code)
 
-        ["= lua 1"]: (tree, _code)=>
-            if _code.type != "Text"
-                return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(_code), ":as_statements('return '))"
-            return add_lua_bits(@, "value", _code)
+        ["= lua 1"]: (tree, code)=>
+            if code.type != "Text"
+                return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(code), ":as_statements('return '))"
+            return add_lua_bits(@, "value", code)
 
-        ["use 1"]: (tree, _path)=>
-            if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string'
-                path = _path[1]
-                for _,f in Files.walk(path)
+        ["use 1"]: (tree, path)=>
+            if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
+                for _,f in Files.walk(path[1])
                     @run_file(f)
-            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(_path), ") do nomsu:run_file(f) end")
+            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(path), ") do nomsu:run_file(f) end")
 
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
-        ["test 1"]: (tree, _body)=>
-            test_str = table.concat [tostring(@tree_to_nomsu(line)) for line in *_body], "\n"
+        ["test 1"]: (tree, body)=>
+            test_str = table.concat [tostring(@tree_to_nomsu(line)) for line in *body], "\n"
             LuaCode tree.source, "TESTS[#{repr(tostring(tree.source))}] = ", repr(test_str)
 
-        ["is jit"]: (tree, _code)=>
+        ["is jit"]: (tree, code)=>
             return LuaCode.Value(tree.source, jit and "true" or "false")
 
-        ["Lua version"]: (tree, _code)=>
+        ["Lua version"]: (tree, code)=>
             return LuaCode.Value(tree.source, repr(_VERSION))
     }, {
         __index: (stub)=>
@@ -417,13 +416,13 @@ with NomsuCompiler
                 return lua
 
             when "List"
-                lua = LuaCode.Value tree.source, "list{"
+                lua = LuaCode.Value tree.source, "_List{"
                 lua\concat_append([@compile(e) for e in *tree], ", ", ",\n  ")
                 lua\append "}"
                 return lua
 
             when "Dict"
-                lua = LuaCode.Value tree.source, "dict{"
+                lua = LuaCode.Value tree.source, "_Dict{"
                 lua\concat_append([@compile(e) for e in *tree], ", ", ",\n  ")
                 lua\append "}"
                 return lua
@@ -481,7 +480,7 @@ with NomsuCompiler
                 return LuaCode.Value(tree.source, tostring(tree[1]))
 
             when "Var"
-                return LuaCode.Value(tree.source, "_", string.as_lua_id(tree[1]))
+                return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
 
             when "FileChunks"
                 error("Cannot convert FileChunks to a single block of lua, since each chunk's "..

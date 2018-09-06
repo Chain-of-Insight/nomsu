@@ -8,7 +8,7 @@ do
   local _obj_0 = require('utils')
   repr, stringify, equivalent, nth_to_last, size = _obj_0.repr, _obj_0.stringify, _obj_0.equivalent, _obj_0.nth_to_last, _obj_0.size
 end
-local list, dict
+local List, Dict
 local _list_mt = {
   __eq = equivalent,
   __tostring = function(self)
@@ -54,7 +54,7 @@ local _list_mt = {
     return true
   end,
   __add = function(self, other)
-    local ret = list((function()
+    local ret = List((function()
       local _accum_0 = { }
       local _len_0 = 1
       for _index_0 = 1, #self do
@@ -113,7 +113,7 @@ local _list_mt = {
     return rawset(self, k, v)
   end
 }
-list = function(t)
+List = function(t)
   return setmetatable(t, _list_mt)
 end
 local walk_items
@@ -122,7 +122,7 @@ walk_items = function(self, i)
   local k, v = next(self.table, self.key)
   if k ~= nil then
     self.key = k
-    return i, dict({
+    return i, Dict({
       key = k,
       value = v
     })
@@ -149,7 +149,7 @@ local _dict_mt = {
     }, 0
   end,
   __band = function(self, other)
-    return dict((function()
+    return Dict((function()
       local _tbl_0 = { }
       for k, v in pairs(self) do
         if other[k] ~= nil then
@@ -173,7 +173,7 @@ local _dict_mt = {
         ret[k] = v
       end
     end
-    return dict(ret)
+    return Dict(ret)
   end,
   __bxor = function(self, other)
     local ret
@@ -191,7 +191,7 @@ local _dict_mt = {
         ret[k] = nil
       end
     end
-    return dict(ret)
+    return Dict(ret)
   end,
   __add = function(self, other)
     local ret
@@ -209,7 +209,7 @@ local _dict_mt = {
         ret[k] = ret[k] + v
       end
     end
-    return dict(ret)
+    return Dict(ret)
   end,
   __sub = function(self, other)
     local ret
@@ -227,18 +227,18 @@ local _dict_mt = {
         ret[k] = ret[k] - v
       end
     end
-    return dict(ret)
+    return Dict(ret)
   end
 }
-dict = function(t)
+Dict = function(t)
   return setmetatable(t, _dict_mt)
 end
-for i, entry in ipairs(dict({
+for i, entry in ipairs(Dict({
   x = 99
 })) do
   assert(i == 1 and entry.key == "x" and entry.value == 99, "ipairs compatibility issue")
 end
 return {
-  list = list,
-  dict = dict
+  List = List,
+  Dict = Dict
 }

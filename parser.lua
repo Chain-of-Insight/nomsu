@@ -1,6 +1,6 @@
 local lpeg = require('lpeg')
 local re = require('re')
-lpeg.setmaxstack(10000)
+lpeg.setmaxstack(20000)
 local P, R, S, C, Cmt, Carg
 P, R, S, C, Cmt, Carg = lpeg.P, lpeg.R, lpeg.S, lpeg.C, lpeg.Cmt, lpeg.Carg
 local match, sub

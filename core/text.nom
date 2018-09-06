@@ -47,7 +47,7 @@ compile [byte %i of %text] to (..)
 
 compile [bytes %start to %stop of %text] to (..)
     Lua value ".."
-        list{(\(%text as lua expr)):byte(\(%start as lua expr), \(%stop as lua expr))}
+        _List{(\(%text as lua expr)):byte(\(%start as lua expr), \(%stop as lua expr))}
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -82,7 +82,7 @@ test:
         ..== ["one", "two"]
 action [lines in %text, lines of %text] (..)
     lua> ".."
-        local result = list{}
+        local result = _List{}
         for line in (\%text):gmatch('[^\\n]+') do
             result[#result+1] = line
         end
@@ -99,7 +99,7 @@ compile [for %match in %text matching %patt %body] to (..)
 compile [%expr for %match in %text matching %patt] to (..)
     Lua value ".."
         (function()
-            local ret = list{}
+            local ret = _List{}
             for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(..)
             %patt as lua expr
         ..) do

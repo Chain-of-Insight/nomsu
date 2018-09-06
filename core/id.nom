@@ -1,0 +1,56 @@
+#!/usr/bin/env nomsu -V3.7.5.6
+#
+    A simple UUID function based on RFC 4122: http://www.ietf.org/rfc/rfc4122.txt
+
+use "core/metaprogramming.nom"
+use "core/math.nom"
+use "core/collections.nom"
+use "core/control_flow.nom"
+
+%NaN_surrogate = {}
+%nil_surrogate = {}
+%obj_by_id = {}
+set %obj_by_id's metatable to {__mode: "v"}
+%id_by_obj = {}
+set %id_by_obj's metatable to {..}
+    __mode: "k"
+    __index: (..)
+        [%self, %key] ->:
+            if (%key == (nil)): return %self.%nil_surrogate
+            if (%key != %key): return %self.%NaN_surrogate
+            --- %retry ---
+            %id = (uuid)
+            if (%obj_by_id.%id != (nil)): go to %retry
+            %self.%key = %id
+            %obj_by_id.%id = %key
+            return %id
+
+local action [uuid]:
+    # Set all the other bits to randomly (or pseudo-randomly) chosen values.
+    %bytes = [..]
+        randint (2^(4*8)), # time-low
+        randint (2^(2*8)), # time-mid
+        randint (2^(2*8 - 4)), # time-high-and-version
+        randint (2^(1*8 - 2)), # clock-seq-and-reserved
+        randint (2^(1*8)), # clock-seq-low
+        randint (2^(3*8)), randint (2^(3*8)), # node
+    # Set the four most significant bits (bits 12 through 15) of the
+    # time_hi_and_version field to the 4-bit version number from
+    # Section 4.1.3.
+    %bytes.3 += 0x4000
+    # Set the two most significant bits (bits 6 and 7) of the
+    # clock_seq_hi_and_reserved to zero and one, respectively.
+    %bytes.4 += 0xC0
+    return (=lua "('%08x-%04x-%04x-%02x%02x-%6x%6x'):format(unpack(\%bytes))")
+
+# For strict identity checking, use (%x's id) == (%y's id)
+test:
+    assume (([] == []) and ((id of []) != (id of [])))
+    seed random with 0
+    %x = []
+    assume ((id of %x) == (id of %x))
+    seed random with 0
+    assume ((id of %x) != (id of []))
+    seed random
+
+action [id of %, %'s id, %' id] %id_by_obj.%

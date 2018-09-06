@@ -4,10 +4,10 @@ local utils = require('utils')
 local Files = require('files')
 local repr, stringify, equivalent
 repr, stringify, equivalent = utils.repr, utils.stringify, utils.equivalent
-local list, dict
+local List, Dict
 do
   local _obj_0 = require('containers')
-  list, dict = _obj_0.list, _obj_0.dict
+  List, Dict = _obj_0.List, _obj_0.Dict
 end
 colors = require('consolecolors')
 colored = setmetatable({ }, {
@@ -37,7 +37,7 @@ local AST = require("syntax_tree")
 local Parser = require("parser")
 SOURCE_MAP = { }
 string.as_lua_id = function(str)
-  str = gsub(str, "^\0*$", "%1\0")
+  str = gsub(str, "^\3*$", "%1\3")
   str = gsub(str, "x([0-9A-F][0-9A-F])", "x78%1")
   str = gsub(str, "%W", function(c)
     if c == ' ' then
@@ -110,7 +110,7 @@ local NomsuCompiler = setmetatable({
   end
 })
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 6
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 7
   NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
   NomsuCompiler.nomsu = NomsuCompiler
   NomsuCompiler.parse = function(self, ...)
@@ -160,8 +160,8 @@ do
     load = load,
     pairs = pairs,
     ipairs = ipairs,
-    list = list,
-    dict = dict
+    _List = List,
+    _Dict = Dict
   }
   if _VERSION == "Lua 5.4" then
     to_add.ipairs = function(x)
@@ -286,42 +286,41 @@ do
       end
       return lua
     end,
-    ["Lua 1"] = function(self, tree, _code)
-      return add_lua_string_bits(self, 'statements', _code)
+    ["Lua 1"] = function(self, tree, code)
+      return add_lua_string_bits(self, 'statements', code)
     end,
-    ["Lua value 1"] = function(self, tree, _code)
-      return add_lua_string_bits(self, 'value', _code)
+    ["Lua value 1"] = function(self, tree, code)
+      return add_lua_string_bits(self, 'value', code)
     end,
-    ["lua > 1"] = function(self, tree, _code)
-      if _code.type ~= "Text" then
-        return LuaCode(tree.source, "nomsu:run_lua(", self:compile(_code), ");")
+    ["lua > 1"] = function(self, tree, code)
+      if code.type ~= "Text" then
+        return LuaCode(tree.source, "nomsu:run_lua(", self:compile(code), ");")
       end
-      return add_lua_bits(self, "statements", _code)
+      return add_lua_bits(self, "statements", code)
     end,
-    ["= lua 1"] = function(self, tree, _code)
-      if _code.type ~= "Text" then
-        return LuaCode.Value(tree.source, "nomsu:run_lua(", self:compile(_code), ":as_statements('return '))")
+    ["= lua 1"] = function(self, tree, code)
+      if code.type ~= "Text" then
+        return LuaCode.Value(tree.source, "nomsu:run_lua(", self:compile(code), ":as_statements('return '))")
       end
-      return add_lua_bits(self, "value", _code)
+      return add_lua_bits(self, "value", code)
     end,
-    ["use 1"] = function(self, tree, _path)
-      if _path.type == 'Text' and #_path == 1 and type(_path[1]) == 'string' then
-        local path = _path[1]
-        for _, f in Files.walk(path) do
+    ["use 1"] = function(self, tree, path)
+      if path.type == 'Text' and #path == 1 and type(path[1]) == 'string' then
+        for _, f in Files.walk(path[1]) do
           self:run_file(f)
         end
       end
-      return LuaCode(tree.source, "for i,f in Files.walk(", self:compile(_path), ") do nomsu:run_file(f) end")
+      return LuaCode(tree.source, "for i,f in Files.walk(", self:compile(path), ") do nomsu:run_file(f) end")
     end,
     ["tests"] = function(self, tree)
       return LuaCode.Value(tree.source, "TESTS")
     end,
-    ["test 1"] = function(self, tree, _body)
+    ["test 1"] = function(self, tree, body)
       local test_str = table.concat((function()
         local _accum_0 = { }
         local _len_0 = 1
-        for _index_0 = 1, #_body do
-          local line = _body[_index_0]
+        for _index_0 = 1, #body do
+          local line = body[_index_0]
           _accum_0[_len_0] = tostring(self:tree_to_nomsu(line))
           _len_0 = _len_0 + 1
         end
@@ -329,10 +328,10 @@ do
       end)(), "\n")
       return LuaCode(tree.source, "TESTS[" .. tostring(repr(tostring(tree.source))) .. "] = ", repr(test_str))
     end,
-    ["is jit"] = function(self, tree, _code)
+    ["is jit"] = function(self, tree, code)
       return LuaCode.Value(tree.source, jit and "true" or "false")
     end,
-    ["Lua version"] = function(self, tree, _code)
+    ["Lua version"] = function(self, tree, code)
       return LuaCode.Value(tree.source, repr(_VERSION))
     end
   }, {
@@ -646,7 +645,7 @@ do
       end
       return lua
     elseif "List" == _exp_0 then
-      local lua = LuaCode.Value(tree.source, "list{")
+      local lua = LuaCode.Value(tree.source, "_List{")
       lua:concat_append((function()
         local _accum_0 = { }
         local _len_0 = 1
@@ -660,7 +659,7 @@ do
       lua:append("}")
       return lua
     elseif "Dict" == _exp_0 then
-      local lua = LuaCode.Value(tree.source, "dict{")
+      local lua = LuaCode.Value(tree.source, "_Dict{")
       lua:concat_append((function()
         local _accum_0 = { }
         local _len_0 = 1
@@ -722,7 +721,7 @@ do
     elseif "Number" == _exp_0 then
       return LuaCode.Value(tree.source, tostring(tree[1]))
     elseif "Var" == _exp_0 then
-      return LuaCode.Value(tree.source, "_", string.as_lua_id(tree[1]))
+      return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
     elseif "FileChunks" == _exp_0 then
       return error("Cannot convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     else

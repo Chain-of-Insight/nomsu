@@ -1,7 +1,7 @@
 -- This file contains the parser, which converts Nomsu text into abstract syntax trees
 lpeg = require 'lpeg'
 re = require 're'
-lpeg.setmaxstack 10000
+lpeg.setmaxstack 20000
 {:P,:R,:S,:C,:Cmt,:Carg} = lpeg
 {:match, :sub} = string
 {:insert, :remove} = table

@@ -88,7 +88,7 @@ if not args or args.help
     os.exit(EXIT_FAILURE)
 
 nomsu = NomsuCompiler
-nomsu.arg = NomsuCompiler.list(args.nomsu_args)
+nomsu.arg = NomsuCompiler._List(args.nomsu_args)
 
 if args.version
     nomsu\run [[

@@ -5,6 +5,20 @@
 
 lua> "NOMSU_CORE_VERSION = 7"
 lua> ".."
+    do
+        local mangle_index = 0
+        function mangler()
+            local my_mangle_index = mangle_index
+            mangle_index = mangle_index + 1
+            return function(varname)
+                return string.as_lua_id(varname..(("\\3%X"):format(my_mangle_index)))
+            end
+        end
+    end
+    COMPILE_ACTIONS["define mangler"] = function(nomsu, tree)
+        return LuaCode(tree.source, "local mangle_1 = mangler()")
+    end
+lua> ".."
     COMPILE_ACTIONS["1 -> 2"] = function(nomsu, tree, \%args, \%body)
         local lua = LuaCode.Value(tree.source, "(function(")
         if AST.is_syntax_tree(\%args, "Action") then \%args = \%args:get_args() end
@@ -34,7 +48,7 @@ test:
     compile [five] to (Lua value "5")
 test:
     assume ((five) == 5) or barf "Compile to expression failed."
-    compile [loc x] to (Lua "local _x = 99;")
+    compile [loc x] to (Lua "local x = 99;")
 test:
     lua> "do"
     loc x
@@ -158,7 +172,7 @@ compile [parse %actions as %body] to (..)
                 if replacements[t[1]] then
                     return replacements[t[1]]
                 else
-                    return t.type.."{"..repr(t[1].." \\0").."..('%X'):format(__MANGLE_INDEX), source="..repr(tostring(t.source)).."}"
+                    return t.type.."{mangle("..repr(t[1]).."), source="..repr(tostring(t.source)).."}"
                 end
             elseif AST.is_syntax_tree(t) then
                 local ret = {}
@@ -181,7 +195,7 @@ compile [parse %actions as %body] to (..)
             end
         end
         local \%new_body = LuaCode(\%body.source,
-            "__MANGLE_INDEX = (__MANGLE_INDEX or 0) + 1",
+            "local mangle = mangler()",
             "\\nlocal tree = ", make_tree(\%body),
             "\\nlocal lua = nomsu:compile(tree)",
             "\\nreturn lua")
@@ -223,8 +237,9 @@ compile [%tree as inline nomsu] to (..)
 action [%var as lua identifier, %var as lua id] (..)
     lua> ".."
         if type(\%var) == 'string' then return string.as_lua_id(\%var)
-        elseif \%var.type == 'Var' then return "_"..string.as_lua_id(\%var[1])
-        elseif \%var.type == 'Action' then return string.as_lua_id(\%var.stub)
+        elseif AST.is_syntax_tree(\%var, 'Var') then return string.as_lua_id(\%var[1])
+        elseif AST.is_syntax_tree(\%var, 'Action') then return string.as_lua_id(\%var.stub)
+        else error("Unknown type: "..tostring(\%var))
         end
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -266,10 +281,10 @@ compile [%tree has subtree %match_tree] to (..)
 
 action [match %tree with %patt]:
     lua> ".."
-        if \%patt.type == "Var" then return dict{[\%patt[1]]=\%tree} end
+        if \%patt.type == "Var" then return _Dict{[\%patt[1]]=\%tree} end
         if \%patt.type == "Action" and \%patt.stub ~= \%tree.stub then return nil end
         if #\%patt ~= #\%tree then return nil end
-        local matches = dict{}
+        local matches = _Dict{}
         for \%i=1,#\%patt do
             if AST.is_syntax_tree(\%tree[\%i]) then
                 local submatch = \(match %tree.%i with %patt.%i)

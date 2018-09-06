@@ -32,7 +32,7 @@ compile [for file %f in %path %body] to (..)
 compile [%expr for file %f in %path] to (..)
     Lua value ".."
         (function()
-            local ret = list{}
+            local ret = _List{}
             for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
                 ret[#ret+1] = \(%expr as lua statements)
             end
