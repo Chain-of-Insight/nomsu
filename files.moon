@@ -131,7 +131,6 @@ Files.get_line_starts = (str)->
     _LINE_STARTS[str] = line_starts
     return line_starts
 
-log = {}
 Files.get_line_number = (str, pos)->
     line_starts = Files.get_line_starts(str)
     -- Binary search for line number of position

@@ -55,7 +55,7 @@ if not arg or debug.getinfo(2).func == require
     return NomsuCompiler
 
 file_queue = {}
-sep = "\0"
+sep = "\3"
 parser = re.compile([[
     args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: '' -> true :} %sep)?
         {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.

@@ -226,7 +226,6 @@ Files.get_line_starts = function(str)
   _LINE_STARTS[str] = line_starts
   return line_starts
 end
-local log = { }
 Files.get_line_number = function(str, pos)
   local line_starts = Files.get_line_starts(str)
   local lo, hi = 1, #line_starts
