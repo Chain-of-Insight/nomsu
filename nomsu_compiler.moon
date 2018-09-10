@@ -29,26 +29,6 @@ Parser = require("parser")
 export SOURCE_MAP
 SOURCE_MAP = {}
 
--- Convert an arbitrary string into a valid Lua identifier. This function is injective,
--- but not idempotent, i.e. if (x != y) then (as_lua_id(x) != as_lua_id(y)),
--- but as_lua_id(x) is not necessarily equal to as_lua_id(as_lua_id(x))
-string.as_lua_id = (str)->
-    -- Empty strings are not valid lua identifiers, so treat them like "\3",
-    -- and treat "\3" as "\3\3", etc. to preserve injectivity.
-    str = gsub str, "^\3*$", "%1\3"
-    -- Escape 'x' when it precedes something that looks like an uppercase hex sequence.
-    -- This way, all Lua IDs can be unambiguously reverse-engineered, but normal usage
-    -- of 'x' won't produce ugly Lua IDs.
-    -- i.e. "x" -> "x", "oxen" -> "oxen", but "Hex2Dec" -> "Hex782Dec" and "He-ec" -> "Hex2Dec"
-    str = gsub str, "x([0-9A-F][0-9A-F])", "x78%1"
-    -- Map spaces to underscores, and everything else non-alphanumeric to hex escape sequences
-    str = gsub str, "%W", (c)->
-        if c == ' ' then '_'
-        else format("x%02X", byte(c))
-    -- Lua IDs can't start with numbers, so map "1" -> "_1", "_1" -> "__1", etc.
-    str = str\gsub "^_*%d", "_%1"
-    return str
-
 table.map = (t, fn)-> setmetatable([fn(v) for _,v in ipairs(t)], getmetatable(t))
 table.fork = (t, values)-> setmetatable(values or {}, {__index:t})
 table.copy = (t)-> setmetatable({k,v for k,v in pairs(t)}, getmetatable(t))
@@ -310,8 +290,8 @@ with NomsuCompiler
 
     .compile = (tree)=>
         if tree.version
-            if get_version = @[string.as_lua_id("Nomsu version")]
-                if upgrade = @[string.as_lua_id("1 upgraded from 2 to 3")]
+            if get_version = @[("Nomsu version")\as_lua_id!]
+                if upgrade = @[("1 upgraded from 2 to 3")\as_lua_id!]
                     tree = upgrade(tree, tree.version, get_version!)
         switch tree.type
             when "Action"
@@ -333,7 +313,7 @@ with NomsuCompiler
                         lua\append target_lua, ":"
                     else
                         lua\append "(", target_lua, "):"
-                lua\append(string.as_lua_id(stub),"(")
+                lua\append((stub)\as_lua_id!,"(")
                 args = {}
                 for i, tok in ipairs tree
                     if type(tok) == "string" then continue
@@ -472,7 +452,7 @@ with NomsuCompiler
                 return LuaCode.Value(tree.source, tostring(tree[1]))
 
             when "Var"
-                return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
+                return LuaCode.Value(tree.source, (tree[1])\as_lua_id!)
 
             when "FileChunks"
                 error("Cannot convert FileChunks to a single block of lua, since each chunk's "..

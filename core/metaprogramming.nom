@@ -11,7 +11,7 @@ lua> ".."
             local my_mangle_index = mangle_index
             mangle_index = mangle_index + 1
             return function(varname)
-                return string.as_lua_id(varname..(("\\3%X"):format(my_mangle_index)))
+                return (varname..(("\\3%X"):format(my_mangle_index))):as_lua_id()
             end
         end
     end
@@ -109,13 +109,13 @@ test:
     assume ((foo 1) == "outer")
 compile [local action %actions %body] to:
     lua> ".."
-        local fn_name = string.as_lua_id(\%actions[1].stub)
+        local fn_name = \%actions[1].stub:as_lua_id()
         local \%args = table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end)
         local lua = LuaCode(tree.source, fn_name, " = ", \(compile as (%args -> %body)))
         lua:add_free_vars({fn_name})
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local alias_name = string.as_lua_id(alias.stub)
+            local alias_name = alias.stub:as_lua_id()
             lua:add_free_vars({alias_name})
             local \%alias_args = table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) end)
             lua:append("\\n", alias_name, " = ")
@@ -140,7 +140,7 @@ test:
 compile [action %actions %body] to (..)
     lua> ".."
         local lua = \(compile as (local action %actions %body))
-        lua:remove_free_vars(table.map(\%actions, function(a) return string.as_lua_id(a.stub) end))
+        lua:remove_free_vars(table.map(\%actions, function(a) return a.stub:as_lua_id() end))
         return lua
 
 test:
@@ -224,7 +224,7 @@ compile [%tree as lua return] to (..)
     Lua value "nomsu:compile(\(%tree as lua expr)):as_statements('return ')"
 
 compile [remove action %action] to (..)
-    Lua "\(=lua "string.as_lua_id(\(%action.stub))") = nil"
+    Lua "\(=lua "(\(%action.stub)):as_lua_id()") = nil"
 
 test:
     assume ("\(\(foo \%x) as nomsu)" == "foo %x") or barf ".."
@@ -237,9 +237,9 @@ compile [%tree as inline nomsu] to (..)
 
 action [%var as lua identifier, %var as lua id] (..)
     lua> ".."
-        if type(\%var) == 'string' then return string.as_lua_id(\%var)
-        elseif AST.is_syntax_tree(\%var, 'Var') then return string.as_lua_id(\%var[1])
-        elseif AST.is_syntax_tree(\%var, 'Action') then return string.as_lua_id(\%var.stub)
+        if type(\%var) == 'string' then return \%var:as_lua_id()
+        elseif AST.is_syntax_tree(\%var, 'Var') then return \%var[1]:as_lua_id()
+        elseif AST.is_syntax_tree(\%var, 'Action') then return \%var.stub:as_lua_id()
         else error("Unknown type: "..tostring(\%var))
         end
 

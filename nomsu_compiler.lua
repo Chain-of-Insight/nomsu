@@ -36,19 +36,6 @@ end
 local AST = require("syntax_tree")
 local Parser = require("parser")
 SOURCE_MAP = { }
-string.as_lua_id = function(str)
-  str = gsub(str, "^\3*$", "%1\3")
-  str = gsub(str, "x([0-9A-F][0-9A-F])", "x78%1")
-  str = gsub(str, "%W", function(c)
-    if c == ' ' then
-      return '_'
-    else
-      return format("x%02X", byte(c))
-    end
-  end)
-  str = str:gsub("^_*%d", "_%1")
-  return str
-end
 table.map = function(t, fn)
   return setmetatable((function()
     local _accum_0 = { }
@@ -475,10 +462,10 @@ do
   NomsuCompiler.compile = function(self, tree)
     if tree.version then
       do
-        local get_version = self[string.as_lua_id("Nomsu version")]
+        local get_version = self[("Nomsu version"):as_lua_id()]
         if get_version then
           do
-            local upgrade = self[string.as_lua_id("1 upgraded from 2 to 3")]
+            local upgrade = self[("1 upgraded from 2 to 3"):as_lua_id()]
             if upgrade then
               tree = upgrade(tree, tree.version, get_version())
             end
@@ -521,7 +508,7 @@ do
           lua:append("(", target_lua, "):")
         end
       end
-      lua:append(string.as_lua_id(stub), "(")
+      lua:append((stub):as_lua_id(), "(")
       local args = { }
       for i, tok in ipairs(tree) do
         local _continue_0 = false
@@ -709,7 +696,7 @@ do
     elseif "Number" == _exp_0 then
       return LuaCode.Value(tree.source, tostring(tree[1]))
     elseif "Var" == _exp_0 then
-      return LuaCode.Value(tree.source, string.as_lua_id(tree[1]))
+      return LuaCode.Value(tree.source, (tree[1]):as_lua_id())
     elseif "FileChunks" == _exp_0 then
       return error("Cannot convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     else

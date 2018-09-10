@@ -174,30 +174,5 @@ do
         if type(i) == 'number' then return sub(@, i, i)
         elseif type(i) == 'table' then return sub(@, i[1], i[2])
         else return text_methods[i]
-    
-    assert(("abc")\matches_1("ab"))
-
-    [==[
-    text_metatable =
-        __mul: (other)=>
-            assert(type(other) == 'number', "Invalid type for multiplication")
-            return rep(@, other)
-        __index: (i)=>
-            -- Use [] for accessing text characters, or s[{3,4}] for s:sub(3,4)
-            if type(i) == 'number' then return sub(@, i, i)
-            elseif type(i) == 'table' then return sub(@, i[1], i[2])
-            else return text_methods[i]
-        __tostring: => @_coalesce![1]
-        __len: => #tostring(@)
-        __concat: (other)=> tostring(@), tostring(other)
-        __len: => #tostring(@)
-        __eq: (other)=>
-            type(@) == type(other) and getmetatable(@) == getmetatable(other) and tostring(@) == tostring(other)
-        __lt: (other)=> tostring(@) < tostring(other)
-        __le: (other)=> tostring(@) <= tostring(other)
-        __newindex: => error("Cannot modify Text")
-
-    Text = (s)-> setmetatable(s, text_metatable)
-        ]==]
 
 return {:List, :Dict, :Text}
