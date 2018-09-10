@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     This file defines some common math literals and functions
 
@@ -73,27 +73,27 @@ compile [all of %items, all %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.all(\(%items as lua expr))")
     %clauses = ((% as lua expr) for % in %items)
-    return (Lua value "(\(%clauses joined with " and "))")
+    return (Lua value "(\(%clauses::joined with " and "))")
 
 parse [not all of %items, not all %items] as (not (all of %items))
 compile [any of %items, any %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.any(\(%items as lua expr))")
     %clauses = ((% as lua expr) for % in %items)
-    return (Lua value "(\(%clauses joined with " or "))")
+    return (Lua value "(\(%clauses::joined with " or "))")
 
 parse [none of %items, none %items] as (not (any of %items))
 compile [sum of %items, sum %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.sum(\(%items as lua expr))")
     %clauses = ((% as lua expr) for % in %items)
-    return (Lua value "(\(%clauses joined with " + "))")
+    return (Lua value "(\(%clauses::joined with " + "))")
 
 compile [product of %items, product %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.product(\(%items as lua expr))")
     %clauses = ((% as lua expr) for % in %items)
-    return (Lua value "(\(%clauses joined with " * "))")
+    return (Lua value "(\(%clauses::joined with " * "))")
 
 action [avg of %items, average of %items] (=lua "(utils.sum(\%items)/#\%items)")
 compile [min of %items, smallest of %items, lowest of %items] to (..)

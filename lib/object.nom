@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     This file contains the implementation of an Object-Oriented programming system.
 
@@ -8,7 +8,7 @@ test:
         my action [set up]: %me.barks or= 0
         my action [bark, woof]:
             %barks = ("Bark!" for % in 1 to %me.barks)
-            return (%barks joined with " ")
+            return (%barks::joined with " ")
         
         my action [get pissed off]: %me.barks += 1
     
@@ -31,7 +31,7 @@ test:
         my action [sploot] "splooted"
         my action [bark, woof]:
             %barks = ("Yip!" for % in 1 to %me.barks)
-            return (%barks joined with " ")
+            return (%barks::joined with " ")
     
     %corg = (new Corgi)
     assume (%corg.barks == 0)

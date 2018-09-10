@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     This file contains basic error reporting code
 
@@ -27,7 +27,9 @@ compile [assume %a == %b] to:
             do
                 local \(mangle "a"), \(mangle "b") = \(%a as lua expr), \(%b as lua expr)
                 if \(mangle "a") ~= \(mangle "b") then
-                    error(\(quote "\%assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\(mangle "b")), 0)
+                    error(\(quote "\%assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\(..)
+                mangle "b"
+            ..), 0)
                 end
             end
 

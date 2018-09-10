@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     Tool to automatically update code from old versions of Nomsu. Usage:
         nomsu tools/upgrade.nom [-i] file1 file2 directory1 ...
@@ -21,7 +21,7 @@ if (%args.1 is "-t"):
 
 for %path in %args:
     for file %filename in %path:
-        unless (%filename matches "%.nom$"): do next %filename
+        unless (%filename::matches "%.nom$"): do next %filename
         %tree = (parse (read file %filename) from %filename)
         %uptree = (%tree upgraded)
         %text = ".."

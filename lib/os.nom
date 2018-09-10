@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     This file defines some actions that interact with the operating system and filesystem.
 
@@ -66,4 +66,4 @@ action [source lines of %tree]:
         (..)
             (line % in %file) for % in (line number of %source.start in %file) to (..)
                 line number of %source.stop in %file
-        ..joined with "\n"
+        ..::joined with "\n"

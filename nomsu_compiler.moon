@@ -621,7 +621,10 @@ with NomsuCompiler
             if type(pos) != 'number' then pos = #tostring(pos)\match("[ ]*([^\n]*)$")
             space = MAX_LINE - pos
             local inline
-            for prefix, nomsu, tree in coroutine.wrap(-> inline = @tree_to_inline_nomsu(t, false, coroutine.yield))
+            check = (prefix,nomsu,tree)->
+                if type(tree) == 'number' then require('ldt').breakpoint!
+                coroutine.yield(prefix,nomsu,tree)
+            for prefix, nomsu, tree in coroutine.wrap(-> inline = @tree_to_inline_nomsu(t, false, check))
                 len = #tostring(nomsu)
                 break if prefix+len > MAX_LINE
                 break if tree.type == "Block" and (#tree > 1 or len > 20)
@@ -700,7 +703,10 @@ with NomsuCompiler
                 return nomsu
 
             when "EscapedNomsu"
-                return NomsuCode tree.source, "\\", recurse(tree[1], 1)
+                val_nomsu = recurse(tree[1], 1)
+                if tree[1].type == "Action" and not val_nomsu\is_multiline!
+                    val_nomsu\parenthesize!
+                return NomsuCode tree.source, "\\", val_nomsu
 
             when "Block"
                 nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))

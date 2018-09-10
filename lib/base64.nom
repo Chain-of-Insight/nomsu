@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     This file defines actions for encoding/decoding base 64, as specified in:
     https://tools.ietf.org/html/rfc4648
@@ -39,7 +39,7 @@ action [base64 %str, base64 encode %str, %str base64]:
                 %chars::add "="
                 %chars::add "="
     
-    return (%chars joined)
+    return (%chars::joined)
 
 action [chr %] (=lua "string.char(\%)")
 action [decode base64 %str, %str base64 decoded, base64 decode %str]:
@@ -52,4 +52,4 @@ action [decode base64 %str, %str base64 decoded, base64 decode %str]:
         if (%str.(%i + 3) == "="): stop
         %chars::add (chr (((%indices.3 & 3) << 6) + %indices.4))
     
-    return (%chars joined)
+    return (%chars::joined)

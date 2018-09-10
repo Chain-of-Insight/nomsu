@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -26,35 +26,11 @@ test:
     assume ("asdf"::uppercase) == "ASDF"
     assume ("asdf"::with "s" -> "X") == "aXdf"
     assume ("one\ntwo\n"::lines) == ["one", "two", ""]
-    
     parse [アクション %spec %body] as (action %spec %body)
 test:
     %こんにちは = "こんにちは"
     アクション [% と言う] "\(%)世界"
     assume (%こんにちは と言う) == "こんにちは世界"
-
-# Text functions
-parse [%texts joined with %glue] as (%texts::joined with %glue)
-parse [%texts joined, joined %texts] as (%texts::joined)
-parse [byte %i of %text] as (%text::byte %i)
-parse [bytes %start to %stop of %text] as (%text::bytes %start to %stop)
-parse [bytes of %text] as (%text::bytes)
-parse [capitalized %text, %text capitalized] as (%text::capitalized)
-parse [uppercase %text, %text uppercase] as (%text::uppercase)
-parse [..]
-    %text with %sub instead of %patt, %text with %patt replaced by %sub
-    %text s/ %patt / %sub
-..as (%text::with %patt -> %sub)
-parse [%text matches %pattern] as (%text::matches %pattern)
-parse [%text matching %pattern] as ((%text::matching %pattern).1)
-
-compile [for %match in %text matching %patt %body] to (..)
-    Lua ".."
-        for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(%patt as lua expr)) do
-            \(%body as lua statements)
-            \(compile as (===next %match ===))
-        end
-        \(compile as (===stop %match ===))
 
 compile [%expr for %match in %text matching %patt] to (..)
     Lua value ".."

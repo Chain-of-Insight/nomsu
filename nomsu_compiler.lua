@@ -963,8 +963,15 @@ do
       end
       local space = MAX_LINE - pos
       local inline
+      local check
+      check = function(prefix, nomsu, tree)
+        if type(tree) == 'number' then
+          require('ldt').breakpoint()
+        end
+        return coroutine.yield(prefix, nomsu, tree)
+      end
       for prefix, nomsu, tree in coroutine.wrap(function()
-        inline = self:tree_to_inline_nomsu(t, false, coroutine.yield)
+        inline = self:tree_to_inline_nomsu(t, false, check)
       end) do
         local len = #tostring(nomsu)
         if prefix + len > MAX_LINE then
@@ -1083,7 +1090,11 @@ do
       nomsu:append(pop_comments(tree.source.stop, '\n'))
       return nomsu
     elseif "EscapedNomsu" == _exp_0 then
-      return NomsuCode(tree.source, "\\", recurse(tree[1], 1))
+      local val_nomsu = recurse(tree[1], 1)
+      if tree[1].type == "Action" and not val_nomsu:is_multiline() then
+        val_nomsu:parenthesize()
+      end
+      return NomsuCode(tree.source, "\\", val_nomsu)
     elseif "Block" == _exp_0 then
       local nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
       for i, line in ipairs(tree) do

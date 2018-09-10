@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -190,7 +190,7 @@ action [..]
     I think %worse_things are worse than %better_things
     I like %better_things more than %worse_things
 ..:
-    say "\(%better_things capitalized) rule and \%worse_things drool!"
+    say "\(%better_things::capitalized) rule and \%worse_things drool!"
 
 I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"

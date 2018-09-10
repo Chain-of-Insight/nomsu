@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     Tool to run all tests in a file (i.e. the code block inside a call to 'test %'). Usage:
         nomsu tools/test.nom file1 file2 directory1 ...
@@ -14,13 +14,13 @@ if (%args.1 == "-v"):
 # Make sure all the files get run
 for %path in (command line args):
     for file %filename in %path:
-        if (%filename matches "%.nom$"): use %filename
+        if (%filename::matches "%.nom$"): use %filename
 
 for %path in (command line args): use %path
 %tests = ((=lua "Source:from_string(\%s)") = %t for %s = %t in (tests))
 for %path in (command line args):
     for file %filename in %path:
-        unless (%filename matches "%.nom$"): do next %filename
+        unless (%filename::matches "%.nom$"): do next %filename
         %file_tests = []
         for %src = %test in %tests:
             if (%src.filename == %filename):
@@ -32,7 +32,7 @@ for %path in (command line args):
             if %verbose: say ""
             for % in %file_tests:
                 if %verbose:
-                    say "    \(yellow (%.test with "\n" replaced by "\n    "))"
+                    say "    \(yellow (%.test::with "\n" -> "\n    "))"
                 run %.test
             
             if %verbose: say (green "PASS")

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.7.5.6
+#!/usr/bin/env nomsu -V3.8.7.6
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -26,7 +26,7 @@ compile [upgrade action %actions to %version as %body] to:
             if (%action.%i.type is "Var"):
                 %replacements.(%action.%i.1) = "\(\%tree as lua id)[\%i]"
         
-        %needs_mangle = (no)
+        define mangler
         local action [make tree %t]:
             when:
                 (%t is "Var" syntax tree):
@@ -34,10 +34,7 @@ compile [upgrade action %actions to %version as %body] to:
                         return %replacements.(%t.1)
                     ..else:
                         external %needs_mangle = (yes)
-                        return ".."
-                            \(%t.type){source=\(quote "\(%t.source)"), \(..)
-                                quote "\(%t.1) \000\(=lua "string.format('%X', __MANGLE_INDEX)")"
-                            ..}
+                        return "\(%t.type){source=\(quote "\(%t.source)"), \(quote (mangle %t.1))}"
                 
                 (%t is syntax tree):
                     %args = []
@@ -47,7 +44,7 @@ compile [upgrade action %actions to %version as %body] to:
                         ..else:
                             %args::add "\(%k)=\(make tree %v)"
                     
-                    return "\(%t.type){\(%args joined with ", ")}"
+                    return "\(%t.type){\(%args::joined with ", ")}"
                 
                 else: return (quote %t)
         
@@ -58,8 +55,7 @@ compile [upgrade action %actions to %version as %body] to:
                 upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
                     \%tree as lua id
                 ..)
-                    \("__MANGLE_INDEX = (__MANGLE_INDEX or 0) + 1\n    " if (%needs_mangle) else "")\
-                ..return \%retval
+                    return \%retval
                 end)
     
     return %lua
