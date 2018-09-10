@@ -14,7 +14,7 @@ re = require 're'
 utils = require 'utils'
 Files = require 'files'
 {:repr, :stringify, :equivalent} = utils
-{:List, :Dict} = require 'containers'
+{:List, :Dict, :Text} = require 'containers'
 export colors, colored
 colors = require 'consolecolors'
 colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring(msg or '')..colors.reset)})
@@ -56,18 +56,6 @@ table.copy = (t)-> setmetatable({k,v for k,v in pairs(t)}, getmetatable(t))
 -- TODO:
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- Re-implement nomsu-to-lua comment translation?
-
--- Use + operator for string coercive concatenation (note: "asdf" + 3 == "asdf3")
--- Use [] for accessing string characters, or s[{3,4}] for s:sub(3,4)
--- Note: This globally affects all strings in this instance of Lua!
-do
-    STRING_METATABLE = getmetatable("")
-    STRING_METATABLE.__add = (other)=> @ .. stringify(other)
-    STRING_METATABLE.__index = (i)=>
-        ret = string[i]
-        if ret != nil then return ret
-        if type(i) == 'number' then return sub(@, i, i)
-        elseif type(i) == 'table' then return sub(@, i[1], i[2])
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable {name:"Nomsu"},
@@ -339,8 +327,12 @@ with NomsuCompiler
                     return ret
 
                 lua = LuaCode.Value(tree.source)
-                if tree.target
-                    lua\append @compile(tree.target), ":"
+                if tree.target -- Method call
+                    target_lua = @compile tree.target
+                    if tostring(target_lua)\match("^%(.*%)$") or tostring(target_lua)\match("^[_a-zA-Z][_a-zA-Z0-9]*$")
+                        lua\append target_lua, ":"
+                    else
+                        lua\append "(", target_lua, "):"
                 lua\append(string.as_lua_id(stub),"(")
                 args = {}
                 for i, tok in ipairs tree

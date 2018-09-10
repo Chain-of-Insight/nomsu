@@ -6,10 +6,8 @@
 use "core/metaprogramming.nom"
 
 test:
-    assume (("x" + "y") == "xy")
-    %s = "list:\[1, 2, 3]"
-    assume (%s == "list:[1, 2, 3]")
-    assume ("foo = \(1 + 2)!" == "foo = 3!")
+    assume "\[1, 2, 3]" == "[1, 2, 3]"
+    assume "foo = \(1 + 2)!" == "foo = 3!"
     assume (..)
         ".."
             one
@@ -20,73 +18,35 @@ test:
             no\
             ..gap
         ..== "nogap"
+    assume (["x", "y"]::joined with ",") == "x,y"
+    assume (["x", "y"]::joined) == "xy"
+    assume ("BAR"::byte 2) == 65
+    assume ("BAR"::bytes 1 to 2) == [66, 65]
+    assume ("asdf"::capitalized) == "Asdf"
+    assume ("asdf"::uppercase) == "ASDF"
+    assume ("asdf"::with "s" -> "X") == "aXdf"
+    assume ("one\ntwo\n"::lines) == ["one", "two", ""]
+    
     parse [アクション %spec %body] as (action %spec %body)
 test:
     %こんにちは = "こんにちは"
     アクション [% と言う] "\(%)世界"
-    assume ((%こんにちは と言う) == "こんにちは世界") or barf ".."
-        Unicode doesn't work
+    assume (%こんにちは と言う) == "こんにちは世界"
 
 # Text functions
-test:
-    assume ((["x", "y"] joined with ",") == "x,y") or barf "joined with failed"
-    assume ((["x", "y"] joined) == "xy") or barf "joined failed"
-action [%texts joined with %glue] (..)
-    lua> ".."
-        local text_bits = {}
-        for i,bit in ipairs(\%texts) do text_bits[i] = stringify(bit) end
-        return table.concat(text_bits, \%glue)
-
-parse [joined %texts, %texts joined] as (%texts joined with "")
-
-test:
-    assume ((byte 2 of "BAR") == 65)
-    assume ((bytes 1 to 2 of "BAR") == [66, 65])
-compile [byte %i of %text] to (..)
-    Lua value "(\(%text as lua expr)):byte(\(%i as lua expr))"
-
-compile [bytes %start to %stop of %text] to (..)
-    Lua value ".."
-        _List{(\(%text as lua expr)):byte(\(%start as lua expr), \(%stop as lua expr))}
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-action [bytes of %text] (bytes 1 to (=lua "#\%text") of %text)
-
-test:
-    assume (("asdf" capitalized) == "Asdf")
-compile [capitalized %text, %text capitalized] to (..)
-    Lua value "(\(%text as lua expr)):gsub('%l', string.upper, 1)"
-
-test:
-    assume (("asdf" uppercase) == "ASDF")
-compile [uppercase %text, %text uppercase] to (..)
-    Lua value "(\(%text as lua expr)):upper()"
-
-test:
-    assume (("asdf" with "X" instead of "s") == "aXdf") or barf ".."
-        substitution failed
-compile [..]
+parse [%texts joined with %glue] as (%texts::joined with %glue)
+parse [%texts joined, joined %texts] as (%texts::joined)
+parse [byte %i of %text] as (%text::byte %i)
+parse [bytes %start to %stop of %text] as (%text::bytes %start to %stop)
+parse [bytes of %text] as (%text::bytes)
+parse [capitalized %text, %text capitalized] as (%text::capitalized)
+parse [uppercase %text, %text uppercase] as (%text::uppercase)
+parse [..]
     %text with %sub instead of %patt, %text with %patt replaced by %sub
     %text s/ %patt / %sub
-..to (..)
-    Lua value ".."
-        ((\(%text as lua expr)):gsub(\(%patt as lua expr), \(%sub as lua expr)))
-
-test:
-    assume (..)
-        (..)
-            lines in ".."
-                one
-                two
-        ..== ["one", "two"]
-action [lines in %text, lines of %text] (..)
-    lua> ".."
-        local result = _List{}
-        for line in (\%text):gmatch('[^\\n]+') do
-            result[#result+1] = line
-        end
-        return result
+..as (%text::with %patt -> %sub)
+parse [%text matches %pattern] as (%text::matches %pattern)
+parse [%text matching %pattern] as ((%text::matching %pattern).1)
 
 compile [for %match in %text matching %patt %body] to (..)
     Lua ".."
@@ -108,15 +68,8 @@ compile [%expr for %match in %text matching %patt] to (..)
             return ret
         end)()
 
-compile [%text matches %pattern] to (..)
-    Lua value ".."
-        ((\(%text as lua expr)):match(\(%pattern as lua expr)) and true or false)
-
-compile [%text matching %pattern] to (..)
-    Lua value "(\(%text as lua expr)):match(\(%pattern as lua expr))"
-
 test:
-    assume ("\n" == (newline)) or barf "Text literals failed."
+    assume "\n" == (newline)
 
 # Text literals
 lua> ".."

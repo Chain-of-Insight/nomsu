@@ -4,10 +4,10 @@ local utils = require('utils')
 local Files = require('files')
 local repr, stringify, equivalent
 repr, stringify, equivalent = utils.repr, utils.stringify, utils.equivalent
-local List, Dict
+local List, Dict, Text
 do
   local _obj_0 = require('containers')
-  List, Dict = _obj_0.List, _obj_0.Dict
+  List, Dict, Text = _obj_0.List, _obj_0.Dict, _obj_0.Text
 end
 colors = require('consolecolors')
 colored = setmetatable({ }, {
@@ -73,23 +73,6 @@ table.copy = function(t)
     end
     return _tbl_0
   end)(), getmetatable(t))
-end
-do
-  local STRING_METATABLE = getmetatable("")
-  STRING_METATABLE.__add = function(self, other)
-    return self .. stringify(other)
-  end
-  STRING_METATABLE.__index = function(self, i)
-    local ret = string[i]
-    if ret ~= nil then
-      return ret
-    end
-    if type(i) == 'number' then
-      return sub(self, i, i)
-    elseif type(i) == 'table' then
-      return sub(self, i[1], i[2])
-    end
-  end
 end
 local MAX_LINE = 80
 local NomsuCompiler = setmetatable({
@@ -531,7 +514,12 @@ do
       end
       local lua = LuaCode.Value(tree.source)
       if tree.target then
-        lua:append(self:compile(tree.target), ":")
+        local target_lua = self:compile(tree.target)
+        if tostring(target_lua):match("^%(.*%)$") or tostring(target_lua):match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
+          lua:append(target_lua, ":")
+        else
+          lua:append("(", target_lua, "):")
+        end
       end
       lua:append(string.as_lua_id(stub), "(")
       local args = { }

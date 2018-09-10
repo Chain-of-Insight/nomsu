@@ -18,6 +18,19 @@ compile [assume %condition] to:
                 error(\(quote "\%assumption"), 0)
             end
 
+compile [assume %a == %b] to:
+    lua> ".."
+        local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\(\(%a == %b))))
+    define mangler
+    return (..)
+        Lua ".."
+            do
+                local \(mangle "a"), \(mangle "b") = \(%a as lua expr), \(%b as lua expr)
+                if \(mangle "a") ~= \(mangle "b") then
+                    error(\(quote "\%assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\(mangle "b")), 0)
+                end
+            end
+
 compile [assume %condition or barf %message] to (..)
     Lua ".."
         if not \(%condition as lua expr) then
