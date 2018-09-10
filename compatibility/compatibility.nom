@@ -55,7 +55,7 @@ compile [upgrade action %actions to %version as %body] to:
         %retval = (make tree %body)
         %lua::append (..)
             Lua ".."
-                A_upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
+                upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
                     \%tree as lua id
                 ..)
                     \("__MANGLE_INDEX = (__MANGLE_INDEX or 0) + 1\n    " if (%needs_mangle) else "")\
