@@ -675,7 +675,18 @@ with NomsuCompiler
                 pos, next_space = tree.source.start, ''
                 nomsu = NomsuCode(tree.source, pop_comments(pos))
                 if tree.target
-                    nomsu\append @tree_to_nomsu(tree.target), "::"
+                    if tree.target.type == "Block"
+                        nomsu\append(recurse(tree.target, #nomsu\match('[^\n]*$')))
+                        pos = tree.target.source.stop
+                        next_space = inline and "::" or "\n..::"
+                    else
+                        target_nomsu = recurse(tree.target, #nomsu\match('[^\n]*$'))
+                        if tree.target.type == "Action" and not target_nomsu\is_multiline!
+                            target_nomsu\parenthesize!
+                        nomsu\append target_nomsu
+                        pos = tree.target.source.stop
+                        next_space = target_nomsu\is_multiline! and "\n..::" or "::"
+
                 for i,bit in ipairs tree
                     if next_space == "\n.." or (next_space == " " and nomsu\trailing_line_len! > MAX_LINE)
                         nomsu\append "\n", pop_comments(pos), '..'

@@ -1059,7 +1059,19 @@ do
       local pos, next_space = tree.source.start, ''
       local nomsu = NomsuCode(tree.source, pop_comments(pos))
       if tree.target then
-        nomsu:append(self:tree_to_nomsu(tree.target), "::")
+        if tree.target.type == "Block" then
+          nomsu:append(recurse(tree.target, #nomsu:match('[^\n]*$')))
+          pos = tree.target.source.stop
+          next_space = inline and "::" or "\n..::"
+        else
+          local target_nomsu = recurse(tree.target, #nomsu:match('[^\n]*$'))
+          if tree.target.type == "Action" and not target_nomsu:is_multiline() then
+            target_nomsu:parenthesize()
+          end
+          nomsu:append(target_nomsu)
+          pos = tree.target.source.stop
+          next_space = target_nomsu:is_multiline() and "\n..::" or "::"
+        end
       end
       for i, bit in ipairs(tree) do
         if next_space == "\n.." or (next_space == " " and nomsu:trailing_line_len() > MAX_LINE) then
