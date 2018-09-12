@@ -35,6 +35,7 @@ do
 end
 local AST = require("syntax_tree")
 local Parser = require("parser")
+local make_parser = require("parser2")
 SOURCE_MAP = { }
 table.map = function(t, fn)
   return setmetatable((function()
@@ -61,6 +62,69 @@ table.copy = function(t)
     return _tbl_0
   end)(), getmetatable(t))
 end
+local Parsers = { }
+local max_parser_version = 0
+for version = 1, 999 do
+  local _continue_0 = false
+  repeat
+    if not (version == 4) then
+      _continue_0 = true
+      break
+    end
+    local peg_file = io.open("nomsu." .. tostring(version) .. ".peg")
+    if not peg_file and package.nomsupath then
+      for path in package.nomsupath:gmatch("[^;]+") do
+        peg_file = io.open(path .. "/nomsu." .. tostring(version) .. ".peg")
+        if peg_file then
+          break
+        end
+      end
+    end
+    if not (peg_file) then
+      break
+    end
+    max_parser_version = version
+    local make_tree
+    make_tree = function(tree, userdata)
+      local cls = AST[tree.type]
+      tree.source = Source(userdata.filename, tree.start, tree.stop)
+      tree.start, tree.stop = nil, nil
+      tree.type = nil
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_0 = 1, #tree do
+          local t = tree[_index_0]
+          if AST.is_syntax_tree(t, "Comment") then
+            _accum_0[_len_0] = t
+            _len_0 = _len_0 + 1
+          end
+        end
+        tree.comments = _accum_0
+      end
+      if #tree.comments == 0 then
+        tree.comments = nil
+      end
+      for i = #tree, 1, -1 do
+        if AST.is_syntax_tree(tree[i], "Comment") then
+          table.remove(tree, i)
+        end
+      end
+      tree = setmetatable(tree, cls)
+      cls.source_code_for_tree[tree] = userdata.source
+      if tree.__init then
+        tree:__init()
+      end
+      return tree
+    end
+    Parsers[version] = make_parser(peg_file:read("*a"), make_tree)
+    peg_file:close()
+    _continue_0 = true
+  until true
+  if not _continue_0 then
+    break
+  end
+end
 local MAX_LINE = 80
 local NomsuCompiler = setmetatable({
   name = "Nomsu"
@@ -79,12 +143,68 @@ local NomsuCompiler = setmetatable({
     return self.name
   end
 })
+local _anon_chunk = 0
 do
   NomsuCompiler.NOMSU_COMPILER_VERSION = 7
-  NomsuCompiler.NOMSU_SYNTAX_VERSION = Parser.version
+  NomsuCompiler.NOMSU_SYNTAX_VERSION = max_parser_version
   NomsuCompiler.nomsu = NomsuCompiler
-  NomsuCompiler.parse = function(self, ...)
-    return Parser.parse(...)
+  NomsuCompiler.parse = function(self, nomsu_code, source, version)
+    if source == nil then
+      source = nil
+    end
+    if version == nil then
+      version = nil
+    end
+    source = source or nomsu_code.source
+    nomsu_code = tostring(nomsu_code)
+    if not (source) then
+      source = Source("anonymous chunk #" .. tostring(_anon_chunk), 1, #nomsu_code)
+      _anon_chunk = _anon_chunk + 1
+    end
+    version = version or nomsu_code:match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
+    local syntax_version = version and tonumber(version:match("^[0-9]+")) or max_parser_version
+    local parse = Parsers[syntax_version] or Parsers[max_parser_version]
+    local tree = parse(nomsu_code, source.filename)
+    local pretty_error = require("pretty_errors")
+    local find_errors
+    find_errors = function(t)
+      if t.type == "Error" then
+        return pretty_error({
+          error = t.error,
+          hint = t.hint,
+          source = t:get_source_code(),
+          start = t.source.start,
+          stop = t.source.stop
+        })
+      end
+      local errs = ""
+      for k, v in pairs(t) do
+        local _continue_0 = false
+        repeat
+          if not (AST.is_syntax_tree(v)) then
+            _continue_0 = true
+            break
+          end
+          local err = find_errors(v)
+          if #err > 0 then
+            if #errs > 0 then
+              errs = errs .. "\n\n"
+            end
+            errs = errs .. err
+          end
+          _continue_0 = true
+        until true
+        if not _continue_0 then
+          break
+        end
+      end
+      return errs
+    end
+    local errs = find_errors(tree)
+    if #errs > 0 then
+      error(errs, 0)
+    end
+    return tree
   end
   NomsuCompiler.can_optimize = function()
     return false
@@ -699,6 +819,10 @@ do
       return LuaCode.Value(tree.source, (tree[1]):as_lua_id())
     elseif "FileChunks" == _exp_0 then
       return error("Cannot convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
+    elseif "Comment" == _exp_0 then
+      return LuaCode(tree.source, "")
+    elseif "Error" == _exp_0 then
+      return error("Cannot compile errors")
     else
       return error("Unknown type: " .. tostring(tree.type))
     end
@@ -726,6 +850,10 @@ do
     local _exp_0 = tree.type
     if "FileChunks" == _exp_0 then
       return error("Cannot inline a FileChunks")
+    elseif "Comment" == _exp_0 then
+      return NomsuCode(tree.source, "")
+    elseif "Error" == _exp_0 then
+      return error("Cannot compile errors")
     elseif "Action" == _exp_0 then
       local nomsu = NomsuCode(tree.source)
       if tree.target then
@@ -950,15 +1078,8 @@ do
       end
       local space = MAX_LINE - pos
       local inline
-      local check
-      check = function(prefix, nomsu, tree)
-        if type(tree) == 'number' then
-          require('ldt').breakpoint()
-        end
-        return coroutine.yield(prefix, nomsu, tree)
-      end
       for prefix, nomsu, tree in coroutine.wrap(function()
-        inline = self:tree_to_inline_nomsu(t, false, check)
+        inline = self:tree_to_inline_nomsu(t, false, coroutine.yield)
       end) do
         local len = #tostring(nomsu)
         if prefix + len > MAX_LINE then
@@ -1197,7 +1318,7 @@ do
       end
       nomsu:append(": ", recurse(value, #tostring(nomsu)))
       return nomsu
-    elseif "IndexChain" == _exp_0 or "Number" == _exp_0 or "Var" == _exp_0 then
+    elseif "IndexChain" == _exp_0 or "Number" == _exp_0 or "Var" == _exp_0 or "Comment" == _exp_0 or "Error" == _exp_0 then
       return self:tree_to_inline_nomsu(tree)
     else
       return error("Unknown type: " .. tostring(tree.type))

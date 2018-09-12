@@ -21,7 +21,7 @@ NOMSU_DEFS = with {}
     .escaped_char = (P("\\")*S("xX")*C(hex*hex)) / => string.char(tonumber(@, 16))
     .escaped_char += (P("\\")*C(digit*(digit^-2))) / => string.char(tonumber @)
     .escaped_char += (P("\\")*C(S("ntbavfr"))) / string_escapes
-    .operator_char = S("'`~!@$^&*-+=|<>?/")
+    .operator_char = S("'`~!@$^&*+=|<>?/-")
     .utf8_char = (
         R("\194\223")*R("\128\191") +
         R("\224\239")*R("\128\191")*R("\128\191") +

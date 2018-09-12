@@ -26,7 +26,9 @@ local types = {
   "DictEntry",
   "IndexChain",
   "Action",
-  "FileChunks"
+  "FileChunks",
+  "Error",
+  "Comment"
 }
 for _index_0 = 1, #types do
   local name = types[_index_0]
@@ -48,6 +50,10 @@ for _index_0 = 1, #types do
       return tostring(self.type) .. tostring(repr(self, (function(x)
         return Source:is_instance(x) and tostring(x) or nil
       end)))
+    end
+    cls.source_code_for_tree = { }
+    cls.get_source_code = function(self)
+      return self.source_code_for_tree[self]
     end
     cls.map = function(self, fn)
       local replacement = fn(self)

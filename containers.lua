@@ -264,83 +264,69 @@ for i, entry in ipairs(Dict({
 })) do
   assert(i == 1 and entry.key == "x" and entry.value == 99, "ipairs compatibility issue")
 end
-local Text
 do
   local reverse, upper, lower, find, byte, match, gmatch, gsub, sub, format, rep
   do
     local _obj_0 = string
     reverse, upper, lower, find, byte, match, gmatch, gsub, sub, format, rep = _obj_0.reverse, _obj_0.upper, _obj_0.lower, _obj_0.find, _obj_0.byte, _obj_0.match, _obj_0.gmatch, _obj_0.gsub, _obj_0.sub, _obj_0.format, _obj_0.rep
   end
-  local as_lua_id
-  as_lua_id = function(str)
-    str = gsub(str, "^\3*$", "%1\3")
-    str = gsub(str, "x([0-9A-F][0-9A-F])", "x78%1")
-    str = gsub(str, "%W", function(c)
-      if c == ' ' then
-        return '_'
-      else
-        return format("x%02X", byte(c))
-      end
-    end)
-    str = gsub(str, "^_*%d", "_%1")
-    return str
-  end
-  local line_matcher = re.compile([[ 
-        lines <- {| line (%nl line)* |}
-        line <- {(!%nl .)*}
-    ]], {
-    nl = lpeg.P("\r") ^ -1 * lpeg.P("\n")
-  })
+  local string2 = require('string2')
+  local lines, line, line_at, as_lua_id
+  lines, line, line_at, as_lua_id = string2.lines, string2.line, string2.line_at, string2.as_lua_id
   local text_methods = {
-    reversed = function(self)
-      return reverse(tostring(self))
-    end,
-    uppercase = function(self)
-      return upper(tostring(self))
-    end,
-    lowercase = function(self)
-      return lower(tostring(self))
-    end,
-    as_lua_id = function(self)
-      return as_lua_id(tostring(self))
-    end,
-    formatted_with_1 = function(self, args)
-      return format(tostring(self), unpack(args))
-    end,
-    byte_1 = function(self, i)
-      return byte(tostring(self), i)
-    end,
-    position_of_1 = function(self)
-      return find(tostring(self))
-    end,
-    position_of_1_after_2 = function(self, i)
-      return find(tostring(self), i)
-    end,
+    formatted_with_1 = format,
+    byte_1 = byte,
+    position_of_1 = find,
+    position_of_1_after_2 = find,
     bytes_1_to_2 = function(self, start, stop)
       return List({
         byte(tostring(self), start, stop)
       })
     end,
+    [as_lua_id("with 1 -> 2")] = gsub,
     bytes = function(self)
       return List({
-        byte(tostring(self), 1, #self)
+        byte(tostring(self), 1, -1)
       })
     end,
-    capitalized = function(self)
-      return gsub(tostring(self), '%l', upper, 1)
-    end,
     lines = function(self)
-      return List(line_matcher:match(self))
+      return List(lines(self))
+    end,
+    line_1 = line,
+    wrap_to_1 = function(self, maxlen)
+      local _lines = { }
+      local _list_0 = self:lines()
+      for _index_0 = 1, #_list_0 do
+        local line = _list_0[_index_0]
+        while #line > maxlen do
+          local chunk = line:sub(1, maxlen)
+          local split = chunk:find(' ', maxlen - 8) or maxlen
+          chunk = line:sub(1, split)
+          line = line:sub(split + 1, -1)
+          _lines[#_lines + 1] = chunk
+        end
+        _lines[#_lines + 1] = line
+      end
+      return table.concat(_lines, "\n")
+    end,
+    line_at_1 = function(self, i)
+      return (line_at(self, i))
+    end,
+    line_number_of_1 = function(self, i)
+      return select(2, line_at(self, i))
+    end,
+    line_position_of_1 = function(self, i)
+      return select(3, line_at(self, i))
     end,
     matches_1 = function(self, patt)
-      return match(tostring(self), patt) and true or false
+      return match(self, patt) and true or false
     end,
     [as_lua_id("* 1")] = function(self, n)
       return rep(self, n)
     end,
     matching_1 = function(self, patt)
       local result = { }
-      local stepper, x, i = gmatch(tostring(self), patt)
+      local stepper, x, i = gmatch(self, patt)
       while true do
         local tmp = List({
           stepper(x, i)
@@ -352,23 +338,10 @@ do
         result[#result + 1] = tmp
       end
       return List(result)
-    end,
-    [as_lua_id("with 1 -> 2")] = function(self, patt, sub)
-      return gsub(tostring(self), patt, sub)
-    end,
-    _coalesce = function(self)
-      if rawlen(self) > 1 then
-        local s = table.concat(self)
-        for i = rawlen(self), 2, -1 do
-          self[i] = nil
-        end
-        self[1] = s
-      end
-      return self
     end
   }
   setmetatable(text_methods, {
-    __index = string
+    __index = string2
   })
   getmetatable("").__index = function(self, i)
     if type(i) == 'number' then
@@ -382,6 +355,5 @@ do
 end
 return {
   List = List,
-  Dict = Dict,
-  Text = Text
+  Dict = Dict
 }

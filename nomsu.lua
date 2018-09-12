@@ -59,7 +59,7 @@ else
 end
 local usage = [=[Nomsu Compiler
 
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O optimization level] [-v] [-c] [-s] [-t] [-I file] [--help | -h] [--version] [--no-core] [file [nomsu args...]]
+Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O optimization level] [-v] [-c] [-s] [-I file] [--help | -h] [--version] [--no-core] [file [nomsu args...]]
 
 OPTIONS
     -O <level> Run the compiler with the given optimization level (>0: use precompiled .lua versions of Nomsu files, when available).
@@ -98,29 +98,24 @@ if not arg or debug.getinfo(2).func == require then
 end
 local file_queue = { }
 local sep = "\3"
-local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: '' -> true :} %sep)?
+local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: %true :} %sep)?
         {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
     flag <-
-        {:optimization: "-O" (%sep? (([0-9]+) -> tonumber))? :}
+        {:optimization: "-O" (%sep? %number)? :}
       / ("-I" %sep? ({~ file ~} -> add_file))
-      / ("-e" %sep? (({} {~ file ~}) -> add_exec_string) {:exec_strings: '' -> true :})
-      / ({:check_syntax: ("-s" -> true):})
-      / ({:compile: ("-c" -> true):})
-      / ({:compile: ("-c" -> true):})
-      / {:verbose: ("-v" -> true) :}
-      / {:help: (("-h" / "--help") -> true) :}
-      / {:version: ("--version" -> true) :}
-      / {:no_core: ("--no-core" -> true) :}
+      / ("-e" %sep? (({} {~ file ~}) -> add_exec_string) {:exec_strings: %true :})
+      / ({:check_syntax: "-s" %true:})
+      / ({:compile: "-c" %true:})
+      / {:verbose: "-v" %true :}
+      / {:help: ("-h" / "--help") %true :}
+      / {:version: "--version" %true :}
+      / {:no_core: "--no-core" %true :}
       / {:debugger: ("-d" %sep? {(!%sep .)*}) :}
       / {:requested_version: "-V" (%sep? {([0-9.])+})? :}
     file <- ("-" -> "stdin") / {(!%sep .)+}
 ]], {
-  ["true"] = (function()
-    return true
-  end),
-  tonumber = (function(self)
-    return tonumber(self)
-  end),
+  ["true"] = lpeg.Cc(true),
+  number = lpeg.R("09") ^ 1 / tonumber,
   sep = lpeg.P(sep),
   add_file = function(f)
     return table.insert(file_queue, f)
@@ -255,7 +250,7 @@ run = function()
             _continue_0 = true
             break
           end
-          nomsu:parse(file, source)
+          local tree = nomsu:parse(file, source)
           print("Parse succeeded: " .. tostring(filename))
         end
         if args.compile then

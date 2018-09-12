@@ -24,6 +24,7 @@ unpack or= table.unpack
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "syntax_tree"
 Parser = require("parser")
+make_parser = require("parser2")
 -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
 -- from lua line number to nomsu line number
 export SOURCE_MAP
@@ -37,15 +38,74 @@ table.copy = (t)-> setmetatable({k,v for k,v in pairs(t)}, getmetatable(t))
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- Re-implement nomsu-to-lua comment translation?
 
+Parsers = {}
+max_parser_version = 0
+for version=1,999
+    continue unless version == 4 -- TODO: remove
+    peg_file = io.open("nomsu.#{version}.peg")
+    if not peg_file and package.nomsupath
+        for path in package.nomsupath\gmatch("[^;]+")
+            peg_file = io.open(path.."/nomsu.#{version}.peg")
+            break if peg_file
+    break unless peg_file
+    max_parser_version = version
+    make_tree = (tree, userdata)->
+        cls = AST[tree.type]
+        tree.source = Source(userdata.filename, tree.start, tree.stop)
+        tree.start, tree.stop = nil, nil
+        tree.type = nil
+        tree.comments = [t for t in *tree when AST.is_syntax_tree(t, "Comment")]
+        if #tree.comments == 0 then tree.comments = nil
+        for i=#tree,1,-1
+            if AST.is_syntax_tree(tree[i], "Comment")
+                table.remove(tree, i)
+        tree = setmetatable(tree, cls)
+        cls.source_code_for_tree[tree] = userdata.source
+        if tree.__init then tree\__init!
+        return tree
+    Parsers[version] = make_parser(peg_file\read("*a"), make_tree)
+    peg_file\close!
+
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable {name:"Nomsu"},
     __index: (k)=> if _self = rawget(@, "self") then _self[k] else nil
     __tostring: => @name
+_anon_chunk = 0
 with NomsuCompiler
     .NOMSU_COMPILER_VERSION = 7
-    .NOMSU_SYNTAX_VERSION = Parser.version
+    .NOMSU_SYNTAX_VERSION = max_parser_version
     .nomsu = NomsuCompiler
-    .parse = (...)=> Parser.parse(...)
+    .parse = (nomsu_code, source=nil, version=nil)=>
+        source or= nomsu_code.source
+        nomsu_code = tostring(nomsu_code)
+        unless source
+            source = Source("anonymous chunk ##{_anon_chunk}", 1, #nomsu_code)
+            _anon_chunk += 1
+        version or= nomsu_code\match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
+        syntax_version = version and tonumber(version\match("^[0-9]+")) or max_parser_version
+        parse = Parsers[syntax_version] or Parsers[max_parser_version]
+        tree = parse(nomsu_code, source.filename)
+        pretty_error = require("pretty_errors")
+        -- TODO: truncate
+        find_errors = (t)->
+            if t.type == "Error"
+                return pretty_error{
+                    error:t.error, hint:t.hint, source:t\get_source_code!
+                    start:t.source.start, stop:t.source.stop
+                }
+            errs = ""
+            for k,v in pairs(t)
+                continue unless AST.is_syntax_tree(v)
+                err = find_errors(v)
+                if #err > 0
+                    if #errs > 0 then errs ..="\n\n"
+                    errs ..= err
+            return errs
+
+        errs = find_errors(tree)
+        if #errs > 0
+            error(errs, 0)
+        return tree
     .can_optimize = -> false
 
     -- Discretionary/convenience stuff
@@ -457,6 +517,13 @@ with NomsuCompiler
             when "FileChunks"
                 error("Cannot convert FileChunks to a single block of lua, since each chunk's "..
                     "compilation depends on the earlier chunks")
+            
+            when "Comment"
+                -- TODO: implement?
+                return LuaCode(tree.source, "")
+            
+            when "Error"
+                error("Cannot compile errors")
 
             else
                 error("Unknown type: #{tree.type}")
@@ -467,6 +534,13 @@ with NomsuCompiler
         switch tree.type
             when "FileChunks"
                 error("Cannot inline a FileChunks")
+            
+            when "Comment"
+                -- TODO: implement?
+                return NomsuCode(tree.source, "")
+            
+            when "Error"
+                error("Cannot compile errors")
 
             when "Action"
                 nomsu = NomsuCode(tree.source)
@@ -601,10 +675,7 @@ with NomsuCompiler
             if type(pos) != 'number' then pos = #tostring(pos)\match("[ ]*([^\n]*)$")
             space = MAX_LINE - pos
             local inline
-            check = (prefix,nomsu,tree)->
-                if type(tree) == 'number' then require('ldt').breakpoint!
-                coroutine.yield(prefix,nomsu,tree)
-            for prefix, nomsu, tree in coroutine.wrap(-> inline = @tree_to_inline_nomsu(t, false, check))
+            for prefix, nomsu, tree in coroutine.wrap(-> inline = @tree_to_inline_nomsu(t, false, coroutine.yield))
                 len = #tostring(nomsu)
                 break if prefix+len > MAX_LINE
                 break if tree.type == "Block" and (#tree > 1 or len > 20)
@@ -779,7 +850,7 @@ with NomsuCompiler
                 nomsu\append ": ", recurse(value, #tostring(nomsu))
                 return nomsu
             
-            when "IndexChain", "Number", "Var"
+            when "IndexChain", "Number", "Var", "Comment", "Error"
                 return @tree_to_inline_nomsu tree
             
             else

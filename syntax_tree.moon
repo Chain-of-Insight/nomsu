@@ -10,7 +10,7 @@ AST.is_syntax_tree = (n, t=nil)->
     type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
 
 types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
-    "IndexChain", "Action", "FileChunks"}
+    "IndexChain", "Action", "FileChunks", "Error", "Comment"}
 for name in *types
     cls = {}
     with cls
@@ -21,6 +21,8 @@ for name in *types
         .is_instance = (x)=> getmetatable(x) == @
         .__tostring = => "#{@type}#{repr @, ((x)-> Source\is_instance(x) and tostring(x) or nil)}"
         .__repr = => "#{@type}#{repr @, ((x)-> Source\is_instance(x) and tostring(x) or nil)}"
+        .source_code_for_tree = {}
+        .get_source_code = => @source_code_for_tree[@]
         .map = (fn)=>
             replacement = fn(@)
             if replacement == false then return nil

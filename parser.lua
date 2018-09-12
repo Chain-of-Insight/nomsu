@@ -47,7 +47,7 @@ do
     return string.char(tonumber(self))
   end)
   _with_0.escaped_char = _with_0.escaped_char + ((P("\\") * C(S("ntbavfr"))) / string_escapes)
-  _with_0.operator_char = S("'`~!@$^&*-+=|<>?/")
+  _with_0.operator_char = S("'`~!@$^&*+=|<>?/-")
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.ident_char = R("az", "AZ", "09") + P("_") + _with_0.utf8_char
   _with_0.userdata = Carg(1)

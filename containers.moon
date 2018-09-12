@@ -106,68 +106,45 @@ Dict = (t)-> setmetatable(t, _dict_mt)
 for i,entry in ipairs(Dict({x:99}))
     assert(i == 1 and entry.key == "x" and entry.value == 99, "ipairs compatibility issue")
 
-local Text
 do
     {:reverse, :upper, :lower, :find, :byte, :match, :gmatch, :gsub, :sub, :format, :rep} = string
-
-    -- Convert an arbitrary text into a valid Lua identifier. This function is injective,
-    -- but not idempotent, i.e. if (x != y) then (as_lua_id(x) != as_lua_id(y)),
-    -- but as_lua_id(x) is not necessarily equal to as_lua_id(as_lua_id(x))
-    as_lua_id = (str)->
-        -- Empty strings are not valid lua identifiers, so treat them like "\3",
-        -- and treat "\3" as "\3\3", etc. to preserve injectivity.
-        str = gsub str, "^\3*$", "%1\3"
-        -- Escape 'x' when it precedes something that looks like an uppercase hex sequence.
-        -- This way, all Lua IDs can be unambiguously reverse-engineered, but normal usage
-        -- of 'x' won't produce ugly Lua IDs.
-        -- i.e. "x" -> "x", "oxen" -> "oxen", but "Hex2Dec" -> "Hex782Dec" and "He-ec" -> "Hex2Dec"
-        str = gsub str, "x([0-9A-F][0-9A-F])", "x78%1"
-        -- Map spaces to underscores, and everything else non-alphanumeric to hex escape sequences
-        str = gsub str, "%W", (c)->
-            if c == ' ' then '_'
-            else format("x%02X", byte(c))
-        -- Lua IDs can't start with numbers, so map "1" -> "_1", "_1" -> "__1", etc.
-        str = gsub str, "^_*%d", "_%1"
-        return str
-
-    line_matcher = re.compile([[ 
-        lines <- {| line (%nl line)* |}
-        line <- {(!%nl .)*}
-    ]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
-
+    string2 = require 'string2'
+    {:lines, :line, :line_at, :as_lua_id} = string2
     text_methods =
-        reversed:=>reverse(tostring @)
-        uppercase:=>upper(tostring @)
-        lowercase:=>lower(tostring @)
-        as_lua_id:=>as_lua_id(tostring @)
-        formatted_with_1:(args)=>format(tostring(@), unpack(args))
-        byte_1:(i)=>byte(tostring(@), i)
-        position_of_1:=>find(tostring @),
-        position_of_1_after_2:(i)=> find(tostring(@), i)
+        formatted_with_1:format, byte_1:byte, position_of_1:find, position_of_1_after_2:find,
         bytes_1_to_2: (start, stop)=> List{byte(tostring(@), start, stop)}
-        bytes: => List{byte(tostring(@), 1, #@)},
-        capitalized: => gsub(tostring(@), '%l', upper, 1)
-        lines: => List(line_matcher\match(@))
-        matches_1: (patt)=> match(tostring(@), patt) and true or false
+        [as_lua_id "with 1 -> 2"]: gsub
+        bytes: => List{byte(tostring(@), 1, -1)},
+        lines: => List(lines(@))
+        line_1: line
+        wrap_to_1: (maxlen)=>
+            _lines = {}
+            for line in *@lines!
+                while #line > maxlen
+                    chunk = line\sub(1, maxlen)
+                    split = chunk\find(' ', maxlen-8) or maxlen
+                    chunk = line\sub(1, split)
+                    line = line\sub(split+1, -1)
+                    _lines[#_lines+1] = chunk
+                _lines[#_lines+1] = line
+            return table.concat(_lines, "\n")
+                                
+        line_at_1: (i)=> (line_at(@, i))
+        line_number_of_1: (i)=> select(2, line_at(@, i))
+        line_position_of_1: (i)=> select(3, line_at(@, i))
+        matches_1: (patt)=> match(@, patt) and true or false
         [as_lua_id "* 1"]: (n)=> rep(@, n)
         matching_1: (patt)=>
             result = {}
-            stepper,x,i = gmatch(tostring(@), patt)
+            stepper,x,i = gmatch(@, patt)
             while true
                 tmp = List{stepper(x,i)}
                 break if #tmp == 0
                 i = tmp[1]
                 result[#result+1] = tmp
             return List(result)
-        [as_lua_id "with 1 -> 2"]: (patt, sub)=> gsub(tostring(@), patt, sub)
-        _coalesce: =>
-            if rawlen(@) > 1
-                s = table.concat(@)
-                for i=rawlen(@), 2, -1 do @[i] = nil
-                @[1] = s
-            return @
     
-    setmetatable(text_methods, {__index:string})
+    setmetatable(text_methods, {__index:string2})
 
     getmetatable("").__index = (i)=>
         -- Use [] for accessing text characters, or s[{3,4}] for s:sub(3,4)
@@ -175,4 +152,4 @@ do
         elseif type(i) == 'table' then return sub(@, i[1], i[2])
         else return text_methods[i]
 
-return {:List, :Dict, :Text}
+return {:List, :Dict}
