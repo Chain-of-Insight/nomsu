@@ -35,19 +35,37 @@ format_error = function(err)
     end
   end
   if err_line then
-    local box_width = 60
     local before = err_line:sub(1, err_linepos - 1)
     local during = err_line:sub(err_linepos, err_linepos + err_size - 1)
     local after = err_line:sub(err_linepos + err_size, -1)
     err_line = "\027[0m" .. tostring(before) .. "\027[41;30m" .. tostring(during) .. tostring(nl_indicator) .. "\027[0m" .. tostring(after)
-    err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(err_linenum)) .. tostring(err_line) .. "\027[0m\n" .. tostring(pointer)
-    local err_text = "\027[47;31;1m" .. tostring((" " .. err.error):wrap_to_1(box_width):gsub("\n", "\n\027[47;31;1m "))
-    if err.hint then
-      err_text = err_text .. "\n\027[47;30m" .. tostring((" Suggestion: " .. tostring(err.hint)):wrap_to_1(box_width):gsub("\n", "\n\027[47;30m "))
-    end
-    err_msg = err_msg .. ("\n\027[33;1m " .. box(err_text):gsub("\n", "\n "))
+    err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(err_linenum)) .. tostring(err_line) .. "\027[0m"
   end
-  for i = err_linenum + 1, err_linenum + context do
+  local _, err_linenum_end, err_linepos_end = string2.line_at(err.source, err.stop)
+  if err_linenum_end == err_linenum then
+    err_msg = err_msg .. "\n" .. tostring(pointer)
+  else
+    for i = err_linenum + 1, err_linenum_end do
+      do
+        local line = string2.line(err.source, i)
+        if line then
+          if i == err_linenum_end then
+            local during, after = line:sub(1, err_linepos_end - 1), line:sub(err_linepos_end, -1)
+            err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0;41;30m" .. tostring(during) .. "\027[0m" .. tostring(after)
+          else
+            err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0m" .. tostring(line) .. "\027[0m"
+          end
+        end
+      end
+    end
+  end
+  local box_width = 70
+  local err_text = "\027[47;31;1m" .. tostring((" " .. err.error):wrap_to_1(box_width):gsub("\n", "\n\027[47;31;1m "))
+  if err.hint then
+    err_text = err_text .. "\n\027[47;30m" .. tostring((" Suggestion: " .. tostring(err.hint)):wrap_to_1(box_width):gsub("\n", "\n\027[47;30m "))
+  end
+  err_msg = err_msg .. ("\n\027[33;1m " .. box(err_text):gsub("\n", "\n "))
+  for i = err_linenum_end + 1, err_linenum_end + context do
     do
       local line = string2.line(err.source, i)
       if line then

@@ -28,17 +28,30 @@ format_error = (err)->
         if line = string2.line(err.source, i)
             err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0m#{line}\027[0m"
     if err_line
-        box_width = 60
         before = err_line\sub(1, err_linepos-1)
         during = err_line\sub(err_linepos,err_linepos+err_size-1)
         after = err_line\sub(err_linepos+err_size, -1)
         err_line = "\027[0m#{before}\027[41;30m#{during}#{nl_indicator}\027[0m#{after}"
-        err_msg ..= "\n\027[2m#{fmt_str\format(err_linenum)}#{err_line}\027[0m\n#{pointer}"
-        err_text = "\027[47;31;1m#{(" "..err.error)\wrap_to_1(box_width)\gsub("\n", "\n\027[47;31;1m ")}"
-        if err.hint
-            err_text ..= "\n\027[47;30m#{(" Suggestion: #{err.hint}")\wrap_to_1(box_width)\gsub("\n", "\n\027[47;30m ")}"
-        err_msg ..= "\n\027[33;1m "..box(err_text)\gsub("\n", "\n ")
-    for i=err_linenum+1,err_linenum+context
+        err_msg ..= "\n\027[2m#{fmt_str\format(err_linenum)}#{err_line}\027[0m"
+    _, err_linenum_end, err_linepos_end = string2.line_at(err.source, err.stop)
+    if err_linenum_end == err_linenum
+        err_msg ..= "\n#{pointer}"
+    else
+        for i=err_linenum+1,err_linenum_end
+            if line = string2.line(err.source, i)
+                if i == err_linenum_end
+                    during, after = line\sub(1,err_linepos_end-1), line\sub(err_linepos_end,-1)
+                    err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0;41;30m#{during}\027[0m#{after}"
+                else
+                    err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0m#{line}\027[0m"
+
+    box_width = 70
+    err_text = "\027[47;31;1m#{(" "..err.error)\wrap_to_1(box_width)\gsub("\n", "\n\027[47;31;1m ")}"
+    if err.hint
+        err_text ..= "\n\027[47;30m#{(" Suggestion: #{err.hint}")\wrap_to_1(box_width)\gsub("\n", "\n\027[47;30m ")}"
+    err_msg ..= "\n\027[33;1m "..box(err_text)\gsub("\n", "\n ")
+
+    for i=err_linenum_end+1,err_linenum_end+context
         if line = string2.line(err.source, i)
             err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0m#{line}\027[0m"
     return err_msg

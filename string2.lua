@@ -71,7 +71,7 @@ local string2 = {
       return 
     end
     for i, line, start, stop in isplit(self, '\n') do
-      if stop >= pos then
+      if stop + 1 >= pos then
         return line, i, (pos - start + 1)
       end
     end

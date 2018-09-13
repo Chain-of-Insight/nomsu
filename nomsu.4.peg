@@ -59,6 +59,10 @@ missing_bracket_error (Error):
 missing_brace_error (Error):
     {:error: {~ eol -> "Line ended before finding a closing }-brace" ~} :}
     {:hint: {~ '' -> 'Put a "}" here' ~} :}
+disallowed_interpolation (Error):
+    {:error: {~ ("\" ('\:' / '(..)' / '[..]' / '{..}') (%nl (&(%nl) / =curr_indent '        ' [^%nl]*))*) -> 
+        "Sorry, indented text interpolations are not currently supported on the first line of multi-line text." ~} :}
+    {:hint: {~ '' -> 'Move the code for the first line of text to the next line by ending this line with "\" and starting the next line indented with "..", followed by the code for the first line.' ~} :}
 
 section_division: ("~")^+3 eol
 
@@ -124,7 +128,7 @@ inline_text (Text):
     !(cool_indented_text / indented_text)
     ('"' _inline_text* ('"' / missing_quote_err / unexpected_code))
 _inline_text:
-    {~ (('\"' -> '"') / ('\\' -> '\') / escaped_char / [^%nl\"])+ ~}
+    {~ (('\"' -> '"') / ('\\' -> '\') / escaped_char / [^%nl\"]+)+ ~}
     / inline_text_interpolation
 inline_text_interpolation:
     "\" (
@@ -140,13 +144,24 @@ indented_text (Text):
         (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
     unexpected_code?
     {:curr_indent: %nil :}
+
+
+cool_quote:
+    '"' !(%nl+ !(=curr_indent))
 cool_indented_text (Text):
     ({|
-        '"' _inline_text* '\' %nl {:curr_indent: indent :} '..'
-            (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
-        unexpected_code?
+        '"'
+        _inline_text* 
+        (('\' %nl+ {:curr_indent: indent :} '..')
+         / disallowed_interpolation? {%nl+} {:curr_indent: indent :})
+        (indented_cool_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
+        ('"' eol / missing_quote_err)
     |} -> unpack)
-    ({(%nl &%nl)+}? %nl =curr_indent '..' _inline_text* '"')?
+indented_cool_plain_text (Text):
+    {~ ((("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation ((!("\n") escaped_char) / ('\\' -> '\') / '\')) / (cool_quote / [^%nl"\])+)+
+        (%nl+ (=curr_indent -> ""))* ~}
+
+
 -- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
 indented_plain_text (Text):
     {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
