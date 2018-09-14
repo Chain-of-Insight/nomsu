@@ -95,7 +95,7 @@ NomsuCompiler = setmetatable {name:"Nomsu"},
     __tostring: => @name
 _anon_chunk = 0
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 7
+    .NOMSU_COMPILER_VERSION = 8
     .NOMSU_SYNTAX_VERSION = max_parser_version
     .nomsu = NomsuCompiler
     .parse = (nomsu_code, source=nil, version=nil)=>
