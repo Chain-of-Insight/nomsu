@@ -43,12 +43,12 @@ for _index_0 = 1, #types do
     end
     cls.__tostring = function(self)
       return tostring(self.type) .. tostring(repr(self, (function(x)
-        return Source:is_instance(x) and tostring(x) or nil
+        return Source:is_instance(x) and repr(tostring(x)) or nil
       end)))
     end
     cls.__repr = function(self)
       return tostring(self.type) .. tostring(repr(self, (function(x)
-        return Source:is_instance(x) and tostring(x) or nil
+        return Source:is_instance(x) and repr(tostring(x)) or nil
       end)))
     end
     cls.source_code_for_tree = { }

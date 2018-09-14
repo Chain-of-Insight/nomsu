@@ -100,7 +100,7 @@ local max_parser_version = 0
 for version = 1, 999 do
   local _continue_0 = false
   repeat
-    if not (version == 4 or version == 3) then
+    if not (version == 4 or version == 3 or version == 2) then
       _continue_0 = true
       break
     end

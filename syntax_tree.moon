@@ -19,8 +19,8 @@ for name in *types
         .__name = name
         .type = name
         .is_instance = (x)=> getmetatable(x) == @
-        .__tostring = => "#{@type}#{repr @, ((x)-> Source\is_instance(x) and tostring(x) or nil)}"
-        .__repr = => "#{@type}#{repr @, ((x)-> Source\is_instance(x) and tostring(x) or nil)}"
+        .__tostring = => "#{@type}#{repr @, ((x)-> Source\is_instance(x) and repr(tostring(x)) or nil)}"
+        .__repr = => "#{@type}#{repr @, ((x)-> Source\is_instance(x) and repr(tostring(x)) or nil)}"
         .source_code_for_tree = {}
         .get_source_code = => @source_code_for_tree[@]
         .map = (fn)=>
