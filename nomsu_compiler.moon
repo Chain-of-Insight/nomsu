@@ -672,13 +672,13 @@ with NomsuCompiler
             find_comments(tree)
             -- Sort in reversed order so they can be easily popped
             comments = [c for c in pairs comment_set]
-            table.sort(comments, (a,b)->(a.pos > b.pos))
+            table.sort(comments, (a,b)->(a.source.start > b.source.start))
 
             pop_comments = (pos, prefix='', suffix='')->
                 nomsu = NomsuCode(tree.source)
                 for i=#comments,1,-1
-                    break if comments[i].pos > pos
-                    comment, comments[i] = comments[i].comment, nil
+                    break if comments[i].source.start > pos
+                    comment, comments[i] = comments[i][1], nil
                     nomsu\append("#"..(gsub(comment, "\n", "\n    ")).."\n")
                     if comment\match("^\n.") then nomsu\append("\n") -- for aesthetics
                 return '' if #nomsu.bits == 0

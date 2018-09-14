@@ -1078,7 +1078,7 @@ do
         comments = _accum_0
       end
       table.sort(comments, function(a, b)
-        return (a.pos > b.pos)
+        return (a.source.start > b.source.start)
       end)
       pop_comments = function(pos, prefix, suffix)
         if prefix == nil then
@@ -1089,11 +1089,11 @@ do
         end
         local nomsu = NomsuCode(tree.source)
         for i = #comments, 1, -1 do
-          if comments[i].pos > pos then
+          if comments[i].source.start > pos then
             break
           end
           local comment
-          comment, comments[i] = comments[i].comment, nil
+          comment, comments[i] = comments[i][1], nil
           nomsu:append("#" .. (gsub(comment, "\n", "\n    ")) .. "\n")
           if comment:match("^\n.") then
             nomsu:append("\n")
