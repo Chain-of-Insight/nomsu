@@ -36,7 +36,7 @@ do
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
 local AST = require("syntax_tree")
-local make_parser = require("parser2")
+local make_parser = require("parser")
 SOURCE_MAP = { }
 table.map = function(t, fn)
   return setmetatable((function()

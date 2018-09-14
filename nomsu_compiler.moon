@@ -24,7 +24,7 @@ unpack or= table.unpack
 {:match, :sub, :gsub, :format, :byte, :find} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "syntax_tree"
-make_parser = require("parser2")
+make_parser = require("parser")
 -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
 -- from lua line number to nomsu line number
 export SOURCE_MAP
