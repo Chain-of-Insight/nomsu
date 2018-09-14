@@ -56,7 +56,6 @@ make_tree = (tree, userdata)->
 Parsers = {}
 max_parser_version = 0
 for version=1,999
-    continue unless version == 4 or version == 3 or version == 2 -- TODO: remove
     peg_file = io.open("nomsu.#{version}.peg")
     if not peg_file and package.nomsupath
         for path in package.nomsupath\gmatch("[^;]+")
