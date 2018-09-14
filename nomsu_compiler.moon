@@ -103,25 +103,24 @@ with NomsuCompiler
         parse = Parsers[syntax_version] or Parsers[max_parser_version]
         tree = parse(nomsu_code, source.filename)
         pretty_error = require("pretty_errors")
-        -- TODO: truncate
         find_errors = (t)->
             if t.type == "Error"
-                return pretty_error{
+                coroutine.yield pretty_error{
                     error:t.error, hint:t.hint, source:t\get_source_code!
                     start:t.source.start, stop:t.source.stop
                 }
-            errs = ""
-            for k,v in pairs(t)
-                continue unless AST.is_syntax_tree(v)
-                err = find_errors(v)
-                if #err > 0
-                    if #errs > 0 then errs ..="\n\n"
-                    errs ..= err
-            return errs
+            else
+                for k,v in pairs(t)
+                    continue unless AST.is_syntax_tree(v)
+                    find_errors(v)
 
-        errs = find_errors(tree)
+        errs = [err for err in coroutine.wrap(-> find_errors(tree))]
+        if #errs > 4
+            num_errs = #errs
+            errs = [errs[i] for i=1,3]
+            table.insert(errs, "\027[31;1m +#{num_errs-#errs} additional errors...\027[0m\n")
         if #errs > 0
-            error(errs, 0)
+            error(table.concat(errs, '\n\n'), 0)
         return tree
     .can_optimize = -> false
 

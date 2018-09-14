@@ -184,40 +184,57 @@ do
     local find_errors
     find_errors = function(t)
       if t.type == "Error" then
-        return pretty_error({
+        return coroutine.yield(pretty_error({
           error = t.error,
           hint = t.hint,
           source = t:get_source_code(),
           start = t.source.start,
           stop = t.source.stop
-        })
-      end
-      local errs = ""
-      for k, v in pairs(t) do
-        local _continue_0 = false
-        repeat
-          if not (AST.is_syntax_tree(v)) then
+        }))
+      else
+        for k, v in pairs(t) do
+          local _continue_0 = false
+          repeat
+            if not (AST.is_syntax_tree(v)) then
+              _continue_0 = true
+              break
+            end
+            find_errors(v)
             _continue_0 = true
+          until true
+          if not _continue_0 then
             break
           end
-          local err = find_errors(v)
-          if #err > 0 then
-            if #errs > 0 then
-              errs = errs .. "\n\n"
-            end
-            errs = errs .. err
-          end
-          _continue_0 = true
-        until true
-        if not _continue_0 then
-          break
         end
       end
-      return errs
     end
-    local errs = find_errors(tree)
+    local errs
+    do
+      local _accum_0 = { }
+      local _len_0 = 1
+      for err in coroutine.wrap(function()
+        return find_errors(tree)
+      end) do
+        _accum_0[_len_0] = err
+        _len_0 = _len_0 + 1
+      end
+      errs = _accum_0
+    end
+    if #errs > 4 then
+      local num_errs = #errs
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for i = 1, 3 do
+          _accum_0[_len_0] = errs[i]
+          _len_0 = _len_0 + 1
+        end
+        errs = _accum_0
+      end
+      table.insert(errs, "\027[31;1m +" .. tostring(num_errs - #errs) .. " additional errors...\027[0m\n")
+    end
     if #errs > 0 then
-      error(errs, 0)
+      error(table.concat(errs, '\n\n'), 0)
     end
     return tree
   end
