@@ -167,7 +167,7 @@ local NomsuCompiler = setmetatable({
 })
 local _anon_chunk = 0
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 7
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 8
   NomsuCompiler.NOMSU_SYNTAX_VERSION = max_parser_version
   NomsuCompiler.nomsu = NomsuCompiler
   NomsuCompiler.parse = function(self, nomsu_code, source, version)
