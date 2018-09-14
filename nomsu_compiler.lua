@@ -130,22 +130,15 @@ end
 local Parsers = { }
 local max_parser_version = 0
 for version = 1, 999 do
-  local peg_file = io.open("nomsu." .. tostring(version) .. ".peg")
-  if not peg_file and package.nomsupath then
-    for path in package.nomsupath:gmatch("[^;]+") do
-      peg_file = io.open(path .. "/nomsu." .. tostring(version) .. ".peg")
-      if peg_file then
-        break
-      end
+  do
+    local peg_contents = Files.read("nomsu." .. tostring(version) .. ".peg")
+    if peg_contents then
+      max_parser_version = version
+      Parsers[version] = make_parser(peg_contents, make_tree)
+    else
+      break
     end
   end
-  if not (peg_file) then
-    break
-  end
-  max_parser_version = version
-  local peg_contents = peg_file:read("*a")
-  Parsers[version] = make_parser(peg_contents, make_tree)
-  peg_file:close()
 end
 local MAX_LINE = 80
 local NomsuCompiler = setmetatable({

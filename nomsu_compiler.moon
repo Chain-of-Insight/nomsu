@@ -78,16 +78,10 @@ make_tree = (tree, userdata)->
 Parsers = {}
 max_parser_version = 0
 for version=1,999
-    peg_file = io.open("nomsu.#{version}.peg")
-    if not peg_file and package.nomsupath
-        for path in package.nomsupath\gmatch("[^;]+")
-            peg_file = io.open(path.."/nomsu.#{version}.peg")
-            break if peg_file
-    break unless peg_file
-    max_parser_version = version
-    peg_contents = peg_file\read("*a")
-    Parsers[version] = make_parser(peg_contents, make_tree)
-    peg_file\close!
+    if peg_contents = Files.read("nomsu.#{version}.peg")
+        max_parser_version = version
+        Parsers[version] = make_parser(peg_contents, make_tree)
+    else break
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable {name:"Nomsu"},
