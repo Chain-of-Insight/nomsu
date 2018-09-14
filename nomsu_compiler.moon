@@ -10,6 +10,7 @@
 --    Or from the command line:
 --        lua nomsu.lua your_file.nom
 lpeg = require 'lpeg'
+{:R,:P,:S} = lpeg
 re = require 're'
 utils = require 'utils'
 Files = require 'files'
@@ -23,7 +24,6 @@ unpack or= table.unpack
 {:match, :sub, :gsub, :format, :byte, :find} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 AST = require "syntax_tree"
-Parser = require("parser")
 make_parser = require("parser2")
 -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
 -- from lua line number to nomsu line number
@@ -34,8 +34,30 @@ table.map = (t, fn)-> setmetatable([fn(v) for _,v in ipairs(t)], getmetatable(t)
 table.fork = (t, values)-> setmetatable(values or {}, {__index:t})
 table.copy = (t)-> setmetatable({k,v for k,v in pairs(t)}, getmetatable(t))
 
+-- Parsing helper functions
+utf8_char_patt = (
+    R("\194\223")*R("\128\191") +
+    R("\224\239")*R("\128\191")*R("\128\191") +
+    R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
+operator_patt = S("'`~!@$^&*+=|<>?/-")^1 * -1
+identifier_patt = (R("az","AZ","09") + P("_") + utf8_char_patt)^1 * -1
+
+is_operator = (s)->
+    return not not operator_patt\match(s)
+
+is_identifier = (s)->
+    return not not identifier_patt\match(s)
+
+inline_escaper = re.compile("{~ (%utf8_char / ('\"' -> '\\\"') / ('\n' -> '\\n') / ('\t' -> '\\t') / ('\b' -> '\\b') / ('\a' -> '\\a') / ('\v' -> '\\v') / ('\f' -> '\\f') / ('\r' -> '\\r') / ('\\' -> '\\\\') / ([^ -~] -> escape) / .)* ~}", {utf8_char: utf8_char_patt, escape:(=> ("\\%03d")\format(@byte!))})
+inline_escape = (s)->
+    return inline_escaper\match(s)
+
+escaper = re.compile("{~ (%utf8_char / ('\\' -> '\\\\') / [\n\r\t -~] / (. -> escape))* ~}",
+    {utf8_char: utf8_char_patt, escape:(=> ("\\%03d")\format(@byte!))})
+escape = (s)->
+    return escaper\match(s)
+
 -- TODO:
--- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- Re-implement nomsu-to-lua comment translation?
 
 make_tree = (tree, userdata)->
@@ -549,7 +571,7 @@ with NomsuCompiler
                     nomsu\append @tree_to_inline_nomsu(tree.target), "::"
                 for i,bit in ipairs tree
                     if type(bit) == "string"
-                        clump_words = (type(tree[i-1]) == 'string' and Parser.is_operator(bit) != Parser.is_operator(tree[i-1]))
+                        clump_words = (type(tree[i-1]) == 'string' and is_operator(bit) != is_operator(tree[i-1]))
                         nomsu\append " " if i > 1 and not clump_words
                         nomsu\append bit
                     else
@@ -582,8 +604,8 @@ with NomsuCompiler
                 add_text = (nomsu, tree)->
                     for i, bit in ipairs tree
                         if type(bit) == 'string'
-                            escaped = Parser.inline_escape(bit)
-                            nomsu\append Parser.inline_escape(bit)
+                            escaped = inline_escape(bit)
+                            nomsu\append inline_escape(bit)
                         elseif bit.type == "Text"
                             add_text(nomsu, bit)
                         else
@@ -609,7 +631,7 @@ with NomsuCompiler
             
             when "DictEntry"
                 key, value = tree[1], tree[2]
-                nomsu = if key.type == "Text" and #key == 1 and Parser.is_identifier(key[1])
+                nomsu = if key.type == "Text" and #key == 1 and is_identifier(key[1])
                     NomsuCode(key.source, key[1])
                 else recurse(key)
                 nomsu\parenthesize! if key.type == "Action" or key.type == "Block"
@@ -627,7 +649,7 @@ with NomsuCompiler
                 for i, bit in ipairs tree
                     nomsu\append "." if i > 1
                     local bit_nomsu
-                    bit_nomsu = if i > 1 and bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and Parser.is_identifier(bit[1])
+                    bit_nomsu = if i > 1 and bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and is_identifier(bit[1])
                         bit[1]
                     else recurse(bit, nomsu)
                     assert bit.type != "Block"
@@ -745,7 +767,7 @@ with NomsuCompiler
                         next_space = ""
 
                     if type(bit) == "string"
-                        unless type(tree[i-1]) == 'string' and Parser.is_operator(tree[i-1]) != Parser.is_operator(bit)
+                        unless type(tree[i-1]) == 'string' and is_operator(tree[i-1]) != is_operator(bit)
                             nomsu\append(next_space)
                         nomsu\append bit
                         next_space = ' '
@@ -788,7 +810,7 @@ with NomsuCompiler
                 add_text = (nomsu, tree)->
                     for i, bit in ipairs tree
                         if type(bit) == 'string'
-                            bit = Parser.escape(bit)
+                            bit = escape(bit)
                             bit_lines = Files.get_lines(bit)
                             for j, line in ipairs bit_lines
                                 if j > 1
@@ -844,7 +866,7 @@ with NomsuCompiler
             
             when "DictEntry"
                 key, value = tree[1], tree[2]
-                nomsu = if key.type == "Text" and #key == 1 and Parser.is_identifier(key[1])
+                nomsu = if key.type == "Text" and #key == 1 and is_identifier(key[1])
                     NomsuCode(key.source, key[1])
                 else @tree_to_inline_nomsu(key)
                 nomsu\parenthesize! if key.type == "Action" or key.type == "Block"

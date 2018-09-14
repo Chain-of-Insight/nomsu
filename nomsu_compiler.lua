@@ -1,4 +1,6 @@
 local lpeg = require('lpeg')
+local R, P, S
+R, P, S = lpeg.R, lpeg.P, lpeg.S
 local re = require('re')
 local utils = require('utils')
 local Files = require('files')
@@ -34,7 +36,6 @@ do
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
 local AST = require("syntax_tree")
-local Parser = require("parser")
 local make_parser = require("parser2")
 SOURCE_MAP = { }
 table.map = function(t, fn)
@@ -61,6 +62,37 @@ table.copy = function(t)
     end
     return _tbl_0
   end)(), getmetatable(t))
+end
+local utf8_char_patt = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
+local operator_patt = S("'`~!@$^&*+=|<>?/-") ^ 1 * -1
+local identifier_patt = (R("az", "AZ", "09") + P("_") + utf8_char_patt) ^ 1 * -1
+local is_operator
+is_operator = function(s)
+  return not not operator_patt:match(s)
+end
+local is_identifier
+is_identifier = function(s)
+  return not not identifier_patt:match(s)
+end
+local inline_escaper = re.compile("{~ (%utf8_char / ('\"' -> '\\\"') / ('\n' -> '\\n') / ('\t' -> '\\t') / ('\b' -> '\\b') / ('\a' -> '\\a') / ('\v' -> '\\v') / ('\f' -> '\\f') / ('\r' -> '\\r') / ('\\' -> '\\\\') / ([^ -~] -> escape) / .)* ~}", {
+  utf8_char = utf8_char_patt,
+  escape = (function(self)
+    return ("\\%03d"):format(self:byte())
+  end)
+})
+local inline_escape
+inline_escape = function(s)
+  return inline_escaper:match(s)
+end
+local escaper = re.compile("{~ (%utf8_char / ('\\' -> '\\\\') / [\n\r\t -~] / (. -> escape))* ~}", {
+  utf8_char = utf8_char_patt,
+  escape = (function(self)
+    return ("\\%03d"):format(self:byte())
+  end)
+})
+local escape
+escape = function(s)
+  return escaper:match(s)
 end
 local make_tree
 make_tree = function(tree, userdata)
@@ -851,7 +883,7 @@ do
       end
       for i, bit in ipairs(tree) do
         if type(bit) == "string" then
-          local clump_words = (type(tree[i - 1]) == 'string' and Parser.is_operator(bit) ~= Parser.is_operator(tree[i - 1]))
+          local clump_words = (type(tree[i - 1]) == 'string' and is_operator(bit) ~= is_operator(tree[i - 1]))
           if i > 1 and not clump_words then
             nomsu:append(" ")
           end
@@ -902,8 +934,8 @@ do
       add_text = function(nomsu, tree)
         for i, bit in ipairs(tree) do
           if type(bit) == 'string' then
-            local escaped = Parser.inline_escape(bit)
-            nomsu:append(Parser.inline_escape(bit))
+            local escaped = inline_escape(bit)
+            nomsu:append(inline_escape(bit))
           elseif bit.type == "Text" then
             add_text(nomsu, bit)
           else
@@ -939,7 +971,7 @@ do
     elseif "DictEntry" == _exp_0 then
       local key, value = tree[1], tree[2]
       local nomsu
-      if key.type == "Text" and #key == 1 and Parser.is_identifier(key[1]) then
+      if key.type == "Text" and #key == 1 and is_identifier(key[1]) then
         nomsu = NomsuCode(key.source, key[1])
       else
         nomsu = recurse(key)
@@ -967,7 +999,7 @@ do
           nomsu:append(".")
         end
         local bit_nomsu
-        if i > 1 and bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and Parser.is_identifier(bit[1]) then
+        if i > 1 and bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and is_identifier(bit[1]) then
           bit_nomsu = bit[1]
         else
           bit_nomsu = recurse(bit, nomsu)
@@ -1177,7 +1209,7 @@ do
           next_space = ""
         end
         if type(bit) == "string" then
-          if not (type(tree[i - 1]) == 'string' and Parser.is_operator(tree[i - 1]) ~= Parser.is_operator(bit)) then
+          if not (type(tree[i - 1]) == 'string' and is_operator(tree[i - 1]) ~= is_operator(bit)) then
             nomsu:append(next_space)
           end
           nomsu:append(bit)
@@ -1223,7 +1255,7 @@ do
       add_text = function(nomsu, tree)
         for i, bit in ipairs(tree) do
           if type(bit) == 'string' then
-            bit = Parser.escape(bit)
+            bit = escape(bit)
             local bit_lines = Files.get_lines(bit)
             for j, line in ipairs(bit_lines) do
               if j > 1 then
@@ -1298,7 +1330,7 @@ do
     elseif "DictEntry" == _exp_0 then
       local key, value = tree[1], tree[2]
       local nomsu
-      if key.type == "Text" and #key == 1 and Parser.is_identifier(key[1]) then
+      if key.type == "Text" and #key == 1 and is_identifier(key[1]) then
         nomsu = NomsuCode(key.source, key[1])
       else
         nomsu = self:tree_to_inline_nomsu(key)
