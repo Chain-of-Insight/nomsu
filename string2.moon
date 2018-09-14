@@ -24,7 +24,6 @@ string2 = {
 
     line_at: (pos)=>
         assert(type(pos) == 'number', "Invalid string position")
-        return if pos < 1 or pos > #@
         for i, line, start, stop in isplit(@, '\n')
             if stop+1 >= pos
                 return line, i, (pos-start+1)

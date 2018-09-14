@@ -184,13 +184,7 @@ do
     local find_errors
     find_errors = function(t)
       if t.type == "Error" then
-        return coroutine.yield(pretty_error({
-          error = t.error,
-          hint = t.hint,
-          source = t:get_source_code(),
-          start = t.source.start,
-          stop = t.source.stop
-        }))
+        return coroutine.yield(t)
       else
         for k, v in pairs(t) do
           local _continue_0 = false
@@ -234,7 +228,24 @@ do
       table.insert(errs, "\027[31;1m +" .. tostring(num_errs - #errs) .. " additional errors...\027[0m\n")
     end
     if #errs > 0 then
-      error(table.concat(errs, '\n\n'), 0)
+      local err_strings
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_0 = 1, #errs do
+          local t = errs[_index_0]
+          _accum_0[_len_0] = pretty_error({
+            error = t.error,
+            hint = t.hint,
+            source = t:get_source_code(),
+            start = t.source.start,
+            stop = t.source.stop
+          })
+          _len_0 = _len_0 + 1
+        end
+        err_strings = _accum_0
+      end
+      error(table.concat(err_strings, '\n\n'), 0)
     end
     return tree
   end
@@ -1305,7 +1316,7 @@ do
               end
             end
             nomsu:append(interp_nomsu)
-            if interp_nomsu:is_multiline() and i < #tree then
+            if interp_nomsu:is_multiline() then
               nomsu:append("\n..")
             end
           end
@@ -1313,10 +1324,7 @@ do
       end
       local nomsu = NomsuCode(tree.source)
       add_text(nomsu, tree)
-      if nomsu:is_multiline() and nomsu:match("\n$") then
-        nomsu:append('\\("")')
-      end
-      return NomsuCode(tree.source, '".."\n    ', nomsu)
+      return NomsuCode(tree.source, '"\\\n    ..', nomsu, '"')
     elseif "List" == _exp_0 or "Dict" == _exp_0 then
       assert(#tree > 0)
       local nomsu = NomsuCode(tree.source, pop_comments(tree[1].source.start))

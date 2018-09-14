@@ -105,10 +105,7 @@ with NomsuCompiler
         pretty_error = require("pretty_errors")
         find_errors = (t)->
             if t.type == "Error"
-                coroutine.yield pretty_error{
-                    error:t.error, hint:t.hint, source:t\get_source_code!
-                    start:t.source.start, stop:t.source.stop
-                }
+                coroutine.yield t
             else
                 for k,v in pairs(t)
                     continue unless AST.is_syntax_tree(v)
@@ -120,7 +117,11 @@ with NomsuCompiler
             errs = [errs[i] for i=1,3]
             table.insert(errs, "\027[31;1m +#{num_errs-#errs} additional errors...\027[0m\n")
         if #errs > 0
-            error(table.concat(errs, '\n\n'), 0)
+            err_strings = [pretty_error{
+                    error:t.error, hint:t.hint, source:t\get_source_code!
+                    start:t.source.start, stop:t.source.stop
+                } for t in *errs]
+            error(table.concat(err_strings, '\n\n'), 0)
         return tree
     .can_optimize = -> false
 
@@ -833,13 +834,11 @@ with NomsuCompiler
                                 elseif bit.type != "List" and bit.type != "Dict"
                                     interp_nomsu\parenthesize!
                             nomsu\append interp_nomsu
-                            if interp_nomsu\is_multiline! and i < #tree
+                            if interp_nomsu\is_multiline!
                                 nomsu\append "\n.."
                 nomsu = NomsuCode(tree.source)
                 add_text(nomsu, tree)
-                if nomsu\is_multiline! and nomsu\match("\n$")
-                    nomsu\append '\\("")' -- Need to specify where the text ends
-                return NomsuCode(tree.source, '".."\n    ', nomsu)
+                return NomsuCode(tree.source, '"\\\n    ..', nomsu, '"')
 
             when "List", "Dict"
                 assert #tree > 0

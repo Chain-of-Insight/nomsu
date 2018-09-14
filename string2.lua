@@ -67,9 +67,6 @@ local string2 = {
   end,
   line_at = function(self, pos)
     assert(type(pos) == 'number', "Invalid string position")
-    if pos < 1 or pos > #self then
-      return 
-    end
     for i, line, start, stop in isplit(self, '\n') do
       if stop + 1 >= pos then
         return line, i, (pos - start + 1)

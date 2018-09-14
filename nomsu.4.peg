@@ -147,7 +147,7 @@ indented_text (Text):
 
 
 cool_quote:
-    '"' !(%nl+ !(=curr_indent))
+    '"' &([^%nl] / %nl+ =curr_indent)
 cool_indented_text (Text):
     '"'
     _inline_text* 
@@ -155,6 +155,7 @@ cool_indented_text (Text):
      / disallowed_interpolation? {%nl+} {:curr_indent: indent :})
     (indented_cool_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
     ('"' eol / missing_quote_err)
+    {:curr_indent: %nil :}
 indented_cool_plain_text (Text):
     {~ ((("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation ((!("\n") escaped_char) / ('\\' -> '\') / '\')) / (cool_quote / [^%nl"\])+)+
         (%nl+ (=curr_indent -> ""))* ~}
