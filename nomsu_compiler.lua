@@ -62,12 +62,45 @@ table.copy = function(t)
     return _tbl_0
   end)(), getmetatable(t))
 end
+local make_tree
+make_tree = function(tree, userdata)
+  local cls = AST[tree.type]
+  tree.source = Source(userdata.filename, tree.start, tree.stop)
+  tree.start, tree.stop = nil, nil
+  tree.type = nil
+  do
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _index_0 = 1, #tree do
+      local t = tree[_index_0]
+      if AST.is_syntax_tree(t, "Comment") then
+        _accum_0[_len_0] = t
+        _len_0 = _len_0 + 1
+      end
+    end
+    tree.comments = _accum_0
+  end
+  if #tree.comments == 0 then
+    tree.comments = nil
+  end
+  for i = #tree, 1, -1 do
+    if AST.is_syntax_tree(tree[i], "Comment") then
+      table.remove(tree, i)
+    end
+  end
+  tree = setmetatable(tree, cls)
+  cls.source_code_for_tree[tree] = userdata.source
+  if tree.__init then
+    tree:__init()
+  end
+  return tree
+end
 local Parsers = { }
 local max_parser_version = 0
 for version = 1, 999 do
   local _continue_0 = false
   repeat
-    if not (version == 4) then
+    if not (version == 4 or version == 3) then
       _continue_0 = true
       break
     end
@@ -84,40 +117,8 @@ for version = 1, 999 do
       break
     end
     max_parser_version = version
-    local make_tree
-    make_tree = function(tree, userdata)
-      local cls = AST[tree.type]
-      tree.source = Source(userdata.filename, tree.start, tree.stop)
-      tree.start, tree.stop = nil, nil
-      tree.type = nil
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #tree do
-          local t = tree[_index_0]
-          if AST.is_syntax_tree(t, "Comment") then
-            _accum_0[_len_0] = t
-            _len_0 = _len_0 + 1
-          end
-        end
-        tree.comments = _accum_0
-      end
-      if #tree.comments == 0 then
-        tree.comments = nil
-      end
-      for i = #tree, 1, -1 do
-        if AST.is_syntax_tree(tree[i], "Comment") then
-          table.remove(tree, i)
-        end
-      end
-      tree = setmetatable(tree, cls)
-      cls.source_code_for_tree[tree] = userdata.source
-      if tree.__init then
-        tree:__init()
-      end
-      return tree
-    end
-    Parsers[version] = make_parser(peg_file:read("*a"), make_tree)
+    local peg_contents = peg_file:read("*a")
+    Parsers[version] = make_parser(peg_contents, make_tree)
     peg_file:close()
     _continue_0 = true
   until true

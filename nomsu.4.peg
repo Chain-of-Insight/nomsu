@@ -11,14 +11,14 @@ shebang: "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* {:version: [0-9.]+ :} [^%n
 file_chunks (FileChunks):
     {:curr_indent: ' '* :}
     shebang? comment? blank_lines?
-    (top_block (section_division nl_nodent top_block)*)
+    (top_block (nl_nodent section_division top_block)*)
     blank_lines?
     ws* unexpected_chunk?
     {:curr_indent: %nil :}
 
 top_block (Block):
     {:curr_indent: ' '* :}
-    comment? blank_lines? statement (nl_nodent statement?)*
+    comment? blank_lines? statement (nl_nodent statement)*
     {:curr_indent: %nil :}
 
 empty_block (Block):
@@ -71,7 +71,7 @@ inline_block:
 raw_inline_block (Block):
     (!"::") ":" ws* ((inline_statement (ws* ";" ws* inline_statement)*) / !(eol nl_indent))
 indented_block (Block):
-    ":" eol nl_indent statement (nl_nodent statement?)*
+    ":" eol nl_indent statement (nl_nodent statement)*
     (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
     {:curr_indent: %nil :}
 
@@ -149,18 +149,15 @@ indented_text (Text):
 cool_quote:
     '"' !(%nl+ !(=curr_indent))
 cool_indented_text (Text):
-    ({|
-        '"'
-        _inline_text* 
-        (('\' %nl+ {:curr_indent: indent :} '..')
-         / disallowed_interpolation? {%nl+} {:curr_indent: indent :})
-        (indented_cool_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
-        ('"' eol / missing_quote_err)
-    |} -> unpack)
+    '"'
+    _inline_text* 
+    (('\' %nl+ {:curr_indent: indent :} '..')
+     / disallowed_interpolation? {%nl+} {:curr_indent: indent :})
+    (indented_cool_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
+    ('"' eol / missing_quote_err)
 indented_cool_plain_text (Text):
     {~ ((("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation ((!("\n") escaped_char) / ('\\' -> '\') / '\')) / (cool_quote / [^%nl"\])+)+
         (%nl+ (=curr_indent -> ""))* ~}
-
 
 -- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
 indented_plain_text (Text):
@@ -182,7 +179,7 @@ inline_list (List):
     ("]" / (","? (missing_bracket_error / unexpected_code)))
 indented_list (List):
     "[..]" eol nl_indent
-        list_line (nl_nodent list_line?)*
+        list_line (nl_nodent list_line)*
         (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
     (","? unexpected_code)?
 list_line:
@@ -197,7 +194,7 @@ inline_dict (Dict):
     ("}" / (","? (missing_brace_error / unexpected_code)))
 indented_dict (Dict):
     "{..}" eol nl_indent
-        dict_line (nl_nodent dict_line?)*
+        dict_line (nl_nodent dict_line)*
         (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
     (","? unexpected_code)?
 dict_line:

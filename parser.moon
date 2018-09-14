@@ -74,73 +74,7 @@ setmetatable(NOMSU_DEFS, {__index:(key)=>
     return make_node
 })
 
-Parser = {version:3, patterns:{}}
-do
-    -- Just for cleanliness, I put the language spec in its own file using a slightly modified
-    -- version of the lpeg.re syntax.
-    peg_tidier = re.compile [[
-    file <- %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
-    def <- anon_def / captured_def
-    anon_def <- ({ident} (" "*) ":"
-        {~ ((%nl " "+ def_line?)+) / def_line ~}) -> "%1 <- %2"
-    captured_def <- ({ident} (" "*) "(" {ident} ")" (" "*) ":"
-        {~ ((%nl " "+ def_line?)+) / def_line ~}) -> "%1 <- (({} {| %3 |} {} %%userdata) -> %2)"
-    def_line <- (err / [^%nl])+
-    err <- ("(!!" { (!("!!)") .)* } "!!)") -> "(({} (%1) %%userdata) => error)"
-    ident <- [a-zA-Z_][a-zA-Z0-9_]*
-    comment <- "--" [^%nl]*
-    ]]
-    for version=1,Parser.version
-        peg_file = io.open("nomsu.#{version}.peg")
-        if not peg_file and package.nomsupath
-            for path in package.nomsupath\gmatch("[^;]+")
-                peg_file = io.open(path.."/nomsu.#{version}.peg")
-                break if peg_file
-        assert(peg_file, "could not find nomsu .peg file")
-        nomsu_peg = peg_tidier\match(peg_file\read('*a'))
-        peg_file\close!
-        Parser.patterns[version] = re.compile(nomsu_peg, NOMSU_DEFS)
-
-_anon_chunk = 0
-Parser.parse = (nomsu_code, source=nil, version=nil)->
-    source or= nomsu_code.source
-    nomsu_code = tostring(nomsu_code)
-    unless source
-        source = Source("anonymous chunk ##{_anon_chunk}", 1, #nomsu_code)
-        _anon_chunk += 1
-    version or= nomsu_code\match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
-    syntax_version = version and tonumber(version\match("^[0-9]+")) or Parser.version
-    userdata = {
-        errors: {}, :source, comments: {}
-    }
-    tree = Parser.patterns[syntax_version]\match(nomsu_code, nil, userdata)
-    if not tree or type(tree) == 'number'
-        error "In file #{colored.blue tostring(source or "<unknown>")} failed to parse:\n#{colored.onyellow colored.black nomsu_code}"
-
-    if next(userdata.errors)
-        keys = [k for k,v in pairs(userdata.errors)]
-        table.sort(keys)
-        errors = [userdata.errors[k] for k in *keys]
-        error("Errors occurred while parsing (v#{syntax_version}):\n\n"..table.concat(errors, "\n\n"), 0)
-
-    comments = [{comment:c, pos:p} for p,c in pairs(userdata.comments)]
-    -- Sort in descending order so we can pop the first comments off the end one at a time
-    table.sort comments, (a,b)-> a.pos > b.pos
-    comment_i = 1
-    walk_tree = (t)->
-        export comment_i
-        comment_buff = {}
-        while comments[#comments] and comments[#comments].pos <= t.source.start
-            table.insert(comment_buff, table.remove(comments))
-        for x in *t
-            if AST.is_syntax_tree x
-                walk_tree x
-        while comments[#comments] and comments[#comments].pos <= t.source.stop
-            table.insert(comment_buff, table.remove(comments))
-        t.comments = comment_buff if #comment_buff > 0
-    walk_tree tree
-
-    return tree
+Parser = {version:4, patterns:{}}
 
 Parser.is_operator = (s)->
     return not not (NOMSU_DEFS.operator_char^1 * -1)\match(s)

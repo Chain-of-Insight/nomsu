@@ -34,6 +34,7 @@ format_error = (err)->
         err_line = "\027[0m#{before}\027[41;30m#{during}#{nl_indicator}\027[0m#{after}"
         err_msg ..= "\n\027[2m#{fmt_str\format(err_linenum)}#{err_line}\027[0m"
     _, err_linenum_end, err_linepos_end = string2.line_at(err.source, err.stop)
+    err_linenum_end or= err_linenum
     if err_linenum_end == err_linenum
         err_msg ..= "\n#{pointer}"
     else

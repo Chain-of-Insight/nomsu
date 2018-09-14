@@ -42,6 +42,7 @@ format_error = function(err)
     err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(err_linenum)) .. tostring(err_line) .. "\027[0m"
   end
   local _, err_linenum_end, err_linepos_end = string2.line_at(err.source, err.stop)
+  err_linenum_end = err_linenum_end or err_linenum
   if err_linenum_end == err_linenum then
     err_msg = err_msg .. "\n" .. tostring(pointer)
   else

@@ -38,10 +38,25 @@ table.copy = (t)-> setmetatable({k,v for k,v in pairs(t)}, getmetatable(t))
 -- consider non-linear codegen, rather than doing thunks for things like comprehensions
 -- Re-implement nomsu-to-lua comment translation?
 
+make_tree = (tree, userdata)->
+    cls = AST[tree.type]
+    tree.source = Source(userdata.filename, tree.start, tree.stop)
+    tree.start, tree.stop = nil, nil
+    tree.type = nil
+    tree.comments = [t for t in *tree when AST.is_syntax_tree(t, "Comment")]
+    if #tree.comments == 0 then tree.comments = nil
+    for i=#tree,1,-1
+        if AST.is_syntax_tree(tree[i], "Comment")
+            table.remove(tree, i)
+    tree = setmetatable(tree, cls)
+    cls.source_code_for_tree[tree] = userdata.source
+    if tree.__init then tree\__init!
+    return tree
+
 Parsers = {}
 max_parser_version = 0
 for version=1,999
-    continue unless version == 4 -- TODO: remove
+    continue unless version == 4 or version == 3 -- TODO: remove
     peg_file = io.open("nomsu.#{version}.peg")
     if not peg_file and package.nomsupath
         for path in package.nomsupath\gmatch("[^;]+")
@@ -49,21 +64,8 @@ for version=1,999
             break if peg_file
     break unless peg_file
     max_parser_version = version
-    make_tree = (tree, userdata)->
-        cls = AST[tree.type]
-        tree.source = Source(userdata.filename, tree.start, tree.stop)
-        tree.start, tree.stop = nil, nil
-        tree.type = nil
-        tree.comments = [t for t in *tree when AST.is_syntax_tree(t, "Comment")]
-        if #tree.comments == 0 then tree.comments = nil
-        for i=#tree,1,-1
-            if AST.is_syntax_tree(tree[i], "Comment")
-                table.remove(tree, i)
-        tree = setmetatable(tree, cls)
-        cls.source_code_for_tree[tree] = userdata.source
-        if tree.__init then tree\__init!
-        return tree
-    Parsers[version] = make_parser(peg_file\read("*a"), make_tree)
+    peg_contents = peg_file\read("*a")
+    Parsers[version] = make_parser(peg_contents, make_tree)
     peg_file\close!
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
