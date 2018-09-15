@@ -184,20 +184,20 @@ run = ->
     unless args.primary_file or args.exec_strings
         -- Run in interactive mode (REPL)
         nomsu\run [[
-#!/usr/bin/env nomsu -V2
+#!/usr/bin/env nomsu -V4
 use "lib/consolecolor.nom"
 action [quit, exit]: lua> "os.exit(0)"
 action [help]:
-    say ".."
-        This is the Nomsu v\(Nomsu version) interactive console.
+    say "\
+        ..This is the Nomsu v\(Nomsu version) interactive console.
         You can type in Nomsu code here and hit 'enter' twice to run it.
-        To exit, type 'exit' or 'quit' and hit enter twice.
+        To exit, type 'exit' or 'quit' and hit enter twice."
 
-say ".."
-
+say "\
+    ..
     \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
         press 'enter' twice to run a command
-    \("")]]
+    "]]
         for repl_line=1,math.huge
             io.write(colored.bright colored.yellow ">> ")
             buff = {}

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file contains basic error reporting code
 
@@ -10,34 +10,34 @@ compile [compile error at %source %msg] to (..)
     Lua "nomsu:compile_error(\(%source as lua expr), \(%msg as lua expr))"
 
 compile [assume %condition] to:
-    lua> ".."
-        local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition))
+    lua> "\
+        ..local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition))"
     return (..)
-        Lua ".."
-            if not \(%condition as lua expr) then
+        Lua "\
+            ..if not \(%condition as lua expr) then
                 error(\(quote "\%assumption"), 0)
-            end
+            end"
 
 compile [assume %a == %b] to:
-    lua> ".."
-        local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\(\(%a == %b))))
+    lua> "\
+        ..local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\(\(%a == %b))))"
     define mangler
     return (..)
-        Lua ".."
-            do
+        Lua "\
+            ..do
                 local \(mangle "a"), \(mangle "b") = \(%a as lua expr), \(%b as lua expr)
                 if \(mangle "a") ~= \(mangle "b") then
                     error(\(quote "\%assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\(..)
                 mangle "b"
             ..), 0)
                 end
-            end
+            end"
 
 compile [assume %condition or barf %message] to (..)
-    Lua ".."
-        if not \(%condition as lua expr) then
+    Lua "\
+        ..if not \(%condition as lua expr) then
             error(\(%message as lua expr), 0)
-        end
+        end"
 
 test:
     try (barf) and if it succeeds: barf "try failed."
@@ -57,8 +57,8 @@ compile [..]
     try %action and if it succeeds %success or if it barfs %msg %fallback
     try %action and if it barfs %msg %fallback or if it succeeds %success
 ..to (..)
-    Lua ".."
-        do
+    Lua "\
+        ..do
             local fell_through = false
             local err, erred = nil, false
             local ok, ret = xpcall(function()
@@ -78,7 +78,7 @@ compile [..]
             elseif erred then
                 error(err, 0)
             end
-        end
+        end"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file contains definitions pertaining to variable scoping
 
@@ -25,9 +25,9 @@ compile [with local %locals %body, with local %locals do %body] to:
     if %locals.type is:
         "Dict":
             %body_lua = (..)
-                Lua ".."
-                    \(compile as (<- %locals))
-                    \%body_lua
+                Lua "\
+                    ..\(compile as (<- %locals))
+                    \%body_lua"
             
             %body_lua::declare locals ("\(%.1 as lua)" for % in %locals)
         
@@ -39,7 +39,7 @@ compile [with local %locals %body, with local %locals do %body] to:
             compile error at %locals.source "Unexpected locals: %s"
     
     return (..)
-        Lua ".."
-            do
+        Lua "\
+            ..do
                 \%body_lua
-            end
+            end"

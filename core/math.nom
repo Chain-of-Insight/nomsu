@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file defines some common math literals and functions
 
@@ -10,8 +10,8 @@ use "core/collections.nom"
 
 # Literals:
 test:
-    assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf ".."
-        math constants failed
+    assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf "\
+        ..math constants failed"
     %nan = (NaN)
     assume (%nan != %nan) or barf "NaN failed"
 compile [infinity, inf] to (Lua value "math.huge")
@@ -127,9 +127,9 @@ parse [max of %items by %item = %value_expr] as (..)
 
 # Random functions
 action [seed random with %] (..)
-    lua> ".."
-        math.randomseed(\%);
-        for i=1,20 do math.random(); end
+    lua> "\
+        ..math.randomseed(\%);
+        for i=1,20 do math.random(); end"
 
 parse [seed random] as (seed random with (=lua "os.time()"))
 compile [random number, random, rand] to (Lua value "math.random()")

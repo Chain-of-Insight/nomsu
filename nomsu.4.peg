@@ -63,6 +63,9 @@ disallowed_interpolation (Error):
     {:error: {~ ("\" ('\:' / '(..)' / '[..]' / '{..}') (%nl (&(%nl) / =curr_indent '        ' [^%nl]*))*) -> 
         "Sorry, indented text interpolations are not currently supported on the first line of multi-line text." ~} :}
     {:hint: {~ '' -> 'Move the code for the first line of text to the next line by ending this line with "\" and starting the next line indented with "..", followed by the code for the first line.' ~} :}
+expected_dotdot (Error):
+    {:error: {~ '' -> 'Expected to see a ".." here' ~} :}
+    {:hint: {~ '' -> 'Add a ".." here.' ~} :}
 
 section_division: ("~")^+3 eol
 
@@ -89,7 +92,7 @@ noindex_inline_expression:
       )
 inline_expression: index_chain / noindex_inline_expression 
 indented_expression:
-    cool_indented_text / indented_text / indented_nomsu / indented_list / indented_dict / ({|
+    indented_text / indented_nomsu / indented_list / indented_dict / ({|
         "(..)" nl_indent
             (action / expression) (eol / unexpected_code)
             (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
@@ -125,45 +128,39 @@ word: !number { operator_char+ / ident_char+ }
 text_word (Text): word
 
 inline_text (Text):
-    !(cool_indented_text / indented_text)
-    ('"' _inline_text* ('"' / missing_quote_err / unexpected_code))
+    !(indented_text)
+    '"' _inline_text* ('"' / missing_quote_err / unexpected_code)
 _inline_text:
     {~ (('\"' -> '"') / ('\\' -> '\') / escaped_char / [^%nl\"]+)+ ~}
     / inline_text_interpolation
 inline_text_interpolation:
     "\" (
-        variable / inline_list / inline_dict / inline_text
+        variable / inline_list / inline_dict
         / ("("
             ws* (inline_action / inline_expression) ws*
             (ws* ',' ws* (inline_action / inline_expression) ws*)*
-        (")" / missing_paren_err / unexpected_code))
+            (")" / missing_paren_err / unexpected_code))
     )
 
-indented_text (Text):
-    '".."' eol %nl {%nl+}? {:curr_indent: indent :}
-        (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
-    unexpected_code?
-    {:curr_indent: %nil :}
-
-
-cool_quote:
+nonterminal_quote:
     '"' &([^%nl] / %nl+ =curr_indent)
-cool_indented_text (Text):
+indented_text (Text):
     '"'
     _inline_text* 
-    (('\' %nl+ {:curr_indent: indent :} '..')
+    (('\' %nl+ {:curr_indent: indent :} ('..' / expected_dotdot))
      / disallowed_interpolation? {%nl+} {:curr_indent: indent :})
-    (indented_cool_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
+    (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
     ('"' eol / missing_quote_err)
     {:curr_indent: %nil :}
-indented_cool_plain_text (Text):
-    {~ ((("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation ((!("\n") escaped_char) / ('\\' -> '\') / '\')) / (cool_quote / [^%nl"\])+)+
-        (%nl+ (=curr_indent -> ""))* ~}
-
 -- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
 indented_plain_text (Text):
-    {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
-        (%nl+ (=curr_indent -> ""))* ~}
+    {~ 
+        ((("\" blank_lines =curr_indent "..") -> "") / ('\\' -> '\')
+        / (!text_interpolation ((!("\n") escaped_char) / '\'))
+        / (nonterminal_quote / [^%nl"\])+)+
+        (%nl+ (=curr_indent -> ""))*
+    ~}
+
 text_interpolation:
     inline_text_interpolation / ("\" indented_expression (blank_lines =curr_indent "..")?)
 

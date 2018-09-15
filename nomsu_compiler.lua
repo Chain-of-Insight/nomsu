@@ -214,36 +214,28 @@ do
       end
       errs = _accum_0
     end
-    if #errs > 4 then
-      local num_errs = #errs
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for i = 1, 3 do
-          _accum_0[_len_0] = errs[i]
-          _len_0 = _len_0 + 1
-        end
-        errs = _accum_0
-      end
-      table.insert(errs, "\027[31;1m +" .. tostring(num_errs - #errs) .. " additional errors...\027[0m\n")
-    end
-    if #errs > 0 then
+    local num_errs = #errs
+    if num_errs > 0 then
       local err_strings
       do
         local _accum_0 = { }
         local _len_0 = 1
-        for _index_0 = 1, #errs do
-          local t = errs[_index_0]
-          _accum_0[_len_0] = pretty_error({
-            error = t.error,
-            hint = t.hint,
-            source = t:get_source_code(),
-            start = t.source.start,
-            stop = t.source.stop
-          })
-          _len_0 = _len_0 + 1
+        for i, t in ipairs(errs) do
+          if i <= 3 then
+            _accum_0[_len_0] = pretty_error({
+              error = t.error,
+              hint = t.hint,
+              source = t:get_source_code(),
+              start = t.source.start,
+              stop = t.source.stop
+            })
+            _len_0 = _len_0 + 1
+          end
         end
         err_strings = _accum_0
+      end
+      if num_errs > 3 then
+        table.insert(err_strings, "\027[31;1m +" .. tostring(num_errs - #errs) .. " additional errors...\027[0m\n")
       end
       error(table.concat(err_strings, '\n\n'), 0)
     end

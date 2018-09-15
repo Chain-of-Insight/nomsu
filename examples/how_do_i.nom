@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -32,18 +32,19 @@ say %one_two
 
 # How do I define a mutli-line string?
 # In Nomsu, "strings" are called "text", and multi-line text looks like:
-%mutli_text = ".."
-    Start with "..", then put indented lines below it. The indented lines will not include
-    the indentation, except when the lines are indented more than 4 spaces relative
-    to the "..".
+%mutli_text = "\
+    ..Start with a quote mark and a backslash and an indented "..", then put indented
+    lines below it. The indented lines will not include the indentation, except when
+    the lines are indented more than 4 spaces relative to the original quote mark.
       <- E.g. the 2 spaces here will be included as part of the text.
     But this line will have no leading spaces.
     
-    The text will continue until the indentation ends, skipping trailing newlines.
+    The text will continue until a closing quotation at the end of the text's
+    indentation level."
 
 # How do I put values inside text? (AKA string formatting, string interpolation)
-say ".."
-    Text can contain a backslash followed by a variable, list, dict, or parenthesized
+say "\
+    ..Text can contain a backslash followed by a variable, list, dict, or parenthesized
     expression. This escaped value will be converted to readable text, like so:
     The value of %foobar is \%foobar, isn't that nice?
     These are some numbers: \[1 + 1, 2 + 1, 3 + 1]
@@ -60,7 +61,7 @@ say ".."
     
     Similarly, you can put a long interpolated indented value like: \(..)
         1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
-    .. between a backslash and two periods.
+    .. between a backslash and two periods."
 
 say "Single-line text can contain escape sequences like \", \\, \000, and \n"
 
@@ -236,8 +237,8 @@ say (2 + 3)
 say (2 + 3)
 
 # If you need to keep going after an indented region, you can start the next line with ".."
-say both "Very long first argument that needs its own line" and also ".."
-    short second arg
+say both "Very long first argument that needs its own line" and also "\
+    ..short second arg"
 
 action [my favorite number] (21 + 2)
 
@@ -259,10 +260,10 @@ parse [if %condition is untrue %body] as (if (not %condition) %body)
 
 # Or to transform nomsu code into custom lua code using "compile % to %"
 compile [if %condition on opposite day %body] to (..)
-    Lua ".."
-        if not \(%condition as lua expr) then
+    Lua "\
+        ..if not \(%condition as lua expr) then
             \(%body as lua statements)
-        end
+        end"
 
 # Constants can be defined as macros
 parse [TWENTY] as 20

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file defines some actions for hashing files and looking up files by hash.
 
@@ -8,21 +8,21 @@ use "lib/base64.nom"
 lua> "local \%use_sha1, \%hashlib = pcall(require, 'openssl.digest')"
 
 test:
-    assume ((hash "hello world") == (hash "hello world"))
-    assume ((hash "hello world") != (hash "goodbye")) or barf ".."
-        Hash collision:
+    assume (hash "hello world") == (hash "hello world")
+    assume ((hash "hello world") != (hash "goodbye")) or barf "\
+        ..Hash collision:
             (hash "hello world") = \(hash "hello world")
-            (hash "goodbye") = \(hash "goodbye")
+            (hash "goodbye") = \(hash "goodbye")"
     
     assume (..)
         (..)
-            hash ".."
-                This is a really long string meant to stress test the hashing function and
-                ensure that it's not overflowing with long inputs.
+            hash "\
+                ..This is a really long string meant to stress test the hashing function and
+                ensure that it's not overflowing with long inputs."
         ..!= "inf"
     
-    assume ((hash "\000") != (hash "\000\000\000\000\000")) or barf ".."
-        Incorrect hashing of null strings
+    assume ((hash "\000") != (hash "\000\000\000\000\000")) or barf "\
+        ..Incorrect hashing of null strings"
     if %use_sha1:
         assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
 if %use_sha1:
@@ -31,8 +31,8 @@ if %use_sha1:
         return (base64 %hash)
 ..else:
     # TODO: remove warning?
-    say ".."
-        \027[31;1mWARNING: OpenSSL module not found. Defaulting to a non-cryptographically secure hash function.\027[0m
+    say "\
+        ..\027[31;1mWARNING: OpenSSL module not found. Defaulting to a non-cryptographically secure hash function.\027[0m"
     action [hash %]:
         %bytes = (%::bytes)
         %hash = (%bytes.1 << 7)

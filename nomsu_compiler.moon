@@ -112,15 +112,14 @@ with NomsuCompiler
                     find_errors(v)
 
         errs = [err for err in coroutine.wrap(-> find_errors(tree))]
-        if #errs > 4
-            num_errs = #errs
-            errs = [errs[i] for i=1,3]
-            table.insert(errs, "\027[31;1m +#{num_errs-#errs} additional errors...\027[0m\n")
-        if #errs > 0
+        num_errs = #errs
+        if num_errs > 0
             err_strings = [pretty_error{
                     error:t.error, hint:t.hint, source:t\get_source_code!
                     start:t.source.start, stop:t.source.stop
-                } for t in *errs]
+                } for i, t in ipairs(errs) when i <= 3]
+            if num_errs > 3
+                table.insert(err_strings, "\027[31;1m +#{num_errs-#errs} additional errors...\027[0m\n")
             error(table.concat(err_strings, '\n\n'), 0)
         return tree
     .can_optimize = -> false

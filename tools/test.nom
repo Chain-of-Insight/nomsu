@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     Tool to run all tests in a file (i.e. the code block inside a call to 'test %'). Usage:
         nomsu tools/test.nom file1 file2 directory1 ...

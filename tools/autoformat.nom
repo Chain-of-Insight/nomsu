@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     Auto-format Nomsu code. Usage:
         nomsu tools/autoformat.nom [-i] file1 file2 directory1 ...
@@ -16,9 +16,9 @@ if (%args.1 is "-i"):
 for %path in %args:
     for file %filename in %path:
         unless (%filename::matches "%.nom$"): do next %filename
-        %formatted = ".."
-            #!/usr/bin/env nomsu -V\(Nomsu version)
-            \((parse (read file %filename) from %filename) as nomsu)
+        %formatted = "\
+            ..#!/usr/bin/env nomsu -V\(Nomsu version)
+            \((parse (read file %filename) from %filename) as nomsu)"
         
         if %inplace:
             write %formatted to file %filename

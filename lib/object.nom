@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file contains the implementation of an Object-Oriented programming system.
 
@@ -43,8 +43,8 @@ test:
     with {%d:new Dog {barks:2}}:
         assume ((%d::bark) == "Bark! Bark!")
 compile [my action %actions %body] to:
-    lua> ".."
-        local fn_name = \%actions[1].stub:as_lua_id()
+    lua> "\
+        ..local fn_name = \%actions[1].stub:as_lua_id()
         local \%args = table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end)
         table.insert(\%args, \(\%me as lua id))
         local lua = LuaCode(tree.source, "class.", fn_name, " = ", \(..)
@@ -66,12 +66,12 @@ compile [my action %actions %body] to:
                 lua:append(")\\nend")
             end
         end
-        return lua
+        return lua"
 
 compile [object %classname extends %parent %class_body] to:
     return (..)
-        Lua ".."
-            do
+        Lua "\
+            ..do
                 local class = {name=\(%classname as lua expr)}
                 setmetatable(class, {
                     __index=\(%parent as lua expr),
@@ -106,7 +106,7 @@ compile [object %classname extends %parent %class_body] to:
                 for stub,metamethod in pairs(metamethod_map) do
                     class[metamethod] = class[stub:as_lua_id()]
                 end
-            end
+            end"
 
 parse [object %classname %class_body] as (..)
     object %classname extends (nil) %class_body

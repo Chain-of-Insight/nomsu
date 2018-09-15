@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -8,16 +8,12 @@ use "core/metaprogramming.nom"
 test:
     assume "\[1, 2, 3]" == "[1, 2, 3]"
     assume "foo = \(1 + 2)!" == "foo = 3!"
-    assume (..)
-        ".."
-            one
-            two
-        ..== "one\ntwo"
-    assume (..)
-        ".."
-            no\
-            ..gap
-        ..== "nogap"
+    assume "one\ntwo" == "\
+        ..one
+        two"
+    assume "nogap" == "\
+        ..no\
+        ..gap"
     assume (["x", "y"]::joined with ",") == "x,y"
     assume (["x", "y"]::joined) == "xy"
     assume ("BAR"::byte 2) == 65
@@ -31,10 +27,9 @@ test:
     %こんにちは = "こんにちは"
     アクション [% と言う] "\(%)世界"
     assume (%こんにちは と言う) == "こんにちは世界"
-
 compile [%expr for %match in %text matching %patt] to (..)
-    Lua value ".."
-        (function()
+    Lua value "\
+        ..(function()
             local ret = _List{}
             for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(..)
             %patt as lua expr
@@ -42,14 +37,14 @@ compile [%expr for %match in %text matching %patt] to (..)
                 ret[#ret+1] = \(%expr as lua statements)
             end
             return ret
-        end)()
+        end)()"
 
 test:
     assume "\n" == (newline)
 
 # Text literals
-lua> ".."
-    do
+lua> "\
+    ..do
         local escapes = {
             nl="\\\\n", newline="\\\\n", tab="\\\\t", bell="\\\\a", cr="\\\\r",
             ["carriage return"]="\\\\r", backspace="\\\\b", ["form feed"]="\\\\f",
@@ -61,4 +56,4 @@ lua> ".."
                 return LuaCode.Value(tree.source, lua)
             end
         end
-    end
+    end"

@@ -42,16 +42,19 @@ for _index_0 = 1, #types do
       return getmetatable(x) == self
     end
     cls.__tostring = function(self)
-      return tostring(self.type) .. tostring(repr(self, (function(x)
-        return Source:is_instance(x) and repr(tostring(x)) or nil
-      end)))
+      return tostring(self.type) .. tostring(repr(self))
     end
     cls.__repr = function(self)
-      return tostring(self.type) .. tostring(repr(self, (function(x)
-        return Source:is_instance(x) and repr(tostring(x)) or nil
-      end)))
+      return tostring(self.type) .. tostring(repr(self))
     end
-    cls.source_code_for_tree = { }
+    cls.source_code_for_tree = setmetatable({ }, {
+      __index = function(self, t)
+        local s = t.source
+        local Files = require('files')
+        local f = Files.read(s.filename)
+        return f
+      end
+    })
     cls.get_source_code = function(self)
       return self.source_code_for_tree[self]
     end

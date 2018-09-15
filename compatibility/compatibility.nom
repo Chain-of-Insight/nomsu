@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -51,12 +51,12 @@ compile [upgrade action %actions to %version as %body] to:
         unless ("\%lua" == ""): %lua::append "\n"
         %retval = (make tree %body)
         %lua::append (..)
-            Lua ".."
-                upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
+            Lua "\
+                ..upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
                     \%tree as lua id
                 ..)
                     return \%retval
-                end)
+                end)"
     
     return %lua
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file defines actions for encoding/decoding base 64, as specified in:
     https://tools.ietf.org/html/rfc4648
@@ -11,13 +11,8 @@ test:
     %cases = ["", "Zg==", "Zm8=", "Zm9v", "Zm9vYg==", "Zm9vYmE=", "Zm9vYmFy"]
     for %len = %encoded in %cases:
         %plain = "foobar".[1, %len - 1]
-        assume ((base64 %plain) == %encoded) or barf ".."
-            \(quote %plain) base64 encoded to \(quote (base64 %plain)) \
-            ..instead of \(quote %encoded)
-        
-        assume ((base64 decode %encoded) == %plain) or barf ".."
-            \(quote %encoded) base64 decoded to \(quote (base64 decode %encoded)) \
-            ..instead of \(quote %plain)
+        assume (base64 %plain) == %encoded
+        assume (base64 decode %encoded) == %plain
 action [base64 %str, base64 encode %str, %str base64]:
     %chars = []
     for %i in 1 to (size of %str) via 3:

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file contains definitions of operators like "+" and "and".
 
@@ -29,21 +29,21 @@ test:
 compile [%var = %value] to:
     lua> "local \%var_lua = \(%var as lua)"
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-    lua> ".."
-        \%value = \%value:map(function(t)
+    lua> "\
+        ..\%value = \%value:map(function(t)
             if Action:is_instance(t) and t.stub == "?" then
                 return \%var
             end
         end)
-        local \%value_lua = \(%value as lua)
+        local \%value_lua = \(%value as lua)"
     
     assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
-    lua> ".."
-        local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
+    lua> "\
+        ..local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
         if \%var.type == 'Var' then
             lua:add_free_vars({tostring(nomsu:compile(\%var))})
         end
-        return lua
+        return lua"
 
 test:
     set {%x:10, %y:20}
@@ -53,10 +53,10 @@ test:
 
 # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
 compile [set %assignments] to:
-    assume (%assignments.type is "Dict") or barf ".."
-        Expected a Dict for the assignments part of '<- %' statement, not \%assignments
-    lua> ".."
-        local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
+    assume (%assignments.type is "Dict") or barf "\
+        ..Expected a Dict for the assignments part of '<- %' statement, not \%assignments"
+    lua> "\
+        ..local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
         for i, item in ipairs(\%assignments) do
             local \%target, \%value = item[1], item[2]
             \%value = \%value:map(function(t)
@@ -82,7 +82,7 @@ compile [set %assignments] to:
             lhs:append(target_lua)
             rhs:append(value_lua)
         end
-        return LuaCode(tree.source, lhs, " = ", rhs, ";")
+        return LuaCode(tree.source, lhs, " = ", rhs, ";")"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -109,12 +109,12 @@ test:
             %y = "inner"
     
     set global x local y
-    assume ((%foozle == "inner") and (%y == "outer")) or barf ".."
-        'with external' failed.
+    assume ((%foozle == "inner") and (%y == "outer")) or barf "\
+        ..'with external' failed."
 compile [with external %externs %body] to:
     %body_lua = (%body as lua statements)
-    lua> ".."
-        \%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))
+    lua> "\
+        ..\%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))"
     return %body_lua
 
 test:
@@ -128,8 +128,8 @@ test:
     assume (%z == (nil)) or barf "'with' scoping failed"
 compile [with %assignments %body] to:
     %lua = (%body as lua statements)
-    lua> ".."
-        local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
+    lua> "\
+        ..local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
         local vars = {}
         for i, item in ipairs(\%assignments) do
             local \%target, \%value = item[1], item[2]
@@ -152,13 +152,13 @@ compile [with %assignments %body] to:
             end
         end
         \%lua:remove_free_vars(vars)
-        \%lua:prepend("local ", lhs, " = ", rhs, ";\\n")
+        \%lua:prepend("local ", lhs, " = ", rhs, ";\\n")"
     
     return (..)
-        Lua ".."
-            do
+        Lua "\
+            ..do
                 \%lua
-            end -- 'with' block
+            end -- 'with' block"
 
 # Math Operators
 test:
@@ -175,8 +175,8 @@ test:
         return 1
     
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
-    assume (%calls == 1) or barf ".."
-        Three-way comparison evaluated middle value multiple times
+    assume (%calls == 1) or barf "\
+        ..Three-way comparison evaluated middle value multiple times"
 parse [%x < %y < %z] as (..)
     call ([%a, %b, %c] -> ((%a < %b) and (%b < %c))) with [%x, %y, %z]
 
@@ -232,28 +232,28 @@ compile [NOT %, ~ %] to (..)
 
 compile [%a OR %b, %a | %b] to (..)
     Lua value (..)
-        (%use_bitops and "bit.bor(\(%a as lua expr), \(%b as lua expr))") or ".."
-            (\(%a as lua expr) | \(%b as lua expr))
+        (%use_bitops and "bit.bor(\(%a as lua expr), \(%b as lua expr))") or "\
+            ..(\(%a as lua expr) | \(%b as lua expr))"
 
 compile [%a XOR %b, %a ~ %b] to (..)
     Lua value (..)
-        (%use_bitops and "bit.bxor(\(%a as lua expr), \(%b as lua expr))") or ".."
-            (\(%a as lua expr) ~ \(%b as lua expr))
+        (%use_bitops and "bit.bxor(\(%a as lua expr), \(%b as lua expr))") or "\
+            ..(\(%a as lua expr) ~ \(%b as lua expr))"
 
 compile [%a AND %b, %a & %b] to (..)
     Lua value (..)
-        (%use_bitops and "bit.band(\(%a as lua expr), \(%b as lua expr))") or ".."
-            (\(%a as lua expr) & \(%b as lua expr))
+        (%use_bitops and "bit.band(\(%a as lua expr), \(%b as lua expr))") or "\
+            ..(\(%a as lua expr) & \(%b as lua expr))"
 
 compile [%x LSHIFT %shift, %x << %shift] to (..)
     Lua value (..)
-        (%use_bitops and "bit.lshift(\(%x as lua expr), \(%shift as lua expr))") or ".."
-            (\(%x as lua expr) << \(%shift as lua expr))
+        (%use_bitops and "bit.lshift(\(%x as lua expr), \(%shift as lua expr))") or "\
+            ..(\(%x as lua expr) << \(%shift as lua expr))"
 
 compile [%x RSHIFT %shift, %x >> %shift] to (..)
     Lua value (..)
-        (%use_bitops and "bit.rshift(\(%x as lua expr), \(%shift as lua expr))") or ".."
-            (\(%x as lua expr) >> \(%shift as lua expr))
+        (%use_bitops and "bit.rshift(\(%x as lua expr), \(%shift as lua expr))") or "\
+            ..(\(%x as lua expr) >> \(%shift as lua expr))"
 
 # Unary operators
 test:

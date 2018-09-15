@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     A simple UUID function based on RFC 4122: http://www.ietf.org/rfc/rfc4122.txt
 
@@ -13,8 +13,7 @@ use "core/control_flow.nom"
 set %obj_by_id's metatable to {__mode:"v"}
 %id_by_obj = {}
 set %id_by_obj 's metatable to {..}
-    __mode:"k"
-    __index: (..)
+    __mode:"k", __index: (..)
         [%self, %key] ->:
             if (%key == (nil)):
                 return %self.%nil_surrogate

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.
@@ -154,8 +154,8 @@ compile [set %dict 's metatable to %metatable] to (..)
 test:
     assume (({} with fallback % -> (% + 1)).10 == 11)
 compile [%dict with fallback %key -> %value] to (..)
-    Lua value ".."
-        (function(d)
+    Lua value "\
+        ..(function(d)
             local mt = {}
             for k,v in pairs(getmetatable(d) or {}) do mt[k] = v end
             mt.__index = function(self, \(%key as lua expr))
@@ -164,7 +164,7 @@ compile [%dict with fallback %key -> %value] to (..)
                 return value
             end
             return setmetatable(d, mt)
-        end)(\(%dict as lua expr))
+        end)(\(%dict as lua expr))"
 
 # Sorting
 test:

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V3.8.7.6
+#!/usr/bin/env nomsu -V4.8.8.6
 #
     This file defines actions for ANSI console color escape codes.
 
@@ -14,9 +14,9 @@ test:
 
 for %name = %colornum in %colors:
     with {%escapecode:"\027[\(%colornum)m"}:
-        run ".."
-            compile [\%name] to (..)
+        run "\
+            ..compile [\%name] to (..)
                 Lua value (quote \(quote %escapecode))
             compile [\%name %text] to (..)
-                Lua value ".."
-                    (\\(quote \(quote %escapecode))..\\(%text as lua expr).."\\27[0m")
+                Lua value "\\
+                    ..(\\(quote \(quote %escapecode))..\\(%text as lua expr).."\\27[0m")""

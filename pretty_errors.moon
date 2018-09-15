@@ -23,7 +23,7 @@ format_error = (err)->
         (" ")\rep(err_linepos+#fmt_str\format(0)-1).."╚#{("═")\rep(err_size-2)}╝"
     else
         (" ")\rep(err_linepos+#fmt_str\format(0)-1).."⬆"
-    err_msg = "\027[33;41;1mParse error at #{err.filename}:#{err_linenum}\027[0m"
+    err_msg = "\027[33;41;1mParse error at #{err.filename or '???'}:#{err_linenum}\027[0m"
     for i=err_linenum-context,err_linenum-1
         if line = string2.line(err.source, i)
             err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0m#{line}\027[0m"
