@@ -1217,8 +1217,11 @@ do
         end
       end
       for i, bit in ipairs(tree) do
-        if next_space == "\n.." or (next_space == " " and nomsu:trailing_line_len() > MAX_LINE) then
+        if next_space == "\n.." then
           nomsu:append("\n", pop_comments(pos), '..')
+          next_space = ""
+        elseif next_space == " " and nomsu:trailing_line_len() > MAX_LINE then
+          nomsu:append(" \\\n", pop_comments(pos), '..')
           next_space = ""
         end
         if type(bit) == "string" then

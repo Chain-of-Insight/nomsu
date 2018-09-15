@@ -44,7 +44,7 @@ format_error = (err)->
                     during, after = line\sub(1,err_linepos_end-1), line\sub(err_linepos_end,-1)
                     err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0;41;30m#{during}\027[0m#{after}"
                 else
-                    err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0m#{line}\027[0m"
+                    err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0;41;30m#{line}\027[0m"
 
     box_width = 70
     err_text = "\027[47;31;1m#{(" "..err.error)\wrap_to_1(box_width)\gsub("\n", "\n\027[47;31;1m ")}"

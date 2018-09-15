@@ -755,8 +755,11 @@ with NomsuCompiler
                         next_space = target_nomsu\is_multiline! and "\n..::" or "::"
 
                 for i,bit in ipairs tree
-                    if next_space == "\n.." or (next_space == " " and nomsu\trailing_line_len! > MAX_LINE)
+                    if next_space == "\n.."
                         nomsu\append "\n", pop_comments(pos), '..'
+                        next_space = ""
+                    elseif next_space == " " and nomsu\trailing_line_len! > MAX_LINE
+                        nomsu\append " \\\n", pop_comments(pos), '..'
                         next_space = ""
 
                     if type(bit) == "string"

@@ -27,12 +27,12 @@ empty_block (Block):
     {:curr_indent: %nil :}
 
 nodent: (unexpected_indent [^%nl]* / =curr_indent)
-indent: =curr_indent ("    ")
+indent: {~ =curr_indent (ws / (%tab -> '    '))+ ~}
 blank_lines: %nl ((nodent comment / ws*) %nl)*
 eol: ws* eol_comment? (!. / &%nl)
 
 nl_nodent: blank_lines nodent
-nl_indent: blank_lines {:curr_indent: indent :} (comment nl_nodent)*
+nl_indent: blank_lines tab_error? {:curr_indent: indent :} (comment nl_nodent)*
 
 comment (Comment):
     "#" {~ [^%nl]* (%nl+ (indent -> '') [^%nl]*)* ~}
@@ -60,12 +60,13 @@ missing_brace_error (Error):
     {:error: {~ eol -> "Line ended before finding a closing }-brace" ~} :}
     {:hint: {~ '' -> 'Put a "}" here' ~} :}
 disallowed_interpolation (Error):
-    {:error: {~ ("\" ('\:' / '(..)' / '[..]' / '{..}') (%nl (&(%nl) / =curr_indent '        ' [^%nl]*))*) -> 
+    {:error: {~ ("\" ('\:' / '(..)' / '[..]' / '{..}') (%nl (&(%nl) / =curr_indent ' ' [^%nl]*))*) -> 
         "Sorry, indented text interpolations are not currently supported on the first line of multi-line text." ~} :}
     {:hint: {~ '' -> 'Move the code for the first line of text to the next line by ending this line with "\" and starting the next line indented with "..", followed by the code for the first line.' ~} :}
-expected_dotdot (Error):
-    {:error: {~ '' -> 'Expected to see a ".." here' ~} :}
-    {:hint: {~ '' -> 'Add a ".." here.' ~} :}
+tab_error (Error):
+    &(=curr_indent %tab)
+    {:error: {~ '' -> 'Tabs are not allowed for indentation.' ~} :}
+    {:hint: {~ '' -> 'Use spaces instead of tabs.' ~} :}
 
 section_division: ("~")^+3 eol
 
@@ -93,7 +94,7 @@ noindex_inline_expression:
 inline_expression: index_chain / noindex_inline_expression 
 indented_expression:
     indented_text / indented_nomsu / indented_list / indented_dict / ({|
-        "(..)" nl_indent
+        "(..)" eol nl_indent
             (action / expression) (eol / unexpected_code)
             (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
         {:curr_indent: %nil :}
@@ -118,9 +119,9 @@ inline_action (Action):
 inline_arg: inline_expression / inline_block
 action (Action):
     !section_division
-    ({:target: arg :} (nl_nodent "..")? ws* "::" (nl_nodent "..")? ws*)?
-    (  (arg  ((nl_nodent "..")? ws* (arg / word))+)
-     / (word ((nl_nodent "..")? ws* (arg / word))*))
+    ({:target: arg :} (eol nl_nodent "..")? ws* "::" (eol nl_nodent "..")? ws*)?
+    (  (arg  ((eol nl_nodent "..")? ws* (arg / word))+)
+     / (word ((eol nl_nodent "..")? ws* (arg / word))*))
 arg: expression / inline_block / indented_block
 
 word: !number { operator_char+ / ident_char+ }
@@ -131,8 +132,8 @@ inline_text (Text):
     !(indented_text)
     '"' _inline_text* ('"' / missing_quote_err / unexpected_code)
 _inline_text:
-    {~ (('\"' -> '"') / ('\\' -> '\') / escaped_char / [^%nl\"]+)+ ~}
-    / inline_text_interpolation
+    {~ (('\"' -> '"') / ('\\' -> '\') / escaped_char / text_char+)+ ~}
+    / inline_text_interpolation / illegal_char
 inline_text_interpolation:
     "\" (
         variable / inline_list / inline_dict
@@ -142,14 +143,19 @@ inline_text_interpolation:
             (")" / missing_paren_err / unexpected_code))
     )
 
+text_char: %utf8_char / !["\] %print / %tab
+illegal_char (Error):
+    {:error: {~ (!(%nl / %tab / %print) .) -> "Illegal unprintable character here (it may not be visible, but it's there)" ~} :}
+    {:hint: {~ '' -> "This sort of thing can happen when copying and pasting code. Try deleting and retyping the code." ~} :}
+
 nonterminal_quote:
     '"' &([^%nl] / %nl+ =curr_indent)
 indented_text (Text):
     '"'
     _inline_text* 
-    (('\' %nl+ {:curr_indent: indent :} ('..' / expected_dotdot))
+    (('\' %nl+ {:curr_indent: indent :} ('..')?)
      / disallowed_interpolation? {%nl+} {:curr_indent: indent :})
-    (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
+    (indented_plain_text / text_interpolation / illegal_char / {~ %nl+ (=curr_indent -> "") ~})*
     ('"' eol / missing_quote_err)
     {:curr_indent: %nil :}
 -- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
@@ -157,7 +163,7 @@ indented_plain_text (Text):
     {~ 
         ((("\" blank_lines =curr_indent "..") -> "") / ('\\' -> '\')
         / (!text_interpolation ((!("\n") escaped_char) / '\'))
-        / (nonterminal_quote / [^%nl"\])+)+
+        / (nonterminal_quote / text_char)+)+
         (%nl+ (=curr_indent -> ""))*
     ~}
 
@@ -207,7 +213,7 @@ dict_key:
 
 operator_char: ['`~!@$^&*+=|<>?/-]
 ident_char: [a-zA-Z0-9_] / %utf8_char
-ws: [ %tab]
+ws: " "
 
 escaped_char:
     ("\"->'') (

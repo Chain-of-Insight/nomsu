@@ -99,8 +99,8 @@ action [avg of %items, average of %items] (=lua "(utils.sum(\%items)/#\%items)")
 compile [min of %items, smallest of %items, lowest of %items] to (..)
     Lua value "utils.min(\(%items as lua expr))"
 
-compile [max of %items, biggest of %items, largest of %items, highest of %items] to
-..(Lua value "utils.max(\(%items as lua expr))")
+compile [max of %items, biggest of %items, largest of %items, highest of %items] to (..)
+    Lua value "utils.max(\(%items as lua expr))"
 
 test:
     assume ((min of [3, -4, 1, 2] by % = (% * %)) == 1)

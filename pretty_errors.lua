@@ -54,7 +54,7 @@ format_error = function(err)
             local during, after = line:sub(1, err_linepos_end - 1), line:sub(err_linepos_end, -1)
             err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0;41;30m" .. tostring(during) .. "\027[0m" .. tostring(after)
           else
-            err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0m" .. tostring(line) .. "\027[0m"
+            err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0;41;30m" .. tostring(line) .. "\027[0m"
           end
         end
       end
