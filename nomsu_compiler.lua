@@ -37,6 +37,7 @@ do
 end
 local AST = require("syntax_tree")
 local make_parser = require("parser")
+local pretty_error = require("pretty_errors")
 SOURCE_MAP = { }
 table.map = function(t, fn)
   return setmetatable((function()
@@ -148,10 +149,120 @@ local NomsuCompiler = setmetatable({ }, {
 })
 local _anon_chunk = 0
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 8
+  NomsuCompiler.NOMSU_COMPILER_VERSION = 9
   NomsuCompiler.NOMSU_SYNTAX_VERSION = max_parser_version
-  NomsuCompiler.nomsu = NomsuCompiler
-  NomsuCompiler.global = Dict({ })
+  NomsuCompiler.can_optimize = function()
+    return false
+  end
+  NomsuCompiler.environment = {
+    NOMSU_COMPILER_VERSION = 8,
+    NOMSU_SYNTAX_VERSION = max_parser_version,
+    next = next,
+    unpack = unpack,
+    setmetatable = setmetatable,
+    coroutine = coroutine,
+    rawequal = rawequal,
+    getmetatable = getmetatable,
+    pcall = pcall,
+    error = error,
+    package = package,
+    os = os,
+    require = require,
+    tonumber = tonumber,
+    tostring = tostring,
+    string = string,
+    xpcall = xpcall,
+    module = module,
+    print = print,
+    loadfile = loadfile,
+    rawset = rawset,
+    _VERSION = _VERSION,
+    collectgarbage = collectgarbage,
+    rawget = rawget,
+    rawlen = rawlen,
+    table = table,
+    assert = assert,
+    dofile = dofile,
+    loadstring = loadstring,
+    type = type,
+    select = select,
+    math = math,
+    io = io,
+    load = load,
+    pairs = pairs,
+    ipairs = ipairs,
+    _List = List,
+    _Dict = Dict,
+    repr = repr,
+    stringify = stringify,
+    utils = utils,
+    lpeg = lpeg,
+    re = re,
+    Files = Files,
+    AST = AST,
+    TESTS = Dict({ }, {
+      globals = Dict({ })
+    }),
+    LuaCode = LuaCode,
+    NomsuCode = NomsuCode,
+    Source = Source,
+    nomsu = NomsuCompiler,
+    __imported = Dict({ }),
+    __parent = nil
+  }
+  setmetatable(NomsuCompiler.environment, {
+    __index = function(self, key)
+      do
+        local imported = rawget(self, "__imported")
+        if imported then
+          local ret = imported[key]
+          if not (ret == nil) then
+            return ret
+          end
+        end
+      end
+      do
+        local parent = rawget(self, "__parent")
+        if parent then
+          return parent[key]
+        end
+      end
+    end
+  })
+  if _VERSION == "Lua 5.4" then
+    NomsuCompiler.environment.ipairs = function(x)
+      do
+        local mt = getmetatable(x)
+        if mt then
+          if mt.__ipairs then
+            return mt.__ipairs(x)
+          end
+        end
+      end
+      return ipairs(x)
+    end
+  end
+  if jit or _VERSION == "Lua 5.2" then
+    NomsuCompiler.environment.bit = require("bitops")
+  end
+  for k, v in pairs(AST) do
+    NomsuCompiler.environment[k] = v
+  end
+  NomsuCompiler.fork = function(self)
+    local f = setmetatable({ }, {
+      __index = self
+    })
+    f.environment = setmetatable({
+      __parent = self.environment,
+      __imported = Dict({ }),
+      nomsu = f,
+      COMPILE_ACTIONS = setmetatable({
+        __parent = self.environment.COMPILE_ACTIONS,
+        __imported = Dict({ })
+      }, getmetatable(self.environment))
+    }, getmetatable(self.environment))
+    return f
+  end
   NomsuCompiler.parse = function(self, nomsu_code, source, version)
     if source == nil then
       source = nil
@@ -169,7 +280,6 @@ do
     local syntax_version = version and tonumber(version:match("^[0-9]+")) or max_parser_version
     local parse = Parsers[syntax_version] or Parsers[max_parser_version]
     local tree = parse(nomsu_code, source.filename)
-    local pretty_error = require("pretty_errors")
     local find_errors
     find_errors = function(t)
       if t.type == "Error" then
@@ -230,101 +340,6 @@ do
     end
     return tree
   end
-  NomsuCompiler.can_optimize = function()
-    return false
-  end
-  local to_add = {
-    repr = repr,
-    stringify = stringify,
-    utils = utils,
-    lpeg = lpeg,
-    re = re,
-    Files = Files,
-    next = next,
-    unpack = unpack,
-    setmetatable = setmetatable,
-    coroutine = coroutine,
-    rawequal = rawequal,
-    getmetatable = getmetatable,
-    pcall = pcall,
-    error = error,
-    package = package,
-    os = os,
-    require = require,
-    tonumber = tonumber,
-    tostring = tostring,
-    string = string,
-    xpcall = xpcall,
-    module = module,
-    print = print,
-    loadfile = loadfile,
-    rawset = rawset,
-    _VERSION = _VERSION,
-    collectgarbage = collectgarbage,
-    rawget = rawget,
-    rawlen = rawlen,
-    table = table,
-    assert = assert,
-    dofile = dofile,
-    loadstring = loadstring,
-    type = type,
-    select = select,
-    math = math,
-    io = io,
-    load = load,
-    pairs = pairs,
-    ipairs = ipairs,
-    _List = List,
-    _Dict = Dict
-  }
-  if _VERSION == "Lua 5.4" then
-    to_add.ipairs = function(x)
-      do
-        local mt = getmetatable(x)
-        if mt then
-          if mt.__ipairs then
-            return mt.__ipairs(x)
-          end
-        end
-      end
-      return ipairs(x)
-    end
-  end
-  if jit or _VERSION == "Lua 5.2" then
-    to_add.bit = require("bitops")
-  end
-  for k, v in pairs(to_add) do
-    NomsuCompiler[k] = v
-  end
-  for k, v in pairs(AST) do
-    NomsuCompiler[k] = v
-  end
-  NomsuCompiler.LuaCode = LuaCode
-  NomsuCompiler.NomsuCode = NomsuCode
-  NomsuCompiler.Source = Source
-  NomsuCompiler.LOADED = { }
-  NomsuCompiler.TESTS = { }
-  NomsuCompiler.AST = AST
-  NomsuCompiler.fork = function(self)
-    local f = setmetatable({ }, {
-      __index = self
-    })
-    f.COMPILE_ACTIONS = setmetatable({ }, {
-      __index = self.COMPILE_ACTIONS
-    })
-    f.nomsu = f
-    return f
-  end
-  local math_expression = re.compile([[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]])
-  NomsuCompiler.get_compile_action = function(self, stub)
-    local ret = self.COMPILE_ACTIONS[stub]
-    if not (ret == nil) then
-      return ret
-    end
-    if math_expression:match(stub) then
-      return self.COMPILE_ACTIONS["# compile math expr #"]
-    end
-  end
   NomsuCompiler.compile_error = function(self, source, err_format_string, ...)
     err_format_string = err_format_string:gsub("%%[^s]", "%%%1")
     local file = Files.read(source.filename)
@@ -340,7 +355,7 @@ do
     return error(tostring(source.filename) .. ":" .. tostring(line_no) .. ": " .. err_msg, 0)
   end
   local add_lua_bits
-  add_lua_bits = function(self, val_or_stmt, code)
+  add_lua_bits = function(self, val_or_stmt, code, compile_actions)
     local cls = val_or_stmt == "value" and LuaCode.Value or LuaCode
     local operate_on_text
     operate_on_text = function(text)
@@ -352,7 +367,7 @@ do
         elseif bit.type == "Text" then
           lua:append(operate_on_text(bit))
         else
-          local bit_lua = self:compile(bit)
+          local bit_lua = self:compile(bit, compile_actions)
           if not (bit_lua.is_value) then
             self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
@@ -397,28 +412,31 @@ do
     end
     return operate_on_text(code)
   end
-  NomsuCompiler.COMPILE_ACTIONS = {
-    ["# compile math expr #"] = function(self, tree, ...)
-      local lua = LuaCode.Value(tree.source)
-      for i, tok in ipairs(tree) do
-        if type(tok) == 'string' then
-          lua:append(tok)
-        else
-          local tok_lua = self:compile(tok)
-          if not (tok_lua.is_value) then
-            self:compile_error(tok.source, "Non-expression value inside math expression:\n%s")
-          end
-          if tok.type == "Action" then
-            tok_lua:parenthesize()
-          end
-          lua:append(tok_lua)
+  local math_expression = re.compile([[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]])
+  local compile_math_expression
+  compile_math_expression = function(self, tree, ...)
+    local lua = LuaCode.Value(tree.source)
+    for i, tok in ipairs(tree) do
+      if type(tok) == 'string' then
+        lua:append(tok)
+      else
+        local tok_lua = self:compile(tok, compile_actions)
+        if not (tok_lua.is_value) then
+          self:compile_error(tok.source, "Non-expression value inside math expression:\n%s")
         end
-        if i < #tree then
-          lua:append(" ")
+        if tok.type == "Action" then
+          tok_lua:parenthesize()
         end
+        lua:append(tok_lua)
       end
-      return lua
-    end,
+      if i < #tree then
+        lua:append(" ")
+      end
+    end
+    return lua
+  end
+  NomsuCompiler.environment.COMPILE_ACTIONS = setmetatable({
+    __imported = Dict({ }),
     ["Lua 1"] = function(self, tree, code)
       return add_lua_string_bits(self, 'statements', code)
     end,
@@ -466,19 +484,46 @@ do
     end,
     ["Lua version"] = function(self, tree, code)
       return LuaCode.Value(tree.source, repr(_VERSION))
-    end
-  }
+    end,
+    __parent = setmetatable({ }, {
+      __index = function(self, key)
+        if type(key) == 'string' and math_expression:match(key) then
+          return compile_math_expression
+        end
+      end
+    })
+  }, getmetatable(NomsuCompiler.environment))
   NomsuCompiler.import = function(self, mod)
     for k, v in pairs(mod) do
-      if not (k == "COMPILE_ACTIONS" or k == "nomsu" or k == "_ENV") then
-        self[k] = v
+      local _continue_0 = false
+      repeat
+        if k == "__imported" or k == "__parent" then
+          _continue_0 = true
+          break
+        end
+        self.environment.__imported[k] = v
+        _continue_0 = true
+      until true
+      if not _continue_0 then
+        break
       end
     end
     for k, v in pairs(mod.COMPILE_ACTIONS) do
-      self.COMPILE_ACTIONS[k] = v
+      local _continue_0 = false
+      repeat
+        if k == "__imported" or k == "__parent" then
+          _continue_0 = true
+          break
+        end
+        self.environment.COMPILE_ACTIONS.__imported[k] = self.environment.COMPILE_ACTIONS.__imported[k] or v
+        _continue_0 = true
+      until true
+      if not _continue_0 then
+        break
+      end
     end
   end
-  NomsuCompiler.run = function(self, to_run)
+  NomsuCompiler.run = function(self, to_run, compile_actions)
     local source = to_run.source or Source(to_run, 1, #to_run)
     if type(source) == 'string' then
       source = Source:from_string(source)
@@ -504,7 +549,7 @@ do
     local all_lua = { }
     for _index_0 = 1, #tree do
       local chunk = tree[_index_0]
-      local lua = self:compile(chunk):as_statements("return ")
+      local lua = self:compile(chunk, compile_actions):as_statements("return ")
       lua:declare_locals()
       lua:prepend("-- File: " .. tostring(source.filename:gsub("\n.*", "...")) .. "\n")
       insert(all_lua, tostring(lua))
@@ -513,9 +558,10 @@ do
     return ret
   end
   local _running_files = { }
-  NomsuCompiler.run_file = function(self, filename)
-    if self.LOADED[filename] then
-      return self.LOADED[filename]
+  local _loaded_files = { }
+  NomsuCompiler.run_file = function(self, filename, compile_actions)
+    if _loaded_files[filename] then
+      return _loaded_files[filename]
     end
     for i, running in ipairs(_running_files) do
       if running == filename then
@@ -535,10 +581,11 @@ do
     end
     insert(_running_files, filename)
     local mod = self:fork()
+    local ret = mod.environment
     mod.from_file = filename
     if match(filename, "%.lua$") then
       local file = assert(Files.read(filename), "Could not find file: " .. tostring(filename))
-      local ret = mod:run_lua(LuaCode(Source(filename, 1, #file), file))
+      ret = mod:run_lua(LuaCode(Source(filename, 1, #file), file)) or ret
     elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$") then
       local ran_lua
       if self.can_optimize(filename) then
@@ -546,10 +593,7 @@ do
         do
           local file = Files.read(lua_filename)
           if file then
-            local ret = mod:run_lua(LuaCode(Source(lua_filename, 1, #file), file))
-            if type(ret) == 'table' then
-              mod = ret
-            end
+            ret = mod:run_lua(LuaCode(Source(lua_filename, 1, #file), file)) or ret
             ran_lua = true
           end
         end
@@ -559,21 +603,18 @@ do
         if not file then
           error("Tried to run file that does not exist: " .. tostring(filename))
         end
-        local ret = mod:run(NomsuCode(Source(filename, 1, #file), file))
-        if type(ret) == 'table' then
-          mod = ret
-        end
+        ret = mod:run(NomsuCode(Source(filename, 1, #file), file), compile_actions) or ret
       end
     else
       error("Invalid filetype for " .. tostring(filename), 0)
     end
-    self.LOADED[filename] = mod
+    _loaded_files[filename] = ret
     remove(_running_files)
-    return mod
+    return ret
   end
   NomsuCompiler.run_lua = function(self, lua)
     local lua_string = tostring(lua)
-    local run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
+    local run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self.environment)
     if not run_lua_fn then
       local line_numbered_lua = concat((function()
         local _accum_0 = { }
@@ -623,7 +664,8 @@ do
     end
     return run_lua_fn()
   end
-  NomsuCompiler.compile = function(self, tree)
+  NomsuCompiler.compile = function(self, tree, compile_actions)
+    compile_actions = compile_actions or self.environment.COMPILE_ACTIONS
     if tree.version then
       do
         local get_version = self[("Nomsu version"):as_lua_id()]
@@ -641,7 +683,7 @@ do
     if "Action" == _exp_0 then
       local stub = tree.stub
       do
-        local compile_action = self:get_compile_action(stub)
+        local compile_action = compile_actions[stub]
         if compile_action then
           local args
           do
@@ -665,7 +707,7 @@ do
       end
       local lua = LuaCode.Value(tree.source)
       if tree.target then
-        local target_lua = self:compile(tree.target)
+        local target_lua = self:compile(tree.target, compile_actions)
         if tostring(target_lua):match("^%(.*%)$") or tostring(target_lua):match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
           lua:append(target_lua, ":")
         else
@@ -681,7 +723,7 @@ do
             _continue_0 = true
             break
           end
-          local arg_lua = self:compile(tok)
+          local arg_lua = self:compile(tok, compile_actions)
           if not (arg_lua.is_value) then
             if tok.type == "Block" then
               self:compile_error(tok.source, ("Cannot compile action '" .. tostring(stub) .. "' with a Block as an argument.\n" .. "Maybe there should be a compile-time action with that name that isn't being found?"))
@@ -713,12 +755,12 @@ do
         elseif type(k) == 'string' and match(k, "[_a-zA-Z][_a-zA-Z0-9]*") then
           lua:append(k, "= ")
         else
-          lua:append("[", (AST.is_syntax_tree(k) and self:compile(k) or repr(k)), "]= ")
+          lua:append("[", (AST.is_syntax_tree(k) and self:compile(k, compile_actions) or repr(k)), "]= ")
         end
         if k == "source" then
           lua:append(repr(tostring(v)))
         else
-          lua:append(AST.is_syntax_tree(v) and self:compile(v) or repr(v))
+          lua:append(AST.is_syntax_tree(v) and self:compile(v, compile_actions) or repr(v))
         end
       end
       lua:append("}")
@@ -730,7 +772,7 @@ do
         local _len_0 = 1
         for _index_0 = 1, #tree do
           local line = tree[_index_0]
-          _accum_0[_len_0] = self:compile(line):as_statements()
+          _accum_0[_len_0] = self:compile(line, compile_actions):as_statements()
           _len_0 = _len_0 + 1
         end
         return _accum_0
@@ -754,9 +796,9 @@ do
             lua:append(repr(string_buffer))
             string_buffer = ""
           end
-          local bit_lua = self:compile(bit)
+          local bit_lua = self:compile(bit, compile_actions)
           if not (bit_lua.is_value) then
-            local src = '    ' .. gsub(tostring(self:compile(bit)), '\n', '\n    ')
+            local src = '    ' .. gsub(tostring(self:compile(bit, compile_actions)), '\n', '\n    ')
             local line = tostring(bit.source.filename) .. ":" .. tostring(Files.get_line_number(Files.read(bit.source.filename), bit.source.start))
             self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
           end
@@ -790,7 +832,7 @@ do
         local _len_0 = 1
         for _index_0 = 1, #tree do
           local e = tree[_index_0]
-          _accum_0[_len_0] = self:compile(e)
+          _accum_0[_len_0] = self:compile(e, compile_actions)
           _len_0 = _len_0 + 1
         end
         return _accum_0
@@ -804,7 +846,7 @@ do
         local _len_0 = 1
         for _index_0 = 1, #tree do
           local e = tree[_index_0]
-          _accum_0[_len_0] = self:compile(e)
+          _accum_0[_len_0] = self:compile(e, compile_actions)
           _len_0 = _len_0 + 1
         end
         return _accum_0
@@ -813,11 +855,11 @@ do
       return lua
     elseif "DictEntry" == _exp_0 then
       local key, value = tree[1], tree[2]
-      local key_lua = self:compile(key)
+      local key_lua = self:compile(key, compile_actions)
       if not (key_lua.is_value) then
         self:compile_error(tree[1].source, "Cannot use:\n%s\nas a dict key, since it's not an expression.")
       end
-      local value_lua = value and self:compile(value) or LuaCode.Value(key.source, "true")
+      local value_lua = value and self:compile(value, compile_actions) or LuaCode.Value(key.source, "true")
       if not (value_lua.is_value) then
         self:compile_error(tree[2].source, "Cannot use:\n%s\nas a dict value, since it's not an expression.")
       end
@@ -830,7 +872,7 @@ do
         return LuaCode(tree.source, "[", key_lua, "]=", value_lua)
       end
     elseif "IndexChain" == _exp_0 then
-      local lua = self:compile(tree[1])
+      local lua = self:compile(tree[1], compile_actions)
       if not (lua.is_value) then
         self:compile_error(tree[1].source, "Cannot index:\n%s\nsince it's not an expression.")
       end
@@ -840,7 +882,7 @@ do
       end
       for i = 2, #tree do
         local key = tree[i]
-        local key_lua = self:compile(key)
+        local key_lua = self:compile(key, compile_actions)
         if not (key_lua.is_value) then
           self:compile_error(key.source, "Cannot use:\n%s\nas an index, since it's not an expression.")
         end

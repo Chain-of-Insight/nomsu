@@ -84,9 +84,9 @@ compile [object %classname extends %parent %class_body] to:
                         return inst
                     end,
                 })
-                nomsu[("new "..class.name):as_lua_id()] = class
-                nomsu[("new "..class.name.." 1"):as_lua_id()] = class
-                nomsu[class.name:as_lua_id()] = function() return class end
+                nomsu.environment[("new "..class.name):as_lua_id()] = class
+                nomsu.environment[("new "..class.name.." 1"):as_lua_id()] = class
+                nomsu.environment[class.name:as_lua_id()] = function() return class end
                 class.__index = class
                 class.class = class
                 class.__tostring = function(inst)

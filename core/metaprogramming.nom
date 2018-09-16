@@ -372,7 +372,8 @@ compile [command line args] to (Lua value "arg")
 compile [with local compile actions %body] to (..)
     Lua "\
         ..do
-            local nomsu = table.fork(nomsu, {COMPILE_ACTIONS=table.fork(COMPILE_ACTIONS)})
+            local nomsu = nomsu:fork()
+            local COMPILE_ACTIONS = nomsu.environment.COMPILE_ACTIONS
             \(%body as lua statements)
         end"
 
