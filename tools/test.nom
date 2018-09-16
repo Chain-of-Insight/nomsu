@@ -17,6 +17,7 @@ for %path in (command line args):
         if (%filename::matches "%.nom$"): use %filename
 
 for %path in (command line args): use %path
+
 %tests = ((=lua "Source:from_string(\%s)") = %t for %s = %t in (tests))
 for %path in (command line args):
     for file %filename in %path:

@@ -187,7 +187,7 @@ run = function()
   if not (args.no_core) then
     for _, filename in Files.walk('core') do
       if filename:match("%.nom$") then
-        nomsu:run_file(filename)
+        nomsu:import(nomsu:run_file(filename))
       end
     end
   end

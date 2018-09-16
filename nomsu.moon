@@ -126,7 +126,7 @@ run = ->
     unless args.no_core
         for _,filename in Files.walk('core')
             if filename\match "%.nom$"
-                nomsu\run_file filename
+                nomsu\import(nomsu\run_file(filename))
 
     get_file_and_source = (filename)->
         local file, source

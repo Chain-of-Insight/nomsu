@@ -84,14 +84,13 @@ for version=1,999
     else break
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
-NomsuCompiler = setmetatable {name:"Nomsu"},
-    __index: (k)=> if _self = rawget(@, "self") then _self[k] else nil
-    __tostring: => @name
+NomsuCompiler = setmetatable {}, __tostring: => "Nomsu"
 _anon_chunk = 0
 with NomsuCompiler
     .NOMSU_COMPILER_VERSION = 8
     .NOMSU_SYNTAX_VERSION = max_parser_version
     .nomsu = NomsuCompiler
+    .global = Dict{}
     .parse = (nomsu_code, source=nil, version=nil)=>
         source or= nomsu_code.source
         nomsu_code = tostring(nomsu_code)
@@ -152,6 +151,24 @@ with NomsuCompiler
     .TESTS = {}
     .AST = AST
 
+    .fork = =>
+        f = setmetatable({}, {__index:@})
+        f.COMPILE_ACTIONS = setmetatable({}, {__index:@COMPILE_ACTIONS})
+        f.nomsu = f
+        return f
+
+    -- This is a bit of a hack, but this code handles arbitrarily complex
+    -- math expressions like 2*x + 3^2 without having to define a single
+    -- action for every possibility.
+    math_expression = re.compile [[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]]
+
+    .get_compile_action = (stub)=>
+        ret = @COMPILE_ACTIONS[stub]
+        return ret unless ret == nil
+        if math_expression\match(stub)
+            return @COMPILE_ACTIONS["# compile math expr #"]
+
+    -- TODO: use pretty_error instead of this
     .compile_error = (source, err_format_string, ...)=>
         err_format_string = err_format_string\gsub("%%[^s]", "%%%1")
         file = Files.read(source.filename)
@@ -165,11 +182,6 @@ with NomsuCompiler
         src = '    '..src\gsub('\n', '\n    ')
         err_msg = err_format_string\format(src, ...)
         error("#{source.filename}:#{line_no}: "..err_msg, 0)
-
-    -- This is a bit of a hack, but this code handles arbitrarily complex
-    -- math expressions like 2*x + 3^2 without having to define a single
-    -- action for every possibility.
-    math_expression = re.compile [[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]]
 
     add_lua_bits = (val_or_stmt, code)=>
         cls = val_or_stmt == "value" and LuaCode.Value or LuaCode
@@ -214,7 +226,7 @@ with NomsuCompiler
             return lua
         return operate_on_text code
 
-    .COMPILE_ACTIONS = setmetatable {
+    .COMPILE_ACTIONS = {
         ["# compile math expr #"]: (tree, ...)=>
             lua = LuaCode.Value(tree.source)
             for i,tok in ipairs tree
@@ -239,19 +251,20 @@ with NomsuCompiler
 
         ["lua > 1"]: (tree, code)=>
             if code.type != "Text"
-                return LuaCode tree.source, "nomsu:run_lua(", @compile(code), ");"
+                return LuaCode tree.source, "nomsu:run_lua(", @compile(code), ", nomsu);"
             return add_lua_bits(@, "statements", code)
 
         ["= lua 1"]: (tree, code)=>
             if code.type != "Text"
-                return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(code), ":as_statements('return '))"
+                return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(code), ":as_statements('return '), nomsu)"
             return add_lua_bits(@, "value", code)
 
         ["use 1"]: (tree, path)=>
             if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
                 for _,f in Files.walk(path[1])
-                    @run_file(f)
-            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(path), ") do nomsu:run_file(f) end")
+                    @import(@run_file(f))
+                    
+            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(path), ") do nomsu:import(nomsu:run_file(f)) end")
 
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
         ["test 1"]: (tree, body)=>
@@ -263,17 +276,19 @@ with NomsuCompiler
 
         ["Lua version"]: (tree, code)=>
             return LuaCode.Value(tree.source, repr(_VERSION))
-    }, {
-        __index: (stub)=>
-            if math_expression\match(stub)
-                return @["# compile math expr #"]
     }
 
-    .run = (to_run, source=nil, version=nil)=>
-        source or= to_run.source or Source(to_run, 1, #to_run)
+    .import = (mod)=>
+        for k,v in pairs(mod)
+            @[k] = v unless k == "COMPILE_ACTIONS" or k == "nomsu" or k == "_ENV"
+        for k,v in pairs(mod.COMPILE_ACTIONS)
+            @COMPILE_ACTIONS[k] = v
+
+    .run = (to_run)=>
+        source = to_run.source or Source(to_run, 1, #to_run)
         if type(source) == 'string' then source = Source\from_string(source)
         if not Files.read(source.filename) then Files.spoof(source.filename, to_run)
-        tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source, version)
+        tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
         if tree.type != "FileChunks"
@@ -305,30 +320,33 @@ with NomsuCompiler
                 error("Circular import, this loops forever: #{concat loop, " -> "}...")
 
         insert _running_files, filename
-        ret = nil
+        mod = @fork!
+        mod.from_file = filename
         if match(filename, "%.lua$")
             file = assert(Files.read(filename), "Could not find file: #{filename}")
-            ret = @run_lua file, Source(filename, 1, #file)
+            ret = mod\run_lua(LuaCode(Source(filename, 1, #file), file))
         elseif match(filename, "%.nom$") or match(filename, "^/dev/fd/[012]$")
             ran_lua = if @.can_optimize(filename) -- Look for precompiled version
                 lua_filename = gsub(filename, "%.nom$", ".lua")
                 if file = Files.read(lua_filename)
-                    ret = @run_lua file, Source(lua_filename, 1, #file)
+                    ret = mod\run_lua(LuaCode(Source(lua_filename, 1, #file), file))
+                    if type(ret) == 'table'
+                        mod = ret
                     true
             unless ran_lua
                 file = Files.read(filename)
                 if not file
                     error("Tried to run file that does not exist: #{filename}")
-                ret = @run file, Source(filename,1,#file)
+                ret = mod\run(NomsuCode(Source(filename,1,#file), file))
+                if type(ret) == 'table'
+                    mod = ret
         else
             error("Invalid filetype for #{filename}", 0)
-        @LOADED[filename] = ret or true
+        @LOADED[filename] = mod
         remove _running_files
+        return mod
 
-        @LOADED[filename] = ret or true
-        return ret
-
-    .run_lua = (lua, source=nil)=>
+    .run_lua = (lua)=>
         lua_string = tostring(lua)
         run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self)
         if not run_lua_fn
@@ -336,7 +354,7 @@ with NomsuCompiler
                 [format("%3d|%s",i,line) for i, line in ipairs Files.get_lines(lua_string)],
                 "\n")
             error("Failed to compile generated code:\n#{colored.bright colored.blue colored.onblack line_numbered_lua}\n\n#{err}", 0)
-        source or= lua.source
+        source = lua.source or Source(lua_string, 1, #lua_string)
         source_key = tostring(source)
         unless SOURCE_MAP[source_key]
             map = {}
@@ -372,7 +390,7 @@ with NomsuCompiler
         switch tree.type
             when "Action"
                 stub = tree.stub
-                if compile_action = @COMPILE_ACTIONS[stub]
+                if compile_action = @get_compile_action(stub)
                     args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force Lua to avoid tail call optimization for debugging purposes
                     -- TODO: use tail call?

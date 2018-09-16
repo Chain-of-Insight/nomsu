@@ -42,10 +42,10 @@ for _index_0 = 1, #types do
       return getmetatable(x) == self
     end
     cls.__tostring = function(self)
-      return tostring(self.type) .. tostring(repr(self))
+      return tostring(self.type) .. tostring(repr(self, (function() end)))
     end
     cls.__repr = function(self)
-      return tostring(self.type) .. tostring(repr(self))
+      return tostring(self.type) .. tostring(repr(self, (function() end)))
     end
     cls.source_code_for_tree = setmetatable({ }, {
       __index = function(self, t)

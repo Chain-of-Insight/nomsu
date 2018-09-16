@@ -205,14 +205,8 @@ compile [parse %actions as %body] to (..)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-action [%tree as lua expr]:
-    lua> "\
-        ..\%tree_lua = nomsu:compile(\%tree)
-        if not \%tree_lua.is_value then
-            nomsu:compile_error(\%tree.source, "Could not convert %s to a Lua expression",
-                nomsu:tree_to_nomsu(\%tree))
-        end
-        return \%tree_lua"
+# TODO: add check for .is_value
+compile [%tree as lua expr] to (Lua value "nomsu:compile(\(=lua "nomsu:compile(\%tree)"))")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -343,18 +337,17 @@ compile [parse %text from %filename] to (..)
 test:
     assume ((run "return (2 + 99)") == 101)
     external %passed = (no)
-    run \:
-        \(external \%passed = \(yes))
+    run "external %passed = (yes)"
     assume %passed
 compile [run %nomsu_code] to (..)
     Lua value "\
-        ..nomsu:run(\(%nomsu_code as lua expr), \(..)
+        ..nomsu:run(NomsuCode(\(..)
             =lua "repr(tostring(\(%nomsu_code.source)))"
-        ..)"
+        .., \(%nomsu_code as lua expr)))"
 
 test:
     assume ((\(\(5) + \(5)) as value) == 10) or barf "%tree as value failed."
-action [run tree %tree, %tree as value] (lua> "return nomsu:run(\%tree)")
+compile [run tree %tree, %tree as value] to (Lua value "nomsu:run(\(%tree as lua expr))")
 compile [compile %block, compiled %block, %block compiled] to (..)
     Lua value "nomsu:compile(\(%block as lua))"
 

@@ -19,8 +19,8 @@ for name in *types
         .__name = name
         .type = name
         .is_instance = (x)=> getmetatable(x) == @
-        .__tostring = => "#{@type}#{repr @}"
-        .__repr = => "#{@type}#{repr @}"
+        .__tostring = => "#{@type}#{repr @, (->)}"
+        .__repr = => "#{@type}#{repr @, (->)}"
         .source_code_for_tree = setmetatable({}, {__index:(t)=>
             s = t.source
             Files = require 'files'
