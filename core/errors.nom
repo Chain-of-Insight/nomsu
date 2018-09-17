@@ -6,8 +6,10 @@ use "core/metaprogramming.nom"
 
 compile [barf] to (Lua "error(nil, 0);")
 compile [barf %msg] to (Lua "error(\(%msg as lua expr), 0);")
-compile [compile error at %source %msg] to (..)
-    Lua "nomsu:compile_error(\(%source as lua expr), \(%msg as lua expr))"
+compile [compile error at %tree %msg] to (..)
+    Lua "nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr))"
+compile [compile error at %tree %msg hint %hint] to (..)
+    Lua "nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr), \(%hint as lua expr))"
 
 compile [assume %condition] to:
     lua> "\

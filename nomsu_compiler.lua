@@ -322,11 +322,13 @@ do
         for i, t in ipairs(errs) do
           if i <= 3 then
             _accum_0[_len_0] = pretty_error({
+              title = "Parse error",
               error = t.error,
               hint = t.hint,
               source = t:get_source_code(),
               start = t.source.start,
-              stop = t.source.stop
+              stop = t.source.stop,
+              filename = t.source.filename
             })
             _len_0 = _len_0 + 1
           end
@@ -340,19 +342,20 @@ do
     end
     return tree
   end
-  NomsuCompiler.compile_error = function(self, source, err_format_string, ...)
-    err_format_string = err_format_string:gsub("%%[^s]", "%%%1")
-    local file = Files.read(source.filename)
-    local line_starts = Files.get_line_starts(file)
-    local line_no = Files.get_line_number(file, source.start)
-    local line_start = line_starts[line_no]
-    local src = colored.dim(file:sub(line_start, source.start - 1))
-    src = src .. colored.underscore(colored.bright(colored.red(file:sub(source.start, source.stop - 1))))
-    local end_of_line = (line_starts[Files.get_line_number(file, source.stop) + 1] or 0) - 1
-    src = src .. colored.dim(file:sub(source.stop, end_of_line - 1))
-    src = '    ' .. src:gsub('\n', '\n    ')
-    local err_msg = err_format_string:format(src, ...)
-    return error(tostring(source.filename) .. ":" .. tostring(line_no) .. ": " .. err_msg, 0)
+  NomsuCompiler.compile_error = function(self, tree, err_msg, hint)
+    if hint == nil then
+      hint = nil
+    end
+    local err_str = pretty_error({
+      title = "Compile error",
+      error = err_msg,
+      hint = hint,
+      source = tree:get_source_code(),
+      start = tree.source.start,
+      stop = tree.source.stop,
+      filename = tree.source.filename
+    })
+    return error(err_str, 0)
   end
   local add_lua_bits
   add_lua_bits = function(self, val_or_stmt, code, compile_actions)
@@ -369,7 +372,7 @@ do
         else
           local bit_lua = self:compile(bit, compile_actions)
           if not (bit_lua.is_value) then
-            self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+            self:compile_error(bit, "Can't use this as a string interpolation value, since it's not an expression.")
           end
           lua:append(bit_lua)
         end
@@ -402,7 +405,7 @@ do
         else
           local bit_lua = self:compile(bit)
           if not (bit_lua.is_value) then
-            self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+            self:compile_error(bit, "Can't use this as a string interpolation value, since it's not an expression.")
           end
           add_bit_lua(lua, bit_lua)
         end
@@ -422,7 +425,7 @@ do
       else
         local tok_lua = self:compile(tok, compile_actions)
         if not (tok_lua.is_value) then
-          self:compile_error(tok.source, "Non-expression value inside math expression:\n%s")
+          self:compile_error(tok, "Can't use this as a value in a math expression, since it's not a value.")
         end
         if tok.type == "Action" then
           tok_lua:parenthesize()
@@ -700,7 +703,8 @@ do
           end
           local ret = compile_action(self, tree, unpack(args))
           if not ret then
-            self:compile_error(tree.source, "Compile-time action:\n%s\nfailed to produce any Lua")
+            local info = debug.getinfo(compile_action, "S")
+            self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to produce any Lua", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(info.short_src:sub(1, 200)) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning Lua code.")
           end
           return ret
         end
@@ -726,9 +730,11 @@ do
           local arg_lua = self:compile(tok, compile_actions)
           if not (arg_lua.is_value) then
             if tok.type == "Block" then
-              self:compile_error(tok.source, ("Cannot compile action '" .. tostring(stub) .. "' with a Block as an argument.\n" .. "Maybe there should be a compile-time action with that name that isn't being found?"))
+              self:compile_error(tok, "Can't compile action (" .. tostring(stub) .. ") with a Block as an argument.", "Maybe there should be a compile-time action with that name that isn't being found?")
+            elseif tok.type == "Action" then
+              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(repr(arg_lua)), "Check the implementation of (" .. tostring(tok.stub) .. ") to see if it is actually meant to produce an expression.")
             else
-              self:compile_error(tok.source, "Cannot use:\n%s\nas an argument to '%s', since it's not an expression, it produces: %s", stub, repr(arg_lua))
+              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(repr(arg_lua)))
             end
           end
           insert(args, arg_lua)
@@ -800,7 +806,7 @@ do
           if not (bit_lua.is_value) then
             local src = '    ' .. gsub(tostring(self:compile(bit, compile_actions)), '\n', '\n    ')
             local line = tostring(bit.source.filename) .. ":" .. tostring(Files.get_line_number(Files.read(bit.source.filename), bit.source.start))
-            self:compile_error(bit.source, "Cannot use:\n%s\nas a string interpolation value, since it's not an expression.")
+            self:compile_error(bit, "Can't this as a string interpolation value, since it's not an expression.")
           end
           if #lua.bits > 0 then
             lua:append("..")
@@ -857,11 +863,11 @@ do
       local key, value = tree[1], tree[2]
       local key_lua = self:compile(key, compile_actions)
       if not (key_lua.is_value) then
-        self:compile_error(tree[1].source, "Cannot use:\n%s\nas a dict key, since it's not an expression.")
+        self:compile_error(tree[1], "Can't use this as a dict key, since it's not an expression.")
       end
       local value_lua = value and self:compile(value, compile_actions) or LuaCode.Value(key.source, "true")
       if not (value_lua.is_value) then
-        self:compile_error(tree[2].source, "Cannot use:\n%s\nas a dict value, since it's not an expression.")
+        self:compile_error(tree[2], "Can't use this as a dict value, since it's not an expression.")
       end
       local key_str = match(tostring(key_lua), [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
       if key_str then
@@ -874,7 +880,7 @@ do
     elseif "IndexChain" == _exp_0 then
       local lua = self:compile(tree[1], compile_actions)
       if not (lua.is_value) then
-        self:compile_error(tree[1].source, "Cannot index:\n%s\nsince it's not an expression.")
+        self:compile_error(tree[1], "Can't index into this, since it's not an expression.")
       end
       local first_char = sub(tostring(lua), 1, 1)
       if first_char == "{" or first_char == '"' or first_char == "[" then
@@ -884,7 +890,7 @@ do
         local key = tree[i]
         local key_lua = self:compile(key, compile_actions)
         if not (key_lua.is_value) then
-          self:compile_error(key.source, "Cannot use:\n%s\nas an index, since it's not an expression.")
+          self:compile_error(key, "Can't use this as an index, since it's not an expression.")
         end
         local key_lua_str = tostring(key_lua)
         do
@@ -904,11 +910,11 @@ do
     elseif "Var" == _exp_0 then
       return LuaCode.Value(tree.source, (tree[1]):as_lua_id())
     elseif "FileChunks" == _exp_0 then
-      return error("Cannot convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
+      return error("Can't convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     elseif "Comment" == _exp_0 then
       return LuaCode(tree.source, "")
     elseif "Error" == _exp_0 then
-      return error("Cannot compile errors")
+      return error("Can't compile errors")
     else
       return error("Unknown type: " .. tostring(tree.type))
     end
@@ -935,11 +941,11 @@ do
     end
     local _exp_0 = tree.type
     if "FileChunks" == _exp_0 then
-      return error("Cannot inline a FileChunks")
+      return error("Can't inline a FileChunks")
     elseif "Comment" == _exp_0 then
       return NomsuCode(tree.source, "")
     elseif "Error" == _exp_0 then
-      return error("Cannot compile errors")
+      return error("Can't compile errors")
     elseif "Action" == _exp_0 then
       local nomsu = NomsuCode(tree.source)
       if tree.target then

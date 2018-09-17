@@ -36,7 +36,7 @@ compile [with local %locals %body, with local %locals do %body] to:
         "Var" "Action":
             %body_lua::declare locals ["\(%locals as lua)"]
         else:
-            compile error at %locals.source "Unexpected locals: %s"
+            compile error at %locals "Unexpected local value"
     
     return (..)
         Lua "\

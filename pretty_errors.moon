@@ -23,7 +23,7 @@ format_error = (err)->
         (" ")\rep(err_linepos+#fmt_str\format(0)-1).."╚#{("═")\rep(err_size-2)}╝"
     else
         (" ")\rep(err_linepos+#fmt_str\format(0)-1).."⬆"
-    err_msg = "\027[33;41;1mParse error at #{err.filename or '???'}:#{err_linenum}\027[0m"
+    err_msg = "\027[33;41;1m#{err.title or "Error"} at #{err.filename or '???'}:#{err_linenum}\027[0m"
     for i=err_linenum-context,err_linenum-1
         if line = string2.line(err.source, i)
             err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0m#{line}\027[0m"
@@ -47,9 +47,9 @@ format_error = (err)->
                     err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0;41;30m#{line}\027[0m"
 
     box_width = 70
-    err_text = "\027[47;31;1m#{(" "..err.error)\wrap_to_1(box_width)\gsub("\n", "\n\027[47;31;1m ")}"
+    err_text = "\027[47;31;1m#{string2.wrap(" "..err.error, box_width, 16)\gsub("\n", "\n\027[47;31;1m ")}"
     if err.hint
-        err_text ..= "\n\027[47;30m#{(" Suggestion: #{err.hint}")\wrap_to_1(box_width)\gsub("\n", "\n\027[47;30m ")}"
+        err_text ..= "\n\027[47;30m#{string2.wrap(" Suggestion: #{err.hint}", box_width, 16)\gsub("\n", "\n\027[47;30m ")}"
     err_msg ..= "\n\027[33;1m "..box(err_text)\gsub("\n", "\n ")
 
     for i=err_linenum_end+1,err_linenum_end+context

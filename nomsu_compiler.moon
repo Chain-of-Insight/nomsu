@@ -164,28 +164,22 @@ with NomsuCompiler
         num_errs = #errs
         if num_errs > 0
             err_strings = [pretty_error{
+                    title:"Parse error"
                     error:t.error, hint:t.hint, source:t\get_source_code!
-                    start:t.source.start, stop:t.source.stop
+                    start:t.source.start, stop:t.source.stop, filename:t.source.filename
                 } for i, t in ipairs(errs) when i <= 3]
             if num_errs > 3
                 table.insert(err_strings, "\027[31;1m +#{num_errs-#errs} additional errors...\027[0m\n")
             error(table.concat(err_strings, '\n\n'), 0)
         return tree
 
-    -- TODO: use pretty_error instead of this
-    .compile_error = (source, err_format_string, ...)=>
-        err_format_string = err_format_string\gsub("%%[^s]", "%%%1")
-        file = Files.read(source.filename)
-        line_starts = Files.get_line_starts(file)
-        line_no = Files.get_line_number(file, source.start)
-        line_start = line_starts[line_no]
-        src = colored.dim(file\sub(line_start, source.start-1))
-        src ..= colored.underscore colored.bright colored.red(file\sub(source.start, source.stop-1))
-        end_of_line = (line_starts[Files.get_line_number(file, source.stop) + 1] or 0) - 1
-        src ..= colored.dim(file\sub(source.stop, end_of_line-1))
-        src = '    '..src\gsub('\n', '\n    ')
-        err_msg = err_format_string\format(src, ...)
-        error("#{source.filename}:#{line_no}: "..err_msg, 0)
+    .compile_error = (tree, err_msg, hint=nil)=>
+        err_str = pretty_error{
+            title: "Compile error"
+            error:err_msg, hint:hint, source:tree\get_source_code!
+            start:tree.source.start, stop:tree.source.stop, filename:tree.source.filename
+        }
+        error(err_str, 0)
 
     add_lua_bits = (val_or_stmt, code, compile_actions)=>
         cls = val_or_stmt == "value" and LuaCode.Value or LuaCode
@@ -199,8 +193,8 @@ with NomsuCompiler
                 else
                     bit_lua = @compile(bit, compile_actions)
                     unless bit_lua.is_value
-                        @compile_error bit.source,
-                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                        @compile_error bit,
+                            "Can't use this as a string interpolation value, since it's not an expression."
                     lua\append bit_lua
             return lua
         return operate_on_text code
@@ -223,8 +217,8 @@ with NomsuCompiler
                 else
                     bit_lua = @compile(bit)
                     unless bit_lua.is_value
-                        @compile_error bit.source,
-                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                        @compile_error bit,
+                            "Can't use this as a string interpolation value, since it's not an expression."
                     add_bit_lua(lua, bit_lua)
             lua\append ")"
             return lua
@@ -242,7 +236,8 @@ with NomsuCompiler
             else
                 tok_lua = @compile(tok, compile_actions)
                 unless tok_lua.is_value
-                    @compile_error tok.source, "Non-expression value inside math expression:\n%s"
+                    @compile_error tok,
+                        "Can't use this as a value in a math expression, since it's not a value."
                 tok_lua\parenthesize! if tok.type == "Action"
                 lua\append tok_lua
             lua\append " " if i < #tree
@@ -409,8 +404,10 @@ with NomsuCompiler
                     -- TODO: use tail call?
                     ret = compile_action(@, tree, unpack(args))
                     if not ret
-                        @compile_error tree.source,
-                            "Compile-time action:\n%s\nfailed to produce any Lua"
+                        info = debug.getinfo(compile_action, "S")
+                        @compile_error tree,
+                            "The compile-time action here (#{stub}) failed to produce any Lua",
+                            "Look at the implementation of (#{stub}) in #{info.short_src\sub(1,200)}:#{info.linedefined} and make sure it's returning Lua code."
                     return ret
 
                 lua = LuaCode.Value(tree.source)
@@ -427,14 +424,17 @@ with NomsuCompiler
                     arg_lua = @compile(tok, compile_actions)
                     unless arg_lua.is_value
                         if tok.type == "Block"
-                            @compile_error tok.source,
-                                ("Cannot compile action '#{stub}' with a Block as an argument.\n"..
-                                 "Maybe there should be a compile-time action with that name that isn't being found?")
+                            @compile_error tok,
+                                "Can't compile action (#{stub}) with a Block as an argument.",
+                                "Maybe there should be a compile-time action with that name that isn't being found?"
 
+                        elseif tok.type == "Action"
+                            @compile_error tok,
+                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{repr arg_lua}",
+                                "Check the implementation of (#{tok.stub}) to see if it is actually meant to produce an expression."
                         else
-                            @compile_error tok.source,
-                                "Cannot use:\n%s\nas an argument to '%s', since it's not an expression, it produces: %s",
-                                stub, repr arg_lua
+                            @compile_error tok,
+                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{repr arg_lua}"
                     insert args, arg_lua
                 lua\concat_append args, ", "
                 lua\append ")"
@@ -479,8 +479,8 @@ with NomsuCompiler
                     unless bit_lua.is_value
                         src = '    '..gsub(tostring(@compile(bit, compile_actions)), '\n','\n    ')
                         line = "#{bit.source.filename}:#{Files.get_line_number(Files.read(bit.source.filename), bit.source.start)}"
-                        @compile_error bit.source,
-                            "Cannot use:\n%s\nas a string interpolation value, since it's not an expression."
+                        @compile_error bit,
+                            "Can't this as a string interpolation value, since it's not an expression."
                     if #lua.bits > 0 then lua\append ".."
                     if bit.type != "Text"
                         bit_lua = LuaCode.Value(bit.source, "stringify(",bit_lua,")")
@@ -510,12 +510,12 @@ with NomsuCompiler
                 key, value = tree[1], tree[2]
                 key_lua = @compile(key, compile_actions)
                 unless key_lua.is_value
-                    @compile_error tree[1].source,
-                        "Cannot use:\n%s\nas a dict key, since it's not an expression."
+                    @compile_error tree[1],
+                        "Can't use this as a dict key, since it's not an expression."
                 value_lua = value and @compile(value, compile_actions) or LuaCode.Value(key.source, "true")
                 unless value_lua.is_value
-                    @compile_error tree[2].source,
-                        "Cannot use:\n%s\nas a dict value, since it's not an expression."
+                    @compile_error tree[2],
+                        "Can't use this as a dict value, since it's not an expression."
                 -- TODO: support arbitrary words here, like operators and unicode
                 key_str = match(tostring(key_lua), [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
                 return if key_str
@@ -531,8 +531,8 @@ with NomsuCompiler
             when "IndexChain"
                 lua = @compile(tree[1], compile_actions)
                 unless lua.is_value
-                    @compile_error tree[1].source,
-                        "Cannot index:\n%s\nsince it's not an expression."
+                    @compile_error tree[1],
+                        "Can't index into this, since it's not an expression."
                 first_char = sub(tostring(lua),1,1)
                 if first_char == "{" or first_char == '"' or first_char == "["
                     lua\parenthesize!
@@ -541,8 +541,8 @@ with NomsuCompiler
                     key = tree[i]
                     key_lua = @compile(key, compile_actions)
                     unless key_lua.is_value
-                        @compile_error key.source,
-                            "Cannot use:\n%s\nas an index, since it's not an expression."
+                        @compile_error key,
+                            "Can't use this as an index, since it's not an expression."
                     key_lua_str = tostring(key_lua)
                     if lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
                         lua\append ".#{lua_id}"
@@ -562,7 +562,7 @@ with NomsuCompiler
                 return LuaCode.Value(tree.source, (tree[1])\as_lua_id!)
 
             when "FileChunks"
-                error("Cannot convert FileChunks to a single block of lua, since each chunk's "..
+                error("Can't convert FileChunks to a single block of lua, since each chunk's "..
                     "compilation depends on the earlier chunks")
             
             when "Comment"
@@ -570,7 +570,7 @@ with NomsuCompiler
                 return LuaCode(tree.source, "")
             
             when "Error"
-                error("Cannot compile errors")
+                error("Can't compile errors")
 
             else
                 error("Unknown type: #{tree.type}")
@@ -580,14 +580,14 @@ with NomsuCompiler
             @tree_to_inline_nomsu(tree, parenthesize_blocks, check, len + (nomsu and #tostring(nomsu) or 0))
         switch tree.type
             when "FileChunks"
-                error("Cannot inline a FileChunks")
+                error("Can't inline a FileChunks")
             
             when "Comment"
                 -- TODO: implement?
                 return NomsuCode(tree.source, "")
             
             when "Error"
-                error("Cannot compile errors")
+                error("Can't compile errors")
 
             when "Action"
                 nomsu = NomsuCode(tree.source)

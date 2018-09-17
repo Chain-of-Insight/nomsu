@@ -197,7 +197,7 @@ compile [..]
 ..to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
-        compile error at %var.source "Loop expected variable, not: %s"
+        compile error at %var "Expected a variable here, not a \(%var.type)."
     %lua = (..)
         Lua "\
             ..for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(..)
@@ -242,7 +242,7 @@ test:
 compile [for %var in %iterable %body] to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
-        compile error at %var.source "Loop expected variable, not: %s"
+        compile error at %var "Expected a variable here, not a \(%var.type)."
     define mangler
     %lua = (..)
         Lua "\
@@ -280,9 +280,9 @@ compile [..]
 ..to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%key.type is "Var"):
-        compile error at %key.source "Loop expected variable, not: %s"
+        compile error at %key "Expected a variable here, not a \(%key.type)."
     unless (%value.type is "Var"):
-        compile error at %value.source "Loop expected variable, not: %s"
+        compile error at %value "Expected a variable here, not a \(%value.type)."
     %lua = (..)
         Lua "\
             ..for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(..)
@@ -331,23 +331,28 @@ compile [if %body, when %body] to:
     %clause = "if"
     %else_allowed = (yes)
     unless (%body.type is "Block"):
-        compile error at %body.source "'if' expected a Block, but got: %s"
+        compile error at %body "'if' expected a Block, but got a \(%body.type)."
+        ..hint "Perhaps you forgot to put a ':' after 'if'?"
     for %line in %body:
         unless (..)
             ((%line.type is "Action") and ((size of %line) >= 2)) and (..)
                 %line.(size of %line) is "Block" syntax tree
         ..:
-            compile error at %line.source "\
-                ..Invalid line for 'if', each line should contain conditional expressions followed by a block, or "else" followed by a block:
-                %s"
+            compile error at %line "Invalid line for the body of an 'if' block."
+            ..hint "Each line should contain one or more conditional expressions \
+                ..followed by a block, or "else" followed by a block."
         
         %action = %line.(size of %line)
         if ((%line.1 is "else") and ((size of %line) == 2)):
             unless %else_allowed:
-                compile error at %line.source "Can't have two 'else' blocks"
+                compile error at %line "You can't have two 'else' blocks."
+                ..hint "Merge all of the 'else' blocks together."
             unless ((size of "\%code") > 0):
-                compile error at %line.source "\
-                    ..Can't have an 'else' block without a preceeding condition"
+                compile error at %line "\
+                    ..You can't have an 'else' block without a preceeding condition"
+                ..hint "If you want the code in this block to always execute, you don't \
+                    ..need a conditional block around it. Otherwise, make sure the 'else' \
+                    ..block comes last."
             
             %code::append "\
                 ..
@@ -358,11 +363,6 @@ compile [if %body, when %body] to:
         ..else:
             %code::append "\%clause "
             for %i in 1 to ((size of %line) - 1):
-                unless (%line.%i is syntax tree):
-                    compile error at %line.source "\
-                        ..Invalid condition for 'if' statement:
-                        %s"
-                
                 if (%i > 1):
                     %code::append " or "
                 %code::append (%line.%i as lua expr)
@@ -374,7 +374,8 @@ compile [if %body, when %body] to:
             %clause = "\nelseif"
     
     if ((size of "\%code") == 0):
-        compile error at %body.source "'if' block has an empty body"
+        compile error at %body "'if' block has an empty body."
+        ..hint "This means nothing would happen, so the 'if' block should be deleted."
     %code::append "\nend --when"
     return %code
 
@@ -395,23 +396,28 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
     %else_allowed = (yes)
     define mangler
     unless (%body.type is "Block"):
-        compile error at %body.source "'if' expected a Block, but got: %s"
+        compile error at %body "'if' expected a Block, but got a \(%body.type)"
+        ..hint "Perhaps you forgot to put a ':' after the 'is'?"
     for %line in %body:
         unless (..)
             ((%line.type is "Action") and ((size of %line) >= 2)) and (..)
                 %line.(size of %line) is "Block" syntax tree
         ..:
-            compile error at %line.source "\
-                ..Invalid line for 'if % is % %', each line should contain expressions followed by a block, or "else" followed by a block:
-                %s"
+            compile error at %line "Invalid line for 'if' block."
+            ..hint "Each line should contain expressions \
+                ..followed by a block, or "else" followed by a block"
         
         %action = %line.(size of %line)
         if ((%line.1 is "else") and ((size of %line) == 2)):
             unless %else_allowed:
-                compile error at %line.source "Can't have two 'else' blocks"
+                compile error at %line "You can't have two 'else' blocks."
+                ..hint "Merge all of the 'else' blocks together."
             unless ((size of "\%code") > 0):
-                compile error at %line.source "\
-                    ..Can't have an 'else' block without a preceeding condition"
+                compile error at %line "\
+                    ..You can't have an 'else' block without a preceeding condition"
+                ..hint "If you want the code in this block to always execute, you don't \
+                    ..need a conditional block around it. Otherwise, make sure the 'else' \
+                    ..block comes last."
             
             %code::append "\
                 ..
@@ -422,11 +428,6 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
         ..else:
             %code::append "\%clause "
             for %i in 1 to ((size of %line) - 1):
-                unless (%line.%i is syntax tree):
-                    compile error at %line.source "\
-                        ..Invalid condition for 'if' statement:
-                        %s"
-                
                 if (%i > 1):
                     %code::append " or "
                 %code::append "\(mangle "branch value") == \(%line.%i as lua expr)"
@@ -438,7 +439,8 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
             %clause = "\nelseif"
     
     if ((size of "\%code") == 0):
-        compile error at %body.source "'if % is % %' block has an empty body"
+        compile error at %body "'if' block has an empty body."
+        ..hint "This means nothing would happen, so the 'if' block should be deleted."
     %code::append "\nend --when"
     return (..)
         Lua "\

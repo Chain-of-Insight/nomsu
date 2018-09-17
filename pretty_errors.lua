@@ -25,7 +25,7 @@ format_error = function(err)
   else
     pointer = (" "):rep(err_linepos + #fmt_str:format(0) - 1) .. "⬆"
   end
-  local err_msg = "\027[33;41;1mParse error at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "\027[0m"
+  local err_msg = "\027[33;41;1m" .. tostring(err.title or "Error") .. " at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "\027[0m"
   for i = err_linenum - context, err_linenum - 1 do
     do
       local line = string2.line(err.source, i)
@@ -61,9 +61,9 @@ format_error = function(err)
     end
   end
   local box_width = 70
-  local err_text = "\027[47;31;1m" .. tostring((" " .. err.error):wrap_to_1(box_width):gsub("\n", "\n\027[47;31;1m "))
+  local err_text = "\027[47;31;1m" .. tostring(string2.wrap(" " .. err.error, box_width, 16):gsub("\n", "\n\027[47;31;1m "))
   if err.hint then
-    err_text = err_text .. "\n\027[47;30m" .. tostring((" Suggestion: " .. tostring(err.hint)):wrap_to_1(box_width):gsub("\n", "\n\027[47;30m "))
+    err_text = err_text .. "\n\027[47;30m" .. tostring(string2.wrap(" Suggestion: " .. tostring(err.hint), box_width, 16):gsub("\n", "\n\027[47;30m "))
   end
   err_msg = err_msg .. ("\n\027[33;1m " .. box(err_text):gsub("\n", "\n "))
   for i = err_linenum_end + 1, err_linenum_end + context do
