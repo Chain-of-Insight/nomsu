@@ -389,7 +389,7 @@ with NomsuCompiler
 
         return run_lua_fn!
 
-    .compile = (tree, compile_actions)=>
+    .compile = (tree, compile_actions, force_value=false)=>
         compile_actions or= @environment.COMPILE_ACTIONS
         if tree.version
             if get_version = @[("Nomsu version")\as_lua_id!]
@@ -430,7 +430,7 @@ with NomsuCompiler
                 args = {}
                 for i, tok in ipairs tree
                     if type(tok) == "string" then continue
-                    arg_lua = @compile(tok, compile_actions)
+                    arg_lua = @compile(tok, compile_actions, true)
                     unless arg_lua.is_value
                         if tok.type == "Block"
                             @compile_error tok,
@@ -469,9 +469,28 @@ with NomsuCompiler
                 return lua
             
             when "Block"
-                lua = LuaCode(tree.source)
-                lua\concat_append([@compile(line, compile_actions)\as_statements! for line in *tree], "\n")
-                return lua
+                if not force_value
+                    lua = LuaCode(tree.source)
+                    lua\concat_append([@compile(line, compile_actions)\as_statements! for line in *tree], "\n")
+                    return lua
+                else
+                    lua = LuaCode.Value(tree.source)
+                    values = [@compile(line) for line in *tree]
+                    all_values = true
+                    for v in *values do all_values and= v.is_value
+                    if all_values
+                        return values[1] if #values == 1
+                        lua\append "("
+                        lua\concat_append(values, " and nil or ")
+                        lua\append ")"
+                    else
+                        lua\append("((function()")
+                        for i, v in ipairs(values)
+                            if v.is_value
+                                v = v\as_statements(i == #values and 'return ' or '')
+                            lua\append "\n    ", v
+                        lua\append("\nend)())")
+                    return lua
 
             when "Text"
                 lua = LuaCode.Value(tree.source)

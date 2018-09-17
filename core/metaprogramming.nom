@@ -197,16 +197,14 @@ compile [parse %actions as %body] to (..)
         end
         local \%new_body = LuaCode(\%body.source,
             "local mangle = mangler()",
-            "\\nlocal tree = ", make_tree(\%body),
-            "\\nlocal lua = nomsu:compile(tree)",
-            "\\nreturn lua")
+            "\\nreturn ", make_tree(\%body))
         local ret = \(compile as (compile %actions to %new_body))
         return ret"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # TODO: add check for .is_value
-compile [%tree as lua expr] to (Lua value "nomsu:compile(\(=lua "nomsu:compile(\%tree)"))")
+compile [%tree as lua expr] to (Lua value "nomsu:compile(\(=lua "nomsu:compile(\%tree, nil, true)"), nil, true)")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

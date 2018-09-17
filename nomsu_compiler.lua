@@ -667,7 +667,10 @@ do
     end
     return run_lua_fn()
   end
-  NomsuCompiler.compile = function(self, tree, compile_actions)
+  NomsuCompiler.compile = function(self, tree, compile_actions, force_value)
+    if force_value == nil then
+      force_value = false
+    end
     compile_actions = compile_actions or self.environment.COMPILE_ACTIONS
     if tree.version then
       do
@@ -736,7 +739,7 @@ do
             _continue_0 = true
             break
           end
-          local arg_lua = self:compile(tok, compile_actions)
+          local arg_lua = self:compile(tok, compile_actions, true)
           if not (arg_lua.is_value) then
             if tok.type == "Block" then
               self:compile_error(tok, "Can't compile action (" .. tostring(stub) .. ") with a Block as an argument.", "Maybe there should be a compile-time action with that name that isn't being found?")
@@ -781,18 +784,56 @@ do
       lua:append("}")
       return lua
     elseif "Block" == _exp_0 then
-      local lua = LuaCode(tree.source)
-      lua:concat_append((function()
-        local _accum_0 = { }
-        local _len_0 = 1
-        for _index_0 = 1, #tree do
-          local line = tree[_index_0]
-          _accum_0[_len_0] = self:compile(line, compile_actions):as_statements()
-          _len_0 = _len_0 + 1
+      if not force_value then
+        local lua = LuaCode(tree.source)
+        lua:concat_append((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          for _index_0 = 1, #tree do
+            local line = tree[_index_0]
+            _accum_0[_len_0] = self:compile(line, compile_actions):as_statements()
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)(), "\n")
+        return lua
+      else
+        local lua = LuaCode.Value(tree.source)
+        local values
+        do
+          local _accum_0 = { }
+          local _len_0 = 1
+          for _index_0 = 1, #tree do
+            local line = tree[_index_0]
+            _accum_0[_len_0] = self:compile(line)
+            _len_0 = _len_0 + 1
+          end
+          values = _accum_0
         end
-        return _accum_0
-      end)(), "\n")
-      return lua
+        local all_values = true
+        for _index_0 = 1, #values do
+          local v = values[_index_0]
+          all_values = all_values and v.is_value
+        end
+        if all_values then
+          if #values == 1 then
+            return values[1]
+          end
+          lua:append("(")
+          lua:concat_append(values, " and nil or ")
+          lua:append(")")
+        else
+          lua:append("((function()")
+          for i, v in ipairs(values) do
+            if v.is_value then
+              v = v:as_statements(i == #values and 'return ' or '')
+            end
+            lua:append("\n    ", v)
+          end
+          lua:append("\nend)())")
+        end
+        return lua
+      end
     elseif "Text" == _exp_0 then
       local lua = LuaCode.Value(tree.source)
       local string_buffer = ""

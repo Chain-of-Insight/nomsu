@@ -27,16 +27,9 @@ test:
 
 # Variable assignment operator
 compile [%var = %value] to:
-    lua> "local \%var_lua = \(%var as lua)"
+    lua> "local \%var_lua = \(%var as lua expr)"
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-    lua> "\
-        ..\%value = \%value:map(function(t)
-            if Action:is_instance(t) and t.stub == "?" then
-                return \%var
-            end
-        end)
-        local \%value_lua = \(%value as lua)"
-    
+    lua> "local \%value_lua = \(%value as lua expr)"
     assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
     lua> "\
         ..local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
