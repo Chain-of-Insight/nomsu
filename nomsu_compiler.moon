@@ -355,7 +355,7 @@ with NomsuCompiler
 
     .run_lua = (lua)=>
         lua_string = tostring(lua)
-        run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", @environment)
+        run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", @environment)
         if not run_lua_fn
             line_numbered_lua = concat(
                 [format("%3d|%s",i,line) for i, line in ipairs Files.get_lines(lua_string)],
@@ -403,11 +403,20 @@ with NomsuCompiler
                     -- Force Lua to avoid tail call optimization for debugging purposes
                     -- TODO: use tail call?
                     ret = compile_action(@, tree, unpack(args))
-                    if not ret
+                    if ret == nil
                         info = debug.getinfo(compile_action, "S")
+                        filename = Source\from_string(info.source).filename
                         @compile_error tree,
-                            "The compile-time action here (#{stub}) failed to produce any Lua",
-                            "Look at the implementation of (#{stub}) in #{info.short_src\sub(1,200)}:#{info.linedefined} and make sure it's returning Lua code."
+                            "The compile-time action here (#{stub}) failed to return any value.",
+                            "Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's returning something."
+                    if AST.is_syntax_tree(ret)
+                        if ret == tree
+                            info = debug.getinfo(compile_action, "S")
+                            filename = Source\from_string(info.source).filename
+                            @compile_error tree,
+                                "The compile-time action here (#{stub}) is producing an endless loop.",
+                                "Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's not just returning the original tree."
+                        return @compile(ret, compile_actions)
                     return ret
 
                 lua = LuaCode.Value(tree.source)

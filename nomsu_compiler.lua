@@ -617,7 +617,7 @@ do
   end
   NomsuCompiler.run_lua = function(self, lua)
     local lua_string = tostring(lua)
-    local run_lua_fn, err = load(lua_string, nil and tostring(source or lua.source), "t", self.environment)
+    local run_lua_fn, err = load(lua_string, tostring(source or lua.source), "t", self.environment)
     if not run_lua_fn then
       local line_numbered_lua = concat((function()
         local _accum_0 = { }
@@ -702,9 +702,18 @@ do
             args = _accum_0
           end
           local ret = compile_action(self, tree, unpack(args))
-          if not ret then
+          if ret == nil then
             local info = debug.getinfo(compile_action, "S")
-            self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to produce any Lua", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(info.short_src:sub(1, 200)) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning Lua code.")
+            local filename = Source:from_string(info.source).filename
+            self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
+          end
+          if AST.is_syntax_tree(ret) then
+            if ret == tree then
+              local info = debug.getinfo(compile_action, "S")
+              local filename = Source:from_string(info.source).filename
+              self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") is producing an endless loop.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's not just returning the original tree.")
+            end
+            return self:compile(ret, compile_actions)
           end
           return ret
         end
