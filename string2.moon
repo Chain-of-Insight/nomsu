@@ -64,7 +64,8 @@ string2 = {
             else format("x%02X", byte(c))
         -- Lua IDs can't start with numbers, so map "1" -> "_1", "_1" -> "__1", etc.
         str = gsub str, "^_*%d", "_%1"
-        if match str, "^_*[a-z]*$"
+        -- This pattern is guaranteed to match all keywords, but also matches some other stuff.
+        if match str, "^_*[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$"
             for kw in *lua_keywords
                 if match str, ("^_*"..kw)
                     str = "_"..str
@@ -73,7 +74,8 @@ string2 = {
     -- from_lua_id(as_lua_id(str)) == str, but behavior is unspecified for inputs that
     -- did not come from as_lua_id()
     from_lua_id: (str)->
-        if match str, "^_+[a-z]*$"
+        -- This pattern is guaranteed to match all keywords, but also matches some other stuff.
+        if match str, "^_+[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$"
             for kw in *lua_keywords
                 if match str, ("^_+"..kw)
                     str = str\sub(2,-1)

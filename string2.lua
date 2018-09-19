@@ -131,7 +131,7 @@ local string2 = {
       end
     end)
     str = gsub(str, "^_*%d", "_%1")
-    if match(str, "^_*[a-z]*$") then
+    if match(str, "^_*[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$") then
       for _index_0 = 1, #lua_keywords do
         local kw = lua_keywords[_index_0]
         if match(str, ("^_*" .. kw)) then
@@ -142,7 +142,7 @@ local string2 = {
     return str
   end,
   from_lua_id = function(str)
-    if match(str, "^_+[a-z]*$") then
+    if match(str, "^_+[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$") then
       for _index_0 = 1, #lua_keywords do
         local kw = lua_keywords[_index_0]
         if match(str, ("^_+" .. kw)) then
