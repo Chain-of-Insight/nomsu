@@ -48,7 +48,6 @@ Files = require "files"
 Errhand = require "error_handling"
 NomsuCompiler = require "nomsu_compiler"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-{:repr} = require "utils"
 
 -- If this file was reached via require(), then just return the Nomsu compiler
 if not arg or debug.getinfo(2).func == require
@@ -222,7 +221,10 @@ say "\
                 Errhand.print_error error_message
             ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))
             if ok and ret != nil
-                print "= "..repr(ret)
+                if type(ret) == 'number'
+                    print "= #{ret}"
+                else
+                    print "= #{ret\as_nomsu!}"
             elseif not ok
                 Errhand.print_error ret
 

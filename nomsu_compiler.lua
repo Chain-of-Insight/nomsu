@@ -4,8 +4,8 @@ R, P, S = lpeg.R, lpeg.P, lpeg.S
 local re = require('re')
 local utils = require('utils')
 local Files = require('files')
-local repr, stringify, equivalent
-repr, stringify, equivalent = utils.repr, utils.stringify, utils.equivalent
+local stringify, equivalent
+stringify, equivalent = utils.stringify, utils.equivalent
 local List, Dict, Text
 do
   local _obj_0 = require('containers')
@@ -193,7 +193,6 @@ do
     ipairs = ipairs,
     _List = List,
     _Dict = Dict,
-    repr = repr,
     stringify = stringify,
     utils = utils,
     lpeg = lpeg,
@@ -385,7 +384,7 @@ do
   add_lua_string_bits = function(self, val_or_stmt, code)
     local cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
     if code.type ~= "Text" then
-      return LuaCode.Value(code.source, cls_str, repr(tostring(code.source)), ", ", self:compile(code), ")")
+      return LuaCode.Value(code.source, cls_str, tostring(code.source):as_lua(), ", ", self:compile(code), ")")
     end
     local add_bit_lua
     add_bit_lua = function(lua, bit_lua)
@@ -395,11 +394,11 @@ do
     end
     local operate_on_text
     operate_on_text = function(text)
-      local lua = LuaCode.Value(text.source, cls_str, repr(tostring(text.source)))
+      local lua = LuaCode.Value(text.source, cls_str, tostring(text.source):as_lua())
       for _index_0 = 1, #text do
         local bit = text[_index_0]
         if type(bit) == "string" then
-          add_bit_lua(lua, repr(bit))
+          add_bit_lua(lua, bit:as_lua())
         elseif bit.type == "Text" then
           add_bit_lua(lua, operate_on_text(bit))
         else
@@ -480,13 +479,13 @@ do
         end
         return _accum_0
       end)(), "\n")
-      return LuaCode(tree.source, "TESTS[" .. tostring(repr(tostring(tree.source))) .. "] = ", repr(test_str))
+      return LuaCode(tree.source, "TESTS[" .. tostring(tostring(tree.source):as_lua()) .. "] = ", test_str:as_lua())
     end,
     ["is jit"] = function(self, tree, code)
       return LuaCode.Value(tree.source, jit and "true" or "false")
     end,
     ["Lua version"] = function(self, tree, code)
-      return LuaCode.Value(tree.source, repr(_VERSION))
+      return LuaCode.Value(tree.source, _VERSION:as_lua())
     end,
     __parent = setmetatable({ }, {
       __index = function(self, key)
@@ -744,9 +743,9 @@ do
             if tok.type == "Block" then
               self:compile_error(tok, "Can't compile action (" .. tostring(stub) .. ") with a Block as an argument.", "Maybe there should be a compile-time action with that name that isn't being found?")
             elseif tok.type == "Action" then
-              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(repr(arg_lua)), "Check the implementation of (" .. tostring(tok.stub) .. ") to see if it is actually meant to produce an expression.")
+              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(tostring(arg_lua)), "Check the implementation of (" .. tostring(tok.stub) .. ") to see if it is actually meant to produce an expression.")
             else
-              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(repr(arg_lua)))
+              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(tostring(arg_lua)))
             end
           end
           insert(args, arg_lua)
@@ -762,6 +761,16 @@ do
     elseif "EscapedNomsu" == _exp_0 then
       local lua = LuaCode.Value(tree.source, tree[1].type, "{")
       local needs_comma, i = false, 1
+      local as_lua
+      as_lua = function(x)
+        if type(x) == 'number' then
+          return tostring(x)
+        elseif AST.is_syntax_tree(x) then
+          return self:compile(x, compile_actions)
+        else
+          return x:as_lua()
+        end
+      end
       for k, v in pairs(AST.is_syntax_tree(tree[1], "EscapedNomsu") and tree or tree[1]) do
         if needs_comma then
           lua:append(", ")
@@ -773,12 +782,12 @@ do
         elseif type(k) == 'string' and match(k, "[_a-zA-Z][_a-zA-Z0-9]*") then
           lua:append(k, "= ")
         else
-          lua:append("[", (AST.is_syntax_tree(k) and self:compile(k, compile_actions) or repr(k)), "]= ")
+          lua:append("[", as_lua(k), "]= ")
         end
         if k == "source" then
-          lua:append(repr(tostring(v)))
+          lua:append(tostring(v):as_lua())
         else
-          lua:append(AST.is_syntax_tree(v) and self:compile(v, compile_actions) or repr(v))
+          lua:append(as_lua(v))
         end
       end
       lua:append("}")
@@ -849,7 +858,7 @@ do
             if #lua.bits > 0 then
               lua:append("..")
             end
-            lua:append(repr(string_buffer))
+            lua:append(string_buffer:as_lua())
             string_buffer = ""
           end
           local bit_lua = self:compile(bit, compile_actions)
@@ -875,7 +884,7 @@ do
         if #lua.bits > 0 then
           lua:append("..")
         end
-        lua:append(repr(string_buffer))
+        lua:append(string_buffer:as_lua())
       end
       if #lua.bits > 1 then
         lua:parenthesize()

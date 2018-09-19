@@ -149,6 +149,8 @@ test:
     assume ("\%t" == "XXX")
 compile [set %dict 's metatable to %metatable] to (..)
     Lua "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
+compile [%'s metatable, %' metatable] to (..)
+    Lua value "getmetatable(\(% as lua expr))"
 
 test:
     assume (({} with fallback % -> (% + 1)).10 == 11)

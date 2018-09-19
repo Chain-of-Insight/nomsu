@@ -3,14 +3,50 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local repr, stringify, equivalent, nth_to_last, size
+local equivalent, nth_to_last, size
 do
   local _obj_0 = require('utils')
-  repr, stringify, equivalent, nth_to_last, size = _obj_0.repr, _obj_0.stringify, _obj_0.equivalent, _obj_0.nth_to_last, _obj_0.size
+  equivalent, nth_to_last, size = _obj_0.equivalent, _obj_0.nth_to_last, _obj_0.size
 end
 local lpeg = require('lpeg')
 local re = require('re')
 local List, Dict
+local as_nomsu
+as_nomsu = function(self)
+  if type(self) == 'number' then
+    return tostring(self)
+  end
+  do
+    local mt = getmetatable(self)
+    if mt then
+      do
+        local _as_nomsu = mt.as_nomsu
+        if _as_nomsu then
+          return _as_nomsu(self)
+        end
+      end
+    end
+  end
+  return error("Not supported: " .. tostring(self))
+end
+local as_lua
+as_lua = function(self)
+  if type(self) == 'number' then
+    return tostring(self)
+  end
+  do
+    local mt = getmetatable(self)
+    if mt then
+      do
+        local _as_lua = mt.as_lua
+        if _as_lua then
+          return _as_lua(self)
+        end
+      end
+    end
+  end
+  return error("Not supported: " .. tostring(self))
+end
 local _list_mt = {
   __eq = equivalent,
   __tostring = function(self)
@@ -19,11 +55,35 @@ local _list_mt = {
       local _len_0 = 1
       for _index_0 = 1, #self do
         local b = self[_index_0]
-        _accum_0[_len_0] = repr(b)
+        _accum_0[_len_0] = tostring(b)
         _len_0 = _len_0 + 1
       end
       return _accum_0
     end)(), ", ") .. "]"
+  end,
+  as_nomsu = function(self)
+    return "[" .. concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #self do
+        local b = self[_index_0]
+        _accum_0[_len_0] = as_nomsu(b)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ") .. "]"
+  end,
+  as_lua = function(self)
+    return "_List{" .. concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #self do
+        local b = self[_index_0]
+        _accum_0[_len_0] = as_lua(b)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ") .. "}"
   end,
   __lt = function(self, other)
     assert(type(self) == 'table' and type(other) == 'table', "Incompatible types for comparison")
@@ -162,7 +222,29 @@ local _dict_mt = {
       local _accum_0 = { }
       local _len_0 = 1
       for k, v in pairs(self) do
-        _accum_0[_len_0] = tostring(repr(k)) .. ": " .. tostring(repr(v))
+        _accum_0[_len_0] = tostring(tostring(k)) .. ": " .. tostring(tostring(v))
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ") .. "}"
+  end,
+  as_nomsu = function(self)
+    return "{" .. concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for k, v in pairs(self) do
+        _accum_0[_len_0] = tostring(as_nomsu(k)) .. ": " .. tostring(as_nomsu(v))
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ") .. "}"
+  end,
+  as_lua = function(self)
+    return "_Dict{" .. concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for k, v in pairs(self) do
+        _accum_0[_len_0] = "[ " .. tostring(as_lua(k)) .. "]= " .. tostring(as_lua(v))
         _len_0 = _len_0 + 1
       end
       return _accum_0

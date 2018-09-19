@@ -2,7 +2,6 @@
 -- build up generated code, while keeping track of where it came from, and managing
 -- indentation levels.
 {:insert, :remove, :concat} = table
-{:repr} = require 'utils'
 unpack or= table.unpack
 local LuaCode, NomsuCode, Source
 
@@ -19,7 +18,7 @@ class Source
 
     __tostring: => "@#{@filename}[#{@start}#{@stop and ':'..@stop or ''}]"
 
-    __repr: => "Source(#{repr @filename}, #{@start}#{@stop and ', '..@stop or ''})"
+    as_lua: => "Source(#{@filename\as_lua!}, #{@start}#{@stop and ', '..@stop or ''})"
     
     __eq: (other)=>
         getmetatable(@) == getmetatable(other) and @filename == other.filename and @start == other.start and @stop == other.stop
@@ -67,8 +66,8 @@ class Code
             @__str = concat(buff, "")
         return @__str
 
-    __repr: =>
-        "#{@__class.__name}(#{concat {repr(tostring(@source)), unpack([repr(b) for b in *@bits])}, ", "})"
+    as_lua: =>
+        "#{@__class.__name}(#{concat {tostring(@source)\as_lua!, unpack([b\as_lua! for b in *@bits])}, ", "})"
 
     __len: => #tostring(@)
     
@@ -93,7 +92,7 @@ class Code
             if b == '' then continue
             b.dirty = error if b.is_code
             if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
-                b = repr(b)
+                b = b\as_lua!
             bits[#bits+1] = b
         @dirty!
     
@@ -148,7 +147,7 @@ class Code
             b = select(i, ...)
             b.dirty = error if b.is_code
             if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
-                b = repr(b)
+                b = b\as_lua!
             bits[i] = b
         @dirty!
 
@@ -158,7 +157,7 @@ class Code
 
 class LuaCode extends Code
     __tostring: Code.__tostring
-    __repr: Code.__repr
+    as_lua: Code.as_lua
     __len: Code.__len
     new: (...)=>
         super ...
@@ -253,7 +252,7 @@ class LuaCode extends Code
 
 class NomsuCode extends Code
     __tostring: Code.__tostring
-    __repr: Code.__repr
+    as_lua: Code.as_lua
     __len: Code.__len
 
 Code.__base.append_1 = assert Code.__base.append

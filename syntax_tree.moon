@@ -1,6 +1,5 @@
 -- This file contains the datastructures used to represent parsed Nomsu syntax trees,
 -- as well as the logic for converting them to Lua code.
-{:repr} = require 'utils'
 {:insert, :remove, :concat} = table
 {:Source} = require "code_obj"
 unpack or= table.unpack
@@ -8,6 +7,14 @@ unpack or= table.unpack
 AST = {}
 AST.is_syntax_tree = (n, t=nil)->
     type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
+
+as_lua = =>
+    if type(@) == 'number'
+        return tostring(@)
+    if mt = getmetatable(@)
+        if _as_lua = mt.as_lua
+            return _as_lua(@)
+    error("Not supported: #{@}")
 
 types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
     "IndexChain", "Action", "FileChunks", "Error", "Comment"}
@@ -19,8 +26,18 @@ for name in *types
         .__name = name
         .type = name
         .is_instance = (x)=> getmetatable(x) == @
-        .__tostring = => "#{@type}#{repr @, (->)}"
-        .__repr = => "#{@type}#{repr @, (->)}"
+        .__tostring = =>
+            bits = [tostring(b) for b in *@]
+            for k,v in pairs(@)
+                unless bits[k]
+                    table.insert(bits, "[ #{tostring(k)}]=#{tostring(v)}")
+            return "#{@type}{#{table.concat(bits, ", ")}}"
+        .as_lua = =>
+            bits = [as_lua(b) for b in *@]
+            for k,v in pairs(@)
+                unless bits[k]
+                    table.insert(bits, "[ #{as_lua(k)}]=#{as_lua(v)}")
+            return "#{@type}{#{table.concat(bits, ", ")}}"
         .source_code_for_tree = setmetatable({}, {__index:(t)=>
             s = t.source
             Files = require 'files'

@@ -46,7 +46,7 @@ compile [my action %actions %body] to:
     lua> "\
         ..local fn_name = \%actions[1].stub:as_lua_id()
         local \%args = table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end)
-        table.insert(\%args, \(\%me as lua id))
+        table.insert(\%args, 1, \(\%me as lua id))
         local lua = LuaCode(tree.source, "class.", fn_name, " = ", \(..)
             compile as (%args -> %body)
         ..)
@@ -54,7 +54,7 @@ compile [my action %actions %body] to:
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
             local \%alias_args = table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) end)
-            table.insert(\%alias_args, \(\%me as lua id))
+            table.insert(\%alias_args, 1, \(\%me as lua id))
             lua:append("\\nclass.", alias_name, " = ")
             if utils.equivalent(\%args, \%alias_args) then
                 lua:append("class.", fn_name)
@@ -110,3 +110,9 @@ compile [object %classname extends %parent %class_body] to:
 
 parse [object %classname %class_body] as (..)
     object %classname extends (nil) %class_body
+
+parse [%obj is a %class] as (..)
+    all of [..]
+        (type of %obj) == "table"
+        %obj's metatable
+        (%obj's metatable).__index == %class

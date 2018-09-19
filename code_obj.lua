@@ -3,8 +3,6 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local repr
-repr = require('utils').repr
 local unpack = unpack or table.unpack
 local LuaCode, NomsuCode, Source
 do
@@ -13,8 +11,8 @@ do
     __tostring = function(self)
       return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. tostring(self.stop and ':' .. self.stop or '') .. "]"
     end,
-    __repr = function(self)
-      return "Source(" .. tostring(repr(self.filename)) .. ", " .. tostring(self.start) .. tostring(self.stop and ', ' .. self.stop or '') .. ")"
+    as_lua = function(self)
+      return "Source(" .. tostring(self.filename:as_lua()) .. ", " .. tostring(self.start) .. tostring(self.stop and ', ' .. self.stop or '') .. ")"
     end,
     __eq = function(self, other)
       return getmetatable(self) == getmetatable(other) and self.filename == other.filename and self.start == other.start and self.stop == other.stop
@@ -108,16 +106,16 @@ do
       end
       return self.__str
     end,
-    __repr = function(self)
+    as_lua = function(self)
       return tostring(self.__class.__name) .. "(" .. tostring(concat({
-        repr(tostring(self.source)),
+        tostring(self.source):as_lua(),
         unpack((function()
           local _accum_0 = { }
           local _len_0 = 1
           local _list_0 = self.bits
           for _index_0 = 1, #_list_0 do
             local b = _list_0[_index_0]
-            _accum_0[_len_0] = repr(b)
+            _accum_0[_len_0] = b:as_lua()
             _len_0 = _len_0 + 1
           end
           return _accum_0
@@ -158,7 +156,7 @@ do
             b.dirty = error
           end
           if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
-            b = repr(b)
+            b = b:as_lua()
           end
           bits[#bits + 1] = b
           _continue_0 = true
@@ -236,7 +234,7 @@ do
           b.dirty = error
         end
         if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
-          b = repr(b)
+          b = b:as_lua()
         end
         bits[i] = b
       end
@@ -276,7 +274,7 @@ do
   local _parent_0 = Code
   local _base_0 = {
     __tostring = Code.__tostring,
-    __repr = Code.__repr,
+    as_lua = Code.as_lua,
     __len = Code.__len,
     add_free_vars = function(self, vars)
       if not (#vars > 0) then
@@ -469,7 +467,7 @@ do
   local _parent_0 = Code
   local _base_0 = {
     __tostring = Code.__tostring,
-    __repr = Code.__repr,
+    as_lua = Code.as_lua,
     __len = Code.__len
   }
   _base_0.__index = _base_0

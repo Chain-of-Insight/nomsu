@@ -119,6 +119,24 @@ local string2 = {
     end
     return table.concat(lines, "\n")
   end,
+  as_lua = function(self)
+    local escaped = gsub(self, "\\", "\\\\")
+    escaped = gsub(escaped, "\n", "\\n")
+    escaped = gsub(escaped, '"', '\\"')
+    escaped = gsub(escaped, "[^ %g]", function(c)
+      return format("\\%03d", byte(c, 1))
+    end)
+    return '"' .. escaped .. '"'
+  end,
+  as_nomsu = function(self)
+    local escaped = gsub(self, "\\", "\\\\")
+    escaped = gsub(escaped, "\n", "\\n")
+    escaped = gsub(escaped, '"', '\\"')
+    escaped = gsub(escaped, "[^ %g]", function(c)
+      return format("\\%03d", byte(c, 1))
+    end)
+    return '"' .. escaped .. '"'
+  end,
   as_lua_id = function(str)
     local orig = str
     str = gsub(str, "^ *$", "%1 ")

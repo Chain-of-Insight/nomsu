@@ -34,7 +34,7 @@ lua> "\
 
 lua> "\
     ..COMPILE_ACTIONS["compile as 1"] = function(nomsu, tree, \%action)
-        local lua = LuaCode.Value(tree.source, "COMPILE_ACTIONS[", repr(\%action.stub), "](")
+        local lua = LuaCode.Value(tree.source, "COMPILE_ACTIONS[", \%action.stub:as_lua(), "](")
         local lua_args = table.map(\%action:get_args(), function(a) return nomsu:compile(a) end)
         table.insert(lua_args, 1, "nomsu")
         table.insert(lua_args, 2, "tree")
@@ -66,19 +66,19 @@ lua> "\
     ..COMPILE_ACTIONS["compile 1 to 2"] = function(nomsu, tree, \%actions, \%body)
         local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(\
     ..a)) end))}
-        local lua = LuaCode(tree.source, "COMPILE_ACTIONS[", repr(\%actions[1].stub),
+        local lua = LuaCode(tree.source, "COMPILE_ACTIONS[", \%actions[1].stub:as_lua(),
             "] = ", \(compile as (%args -> %body)))
         for i=2,#\%actions do
             local alias = \%actions[i]
             local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return tostring(nomsu:compile(\
     ..a)) end))}
-            lua:append("\\nCOMPILE_ACTIONS[", repr(alias.stub), "] = ")
+            lua:append("\\nCOMPILE_ACTIONS[", alias.stub:as_lua(), "] = ")
             if utils.equivalent(\%args, \%alias_args) then
-                lua:append("COMPILE_ACTIONS[", repr(\%actions[1].stub), "]")
+                lua:append("COMPILE_ACTIONS[", \%actions[1].stub:as_lua(), "]")
             else
                 lua:append("function(")
                 lua:concat_append(\%alias_args, ", ")
-                lua:append(")\\n    return COMPILE_ACTIONS[", repr(\%actions[1].stub), "](")
+                lua:append(")\\n    return COMPILE_ACTIONS[", \%actions[1].stub:as_lua(), "](")
                 lua:concat_append(\%args, ", ")
                 lua:append(")\\nend")
             end
@@ -173,7 +173,7 @@ compile [parse %actions as %body] to (..)
                 if replacements[t[1]] then
                     return replacements[t[1]]
                 else
-                    return t.type.."{mangle("..repr(t[1]).."), source="..repr(tostring(t.source)).."}"
+                    return t.type.."{mangle("..t[1]:as_lua().."), source="..tostring(t.source):as_lua().."}"
                 end
             elseif AST.is_syntax_tree(t) then
                 local ret = {}
@@ -183,7 +183,7 @@ compile [parse %actions as %body] to (..)
                         ret[#ret+1] = make_tree(t[i])
                         i = i + 1
                     elseif k == "source" then
-                        ret[#ret+1] = k.."= "..repr(tostring(v))
+                        ret[#ret+1] = k.."= "..tostring(v):as_lua()
                     elseif type(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
                         ret[#ret+1] = k.."= "..make_tree(v)
                     else
@@ -191,8 +191,10 @@ compile [parse %actions as %body] to (..)
                     end
                 end
                 return t.type.."{"..table.concat(ret, ", ").."}"
+            elseif type(t) == 'number' then
+                return tostring(t)
             else
-                return repr(t)
+                return t:as_lua()
             end
         end
         local \%new_body = LuaCode(\%body.source,
@@ -257,7 +259,7 @@ action [%tree with vars %replacements] (..)
 
 compile [tree %tree with vars %replacements] to (..)
     Lua value "\
-        ..\(=lua "repr(\%tree)"):map(function(t)
+        ..\(=lua "(\%tree):as_lua()"):map(function(t)
             if t.type == "Var" then
                 return \(%replacements as lua expr)[t[1]]
             end
@@ -312,7 +314,7 @@ test:
                 ..one
                 "two""
         ..== "\"one\\n\\\"two\\\"\""
-compile [quote %s] to (Lua value "repr(\(%s as lua expr))")
+compile [quote %s] to (Lua value "tostring(\(%s as lua expr)):as_lua()")
 
 test:
     assume ((type of {}) == "table") or barf "type of failed."
@@ -340,7 +342,7 @@ test:
 compile [run %nomsu_code] to (..)
     Lua value "\
         ..nomsu:run(NomsuCode(\(..)
-            =lua "repr(tostring(\(%nomsu_code.source)))"
+            =lua "tostring(\(%nomsu_code.source)):as_lua()"
         .., \(%nomsu_code as lua expr)))"
 
 test:

@@ -1,11 +1,27 @@
 -- This file contains container classes, i.e. Lists, Dicts, and Sets
 
 {:insert,:remove,:concat} = table
-{:repr, :stringify, :equivalent, :nth_to_last, :size} = require 'utils'
+{:equivalent, :nth_to_last, :size} = require 'utils'
 lpeg = require 'lpeg'
 re = require 're'
 
 local List, Dict
+
+as_nomsu = =>
+    if type(@) == 'number'
+        return tostring(@)
+    if mt = getmetatable(@)
+        if _as_nomsu = mt.as_nomsu
+            return _as_nomsu(@)
+    error("Not supported: #{@}")
+
+as_lua = =>
+    if type(@) == 'number'
+        return tostring(@)
+    if mt = getmetatable(@)
+        if _as_lua = mt.as_lua
+            return _as_lua(@)
+    error("Not supported: #{@}")
 
 -- List and Dict classes to provide basic equality/tostring functionality for the tables
 -- used in Nomsu. This way, they retain a notion of whether they were originally lists or dicts.
@@ -13,7 +29,11 @@ _list_mt =
     __eq:equivalent
     -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
     __tostring: =>
-        "["..concat([repr(b) for b in *@], ", ").."]"
+        "["..concat([tostring(b) for b in *@], ", ").."]"
+    as_nomsu: =>
+        "["..concat([as_nomsu(b) for b in *@], ", ").."]"
+    as_lua: =>
+        "_List{"..concat([as_lua(b) for b in *@], ", ").."}"
     __lt: (other)=>
         assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
         for i=1,math.max(#@, #other)
@@ -74,7 +94,11 @@ _dict_mt =
     __eq:equivalent
     __len:size
     __tostring: =>
-        "{"..concat(["#{repr(k)}: #{repr(v)}" for k,v in pairs @], ", ").."}"
+        "{"..concat(["#{tostring(k)}: #{tostring(v)}" for k,v in pairs @], ", ").."}"
+    as_nomsu: =>
+        "{"..concat(["#{as_nomsu(k)}: #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
+    as_lua: =>
+        "_Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
     __ipairs: => walk_items, {table:@, key:nil}, 0
     __band: (other)=>
         Dict{k,v for k,v in pairs(@) when other[k] != nil}

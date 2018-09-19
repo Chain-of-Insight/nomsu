@@ -14,7 +14,7 @@ lpeg = require 'lpeg'
 re = require 're'
 utils = require 'utils'
 Files = require 'files'
-{:repr, :stringify, :equivalent} = utils
+{:stringify, :equivalent} = utils
 {:List, :Dict, :Text} = require 'containers'
 export colors, colored
 colors = require 'consolecolors'
@@ -104,7 +104,7 @@ with NomsuCompiler
         -- Nomsu types:
         _List:List, _Dict:Dict,
         -- Utilities and misc.
-        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re, Files:Files,
+        stringify:stringify, utils:utils, lpeg:lpeg, re:re, Files:Files,
         :AST, TESTS: Dict{}, globals: Dict{}
         :LuaCode, :NomsuCode, :Source
         nomsu:NomsuCompiler
@@ -202,16 +202,16 @@ with NomsuCompiler
     add_lua_string_bits = (val_or_stmt, code)=>
         cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
         if code.type != "Text"
-            return LuaCode.Value(code.source, cls_str, repr(tostring(code.source)), ", ", @compile(code), ")")
+            return LuaCode.Value(code.source, cls_str, tostring(code.source)\as_lua!, ", ", @compile(code), ")")
         add_bit_lua = (lua, bit_lua)->
             bit_leading_len = #(bit_lua\match("^[^\n]*"))
             lua\append(lua\trailing_line_len! + bit_leading_len > MAX_LINE and ",\n    " or ", ")
             lua\append(bit_lua)
         operate_on_text = (text)->
-            lua = LuaCode.Value(text.source, cls_str, repr(tostring(text.source)))
+            lua = LuaCode.Value(text.source, cls_str, tostring(text.source)\as_lua!)
             for bit in *text
                 if type(bit) == "string"
-                    add_bit_lua(lua, repr(bit))
+                    add_bit_lua(lua, bit\as_lua!)
                 elseif bit.type == "Text"
                     add_bit_lua(lua, operate_on_text(bit))
                 else
@@ -270,13 +270,13 @@ with NomsuCompiler
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
         ["test 1"]: (tree, body)=>
             test_str = table.concat [tostring(@tree_to_nomsu(line)) for line in *body], "\n"
-            LuaCode tree.source, "TESTS[#{repr(tostring(tree.source))}] = ", repr(test_str)
+            LuaCode tree.source, "TESTS[#{tostring(tree.source)\as_lua!}] = ", test_str\as_lua!
 
         ["is jit"]: (tree, code)=>
             return LuaCode.Value(tree.source, jit and "true" or "false")
 
         ["Lua version"]: (tree, code)=>
-            return LuaCode.Value(tree.source, repr(_VERSION))
+            return LuaCode.Value(tree.source, _VERSION\as_lua!)
 
         __parent: setmetatable({}, {
             __index: (key)=>
@@ -439,11 +439,11 @@ with NomsuCompiler
 
                         elseif tok.type == "Action"
                             @compile_error tok,
-                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{repr arg_lua}",
+                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{tostring(arg_lua)}",
                                 "Check the implementation of (#{tok.stub}) to see if it is actually meant to produce an expression."
                         else
                             @compile_error tok,
-                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{repr arg_lua}"
+                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{tostring(arg_lua)}"
                     insert args, arg_lua
                 lua\concat_append args, ", "
                 lua\append ")"
@@ -452,6 +452,13 @@ with NomsuCompiler
             when "EscapedNomsu"
                 lua = LuaCode.Value tree.source, tree[1].type, "{"
                 needs_comma, i = false, 1
+                as_lua = (x)->
+                    if type(x) == 'number'
+                        tostring(x)
+                    elseif AST.is_syntax_tree(x)
+                        @compile(x, compile_actions)
+                    else x\as_lua!
+
                 for k,v in pairs(AST.is_syntax_tree(tree[1], "EscapedNomsu") and tree or tree[1])
                     if needs_comma then lua\append ", "
                     else needs_comma = true
@@ -460,11 +467,11 @@ with NomsuCompiler
                     elseif type(k) == 'string' and match(k,"[_a-zA-Z][_a-zA-Z0-9]*")
                         lua\append(k, "= ")
                     else
-                        lua\append("[", (AST.is_syntax_tree(k) and @compile(k, compile_actions) or repr(k)), "]= ")
+                        lua\append("[", as_lua(k), "]= ")
                     if k == "source"
-                        lua\append repr(tostring(v))
+                        lua\append tostring(v)\as_lua!
                     else
-                        lua\append(AST.is_syntax_tree(v) and @compile(v, compile_actions) or repr(v))
+                        lua\append as_lua(v)
                 lua\append "}"
                 return lua
             
@@ -499,9 +506,9 @@ with NomsuCompiler
                     if type(bit) == "string"
                         string_buffer ..= bit
                         continue
-                    if string_buffer ~= ""
+                    if string_buffer != ""
                         if #lua.bits > 0 then lua\append ".."
-                        lua\append repr(string_buffer)
+                        lua\append string_buffer\as_lua!
                         string_buffer = ""
                     bit_lua = @compile(bit, compile_actions)
                     unless bit_lua.is_value
@@ -516,7 +523,7 @@ with NomsuCompiler
 
                 if string_buffer ~= "" or #lua.bits == 0
                     if #lua.bits > 0 then lua\append ".."
-                    lua\append repr(string_buffer)
+                    lua\append string_buffer\as_lua!
 
                 if #lua.bits > 1
                     lua\parenthesize!

@@ -1,5 +1,3 @@
-local repr
-repr = require('utils').repr
 local insert, remove, concat
 do
   local _obj_0 = table
@@ -14,6 +12,24 @@ AST.is_syntax_tree = function(n, t)
     t = nil
   end
   return type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
+end
+local as_lua
+as_lua = function(self)
+  if type(self) == 'number' then
+    return tostring(self)
+  end
+  do
+    local mt = getmetatable(self)
+    if mt then
+      do
+        local _as_lua = mt.as_lua
+        if _as_lua then
+          return _as_lua(self)
+        end
+      end
+    end
+  end
+  return error("Not supported: " .. tostring(self))
 end
 local types = {
   "Number",
@@ -42,10 +58,42 @@ for _index_0 = 1, #types do
       return getmetatable(x) == self
     end
     cls.__tostring = function(self)
-      return tostring(self.type) .. tostring(repr(self, (function() end)))
+      local bits
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_1 = 1, #self do
+          local b = self[_index_1]
+          _accum_0[_len_0] = tostring(b)
+          _len_0 = _len_0 + 1
+        end
+        bits = _accum_0
+      end
+      for k, v in pairs(self) do
+        if not (bits[k]) then
+          table.insert(bits, "[ " .. tostring(tostring(k)) .. "]=" .. tostring(tostring(v)))
+        end
+      end
+      return tostring(self.type) .. "{" .. tostring(table.concat(bits, ", ")) .. "}"
     end
-    cls.__repr = function(self)
-      return tostring(self.type) .. tostring(repr(self, (function() end)))
+    cls.as_lua = function(self)
+      local bits
+      do
+        local _accum_0 = { }
+        local _len_0 = 1
+        for _index_1 = 1, #self do
+          local b = self[_index_1]
+          _accum_0[_len_0] = as_lua(b)
+          _len_0 = _len_0 + 1
+        end
+        bits = _accum_0
+      end
+      for k, v in pairs(self) do
+        if not (bits[k]) then
+          table.insert(bits, "[ " .. tostring(as_lua(k)) .. "]=" .. tostring(as_lua(v)))
+        end
+      end
+      return tostring(self.type) .. "{" .. tostring(table.concat(bits, ", ")) .. "}"
     end
     cls.source_code_for_tree = setmetatable({ }, {
       __index = function(self, t)

@@ -91,8 +91,6 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local repr
-repr = require("utils").repr
 if not arg or debug.getinfo(2).func == require then
   return NomsuCompiler
 end
@@ -324,7 +322,11 @@ say "\
       local ret
       ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))
       if ok and ret ~= nil then
-        print("= " .. repr(ret))
+        if type(ret) == 'number' then
+          print("= " .. tostring(ret))
+        else
+          print("= " .. tostring(ret:as_nomsu()))
+        end
       elseif not ok then
         Errhand.print_error(ret)
       end

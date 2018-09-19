@@ -3,8 +3,6 @@ local re = require('re')
 lpeg.setmaxstack(20000)
 local P, R, S, C, Cmt, Carg, Cc
 P, R, S, C, Cmt, Carg, Cc = lpeg.P, lpeg.R, lpeg.S, lpeg.C, lpeg.Cmt, lpeg.Carg, lpeg.Cc
-local repr
-repr = require('utils').repr
 local DEFS
 do
   local _with_0 = { }

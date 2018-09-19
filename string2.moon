@@ -45,6 +45,20 @@ string2 = {
             lines[#lines+1] = line
         return table.concat(lines, "\n")
 
+    as_lua: =>
+        escaped = gsub(@, "\\", "\\\\")
+        escaped = gsub(escaped, "\n", "\\n")
+        escaped = gsub(escaped, '"', '\\"')
+        escaped = gsub(escaped, "[^ %g]", (c)-> format("\\%03d", byte(c, 1)))
+        return '"'..escaped..'"'
+
+    as_nomsu: =>
+        escaped = gsub(@, "\\", "\\\\")
+        escaped = gsub(escaped, "\n", "\\n")
+        escaped = gsub(escaped, '"', '\\"')
+        escaped = gsub(escaped, "[^ %g]", (c)-> format("\\%03d", byte(c, 1)))
+        return '"'..escaped..'"'
+
     -- Convert an arbitrary text into a valid Lua identifier. This function is injective,
     -- but not idempotent. In logic terms: (x != y) => (as_lua_id(x) != as_lua_id(y)),
     -- but not (as_lua_id(a) == b) => (as_lua_id(b) == b).
