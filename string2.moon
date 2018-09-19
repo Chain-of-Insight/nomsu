@@ -12,6 +12,11 @@ isplit = (sep='%s+')=>
         return i, line, start, (nl and (nl-1) or #@str)
     return step, {str:@, pos:1, :sep}, 0
 
+lua_keywords = {
+    "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if",
+    "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"
+}
+
 string2 = {
     :isplit, uppercase:upper, lowercase:lower, reversed:reverse
     capitalized: => gsub(@, '%l', upper, 1)
@@ -59,14 +64,19 @@ string2 = {
             else format("x%02X", byte(c))
         -- Lua IDs can't start with numbers, so map "1" -> "_1", "_1" -> "__1", etc.
         str = gsub str, "^_*%d", "_%1"
-        if str.from_lua_id
-            re_orig = str\from_lua_id!
-            require('ldt').breakpoint! if re_orig != orig
+        if match str, "^_*[a-z]*$"
+            for kw in *lua_keywords
+                if match str, ("^_*"..kw)
+                    str = "_"..str
         return str
 
     -- from_lua_id(as_lua_id(str)) == str, but behavior is unspecified for inputs that
     -- did not come from as_lua_id()
     from_lua_id: (str)->
+        if match str, "^_+[a-z]*$"
+            for kw in *lua_keywords
+                if match str, ("^_+"..kw)
+                    str = str\sub(2,-1)
         str = gsub(str, "^_(_*%d.*)", "%1")
         str = gsub(str, "_", " ")
         str = gsub(str, "x([0-9A-F][0-9A-F])", (hex)-> char(tonumber(hex, 16)))

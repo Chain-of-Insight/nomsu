@@ -26,6 +26,30 @@ isplit = function(self, sep)
     sep = sep
   }, 0
 end
+local lua_keywords = {
+  "and",
+  "break",
+  "do",
+  "else",
+  "elseif",
+  "end",
+  "false",
+  "for",
+  "function",
+  "goto",
+  "if",
+  "in",
+  "local",
+  "nil",
+  "not",
+  "or",
+  "repeat",
+  "return",
+  "then",
+  "true",
+  "until",
+  "while"
+}
 local string2 = {
   isplit = isplit,
   uppercase = upper,
@@ -107,15 +131,25 @@ local string2 = {
       end
     end)
     str = gsub(str, "^_*%d", "_%1")
-    if str.from_lua_id then
-      local re_orig = str:from_lua_id()
-      if re_orig ~= orig then
-        require('ldt').breakpoint()
+    if match(str, "^_*[a-z]*$") then
+      for _index_0 = 1, #lua_keywords do
+        local kw = lua_keywords[_index_0]
+        if match(str, ("^_*" .. kw)) then
+          str = "_" .. str
+        end
       end
     end
     return str
   end,
   from_lua_id = function(str)
+    if match(str, "^_+[a-z]*$") then
+      for _index_0 = 1, #lua_keywords do
+        local kw = lua_keywords[_index_0]
+        if match(str, ("^_+" .. kw)) then
+          str = str:sub(2, -1)
+        end
+      end
+    end
     str = gsub(str, "^_(_*%d.*)", "%1")
     str = gsub(str, "_", " ")
     str = gsub(str, "x([0-9A-F][0-9A-F])", function(hex)
