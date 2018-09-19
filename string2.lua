@@ -134,7 +134,7 @@ local string2 = {
     if match(str, "^_*[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$") then
       for _index_0 = 1, #lua_keywords do
         local kw = lua_keywords[_index_0]
-        if match(str, ("^_*" .. kw)) then
+        if match(str, ("^_*" .. kw .. "$")) then
           str = "_" .. str
         end
       end
@@ -145,7 +145,7 @@ local string2 = {
     if match(str, "^_+[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$") then
       for _index_0 = 1, #lua_keywords do
         local kw = lua_keywords[_index_0]
-        if match(str, ("^_+" .. kw)) then
+        if match(str, ("^_+" .. kw .. "$")) then
           str = str:sub(2, -1)
         end
       end

@@ -13,10 +13,10 @@ test:
     "on magenta":45, "on cyan":46, "on white":47
 
 for %name = %colornum in %colors:
-    with {%escapecode:"\027[\(%colornum)m"}:
-        run "\
-            ..compile [\%name] to (..)
-                Lua value (quote \(quote %escapecode))
-            compile [\%name %text] to (..)
-                Lua value "\\
-                    ..(\\(quote \(quote %escapecode))..\\(%text as lua expr).."\\27[0m")""
+    %colornum = "\%colornum"
+    (=lua "COMPILE_ACTIONS").%name = (..)
+        [%nomsu, %tree] -> (..)
+            Lua value "'\\027[\(%colornum)m'"
+    (=lua "COMPILE_ACTIONS")."\%name 1" = (..)
+        [%nomsu, %tree, %text] -> (..)
+            Lua value "('\\027[\(%colornum)m'..\(%text as lua expr)..'\\027[0m')"

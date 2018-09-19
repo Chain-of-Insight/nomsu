@@ -67,7 +67,7 @@ string2 = {
         -- This pattern is guaranteed to match all keywords, but also matches some other stuff.
         if match str, "^_*[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$"
             for kw in *lua_keywords
-                if match str, ("^_*"..kw)
+                if match str, ("^_*"..kw.."$")
                     str = "_"..str
         return str
 
@@ -77,7 +77,7 @@ string2 = {
         -- This pattern is guaranteed to match all keywords, but also matches some other stuff.
         if match str, "^_+[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$"
             for kw in *lua_keywords
-                if match str, ("^_+"..kw)
+                if match str, ("^_+"..kw.."$")
                     str = str\sub(2,-1)
         str = gsub(str, "^_(_*%d.*)", "%1")
         str = gsub(str, "_", " ")
