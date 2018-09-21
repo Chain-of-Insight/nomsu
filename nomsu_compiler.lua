@@ -131,14 +131,19 @@ end
 local Parsers = { }
 local max_parser_version = 0
 for version = 1, 999 do
-  do
-    local peg_contents = Files.read("nomsu." .. tostring(version) .. ".peg")
-    if peg_contents then
-      max_parser_version = version
-      Parsers[version] = make_parser(peg_contents, make_tree)
-    else
-      break
+  local found_version = false
+  for _, full_path in Files.walk("nomsu." .. tostring(version) .. ".peg") do
+    do
+      local peg_contents = Files.read(full_path)
+      if peg_contents then
+        found_version = true
+        max_parser_version = version
+        Parsers[version] = make_parser(peg_contents, make_tree)
+      end
     end
+  end
+  if not (found_version) then
+    break
   end
 end
 local MAX_LINE = 80

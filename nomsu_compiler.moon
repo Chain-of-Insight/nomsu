@@ -79,10 +79,13 @@ make_tree = (tree, userdata)->
 Parsers = {}
 max_parser_version = 0
 for version=1,999
-    if peg_contents = Files.read("nomsu.#{version}.peg")
-        max_parser_version = version
-        Parsers[version] = make_parser(peg_contents, make_tree)
-    else break
+    found_version = false
+    for _, full_path in Files.walk("nomsu.#{version}.peg")
+        if peg_contents = Files.read(full_path)
+            found_version = true
+            max_parser_version = version
+            Parsers[version] = make_parser(peg_contents, make_tree)
+    break unless found_version
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable {}, {__tostring: => "Nomsu"}
