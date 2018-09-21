@@ -353,13 +353,17 @@ do
     reverse, upper, lower, find, byte, match, gmatch, gsub, sub, format, rep = _obj_0.reverse, _obj_0.upper, _obj_0.lower, _obj_0.find, _obj_0.byte, _obj_0.match, _obj_0.gmatch, _obj_0.gsub, _obj_0.sub, _obj_0.format, _obj_0.rep
   end
   local string2 = require('string2')
-  local lines, line, line_at, as_lua_id
-  lines, line, line_at, as_lua_id = string2.lines, string2.line, string2.line_at, string2.as_lua_id
+  local lines, line, line_at, as_lua_id, is_lua_id
+  lines, line, line_at, as_lua_id, is_lua_id = string2.lines, string2.line, string2.line_at, string2.as_lua_id, string2.is_lua_id
   local text_methods = {
     formatted_with_1 = format,
     byte_1 = byte,
     position_of_1 = find,
     position_of_1_after_2 = find,
+    as_a_lua_identifier = as_lua_id,
+    is_a_lua_identifier = is_lua_id,
+    as_a_lua_id = as_lua_id,
+    is_a_lua_id = is_lua_id,
     bytes_1_to_2 = function(self, start, stop)
       return List({
         byte(tostring(self), start, stop)
@@ -403,10 +407,18 @@ do
     matches_1 = function(self, patt)
       return match(self, patt) and true or false
     end,
+    matching_1 = function(self, patt)
+      return (match(self, patt))
+    end,
+    matching_groups_1 = function(self, patt)
+      return {
+        match(self, patt)
+      }
+    end,
     [as_lua_id("* 1")] = function(self, n)
       return rep(self, n)
     end,
-    matching_1 = function(self, patt)
+    all_matches_of_1 = function(self, patt)
       local result = { }
       local stepper, x, i = gmatch(self, patt)
       while true do
@@ -433,6 +445,9 @@ do
     else
       return text_methods[i]
     end
+  end
+  getmetatable("").__add = function(self, x)
+    return tostring(self) .. tostring(x)
   end
 end
 return {

@@ -184,7 +184,7 @@ do
     assert = assert,
     dofile = dofile,
     loadstring = loadstring,
-    type = type,
+    lua_type_of_1 = type,
     select = select,
     math = math,
     io = io,
