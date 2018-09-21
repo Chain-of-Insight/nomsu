@@ -133,9 +133,11 @@ for i,entry in ipairs(Dict({x:99}))
 do
     {:reverse, :upper, :lower, :find, :byte, :match, :gmatch, :gsub, :sub, :format, :rep} = string
     string2 = require 'string2'
-    {:lines, :line, :line_at, :as_lua_id} = string2
+    {:lines, :line, :line_at, :as_lua_id, :is_lua_id} = string2
     text_methods =
         formatted_with_1:format, byte_1:byte, position_of_1:find, position_of_1_after_2:find,
+        as_a_lua_identifier: as_lua_id, is_a_lua_identifier: is_lua_id,
+        as_a_lua_id: as_lua_id, is_a_lua_id: is_lua_id,
         bytes_1_to_2: (start, stop)=> List{byte(tostring(@), start, stop)}
         [as_lua_id "with 1 -> 2"]: gsub
         bytes: => List{byte(tostring(@), 1, -1)},
@@ -157,8 +159,10 @@ do
         line_number_of_1: (i)=> select(2, line_at(@, i))
         line_position_of_1: (i)=> select(3, line_at(@, i))
         matches_1: (patt)=> match(@, patt) and true or false
+        matching_1: (patt)=> (match(@, patt))
+        matching_groups_1: (patt)=> {match(@, patt)}
         [as_lua_id "* 1"]: (n)=> rep(@, n)
-        matching_1: (patt)=>
+        all_matches_of_1: (patt)=>
             result = {}
             stepper,x,i = gmatch(@, patt)
             while true
@@ -175,5 +179,7 @@ do
         if type(i) == 'number' then return sub(@, i, i)
         elseif type(i) == 'table' then return sub(@, i[1], i[2])
         else return text_methods[i]
+
+    getmetatable("").__add = (x)=> tostring(@)..tostring(x)
 
 return {:List, :Dict}

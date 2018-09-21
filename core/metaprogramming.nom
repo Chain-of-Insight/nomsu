@@ -145,7 +145,7 @@ compile [action %actions %body] to (..)
 
 test:
     assume ((action (say %)) == (=lua "say_1"))
-compile [action %action] to (Lua value (%action as lua id))
+compile [action %action] to (Lua value (%action.stub as lua id))
 
 test:
     parse [swap %x and %y] as (..)
@@ -233,7 +233,12 @@ action [%var as lua identifier, %var as lua id] (..)
     lua> "\
         ..if type(\%var) == 'string' then return \%var:as_lua_id()
         elseif AST.is_syntax_tree(\%var, 'Var') then return \%var[1]:as_lua_id()
-        elseif AST.is_syntax_tree(\%var, 'Action') then return \%var.stub:as_lua_id()
+        elseif AST.is_syntax_tree(\%var) then
+            local lua = \(%var as lua expr)
+            if not tostring(lua):match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
+                \(compile error at %var "This is not a valid Lua identifier.")
+            end
+            return lua
         else error("Unknown type: "..tostring(\%var))
         end"
 
@@ -317,8 +322,29 @@ test:
 compile [quote %s] to (Lua value "tostring(\(%s as lua expr)):as_lua()")
 
 test:
-    assume ((type of {}) == "table") or barf "type of failed."
-compile [type of %obj] to (Lua value "type(\(%obj as lua expr))")
+    assume (lua type of {}) == "Lua table"
+    assume (type of {}) == "Dict"
+    assume ({} is a "Dict")
+    assume ("" is text)
+    assume ("" isn't a "Dict")
+
+%dict_mt = (=lua "getmetatable(\{})")
+%list_mt = (=lua "getmetatable(\[])")
+
+action [% is text] (=lua "\(lua type of %) == 'string'")
+action [% is not text, % isn't text] (=lua "\(lua type of %) ~= 'string'")
+action [type of %]:
+    lua> "\
+        local lua_type = \(lua type of %)
+        if lua_type == 'string' then return 'Text'
+        elseif lua_type == 'table' then
+            local mt = getmetatable(\%)
+            if mt and mt.__type then return mt.__type end
+            return 'Lua table'
+        else return lua_type end"
+parse [% is a %type, % is an %type] as ((type of %) == %type)
+parse [% isn't a %type, % isn't an %type, % is not a %type, % is not an %type]
+..as ((type of %) == %type)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -79,6 +79,10 @@ test:
     %i += 1
     unless (%i == 10): go to %loop
     assume (%i == 10)
+    === (Loop) ===
+    %i -= 1
+    unless (%i == 0): go to (Loop)
+    assume (%i == 0)
 compile [=== %label ===, --- %label ---, *** %label ***] to (..)
     Lua "::label_\(%label as lua identifier)::"
 
@@ -240,13 +244,34 @@ test:
 
 # For-each loop (lua's "ipairs()")
 compile [for %var in %iterable %body] to:
-    # This uses Lua's approach of only allowing loop-scoped variables in a loop
-    unless (%var.type is "Var"):
-        compile error at %var "Expected a variable here, not a \(%var.type)."
     define mangler
+    # This uses Lua's approach of only allowing loop-scoped variables in a loop
     %lua = (..)
         Lua "\
             ..for \(mangle "i"),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
+                \(%body as lua statements)"
+    
+    if (%body has subtree \(do next)):
+        %lua::append "\n    ::continue::"
+    if (%body has subtree \(do next %var)):
+        %lua::append (Lua "\n\(compile as (===next %var ===))")
+    %lua::append "\nend --foreach-loop"
+    if (%body has subtree \(stop %var)):
+        %lua = (..)
+            Lua "\
+                ..do -- scope for stopping for-loop
+                    \%lua
+                    \(compile as (===stop %var ===))
+                end -- end of scope for stopping for-loop"
+    
+    return %lua
+
+# TODO: reduce code duplication
+compile [for %var in %iterable at %i %body] to:
+    # This uses Lua's approach of only allowing loop-scoped variables in a loop
+    %lua = (..)
+        Lua "\
+            ..for \(%i as lua identifier),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
                 \(%body as lua statements)"
     
     if (%body has subtree \(do next)):

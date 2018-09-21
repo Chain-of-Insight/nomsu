@@ -13,8 +13,10 @@ isplit = (sep='%s+')=>
     return step, {str:@, pos:1, :sep}, 0
 
 lua_keywords = {
-    "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if",
-    "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"
+    ["and"]=true, ["break"]=true, ["do"]=true, ["else"]=true, ["elseif"]=true, ["end"]=true,
+    ["false"]=true, ["for"]=true, ["function"]=true, ["goto"]=true, ["if"]=true,
+    ["in"]=true, ["local"]=true, ["nil"]=true, ["not"]=true, ["or"]=true, ["repeat"]=true,
+    ["return"]=true, ["then"]=true, ["true"]=true, ["until"]=true, ["while"]=true
 }
 
 string2 = {
@@ -76,24 +78,19 @@ string2 = {
         str = gsub str, "%W", (c)->
             if c == ' ' then '_'
             else format("x%02X", byte(c))
-        -- Lua IDs can't start with numbers, so map "1" -> "_1", "_1" -> "__1", etc.
-        str = gsub str, "^_*%d", "_%1"
-        -- This pattern is guaranteed to match all keywords, but also matches some other stuff.
-        if match str, "^_*[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$"
-            for kw in *lua_keywords
-                if match str, ("^_*"..kw.."$")
-                    str = "_"..str
+
+        unless string2.is_lua_id(str\match("^_*(.*)$"))
+            str = "_"..str
         return str
+
+    is_lua_id: (str)->
+        match(str, "^[_a-zA-Z][_a-zA-Z0-9]*$") and not lua_keywords[str]
 
     -- from_lua_id(as_lua_id(str)) == str, but behavior is unspecified for inputs that
     -- did not come from as_lua_id()
     from_lua_id: (str)->
-        -- This pattern is guaranteed to match all keywords, but also matches some other stuff.
-        if match str, "^_+[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$"
-            for kw in *lua_keywords
-                if match str, ("^_+"..kw.."$")
-                    str = str\sub(2,-1)
-        str = gsub(str, "^_(_*%d.*)", "%1")
+        unless string2.is_lua_id("^_+(.*)$")
+            str = str\sub(2,-1)
         str = gsub(str, "_", " ")
         str = gsub(str, "x([0-9A-F][0-9A-F])", (hex)-> char(tonumber(hex, 16)))
         str = gsub(str, "^ ([ ]*)$", "%1")

@@ -3,7 +3,7 @@
     This file contains the implementation of an Object-Oriented programming system.
 
 test:
-    object "Dog":
+    object (Dog):
         (Dog).genus = "Canus"
         my action [set up]: %me.barks or= 0
         my action [bark, woof]:
@@ -12,8 +12,10 @@ test:
         
         my action [get pissed off]: %me.barks += 1
     
-    %d = (new Dog {barks:2})
-    assume (%d.barks == 2)
+    %d = (Dog {barks:2})
+    assume (type of %d) == "Dog"
+    assume (%d is a "Dog")
+    assume %d.barks == 2
     assume ((%d::bark) == "Bark! Bark!")
     assume ((%d::woof) == "Bark! Bark!")
     %d::get pissed off
@@ -23,24 +25,24 @@ test:
     assume ("\(%d.class)" == "Dog")
     assume (%d.genus == "Canus")
     assume (%d.barks == 3)
-    %d2 = (new Dog)
+    %d2 = (Dog {})
     assume (%d2.barks == 0) or barf "Default initializer failed"
-    with {%d:new Dog {barks:1}}:
+    with {%d:Dog {barks:1}}:
         assume ((%d::bark) == "Bark!")
-    object "Corgi" extends (Dog):
+    object (Corgi) extends (Dog):
         my action [sploot] "splooted"
         my action [bark, woof]:
             %barks = ("Yip!" for % in 1 to %me.barks)
             return (%barks::joined with " ")
     
-    %corg = (new Corgi)
+    %corg = (Corgi {})
     assume (%corg.barks == 0)
-    with {%d:new Corgi {barks:1}}:
+    with {%d:Corgi {barks:1}}:
         assume ((%d::sploot) == "splooted") or barf "subclass method failed"
         assume ((%d::bark) == "Yip!") or barf "inheritance failed"
         assume ((%d::woof) == "Yip!")
     
-    with {%d:new Dog {barks:2}}:
+    with {%d:Dog {barks:2}}:
         assume ((%d::bark) == "Bark! Bark!")
 compile [my action %actions %body] to:
     lua> "\
@@ -69,12 +71,18 @@ compile [my action %actions %body] to:
         return lua"
 
 compile [object %classname extends %parent %class_body] to:
+    unless (%classname.type == "Action"):
+        compile error at %classname "Expected this to be an action, not a \(%classname.type)"
+    for % in %classname:
+        unless (% is text):
+            compile error at % "Class names should not have arguments."
     return (..)
         Lua "\
             ..do
-                local class = {name=\(%classname as lua expr)}
+                local class = {name=\(quote %classname.stub)}
                 setmetatable(class, {
                     __index=\(%parent as lua expr),
+                    __type=class.name,
                     __tostring=function(cls) return cls.name end,
                     __call=function(cls, inst)
                         inst = setmetatable(inst or {}, cls)
@@ -84,24 +92,21 @@ compile [object %classname extends %parent %class_body] to:
                         return inst
                     end,
                 })
-                nomsu.environment[("new "..class.name):as_lua_id()] = class
-                nomsu.environment[("new "..class.name.." 1"):as_lua_id()] = class
+                nomsu.environment[(class.name.." 1"):as_lua_id()] = class
                 nomsu.environment[class.name:as_lua_id()] = function() return class end
                 class.__index = class
                 class.class = class
                 class.__tostring = function(inst)
                     return inst.name..getmetatable(_Dict{}).__tostring(inst)
                 end
-            
                 \(%class_body as lua statements)
-            
                 local metamethod_map = {["as text"]="__tostring", ["clean up"]="__gc",
                     ["+ 1"]="__add", ["- 1"]="__sub", ["* 1"]="__mul", ["/ 1"]="__div",
                     ["-"]="__unm", ["// 1"]="__idiv", ["mod 1"]="__mod", ["^ 1"]="__pow",
                     ["& 1"]="__band", ["| 1"]="__bor", ["~ 1"]="__bxor", ["~"]="__bnot",
                     ["<< 1"]="__bshl", [">> 1"]="__bshr", ["== 1"]="__eq", ["< 1"]="__lt",
-                    ["<= 1"]="__le", ["set 1 = 2"]="__newindex", ["length"]="__len",
-                    ["__ipairs"]="__ipairs", ["__pairs"]="__pairs",
+                    ["<= 1"]="__le", ["set 1 = 2"]="__newindex", ["size"]="__len",
+                    ["iterate"]="__ipairs", ["iterate all"]="__pairs",
                 }
                 for stub,metamethod in pairs(metamethod_map) do
                     class[metamethod] = class[stub:as_lua_id()]
@@ -111,8 +116,3 @@ compile [object %classname extends %parent %class_body] to:
 parse [object %classname %class_body] as (..)
     object %classname extends (nil) %class_body
 
-parse [%obj is a %class] as (..)
-    all of [..]
-        (type of %obj) == "table"
-        %obj's metatable
-        (%obj's metatable).__index == %class

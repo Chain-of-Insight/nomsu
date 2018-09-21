@@ -1,0 +1,81 @@
+# This file contains the parser, which converts text into abstract syntax trees
+use "nomonom/ast.nom"
+
+%lpeg = (=lua "require('lpeg')")
+%re = (=lua "require('re')")
+call %lpeg.setmaxstack with [20_000]
+set {..}
+    (action (P 1)): %lpeg.P, (action (R 1)): %lpeg.R, (action (Carg 1)): %lpeg.Carg,
+    (action (Cc 1)): %lpeg.Cc, (action (lpeg re pattern 1)): %re.compile,
+    (action (lpeg re pattern 1 using 2)): %re.compile
+
+%source_code_for_tree = {}
+%defs = (..)
+    {..}
+        nl: (P "\r")^(-1) * (P "\n")
+        tab: P "\t"
+        tonumber: %tonumber
+        tochar: %string.char
+        unpack: %unpack
+        nil: Cc (nil)
+        userdata: Carg 1
+        utf8_char: (..)
+            (R "\194\223")*(R "\128\191") +
+            (R "\224\239")*(R "\128\191")*(R "\128\191") +
+            (R "\240\244")*(R "\128\191")*(R "\128\191")*(R "\128\191")
+
+        Tree: [%t, %userdata] ->:
+            %source = (..)
+                Source {filename:%userdata.filename, start:%tree.start, stop:%tree.stop}
+            set {%t.start: nil, %t.stop: nil}
+            %t = (Syntax Tree %t)
+            (Syntax Tree).source_code_for_tree.%t = %userdata.source
+            return %t
+
+    ..with fallback %key ->:
+        if:
+            (%key::matches "^ascii_(%d+)$"):
+                %i = (%key::matching "^ascii_(%d+)$")
+                return (call %string.char with [%i as a number])
+            (%key::matches "^number_(%d+)$"):
+                %i = (%key::matching "^number_(%d+)$")
+                return (Cc (%i as a number))
+
+%id_patt = (((P "") - (R "09")) *  ((%defs.utf8_char + (R "az") + (R "AZ") + (P "_") + (R "09"))^1 * -1))
+%operator_patt = ((S "'`~!@$^&*+=|<>?/-")^1 * -1)
+%text_methods = (""'s metatable).__index
+%text_methods.(action (is a nomsu identifier)) = (..)
+    [%str] -> (call %id_patt.match with [%id_patt, %str])
+%text_methods.(action (is a nomsu id)) = %text_methods.(action (is a nomsu identifier))
+%text_methods.(action (is a nomsu operator)) = (..)
+    [%str] -> (call %operator_patt.match with [%operator_patt, %str])
+
+%peg_tidier = (..)
+    lpeg re pattern "\
+        file <- %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
+        def <- anon_def / captured_def
+        anon_def <-
+            ({ident} (" "*) ":" {[^%nl]* (%nl+ " "+ [^%nl]*)*}) 
+            -> "%1 <- %2"
+        captured_def <-
+            ({ident} (" "*) "(" {ident} ")" (" "*) ":" {[^%nl]* (%nl+ " "+ [^%nl]*)*})
+            -> "%1 <- ({| {:start:{}:} %3 {:stop:{}:} {:type: (''->'%2') :} |} %%userdata) -> Tree"
+        ident <- [a-zA-Z_][a-zA-Z0-9_]*
+        comment <- "--" [^%nl]*
+        "
+
+action [make parser from %peg] (make parser from %peg using (nil))
+
+action [make parser from %peg using %make_tree]:
+    %peg = (call %peg_tidier.match with [%peg_tidier, %peg])
+    %peg = (lpeg re pattern %peg using %defs)
+    local action [parse %input from %filename]:
+        %input = "\%input"
+        %tree_mt = {__index: {source:%input, filename:%filename}}
+        %userdata = {..}
+            make_tree: %make_tree or ([%]-> (: set %'s metatable to %tree_mt; return %))
+            filename:%filename, source:%input
+        %tree = (call %peg.match with [%peg, %input, (nil), %userdata])
+        assume %tree or barf "File \%filename failed to parse:\n\%input"
+        return %tree
+    return (action (parse 1 from 2))

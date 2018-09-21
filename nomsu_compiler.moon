@@ -99,7 +99,7 @@ with NomsuCompiler
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
         :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
-        :table, :assert, :dofile, :loadstring, :type, :select, :math, :io, :load,
+        :table, :assert, :dofile, :loadstring, lua_type_of_1:type, :select, :math, :io, :load,
         :pairs, :ipairs,
         -- Nomsu types:
         _List:List, _Dict:Dict,
