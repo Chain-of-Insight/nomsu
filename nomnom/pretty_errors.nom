@@ -8,8 +8,9 @@ local action [boxed %text]:
     %max_line = (..)
         max of ((visible size of %line) for %line in (%text::lines))
     %ret = (..)
-        "\n\%text"::with "\n([^\n]*)" as % -> (..)
-            "\n\%\(" "::* (%max_line - (visible size of %))) \027[0m"
+        "\n\%text"::with "\n([^\n]*)" -> (..)
+            [%] -> (..)
+                "\n\%\(" "::* (%max_line - (visible size of %))) \027[0m"
     return %ret.[2,-1]
 
 action [%err as a pretty error]:
@@ -66,7 +67,7 @@ action [%err as a pretty error]:
         ..\027[47;31;1m\((" \(%err.error)"::wrapped to %box_width)::with "\n" -> "\n\027[47;31;1m ")"
     if %err.hint:
         err_text += "\n\027[47;30m\((" Suggestion: \(%err.hint)"::wrapped to %box_width)::with "\n" -> "\n\027[47;30m ")"
-    %err_msg += "\n\027[33;1m \((%err_text boxed) with "\n" -> "\n ")"
+    %err_msg += "\n\027[33;1m \((%err_text boxed)::with "\n" -> "\n ")"
 
     for %i in (%err_linenum_end + 1) to (%err_linenum_end + %context):
         %line = (%err_code::line %i)

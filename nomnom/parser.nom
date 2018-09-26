@@ -1,11 +1,12 @@
 # This file contains the parser, which converts text into abstract syntax trees
-use "nomonom/ast.nom"
+#use "nomonom/ast.nom"
 
 %lpeg = (=lua "require('lpeg')")
 %re = (=lua "require('re')")
-call %lpeg.setmaxstack with [20_000]
+call %lpeg.setmaxstack with [20000]
 set {..}
     (action (P 1)): %lpeg.P, (action (R 1)): %lpeg.R, (action (Carg 1)): %lpeg.Carg,
+    (action (S 1)): %lpeg.S,
     (action (Cc 1)): %lpeg.Cc, (action (lpeg re pattern 1)): %re.compile,
     (action (lpeg re pattern 1 using 2)): %re.compile
 
@@ -43,11 +44,11 @@ set {..}
 
 %id_patt = (((P "") - (R "09")) *  ((%defs.utf8_char + (R "az") + (R "AZ") + (P "_") + (R "09"))^1 * -1))
 %operator_patt = ((S "'`~!@$^&*+=|<>?/-")^1 * -1)
-%text_methods = (""'s metatable).__index
-%text_methods.(action (is a nomsu identifier)) = (..)
+%text_methods = (""'s metatable).__methods
+%text_methods.("is a nomsu identifier"::as lua id) = (..)
     [%str] -> (call %id_patt.match with [%id_patt, %str])
-%text_methods.(action (is a nomsu id)) = %text_methods.(action (is a nomsu identifier))
-%text_methods.(action (is a nomsu operator)) = (..)
+%text_methods.("is a nomsu id"::as lua id) = %text_methods.("is a nomsu identifier"::as lua id)
+%text_methods.("is a nomsu operator"::as lua id) = (..)
     [%str] -> (call %operator_patt.match with [%operator_patt, %str])
 
 %peg_tidier = (..)

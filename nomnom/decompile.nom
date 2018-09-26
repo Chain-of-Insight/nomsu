@@ -1,6 +1,6 @@
 # This file contains the code to convert syntax trees to Nomsu code
-use "nomnom/code_obj.nom"
-use "nomnom/parser.nom"
+#use "nomnom/code_obj.nom"
+#use "nomnom/parser.nom"
 
 # TODO: maybe re-implement the fancy coroutine checker that aborts early if nomsu gets too long
 action [decompile %tree inline]:
@@ -55,9 +55,9 @@ action [decompile %tree inline]:
             %nomsu = (Nomsu Code from %tree ["\""])
             for %text in recursive %tree:
                 for %bit in %text at %i:
-                    if:
-                        (%bit is text):
-                            %nomsu::add %bit
+                    if (%bit is text):
+                        %nomsu::add %bit
+                    ..else:
                         if %bit.type is:
                             "Text":
                                 recurse %text on %bit
@@ -143,7 +143,7 @@ action [decompile %tree]:
     # For concision:
     local action [recurse on %t]:
         %space = (%MAX_LINE - (%nomsu::trailing line length))
-        if (%space <= 0): go to (Indented)
+        if (%space <= 0): go to (Use Indented)
         for %subtree in recursive %tree:
             if %subtree.type is:
                 "Block":

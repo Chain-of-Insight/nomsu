@@ -1,6 +1,6 @@
 # This file contains the code to convert syntax trees to Lua code
 
-use "nomnom/code_obj.nom"
+#use "nomnom/code_obj.nom"
 
 action [compile %tree using %compile_actions]:
     assume (%tree is a "Syntax Tree")
