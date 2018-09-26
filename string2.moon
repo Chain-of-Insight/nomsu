@@ -13,14 +13,16 @@ isplit = (sep='%s+')=>
     return step, {str:@, pos:1, :sep}, 0
 
 lua_keywords = {
-    ["and"]=true, ["break"]=true, ["do"]=true, ["else"]=true, ["elseif"]=true, ["end"]=true,
-    ["false"]=true, ["for"]=true, ["function"]=true, ["goto"]=true, ["if"]=true,
-    ["in"]=true, ["local"]=true, ["nil"]=true, ["not"]=true, ["or"]=true, ["repeat"]=true,
-    ["return"]=true, ["then"]=true, ["true"]=true, ["until"]=true, ["while"]=true
+    ["and"]:true, ["break"]:true, ["do"]:true, ["else"]:true, ["elseif"]:true, ["end"]:true,
+    ["false"]:true, ["for"]:true, ["function"]:true, ["goto"]:true, ["if"]:true,
+    ["in"]:true, ["local"]:true, ["nil"]:true, ["not"]:true, ["or"]:true, ["repeat"]:true,
+    ["return"]:true, ["then"]:true, ["true"]:true, ["until"]:true, ["while"]:true
 }
+is_lua_id = (str)->
+    match(str, "^[_a-zA-Z][_a-zA-Z0-9]*$") and not lua_keywords[str]
 
 string2 = {
-    :isplit, uppercase:upper, lowercase:lower, reversed:reverse
+    :isplit, uppercase:upper, lowercase:lower, reversed:reverse, :is_lua_id
     capitalized: => gsub(@, '%l', upper, 1)
     byte: byte, bytes: (i, j)=> {byte(@, i or 1, j or -1)}
     split: (sep)=> [chunk for i,chunk in isplit(@, sep)]
@@ -79,17 +81,14 @@ string2 = {
             if c == ' ' then '_'
             else format("x%02X", byte(c))
 
-        unless string2.is_lua_id(str\match("^_*(.*)$"))
+        unless is_lua_id(str\match("^_*(.*)$"))
             str = "_"..str
         return str
-
-    is_lua_id: (str)->
-        match(str, "^[_a-zA-Z][_a-zA-Z0-9]*$") and not lua_keywords[str]
 
     -- from_lua_id(as_lua_id(str)) == str, but behavior is unspecified for inputs that
     -- did not come from as_lua_id()
     from_lua_id: (str)->
-        unless string2.is_lua_id("^_+(.*)$")
+        unless is_lua_id("^_+(.*)$")
             str = str\sub(2,-1)
         str = gsub(str, "_", " ")
         str = gsub(str, "x([0-9A-F][0-9A-F])", (hex)-> char(tonumber(hex, 16)))

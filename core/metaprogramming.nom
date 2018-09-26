@@ -184,14 +184,14 @@ compile [parse %actions as %body] to (..)
                         i = i + 1
                     elseif k == "source" then
                         ret[#ret+1] = k.."= "..tostring(v):as_lua()
-                    elseif type(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
+                    elseif lua_type_of_1(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
                         ret[#ret+1] = k.."= "..make_tree(v)
                     else
                         ret[#ret+1] = "["..make_tree(k).."]= "..make_tree(v)
                     end
                 end
                 return t.type.."{"..table.concat(ret, ", ").."}"
-            elseif type(t) == 'number' then
+            elseif lua_type_of_1(t) == 'number' then
                 return tostring(t)
             else
                 return t:as_lua()
@@ -231,12 +231,12 @@ compile [%tree as inline nomsu] to (..)
 
 action [%var as lua identifier, %var as lua id] (..)
     lua> "\
-        ..if type(\%var) == 'string' then return \%var:as_lua_id()
+        ..if lua_type_of_1(\%var) == 'string' then return \%var:as_lua_id()
         elseif AST.is_syntax_tree(\%var, 'Var') then return \%var[1]:as_lua_id()
         elseif AST.is_syntax_tree(\%var) then
             local lua = \(%var as lua expr)
             if not tostring(lua):match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
-                \(compile error at %var "This is not a valid Lua identifier.")
+                compile_error_at_1_2(\%var, "This is not a valid Lua identifier.")
             end
             return lua
         else error("Unknown type: "..tostring(\%var))
@@ -327,9 +327,6 @@ test:
     assume ({} is a "Dict")
     assume ("" is text)
     assume ("" isn't a "Dict")
-
-%dict_mt = (=lua "getmetatable(\{})")
-%list_mt = (=lua "getmetatable(\[])")
 
 action [% is text] (=lua "\(lua type of %) == 'string'")
 action [% is not text, % isn't text] (=lua "\(lua type of %) ~= 'string'")

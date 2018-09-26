@@ -89,6 +89,32 @@ compile [sum of %items, sum %items] to:
     %clauses = ((% as lua expr) for % in %items)
     return (Lua value "(\(%clauses::joined with " + "))")
 
+parse [if all of %items %body, if all of %items then %body] as (..)
+    if (all of %items) %body
+parse [unless all of %items %body, unless all of %items then %body] as (..)
+    if (not (all of %items)) %body
+parse [if any of %items %body, if any of %items then %body] as (..)
+    if (any of %items) %body
+parse [unless any of %items %body, unless any of %items then %body] as (..)
+    if (not (any of %items)) %body
+parse [if none of %items %body, if none of %items then %body] as (..)
+    if (not (any of %items)) %body
+parse [unless none of %items %body, unless none of %items then %body] as (..)
+    if (any of %items) %body
+
+parse [if all of %items %body else %else, if all of %items then %body else %else] as (..)
+    if (all of %items) %body else %else
+parse [unless all of %items %body else %else, unless all of %items then %body else %else] as (..)
+    if (not (all of %items)) %body else %else
+parse [if any of %items %body else %else, if any of %items then %body else %else] as (..)
+    if (any of %items) %body else %else
+parse [unless any of %items %body else %else, unless any of %items then %body else %else] as (..)
+    if (not (any of %items)) %body else %else
+parse [if none of %items %body else %else, if none of %items then %body else %else] as (..)
+    if (not (any of %items)) %body else %else
+parse [unless none of %items %body else %else, unless none of %items then %body else %else] as (..)
+    if (any of %items) %body else %else
+
 compile [product of %items, product %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.product(\(%items as lua expr))")

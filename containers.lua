@@ -192,6 +192,22 @@ local _list_mt = {
         end
       end
       return nil
+    end,
+    slice_1_to_2 = function(self, start, stop)
+      local n = #self
+      if n < 0 then
+        start = (n + 1 - start)
+      end
+      if n < 0 then
+        stop = (n + 1 - stop)
+      end
+      local _accum_0 = { }
+      local _len_0 = 1
+      for i = start, stop do
+        _accum_0[_len_0] = self[i]
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
     end
   },
   __newindex = function(self, k, v)

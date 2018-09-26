@@ -163,18 +163,20 @@ object (Lua Code) extends (Code):
             %statements::add %suffix
         return %statements
 
-    action [Lua Code from %tree] (..)
-        Lua Code {source:%tree.source, bits:[], is_value:(no), free_vars:[]}
-    action [Lua Code from %tree %bits] (..)
-        Lua Code {source:%tree.source, bits:%bits, is_value:(no), free_vars:[]}
-
-    action [Lua Value from %tree] (..)
-        Lua Code {source:%tree.source, bits:[], is_value:(yes), free_vars:[]}
-    action [Lua Value from %tree %bits] (..)
-        Lua Code {source:%tree.source, bits:%bits, is_value:(yes), free_vars:[]}
+    action [Lua Code from %source {%bits:[]}]:
+        if (%bits is text): %bits = [%bits]
+        if (%source is a "Syntax Tree"): %source = %source.source
+        return (..)
+            Lua Code {source:%source, bits:%bits, is_value:(no), free_vars:[]}
+    action [Lua Value from %tree {%bits:[]}]:
+        if (%bits is text): %bits = [%bits]
+        if (%source is a "Syntax Tree"): %source = %source.source
+        return (..)
+            Lua Code {source:%source, bits:%bits, is_value:(yes), free_vars:[]}
 
 object (Nomsu Code) extends (Code):
-    action [Nomsu Code from %tree] (..)
-        Nomsu Code {source:%tree.source, bits:[]}
-    action [Nomsu Code from %tree %bits] (..)
-        Nomsu Code {source:%tree.source, bits:%bits}
+    action [Nomsu Code from %source {%bits:[]}]:
+        if (%bits is text): %bits = [%bits]
+        if (%source is a "Syntax Tree"): %source = %source.source
+        return (..)
+            Nomsu Code {source:%source, bits:%bits}

@@ -27,34 +27,39 @@ isplit = function(self, sep)
   }, 0
 end
 local lua_keywords = {
-  "and",
-  "break",
-  "do",
-  "else",
-  "elseif",
-  "end",
-  "false",
-  "for",
-  "function",
-  "goto",
-  "if",
-  "in",
-  "local",
-  "nil",
-  "not",
-  "or",
-  "repeat",
-  "return",
-  "then",
-  "true",
-  "until",
-  "while"
+  ["and"] = true,
+  ["break"] = true,
+  ["do"] = true,
+  ["else"] = true,
+  ["elseif"] = true,
+  ["end"] = true,
+  ["false"] = true,
+  ["for"] = true,
+  ["function"] = true,
+  ["goto"] = true,
+  ["if"] = true,
+  ["in"] = true,
+  ["local"] = true,
+  ["nil"] = true,
+  ["not"] = true,
+  ["or"] = true,
+  ["repeat"] = true,
+  ["return"] = true,
+  ["then"] = true,
+  ["true"] = true,
+  ["until"] = true,
+  ["while"] = true
 }
+local is_lua_id
+is_lua_id = function(str)
+  return match(str, "^[_a-zA-Z][_a-zA-Z0-9]*$") and not lua_keywords[str]
+end
 local string2 = {
   isplit = isplit,
   uppercase = upper,
   lowercase = lower,
   reversed = reverse,
+  is_lua_id = is_lua_id,
   capitalized = function(self)
     return gsub(self, '%l', upper, 1)
   end,
@@ -148,27 +153,15 @@ local string2 = {
         return format("x%02X", byte(c))
       end
     end)
-    str = gsub(str, "^_*%d", "_%1")
-    if match(str, "^_*[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$") then
-      for _index_0 = 1, #lua_keywords do
-        local kw = lua_keywords[_index_0]
-        if match(str, ("^_*" .. kw .. "$")) then
-          str = "_" .. str
-        end
-      end
+    if not (is_lua_id(str:match("^_*(.*)$"))) then
+      str = "_" .. str
     end
     return str
   end,
   from_lua_id = function(str)
-    if match(str, "^_+[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$") then
-      for _index_0 = 1, #lua_keywords do
-        local kw = lua_keywords[_index_0]
-        if match(str, ("^_+" .. kw .. "$")) then
-          str = str:sub(2, -1)
-        end
-      end
+    if not (is_lua_id("^_+(.*)$")) then
+      str = str:sub(2, -1)
     end
-    str = gsub(str, "^_(_*%d.*)", "%1")
     str = gsub(str, "_", " ")
     str = gsub(str, "x([0-9A-F][0-9A-F])", function(hex)
       return char(tonumber(hex, 16))
