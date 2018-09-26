@@ -91,7 +91,11 @@ lua> "\
 compile [call %fn with %args] to:
     lua> "\
         ..local lua = LuaCode.Value(tree.source, nomsu:compile(\%fn), "(")
-        lua:concat_append(table.map(\%args, function(a) return nomsu:compile(a) end), ", ")
+        if \%args.type == 'List' then
+            lua:concat_append(table.map(\%args, function(a) return nomsu:compile(a) end), ", ")
+        else
+            lua:append('unpack(', nomsu:compile(\%args), ')')
+        end
         lua:append(")")
         return lua"
 
