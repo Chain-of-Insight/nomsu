@@ -236,7 +236,7 @@ action [%var as lua identifier, %var as lua id] (..)
         elseif AST.is_syntax_tree(\%var) then
             local lua = \(%var as lua expr)
             if not tostring(lua):match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
-                compile_error_at_1_2(\%var, "This is not a valid Lua identifier.")
+                nomsu:compile_error(\%var, "This is not a valid Lua identifier.")
             end
             return lua
         else error("Unknown type: "..tostring(\%var))
@@ -322,7 +322,7 @@ test:
 compile [quote %s] to (Lua value "tostring(\(%s as lua expr)):as_lua()")
 
 test:
-    assume (lua type of {}) == "Lua table"
+    assume (lua type of {}) == "table"
     assume (type of {}) == "Dict"
     assume ({} is a "Dict")
     assume ("" is text)
@@ -341,7 +341,7 @@ action [type of %]:
         else return lua_type end"
 parse [% is a %type, % is an %type] as ((type of %) == %type)
 parse [% isn't a %type, % isn't an %type, % is not a %type, % is not an %type]
-..as ((type of %) == %type)
+..as ((type of %) != %type)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

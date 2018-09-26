@@ -26,6 +26,7 @@ as_lua = =>
 -- List and Dict classes to provide basic equality/tostring functionality for the tables
 -- used in Nomsu. This way, they retain a notion of whether they were originally lists or dicts.
 _list_mt =
+    __type: "List"
     __eq:equivalent
     -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
     __tostring: =>
@@ -96,6 +97,7 @@ walk_items = (i)=>
         return i, Dict{key:k, value:v}
 
 _dict_mt =
+    __type: "Dict"
     __eq:equivalent
     __len:size
     __tostring: =>

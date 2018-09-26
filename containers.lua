@@ -48,6 +48,7 @@ as_lua = function(self)
   return error("Not supported: " .. tostring(self))
 end
 local _list_mt = {
+  __type = "List",
   __eq = equivalent,
   __tostring = function(self)
     return "[" .. concat((function()
@@ -231,6 +232,7 @@ walk_items = function(self, i)
   end
 end
 local _dict_mt = {
+  __type = "Dict",
   __eq = equivalent,
   __len = size,
   __tostring = function(self)

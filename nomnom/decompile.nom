@@ -45,9 +45,10 @@ action [decompile %tree inline]:
 
         "Block":
             %nomsu = (Nomsu Code from %tree [":"])
-            for i,line in ipairs tree
-                %nomsu::add(i == 1 and " " or "; ")
-                %nomsu::add recurse(line, nomsu, i == 1 or i < #tree)
+            for %line in %tree at %i:
+                %nomsu::add [..]
+                    " " if (%i == 1) else "; "
+                    decompile %line inline
             return %nomsu
 
         "Text":
@@ -100,12 +101,12 @@ action [decompile %tree inline]:
         "IndexChain":
             %nomsu = (Nomsu Code from %tree)
             for %bit in %tree at %i:
-                if (%i > 1): nomsu::add "."
+                if (%i > 1): %nomsu::add "."
                 if (..)
                     all of [..]
                         %i > 1, %bit.type == "Text", (size of %bit) == 1, %bit.1 is text,
                         %bit.1::is a nomsu identifier
-                    %nomsu::add %bit.1
+                ..:%nomsu::add %bit.1
                 ..else:
                     %bit_nomsu = (decompile %bit inline)
                     if (..)
@@ -261,7 +262,7 @@ action [decompile %tree]:
                         %bit = (escape text %bit)
                         for %line in (%bit::lines) at %j:
                             if:
-                                (%j > 1): nomsu::add "\n"
+                                (%j > 1): %nomsu::add "\n"
                                 (((size of %line) > 10) and ((%nomsu::trailing line length) > %max_line)):
                                     %nomsu::add "\\\n.."
 
@@ -304,14 +305,14 @@ action [decompile %tree]:
                     %item_nomsu = (recurse on %item_nomsu)
                 %nomsu::add %item_nomsu
                 if (%i < (size of %tree)):
-                    if (..)
-                        (%item_nomsu::is multi-line) or (..)
-                            (%nomsu::trailing line length) + (size of "\%item_nomsu")) >= %MAX_LINE
+                    if any of [..]
+                        %item_nomsu::is multi-line
+                        ((%nomsu::trailing line length) + (size of "\%item_nomsu")) >= %MAX_LINE
                     ..: %nomsu::add "\n"
                     ..else: %nomsu::add ", "
             return (..)
                 Nomsu Code from %tree [..]
-                    "[..]\n    " if tree.type == "List" else "{..}\n    "
+                    "[..]\n    " if (%tree.type == "List") else "{..}\n    "
                     %nomsu
         
         "DictEntry":

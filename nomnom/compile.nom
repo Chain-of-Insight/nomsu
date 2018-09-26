@@ -140,7 +140,7 @@ action [compile %tree using %compile_actions]:
                     ..Can't use this as a dict key, since it's not an expression."
             %value_lua = (..)
                 (compile %value using %compile_actions) if %value
-                ..else (Lua Value from %key ["true"]))
+                ..else (Lua Value from %key ["true"])
             unless %value_lua.is_value:
                 compile error at %tree.2 "\
                     ..Can't use this as a dict value, since it's not an expression."

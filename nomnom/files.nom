@@ -82,9 +82,6 @@ try:
 ..or if it barfs:
     # LFS not found! Fall back to shell commands, if available.
     unless (sh> "find . -maxdepth 0"):
-        url = if jit
-            'https://github.com/spacewander/luafilesystem'
-        else 
         barf "\
             ..Could not find 'luafilesystem' module and couldn't run system command 'find' \
             ..(this might happen on Windows). Please install 'luafilesystem' (which can be \

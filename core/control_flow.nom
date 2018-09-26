@@ -72,6 +72,8 @@ compile [..]
                     end
                 end)())"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # GOTOs
 test:
     %i = 0
@@ -84,9 +86,10 @@ test:
     unless (%i == 0): go to (Loop)
     assume (%i == 0)
 compile [=== %label ===, --- %label ---, *** %label ***] to (..)
-    Lua "::label_\(%label as lua identifier)::"
+    Lua "::label_\((%label.stub if (%label.type == "Action") else %label) as lua identifier)::"
 
-compile [go to %label] to (Lua "goto label_\(%label as lua identifier)")
+compile [go to %label] to (..)
+    Lua "goto label_\((%label.stub if (%label.type == "Action") else %label) as lua identifier)"
 
 # Basic loop control
 compile [do next] to (Lua "goto continue")
@@ -165,13 +168,15 @@ compile [repeat %n times %body] to:
     return %lua
 
 # For loop control flow
-compile [stop %var] to (Lua "goto stop_\(%var as lua identifier)")
-compile [do next %var] to (Lua "goto continue_\(%var as lua identifier)")
+compile [stop %var] to (..)
+    Lua "goto stop_\((%var.stub if (%var.type == "Action") else %var) as lua identifier)"
+compile [do next %var] to (..)
+    Lua "goto continue_\((%var.stub if (%var.type == "Action") else %var) as lua identifier)"
 compile [===stop %var ===, ---stop %var ---, ***stop %var ***] to (..)
-    Lua "::stop_\(%var as lua identifier)::"
+    Lua "::stop_\((%var.stub if (%var.type == "Action") else %var) as lua identifier)::"
 
 compile [===next %var ===, ---next %var ---, ***next %var ***] to (..)
-    Lua "::continue_\(%var as lua identifier)::"
+    Lua "::continue_\((%var.stub if (%var.type == "Action") else %var) as lua identifier)::"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -516,11 +521,11 @@ test:
     %t = [1, [2, [[3], 4], 5, [[[6]]]]]
     %flat = []
     for % in recursive %t:
-        if ((type of %) is "table"):
+        if ((lua type of %) is "table"):
             for %2 in %: recurse % on %2
         ..else: %flat::add %
     
-    assume ((sorted %flat) == [1, 2, 3, 4, 5, 6])
+    assume (sorted %flat) == [1, 2, 3, 4, 5, 6]
 
 # Recurion control flow
 compile [for %var in recursive %structure %body] to (..)

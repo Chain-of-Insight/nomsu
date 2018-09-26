@@ -80,9 +80,9 @@ compile [object %classname extends %parent %class_body] to:
         Lua "\
             ..do
                 local class = {name=\(quote %classname.stub)}
+                class.__type = class.name
                 setmetatable(class, {
                     __index=\(%parent as lua expr),
-                    __type=class.name,
                     __tostring=function(cls) return cls.name end,
                     __call=function(cls, inst)
                         inst = setmetatable(inst or {}, cls)
