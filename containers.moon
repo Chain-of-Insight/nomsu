@@ -181,6 +181,7 @@ do
     
     setmetatable(text_methods, {__index:string2})
 
+    getmetatable("").__methods = text_methods
     getmetatable("").__index = (i)=>
         -- Use [] for accessing text characters, or s[{3,4}] for s:sub(3,4)
         if type(i) == 'number' then return sub(@, i, i)

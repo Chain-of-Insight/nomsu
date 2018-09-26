@@ -455,6 +455,7 @@ do
   setmetatable(text_methods, {
     __index = string2
   })
+  getmetatable("").__methods = text_methods
   getmetatable("").__index = function(self, i)
     if type(i) == 'number' then
       return sub(self, i, i)
