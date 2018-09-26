@@ -398,7 +398,8 @@ with NomsuCompiler
         switch tree.type
             when "Action"
                 stub = tree.stub
-                if compile_action = compile_actions[stub]
+                compile_action = compile_actions[stub]
+                if compile_action and not tree.target
                     args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force Lua to avoid tail call optimization for debugging purposes
                     -- TODO: use tail call?
@@ -551,9 +552,8 @@ with NomsuCompiler
                 unless value_lua.is_value
                     @compile_error tree[2],
                         "Can't use this as a dict value, since it's not an expression."
-                -- TODO: support arbitrary words here, like operators and unicode
                 key_str = match(tostring(key_lua), [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
-                return if key_str
+                return if key_str and key_str\is_lua_id!
                     LuaCode tree.source, key_str,"=",value_lua
                 elseif sub(tostring(key_lua),1,1) == "["
                     -- NOTE: this *must* use a space after the [ to avoid freaking out
@@ -579,7 +579,8 @@ with NomsuCompiler
                         @compile_error key,
                             "Can't use this as an index, since it's not an expression."
                     key_lua_str = tostring(key_lua)
-                    if lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
+                    lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
+                    if lua_id and lua_id\is_lua_id!
                         lua\append ".#{lua_id}"
                     elseif sub(key_lua_str,1,1) == '['
                         -- NOTE: this *must* use a space after the [ to avoid freaking out

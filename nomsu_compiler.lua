@@ -687,38 +687,36 @@ do
     local _exp_0 = tree.type
     if "Action" == _exp_0 then
       local stub = tree.stub
-      do
-        local compile_action = compile_actions[stub]
-        if compile_action then
-          local args
-          do
-            local _accum_0 = { }
-            local _len_0 = 1
-            for _index_0 = 1, #tree do
-              local arg = tree[_index_0]
-              if type(arg) ~= "string" then
-                _accum_0[_len_0] = arg
-                _len_0 = _len_0 + 1
-              end
+      local compile_action = compile_actions[stub]
+      if compile_action and not tree.target then
+        local args
+        do
+          local _accum_0 = { }
+          local _len_0 = 1
+          for _index_0 = 1, #tree do
+            local arg = tree[_index_0]
+            if type(arg) ~= "string" then
+              _accum_0[_len_0] = arg
+              _len_0 = _len_0 + 1
             end
-            args = _accum_0
           end
-          local ret = compile_action(self, tree, unpack(args))
-          if ret == nil then
+          args = _accum_0
+        end
+        local ret = compile_action(self, tree, unpack(args))
+        if ret == nil then
+          local info = debug.getinfo(compile_action, "S")
+          local filename = Source:from_string(info.source).filename
+          self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
+        end
+        if AST.is_syntax_tree(ret) then
+          if ret == tree then
             local info = debug.getinfo(compile_action, "S")
             local filename = Source:from_string(info.source).filename
-            self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
+            self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") is producing an endless loop.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's not just returning the original tree.")
           end
-          if AST.is_syntax_tree(ret) then
-            if ret == tree then
-              local info = debug.getinfo(compile_action, "S")
-              local filename = Source:from_string(info.source).filename
-              self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") is producing an endless loop.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's not just returning the original tree.")
-            end
-            return self:compile(ret, compile_actions)
-          end
-          return ret
+          return self:compile(ret, compile_actions)
         end
+        return ret
       end
       local lua = LuaCode.Value(tree.source)
       if tree.target then
@@ -929,7 +927,7 @@ do
         self:compile_error(tree[2], "Can't use this as a dict value, since it's not an expression.")
       end
       local key_str = match(tostring(key_lua), [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
-      if key_str then
+      if key_str and key_str:is_lua_id() then
         return LuaCode(tree.source, key_str, "=", value_lua)
       elseif sub(tostring(key_lua), 1, 1) == "[" then
         return LuaCode(tree.source, "[ ", key_lua, "]=", value_lua)
@@ -952,15 +950,13 @@ do
           self:compile_error(key, "Can't use this as an index, since it's not an expression.")
         end
         local key_lua_str = tostring(key_lua)
-        do
-          local lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
-          if lua_id then
-            lua:append("." .. tostring(lua_id))
-          elseif sub(key_lua_str, 1, 1) == '[' then
-            lua:append("[ ", key_lua, " ]")
-          else
-            lua:append("[", key_lua, "]")
-          end
+        local lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
+        if lua_id and lua_id:is_lua_id() then
+          lua:append("." .. tostring(lua_id))
+        elseif sub(key_lua_str, 1, 1) == '[' then
+          lua:append("[ ", key_lua, " ]")
+        else
+          lua:append("[", key_lua, "]")
         end
       end
       return lua
