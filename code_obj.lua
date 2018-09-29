@@ -78,7 +78,7 @@ do
   local _class_0
   local _base_0 = {
     is_code = true,
-    __tostring = function(self)
+    as_smext = function(self)
       if self.__str == nil then
         local buff, indent = { }, 0
         local match, gsub, rep
@@ -95,7 +95,7 @@ do
               end
             end
           else
-            b = tostring(b)
+            b = b:as_smext()
             if indent > 0 then
               b = gsub(b, "\n", "\n" .. rep(" ", indent))
             end
@@ -105,6 +105,9 @@ do
         self.__str = concat(buff, "")
       end
       return self.__str
+    end,
+    __tostring = function(self)
+      return self:as_smext()
     end,
     as_lua = function(self)
       return tostring(self.__class.__name) .. "(" .. tostring(concat({
@@ -123,13 +126,13 @@ do
       }, ", ")) .. ")"
     end,
     __len = function(self)
-      return #tostring(self)
+      return #self:as_smext()
     end,
     match = function(self, ...)
-      return tostring(self):match(...)
+      return self:as_smext():match(...)
     end,
     gmatch = function(self, ...)
-      return tostring(self):gmatch(...)
+      return self:as_smext():gmatch(...)
     end,
     dirty = function(self)
       self.__str = nil
@@ -155,9 +158,6 @@ do
           if b.is_code then
             b.dirty = error
           end
-          if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
-            b = b:as_lua()
-          end
           bits[#bits + 1] = b
           _continue_0 = true
         until true
@@ -169,7 +169,7 @@ do
     end,
     trailing_line_len = function(self)
       if self._trailing_line_len == nil then
-        self._trailing_line_len = #tostring(self):match("[^\n]*$")
+        self._trailing_line_len = #self:as_smext():match("[^\n]*$")
       end
       return self._trailing_line_len
     end,
@@ -212,7 +212,9 @@ do
         if b.is_code then
           b.dirty = error
         end
-        b = tostring(b)
+        if not (type(b) == 'string') then
+          b = b:as_smext()
+        end
         local line = match(b, "\n([^\n]*)$")
         if line then
           line_len = #line
@@ -233,9 +235,6 @@ do
         if b.is_code then
           b.dirty = error
         end
-        if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
-          b = b:as_lua()
-        end
         bits[i] = b
       end
       return self:dirty()
@@ -253,7 +252,6 @@ do
       if type(self.source) == 'string' then
         self.source = Source:from_string(self.source)
       end
-      assert(self.source and Source:is_instance(self.source), "Source has the wrong type")
       return self:append(...)
     end,
     __base = _base_0,
@@ -402,8 +400,9 @@ do
             end
           else
             walk(b, pos)
+            b = b:as_smext()
           end
-          pos = pos + #tostring(b)
+          pos = pos + #b
         end
       end
       walk(self, 1)

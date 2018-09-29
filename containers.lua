@@ -216,6 +216,8 @@ local _list_mt = {
     return rawset(self, k, v)
   end
 }
+_list_mt.__index.as_lua = _list_mt.as_lua
+_list_mt.__index.as_nomsu = _list_mt.as_nomsu
 List = function(t)
   return setmetatable(t, _list_mt)
 end

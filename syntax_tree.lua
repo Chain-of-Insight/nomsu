@@ -11,7 +11,7 @@ AST.is_syntax_tree = function(n, t)
   if t == nil then
     t = nil
   end
-  return type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
+  return type(n) == 'table' and getmetatable(n) and getmetatable(n).__type == "Syntax Tree" and (t == nil or n.type == t)
 end
 local as_lua
 as_lua = function(self)
@@ -54,6 +54,7 @@ for _index_0 = 1, #types do
     cls.__index = cls
     cls.__name = name
     cls.type = name
+    cls.__type = "Syntax Tree"
     cls.is_instance = function(self, x)
       return getmetatable(x) == self
     end
