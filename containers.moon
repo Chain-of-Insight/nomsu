@@ -13,7 +13,7 @@ as_nomsu = =>
     if mt = getmetatable(@)
         if _as_nomsu = mt.as_nomsu
             return _as_nomsu(@)
-    error("Not supported: #{@}")
+    return tostring(@)
 
 as_lua = =>
     if type(@) == 'number'
@@ -21,16 +21,17 @@ as_lua = =>
     if mt = getmetatable(@)
         if _as_lua = mt.as_lua
             return _as_lua(@)
-    error("Not supported: #{@}")
+    return tostring(@)
 
 -- List and Dict classes to provide basic equality/tostring functionality for the tables
 -- used in Nomsu. This way, they retain a notion of whether they were originally lists or dicts.
+
 _list_mt =
     __type: "List"
     __eq:equivalent
     -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
     __tostring: =>
-        "["..concat([tostring(b) for b in *@], ", ").."]"
+        "["..concat([as_nomsu(b) for b in *@], ", ").."]"
     as_nomsu: =>
         "["..concat([as_nomsu(b) for b in *@], ", ").."]"
     as_lua: =>
@@ -77,7 +78,7 @@ _list_mt =
                 if x == item
                     return i
             return nil
-        slice_1_to_2: (start, stop)=>
+        from_1_to_2: (start, stop)=>
             n = #@
             start = (n+1-start) if n < 0
             stop = (n+1-stop) if n < 0
@@ -101,7 +102,7 @@ _dict_mt =
     __eq:equivalent
     __len:size
     __tostring: =>
-        "{"..concat(["#{tostring(k)}: #{tostring(v)}" for k,v in pairs @], ", ").."}"
+        "{"..concat(["#{as_nomsu(k)}: #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_nomsu: =>
         "{"..concat(["#{as_nomsu(k)}: #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_lua: =>

@@ -27,7 +27,7 @@ as_nomsu = function(self)
       end
     end
   end
-  return error("Not supported: " .. tostring(self))
+  return tostring(self)
 end
 local as_lua
 as_lua = function(self)
@@ -45,7 +45,7 @@ as_lua = function(self)
       end
     end
   end
-  return error("Not supported: " .. tostring(self))
+  return tostring(self)
 end
 local _list_mt = {
   __type = "List",
@@ -56,7 +56,7 @@ local _list_mt = {
       local _len_0 = 1
       for _index_0 = 1, #self do
         local b = self[_index_0]
-        _accum_0[_len_0] = tostring(b)
+        _accum_0[_len_0] = as_nomsu(b)
         _len_0 = _len_0 + 1
       end
       return _accum_0
@@ -194,7 +194,7 @@ local _list_mt = {
       end
       return nil
     end,
-    slice_1_to_2 = function(self, start, stop)
+    from_1_to_2 = function(self, start, stop)
       local n = #self
       if n < 0 then
         start = (n + 1 - start)
@@ -240,7 +240,7 @@ local _dict_mt = {
       local _accum_0 = { }
       local _len_0 = 1
       for k, v in pairs(self) do
-        _accum_0[_len_0] = tostring(tostring(k)) .. ": " .. tostring(tostring(v))
+        _accum_0[_len_0] = tostring(as_nomsu(k)) .. ": " .. tostring(as_nomsu(v))
         _len_0 = _len_0 + 1
       end
       return _accum_0
