@@ -129,12 +129,13 @@ compile [repeat while %condition %body] to:
         %lua::append "\n    ::continue_repeat::"
     %lua::append "\nend --while-loop"
     if (%body has subtree \(stop repeating)):
-        %lua = (..)
-            Lua "\
-                ..do -- scope of "stop repeating" label
-                    \%lua
+        %inner_lua = %lua
+        %lua = (Lua "do -- scope of 'stop repeating' label\n    ")
+        %lua::append %inner_lua
+        %lua::append "\
+                ..
                     ::stop_repeat::
-                end -- end of "stop repeating" label scope"
+                end -- end of 'stop repeating' label scope"
     
     return %lua
 
@@ -158,12 +159,13 @@ compile [repeat %n times %body] to:
         %lua::append "\n    ::continue_repeat::"
     %lua::append "\nend --numeric for-loop"
     if (%body has subtree \(stop repeating)):
-        %lua = (..)
-            Lua "\
-                ..do -- scope of "stop repeating" label
-                    \%lua
+        %inner_lua = %lua
+        %lua = (Lua "do -- scope of 'stop repeating' label\n    ")
+        %lua::append %inner_lua
+        %lua::append "\
+                ..
                     ::stop_repeat::
-                end -- end of "stop repeating" label scope"
+                end -- end of 'stop repeating' label scope"
     
     return %lua
 
@@ -220,12 +222,12 @@ compile [..]
         %lua::append "\n    \(compile as (===next %var ===))"
     %lua::append "\nend --numeric for-loop"
     if (%body has subtree \(stop %var)):
-        %lua = (..)
-            Lua "\
-                ..do -- scope for stopping for-loop
-                    \%lua
-                    \(compile as (===stop %var ===))
-                end -- end of scope for stopping for-loop"
+        %inner_lua = %lua
+        %lua = (Lua "do -- scope for stopping for-loop\n    ")
+        %lua::append %inner_lua
+        %lua::append "\n    "
+        %lua::append (compile as (===stop %var ===))
+        %lua::append "\nend -- end of scope for stopping for-loop"
     
     return %lua
 
@@ -262,12 +264,12 @@ compile [for %var in %iterable %body] to:
         %lua::append (Lua "\n\(compile as (===next %var ===))")
     %lua::append "\nend --foreach-loop"
     if (%body has subtree \(stop %var)):
-        %lua = (..)
-            Lua "\
-                ..do -- scope for stopping for-loop
-                    \%lua
-                    \(compile as (===stop %var ===))
-                end -- end of scope for stopping for-loop"
+        %inner_lua = %lua
+        %lua = (Lua "do -- scope for stopping for-loop\n    ")
+        %lua::append %inner_lua
+        %lua::append "\n    "
+        %lua::append (compile as (===stop %var ===))
+        %lua::append "\nend -- end of scope for stopping for-loop"
     
     return %lua
 
@@ -285,12 +287,12 @@ compile [for %var in %iterable at %i %body] to:
         %lua::append (Lua "\n\(compile as (===next %var ===))")
     %lua::append "\nend --foreach-loop"
     if (%body has subtree \(stop %var)):
-        %lua = (..)
-            Lua "\
-                ..do -- scope for stopping for-loop
-                    \%lua
-                    \(compile as (===stop %var ===))
-                end -- end of scope for stopping for-loop"
+        %inner_lua = %lua
+        %lua = (Lua "do -- scope for stopping for-loop\n    ")
+        %lua::append %inner_lua
+        %lua::append "\n    "
+        %lua::append (compile as (===stop %var ===))
+        %lua::append "\nend -- end of scope for stopping for-loop"
     
     return %lua
 
@@ -333,11 +335,11 @@ compile [..]
     if (%body has subtree \(stop %value)):
         %stop_labels::append "\n\(compile as (===stop %value ===))"
     if ((size of "\%stop_labels") > 0):
-        %lua = (..)
-            Lua "\
-                ..do -- scope for stopping for % = % loop
-                    \%lua\%stop_labels
-                end"
+        %inner_lua = %lua
+        %lua = (Lua "do -- scope for stopping for % = % loop\n    ")
+        %lua::append %inner_lua
+        %lua::append %stop_labels
+        %lua::append "\nend"
     
     return %lua
 
@@ -384,11 +386,8 @@ compile [if %body, when %body] to:
                     ..need a conditional block around it. Otherwise, make sure the 'else' \
                     ..block comes last."
             
-            %code::append "\
-                ..
-                else
-                    \(%action as lua statements)"
-            
+            %code::append "\nelse\n    "
+            %code::append (%action as lua statements)
             %else_allowed = (no)
         ..else:
             %code::append "\%clause "
@@ -397,10 +396,8 @@ compile [if %body, when %body] to:
                     %code::append " or "
                 %code::append (%line.%i as lua expr)
             
-            %code::append "\
-                .. then
-                    \(%action as lua statements)"
-            
+            %code::append " then\n    "
+            %code::append (%action as lua statements)
             %clause = "\nelseif"
     
     if ((size of "\%code") == 0):
@@ -449,11 +446,8 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
                     ..need a conditional block around it. Otherwise, make sure the 'else' \
                     ..block comes last."
             
-            %code::append "\
-                ..
-                else
-                    \(%action as lua statements)"
-            
+            %code::append "\nelse\n    "
+            %code::append (%action as lua statements)
             %else_allowed = (no)
         ..else:
             %code::append "\%clause "
@@ -462,22 +456,22 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
                     %code::append " or "
                 %code::append "\(mangle "branch value") == \(%line.%i as lua expr)"
             
-            %code::append "\
-                .. then
-                    \(%action as lua statements)"
-            
+            %code::append " then\n    "
+            %code::append (%action as lua statements)
             %clause = "\nelseif"
     
     if ((size of "\%code") == 0):
         compile error at %body "'if' block has an empty body."
         ..hint "This means nothing would happen, so the 'if' block should be deleted."
     %code::append "\nend --when"
-    return (..)
+    %lua = (..)
         Lua "\
-            ..do --if % is
-                local \(mangle "branch value") = \(%branch_value as lua expr)
-                \%code
-            end --if % is"
+            ..do --if % is...
+                local \(mangle "branch value") = \(%branch_value as lua expr)"
+    %lua::append "\n    "
+    %lua::append %code
+    %lua::append "\nend --if % is..."
+    return %lua
 
 # Do/finally
 compile [do %action] to (..)
