@@ -6,7 +6,7 @@ unpack or= table.unpack
 
 AST = {}
 AST.is_syntax_tree = (n, t=nil)->
-    type(n) == 'table' and getmetatable(n) and AST[n.type] == getmetatable(n) and (t == nil or n.type == t)
+    type(n) == 'table' and getmetatable(n) and getmetatable(n).__type == "Syntax Tree" and (t == nil or n.type == t)
 
 as_lua = =>
     if type(@) == 'number'
@@ -25,6 +25,7 @@ for name in *types
         .__index = cls
         .__name = name
         .type = name
+        .__type = "Syntax Tree"
         .is_instance = (x)=> getmetatable(x) == @
         .__tostring = =>
             bits = [tostring(b) for b in *@]

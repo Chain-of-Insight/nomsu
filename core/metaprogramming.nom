@@ -23,7 +23,7 @@ lua> "\
     ..COMPILE_ACTIONS["1 -> 2"] = function(nomsu, tree, \%args, \%body)
         local lua = LuaCode.Value(tree.source, "(function(")
         if AST.is_syntax_tree(\%args, "Action") then \%args = \%args:get_args() end
-        local lua_args = table.map(\%args, function(a) return AST.is_syntax_tree(a) and tostring(nomsu:compile(a)) or a end)
+        local lua_args = table.map(\%args, function(a) return AST.is_syntax_tree(a) and nomsu:compile(a):as_smext() or a end)
         lua:concat_append(lua_args, ", ")
         local body_lua = AST.is_syntax_tree(\%body) and nomsu:compile(\%body):as_statements("return ") or \%body
         body_lua:remove_free_vars(lua_args)
@@ -64,14 +64,14 @@ test:
     assume (%tmp is (nil)) or barf "compile to is leaking variables"
 lua> "\
     ..COMPILE_ACTIONS["compile 1 to 2"] = function(nomsu, tree, \%actions, \%body)
-        local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(\
-    ..a)) end))}
+        local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return nomsu:compile(\
+    ..a):as_smext() end))}
         local lua = LuaCode(tree.source, "COMPILE_ACTIONS[", \%actions[1].stub:as_lua(),
             "] = ", \(compile as (%args -> %body)))
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return tostring(nomsu:compile(\
-    ..a)) end))}
+            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return nomsu:compile(\
+    ..a):as_smext() end))}
             lua:append("\\nCOMPILE_ACTIONS[", alias.stub:as_lua(), "] = ")
             if utils.equivalent(\%args, \%alias_args) then
                 lua:append("COMPILE_ACTIONS[", \%actions[1].stub:as_lua(), "]")
@@ -114,14 +114,14 @@ test:
 compile [local action %actions %body] to:
     lua> "\
         ..local fn_name = \%actions[1].stub:as_lua_id()
-        local \%args = table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end)
+        local \%args = table.map(\%actions[1]:get_args(), function(a) return nomsu:compile(a):as_smext() end)
         local lua = LuaCode(tree.source, fn_name, " = ", \(compile as (%args -> %body)))
         lua:add_free_vars({fn_name})
         for i=2,#\%actions do
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
             lua:add_free_vars({alias_name})
-            local \%alias_args = table.map(alias:get_args(), function(a) return tostring(nomsu:compile(a)) end)
+            local \%alias_args = table.map(alias:get_args(), function(a) return nomsu:compile(a):as_smext() end)
             lua:append("\\n", alias_name, " = ")
             if utils.equivalent(\%args, \%alias_args) then
                 lua:append(fn_name)
@@ -170,7 +170,7 @@ compile [parse %actions as %body] to (..)
     lua> "\
         ..local replacements = {}
         for i,arg in ipairs(\%actions[1]:get_args()) do
-            replacements[arg[1]] = tostring(nomsu:compile(arg))
+            replacements[arg[1]] = nomsu:compile(arg):as_smext()
         end
         local function make_tree(t)
             if AST.is_syntax_tree(t, "Var") then
@@ -239,7 +239,7 @@ action [%var as lua identifier, %var as lua id] (..)
         elseif AST.is_syntax_tree(\%var, 'Var') then return \%var[1]:as_lua_id()
         elseif AST.is_syntax_tree(\%var) then
             local lua = \(%var as lua expr)
-            if not tostring(lua):match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
+            if not lua:as_smext():match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
                 nomsu:compile_error(\%var, "This is not a valid Lua identifier.")
             end
             return lua

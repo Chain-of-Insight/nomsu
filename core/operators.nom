@@ -34,7 +34,7 @@ compile [%var = %value] to:
     lua> "\
         ..local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
         if \%var.type == 'Var' then
-            lua:add_free_vars({tostring(nomsu:compile(\%var))})
+            lua:add_free_vars({nomsu:compile(\%var):as_smext()})
         end
         return lua"
 
@@ -66,7 +66,7 @@ compile [set %assignments] to:
             %value as text
         ..) end
             if \%target.type == "Var" then
-                lhs:add_free_vars({tostring(target_lua)})
+                lhs:add_free_vars({target_lua:as_smext()})
             end
             if i > 1 then
                 lhs:append(", ")
@@ -107,7 +107,7 @@ test:
 compile [with external %externs %body] to:
     %body_lua = (%body as lua statements)
     lua> "\
-        ..\%body_lua:remove_free_vars(table.map(\%externs, function(v) return tostring(nomsu:compile(v)) end))"
+        ..\%body_lua:remove_free_vars(table.map(\%externs, function(v) return nomsu:compile(v):as_smext() end))"
     return %body_lua
 
 test:
@@ -141,7 +141,7 @@ compile [with %assignments %body] to:
             lhs:append(target_lua)
             rhs:append(value_lua)
             if \%target.type == "Var" then
-                vars[i] = tostring(target_lua)
+                vars[i] = target_lua:as_smext()
             end
         end
         \%lua:remove_free_vars(vars)

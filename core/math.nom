@@ -72,21 +72,21 @@ action [%n to the nearest %rounder] (..)
 compile [all of %items, all %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.all(\(%items as lua expr))")
-    %clauses = ((% as lua expr) for % in %items)
+    %clauses = (((% as lua expr)::as smext) for % in %items)
     return (Lua value "(\(%clauses::joined with " and "))")
 
 parse [not all of %items, not all %items] as (not (all of %items))
 compile [any of %items, any %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.any(\(%items as lua expr))")
-    %clauses = ((% as lua expr) for % in %items)
+    %clauses = (((% as lua expr)::as smext) for % in %items)
     return (Lua value "(\(%clauses::joined with " or "))")
 
 parse [none of %items, none %items] as (not (any of %items))
 compile [sum of %items, sum %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.sum(\(%items as lua expr))")
-    %clauses = ((% as lua expr) for % in %items)
+    %clauses = (((% as lua expr)::as smext) for % in %items)
     return (Lua value "(\(%clauses::joined with " + "))")
 
 parse [if all of %items %body, if all of %items then %body] as (..)
@@ -118,7 +118,7 @@ parse [unless none of %items %body else %else, unless none of %items then %body 
 compile [product of %items, product %items] to:
     unless (%items.type is "List"):
         return (Lua value "utils.product(\(%items as lua expr))")
-    %clauses = ((% as lua expr) for % in %items)
+    %clauses = (((% as lua expr)::as smext) for % in %items)
     return (Lua value "(\(%clauses::joined with " * "))")
 
 action [avg of %items, average of %items] (=lua "(utils.sum(\%items)/#\%items)")

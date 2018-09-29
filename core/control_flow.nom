@@ -16,11 +16,13 @@ compile [do nothing] to (Lua "")
 test:
     if (no):
         barf "conditional fail"
-compile [if %condition %if_body] to (..)
-    Lua "\
-        ..if \(%condition as lua expr) then
-            \(%if_body as lua statements)
-        end"
+compile [if %condition %if_body] to:
+    %lua = (Lua "if ")
+    %lua::append (%condition as lua expr)
+    %lua::append " then\n    "
+    %lua::append (%if_body as lua statements)
+    %lua::append "\nend"
+    return %lua
 
 test:
     unless (yes):
@@ -28,13 +30,15 @@ test:
 parse [unless %condition %unless_body] as (if (not %condition) %unless_body)
 compile [..]
     if %condition %if_body else %else_body, unless %condition %else_body else %if_body
-..to (..)
-    Lua "\
-        ..if \(%condition as lua expr) then
-            \(%if_body as lua statements)
-        else
-            \(%else_body as lua statements)
-        end"
+..to:
+    %lua = (Lua "if ")
+    %lua::append (%condition as lua expr)
+    %lua::append " then\n    "
+    %lua::append (%if_body as lua statements)
+    %lua::append "\nelse\n    "
+    %lua::append (%else_body as lua statements)
+    %lua::append "\nend"
+    return %lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -149,9 +153,8 @@ test:
 compile [repeat %n times %body] to:
     define mangler
     %lua = (..)
-        Lua "\
-            ..for \(mangle "i")=1,\(%n as lua expr) do
-                \(%body as lua statements)"
+        Lua "for \(mangle "i")=1,\(%n as lua expr) do\n    "
+    %lua::append (%body as lua statements)
     
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
@@ -208,18 +211,20 @@ compile [..]
 ..to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
-        compile error at %var "Expected a variable here, not a \(%var.type)."
+        compile error at %var "Expected a variable here, not a \(%var.type)"
     %lua = (..)
         Lua "\
             ..for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(..)
                 %step as lua expr
-            .. do
-                \(%body as lua statements)"
+            .. do"
+    %lua::append "\n    "
+    %lua::append (%body as lua statements)
     
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %var)):
-        %lua::append "\n    \(compile as (===next %var ===))"
+        %lua::append "\n    "
+        %lua::append (compile as (===next %var ===))
     %lua::append "\nend --numeric for-loop"
     if (%body has subtree \(stop %var)):
         %inner_lua = %lua
@@ -254,14 +259,14 @@ compile [for %var in %iterable %body] to:
     define mangler
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     %lua = (..)
-        Lua "\
-            ..for \(mangle "i"),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
-                \(%body as lua statements)"
+        Lua "for \(mangle "i"),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do\n    "
+    %lua::append (%body as lua statements)
     
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %var)):
-        %lua::append (Lua "\n\(compile as (===next %var ===))")
+        %lua::append "\n    "
+        %lua::append (compile as (===next %var ===))
     %lua::append "\nend --foreach-loop"
     if (%body has subtree \(stop %var)):
         %inner_lua = %lua
@@ -277,14 +282,14 @@ compile [for %var in %iterable %body] to:
 compile [for %var in %iterable at %i %body] to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     %lua = (..)
-        Lua "\
-            ..for \(%i as lua identifier),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
-                \(%body as lua statements)"
+        Lua "for \(%i as lua identifier),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do\n    "
+    %lua::append (%body as lua statements)
     
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %var)):
-        %lua::append (Lua "\n\(compile as (===next %var ===))")
+        %lua::append "\n    "
+        %lua::append (compile as (===next %var ===))
     %lua::append "\nend --foreach-loop"
     if (%body has subtree \(stop %var)):
         %inner_lua = %lua
@@ -312,28 +317,33 @@ compile [..]
 ..to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%key.type is "Var"):
-        compile error at %key "Expected a variable here, not a \(%key.type)."
+        compile error at %key "Expected a variable here, not a \(%key.type)"
     unless (%value.type is "Var"):
-        compile error at %value "Expected a variable here, not a \(%value.type)."
+        compile error at %value "Expected a variable here, not a \(%value.type)"
     %lua = (..)
         Lua "\
             ..for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(..)
                 %iterable as lua expr
-            ..) do
-                \(%body as lua statements)"
+            ..) do"
+    %lua::append "\n    "
+    %lua::append (%body as lua statements)
     
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %key)):
-        %lua::append (Lua "\n\(compile as (===next %key ===))")
+        %lua::append "\n    "
+        %lua::append (compile as (===next %key ===))
     if (%body has subtree \(do next %value)):
-        %lua::append (Lua "\n\(compile as (===next %value ===))")
+        %lua::append "\n    "
+        %lua::append (compile as (===next %value ===))
     %lua::append "\nend --foreach-loop"
     %stop_labels = (Lua "")
     if (%body has subtree \(stop %key)):
-        %stop_labels::append "\n\(compile as (===stop %key ===))"
+        %stop_labels::append "\n"
+        %stop_labels::append (compile as (===stop %key ===))
     if (%body has subtree \(stop %value)):
-        %stop_labels::append "\n\(compile as (===stop %value ===))"
+        %stop_labels::append "\n"
+        %stop_labels::append (compile as (===stop %value ===))
     if ((size of "\%stop_labels") > 0):
         %inner_lua = %lua
         %lua = (Lua "do -- scope for stopping for % = % loop\n    ")
@@ -390,7 +400,8 @@ compile [if %body, when %body] to:
             %code::append (%action as lua statements)
             %else_allowed = (no)
         ..else:
-            %code::append "\%clause "
+            %code::append %clause
+            %code::append " "
             for %i in 1 to ((size of %line) - 1):
                 if (%i > 1):
                     %code::append " or "
@@ -450,11 +461,13 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
             %code::append (%action as lua statements)
             %else_allowed = (no)
         ..else:
-            %code::append "\%clause "
+            %code::append %clause
+            %code::append " "
             for %i in 1 to ((size of %line) - 1):
                 if (%i > 1):
                     %code::append " or "
-                %code::append "\(mangle "branch value") == \(%line.%i as lua expr)"
+                %code::append "\(mangle "branch value") == "
+                %code::append (%line.%i as lua expr)
             
             %code::append " then\n    "
             %code::append (%action as lua statements)
@@ -467,18 +480,19 @@ compile [if %branch_value is %body, when %branch_value is %body] to:
     %lua = (..)
         Lua "\
             ..do --if % is...
-                local \(mangle "branch value") = \(%branch_value as lua expr)"
+                local \(mangle "branch value") = "
+    %lua::append (%branch_value as lua expr)
     %lua::append "\n    "
     %lua::append %code
     %lua::append "\nend --if % is..."
     return %lua
 
 # Do/finally
-compile [do %action] to (..)
-    Lua "\
-        ..do
-            \(%action as lua statements)
-        end --do"
+compile [do %action] to:
+    %lua = (Lua "do\n    ")
+    %lua::append (%action as lua statements)
+    %lua::append "\nend -- do"
+    return %lua
 
 test:
     %d = {}
@@ -492,18 +506,22 @@ test:
     assume (%d.x == "good")
 compile [do %action then always %final_action] to:
     define mangler
-    return (..)
+    %lua = (..)
         Lua "\
             ..do
                 local \(mangle "fell_through") = false
-                local \(mangle "ok"), \(mangle "ret") = pcall(function()
-                    \(%action as lua statements)
-                    \(mangle "fell_through") = true
-                end)
-                \(%final_action as lua statements)
-                if not \(mangle "ok") then error(ret, 0) end
-                if not \(mangle "fell_through") then return ret end
-            end"
+                local \(mangle "ok"), \(mangle "ret") = pcall(function()"
+    %lua::append "\n        "
+    %lua::append (%action as lua statements)
+    %lua::append "\
+        ..        \(mangle "fell_through") = true
+            end)"
+    %lua::append "\n    "
+    %lua::append (%final_action as lua statements)
+    %lua::append "\
+        ..    if not \(mangle "ok") then error(ret, 0) end
+            if not \(mangle "fell_through") then return ret end
+        end"
 
 test:
     assume ((result of (: return 99)) == 99)
@@ -532,8 +550,9 @@ compile [for %var in recursive %structure %body] to (..)
                 ..do
                     local \(mangle "stack \(%var.1)") = _List{\(%structure as lua expr)}
                     while #\(mangle "stack \(%var.1)") > 0 do
-                        \(%var as lua expr) = table.remove(\(mangle "stack \(%var.1)"), 1)
-                        \(%body as lua statements)"
+                        \(%var as lua expr) = table.remove(\(mangle "stack \(%var.1)"), 1)"
+        %lua::append "\n        "
+        %lua::append (%body as lua statements)
         
         if (%body has subtree \(do next)):
             %lua::append "\n        ::continue::"

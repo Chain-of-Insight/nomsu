@@ -87,6 +87,8 @@ _list_mt =
     __newindex: (k,v)=>
         assert type(k) == 'number', "List indices must be numbers"
         rawset(@, k, v)
+_list_mt.__index.as_lua = _list_mt.as_lua
+_list_mt.__index.as_nomsu = _list_mt.as_nomsu
 
 List = (t)-> setmetatable(t, _list_mt)
 

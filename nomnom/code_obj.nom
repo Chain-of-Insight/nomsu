@@ -14,11 +14,10 @@ object (Code):
         for % in %old_bits:
             %me::add %
 
-    %depth = 0
     my action [as text]:
-        external %depth = (%depth + 1)
-        if (%depth > 10):
-            lua> "require('ldt').breakpoint()"
+        barf "Not implemented"
+
+    my action [as smext]:
         if (%me.__str == (nil)):
             set {%buff:[], %indent:0}
             for %bit in %me.bits:
@@ -26,21 +25,21 @@ object (Code):
                     %spaces = (%bit::matching "\n([ ]*)[^\n]*$")
                     if %spaces: %indent = (size of %spaces.1)
                 ..else:
-                    %bit = "\%bit"
+                    %bit = (%bit::as smext)
                     if (%indent > 0):
                         %bit = (%bit::with "\n" -> "\n\(" "::* %indent)")
                 %buff::add %bit
             %me.__str = (%buff::joined)
-        external %depth = (%depth - 1)
         return %me.__str
 
-    my action [as lua] (..)
-        "\(%me.class.name::as lua id)_1_2(\(%me.source::as lua), \(%me.bits::as lua))"
+    my action [as lua]:
+        barf
+        return "\(%me.class.name::as lua id)_from_1_2(\(%me.source::as lua), \(%me.bits::as lua))"
 
     my action [as nomsu] (..)
         "(\(%me.class.name) \(%me.source::as nomsu) \(%me.bits::as nomsu))"
 
-    my action [size] (size of "\%me")
+    my action [size] (size of (%me::as smext))
     
     my action [mark as dirty]:
         %me.__str = (nil)
@@ -52,14 +51,14 @@ object (Code):
             %new_bits = [%new_bits]
         for % in %new_bits:
             if (% == ""): do next %
-            if ((% isn't text) and (% isn't a (Code))):
+            #if ((% isn't text) and (% isn't a (Code))):
                 % = (%::as lua)
             %me.bits::add %
         %me::mark as dirty
     
     my action [trailing line length]:
         if (%me._trailing_line_len == (nil)):
-            %me._trailing_line_len = (size of ("\%me"::matching "[^\n]*$"))
+            %me._trailing_line_len = (size of ((%me::as smext)::matching "[^\n]*$"))
         return %me._trailing_line_len
     
     my action [number of lines]:
@@ -83,7 +82,6 @@ object (Code):
         %line_len = 0
         %bits = %me.bits
         for %value in %values at %i:
-            assume (%value != %me)
             if (%i > 1):
                 if (%line_len > 80):
                     %bits::add %wrapping_joiner
@@ -91,7 +89,9 @@ object (Code):
                 ..else:
                     %bits::add %joiner
             %bits::add %value
-            %line = ("\%value"::matching "\n([^\n]*)$")
+            unless (%value is text):
+                %value = (%value::as smext)
+            %line = (%value::matching "\n([^\n]*)$")
             if %line:
                 %line_len = (size of %line)
             ..else:
@@ -99,7 +99,7 @@ object (Code):
         %me::mark as dirty
     
     my action [prepend %]:
-        if ((% isn't text) and (% isn't a %me.__type)):
+        #if ((% isn't text) and (% isn't a %me.__type)):
             % = (%::as lua)
         %me.bits::add % at index 1
         %me::mark as dirty
@@ -129,29 +129,30 @@ object (Lua Code) extends (Code):
             %removals.%var = (yes)
         
         %stack = [%me]
-        while ((size of %stack) > 0):
+        repeat while ((size of %stack) > 0):
             %lua = (%stack::pop)
             for %i in (size of %lua.free_vars) to 1 by -1:
-                if %removals.(%lua.%free_vars.%i):
-                    %lua.free_vars::remove index %i
+                if %removals.(%lua.free_vars.%i):
+                    lua> "table.remove(\%lua.free_vars, \%i)"
+                    #TODO: reinstate this
+                    #%lua.free_vars::remove at index %i
             for % in %lua.bits:
-                if (% is a "Lua Code"):
+                unless (% is text):
                     %stack::add %
         %me::mark as dirty
 
-    my action [declare locals]:
-        set {%to_declare:[], %seen:{}}
-        for %lua in recursive %me:
-            for %var in %lua.free_vars:
-                unless %seen.%var:
-                    %seen.%var = (yes)
-                    %to_declare::add %var
-            for % in %lua.bits:
-                if (% is a "Lua Code"):
-                    recurse %lua on %
-        return (%me::declare locals %to_declare)
-
+    my action [declare locals] (%me::declare locals (nil))
     my action [declare locals %to_declare]:
+        unless %to_declare:
+            set {%to_declare:[], %seen:{}}
+            for %lua in recursive %me:
+                for %var in %lua.free_vars:
+                    unless %seen.%var:
+                        %seen.%var = (yes)
+                        %to_declare::add %var
+                for % in %lua.bits:
+                    unless (% is text):
+                        recurse %lua on %
         if ((size of %to_declare) > 0):
             %me::remove free vars %to_declare
             %me::prepend "local \(%to_declare::joined with ", ");\n"
@@ -163,11 +164,11 @@ object (Lua Code) extends (Code):
         unless %me.is_value:
             return %me
         %statements = (Lua Code from %me.source [])
-        if (%prefix != ""):
+        if ((%prefix or "") != ""):
             %statements::add %prefix
         %statements::add %me
         if (%suffix != ""):
-            %statements::add %suffix
+            %statements::add (%suffix or ";")
         return %statements
 
     action [Lua Code from %source %bits]:
@@ -176,12 +177,17 @@ object (Lua Code) extends (Code):
         return (..)
             Lua Code {source:%source, bits:%bits, is_value:(no), free_vars:[]}
     action [Lua Code from %source] (Lua Code from %source [])
-    action [Lua Value from %tree %bits]:
+    action [Lua Value from %source %bits]:
         if (%bits is text): %bits = [%bits]
         if (%source is a "Syntax Tree"): %source = %source.source
         return (..)
             Lua Code {source:%source, bits:%bits, is_value:(yes), free_vars:[]}
-    action [Lua Value from %tree] (Lua Value from %tree [])
+    action [Lua Value from %source] (Lua Value from %source [])
+
+(Lua Code).add_free_vars = (Lua Code).add_free_vars_1
+(Lua Code).remove_free_vars = (Lua Code).remove_free_vars_1
+(Lua Code).declare_locals = (Lua Code).declare_locals_1
+(Lua Code).as_statements = (Lua Code).as_statements_1_2
 
 object (Nomsu Code) extends (Code):
     action [Nomsu Code from %source %bits]:

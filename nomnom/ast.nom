@@ -16,6 +16,8 @@ object (Syntax Tree):
                         %stub_bits::add "\%argnum"
                         %argnum += 1
             %me.stub = (%stub_bits::joined with " ")
+            if (%me.stub == "Lua Code 1 2"):
+                lua> "require('ldt').breakpoint()"
 
     (Syntax Tree).source_code_for_tree = (..)
         {} with fallback % -> (read file %.source.filename)
@@ -86,3 +88,4 @@ object (Syntax Tree):
                 %args::add %
         return %args
 
+(Syntax Tree).map = (Syntax Tree).map_1

@@ -266,7 +266,7 @@ action [decompile %tree]:
                                 (((size of %line) > 10) and ((%nomsu::trailing line length) > %max_line)):
                                     %nomsu::add "\\\n.."
 
-                            while ((size of %line) > 0):
+                            repeat while ((size of %line) > 0):
                                 %space = (%max_line - (%nomsu::trailing line length))
                                 %split = (%line::position of "[%p%s]" after %space)
                                 if ((not %split) or (%split > %space + 10)):

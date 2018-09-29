@@ -47,10 +47,10 @@ class Code
         @bits = {}
         if type(@source) == 'string'
             @source = Source\from_string(@source)
-        assert(@source and Source\is_instance(@source), "Source has the wrong type")
+        --assert(@source and Source\is_instance(@source), "Source has the wrong type")
         @append(...)
 
-    __tostring: =>
+    as_smext: =>
         if @__str == nil
             buff, indent = {}, 0
             {:match, :gsub, :rep} = string
@@ -59,21 +59,23 @@ class Code
                     if spaces = match(b, "\n([ ]*)[^\n]*$")
                         indent = #spaces
                 else
-                    b = tostring(b)
+                    b = b\as_smext!
                     if indent > 0
                         b = gsub(b, "\n", "\n"..rep(" ", indent))
                 buff[#buff+1] = b
             @__str = concat(buff, "")
         return @__str
 
+    __tostring: => @as_smext!
+
     as_lua: =>
         "#{@__class.__name}(#{concat {tostring(@source)\as_lua!, unpack([b\as_lua! for b in *@bits])}, ", "})"
 
-    __len: => #tostring(@)
+    __len: => #@as_smext!
     
-    match: (...)=> tostring(@)\match(...)
+    match: (...)=> @as_smext!\match(...)
 
-    gmatch: (...)=> tostring(@)\gmatch(...)
+    gmatch: (...)=> @as_smext!\gmatch(...)
     
     dirty: =>
         @__str = nil
@@ -91,14 +93,14 @@ class Code
             assert(not Source\is_instance(b), "code bit is a Source")
             if b == '' then continue
             b.dirty = error if b.is_code
-            if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
-                b = b\as_lua!
+            --if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
+            --    b = b\as_lua!
             bits[#bits+1] = b
         @dirty!
     
     trailing_line_len: =>
         if @_trailing_line_len == nil
-            @_trailing_line_len = #tostring(@)\match("[^\n]*$")
+            @_trailing_line_len = #@as_smext!\match("[^\n]*$")
         return @_trailing_line_len
     
     is_multiline: =>
@@ -130,7 +132,8 @@ class Code
                     bits[#bits+1] = joiner
             bits[#bits+1] = b
             b.dirty = error if b.is_code
-            b = tostring(b)
+            unless type(b) == 'string'
+                b = b\as_smext!
             line = match(b, "\n([^\n]*)$")
             if line
                 line_len = #line
@@ -146,8 +149,8 @@ class Code
         for i=1,n
             b = select(i, ...)
             b.dirty = error if b.is_code
-            if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
-                b = b\as_lua!
+            --if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
+            --    b = b\as_lua!
             bits[i] = b
         @dirty!
 
@@ -237,7 +240,8 @@ class LuaCode extends Code
                         nomsu_to_lua[lua.source.start] = pos
                 else
                     walk b, pos
-                pos += #tostring(b)
+                    b = b\as_smext!
+                pos += #b
         walk self, 1
         return {
             nomsu_filename:@source.filename
