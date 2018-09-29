@@ -355,7 +355,7 @@ do
           local _list_1 = self.bits
           for _index_0 = 1, #_list_1 do
             local bit = _list_1[_index_0]
-            if bit.__class == LuaCode then
+            if not (type(bit) == 'string') then
               gather_from(bit)
             end
           end

@@ -207,7 +207,7 @@ class LuaCode extends Code
                         seen[var] = true
                         to_declare[#to_declare+1] = var
                 for bit in *@bits
-                    if bit.__class == LuaCode
+                    unless type(bit) == 'string'
                         gather_from bit
             gather_from self
         if #to_declare > 0
