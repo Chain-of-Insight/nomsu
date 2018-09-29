@@ -522,6 +522,7 @@ compile [do %action then always %final_action] to:
         ..    if not \(mangle "ok") then error(ret, 0) end
             if not \(mangle "fell_through") then return ret end
         end"
+    return %lua
 
 test:
     assume ((result of (: return 99)) == 99)
