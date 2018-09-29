@@ -1,6 +1,6 @@
 use "lib/object.nom"
 
-#%types = [..]
+# The types are [..]
     "Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
     "IndexChain", "Action", "FileChunks", "Error", "Comment"
 

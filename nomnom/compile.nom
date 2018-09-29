@@ -1,6 +1,14 @@
 # This file contains the code to convert syntax trees to Lua code
 
-#use "nomnom/code_obj.nom"
+use "nomnom/code_obj.nom"
+use "nomnom/parser.nom"
+use "nomnom/pretty_errors.nom"
+
+local action [report compile error at %pos %err]:
+    barf "Compile error at \%pos: \%err"
+
+local action [report compile error at %pos %err hint %hint]:
+    barf "Compile error at \%pos: \%err\n\%hint"
 
 action [compile %tree using %compile_actions]:
     assume (%tree is a "Syntax Tree")
@@ -15,17 +23,17 @@ action [compile %tree using %compile_actions]:
             %compile_action = %compile_actions.%stub
             # Don't apply compiler actions to methods
             if (%compile_action and (not %tree.target)):
-                %args = [%tree, %compile_actions]
+                %args = ["tree", "compile_actions"]
                 for % in (%tree::get args): %args::add %
                 %result = (call %compile_action with %args)
                 if (%result == (nil)):
-                    compile error at %tree.source "\
+                    report compile error at %tree.source "\
                         ..The compile-time action here (\(%tree.stub)) failed to return any value."
                     ..hint "\
                         ..Look at the implementation of (\(%tree.stub)) and make sure it's returning something."
                 if (%result is a "Syntax Tree"):
                     if (%result == %tree):
-                        compile error at %tree.source "\
+                        report compile error at %tree.source "\
                             ..The compile-time action here (\(%tree.stub)) is producing an endless loop."
                         ..hint "\
                             ..Look at the implementation of (\(%tree.stub)) and make sure it's not just returning the original tree."
@@ -39,9 +47,9 @@ action [compile %tree using %compile_actions]:
                     %lua::add [%target_lua, ":"]
                 ..else:
                     %lua::add ["(", %target_lua, "):"]
-            %lua:add [%stub as lua id, "("]
+            %lua::add [%stub as lua id, "("]
             %args = []
-            for %tok in %tree:
+            for %tok in %tree at %i:
                 if (%tok is text): do next %tok
                 # TODO: maybe translate Lua comments
                 if (%tok.type == "Comment"): do next %tok
@@ -67,16 +75,17 @@ action [compile %tree using %compile_actions]:
                     %arg_lua = (compile %tok using %compile_actions)
                     unless %arg_lua.is_value:
                         if (%tok.type == "Action"):
-                            compile error at %tok "\
+                            report compile error at %tok "\
                                 ..Can't use this as an argument to (\%stub), since it's not \
                                 ..an expression, it produces: \%arg_lua"
                             ..hint "\
                                 ..Check the implementation of (\(%tok.stub)) to see if it \
                                 ..is actually meant to produce an expression."
                         ..else:
-                            compile error at %tok "\
+                            report compile error at %tok "\
                                 ..Can't use this as an argument to (\%stub), since it's \
                                 ..not an expression, it produces: \%arg_lua"
+                assume (%arg_lua != %lua) or barf "Huh? \%tree .\%i = \%tok -> \%arg_lua"
                 %args::add %arg_lua
             %lua::add %args joined with ", "
             %lua::add ")"
@@ -94,7 +103,7 @@ action [compile %tree using %compile_actions]:
             return %lua
 
         "Text":
-            %lua = (Lua Code from %tree)
+            %lua = (Lua Value from %tree)
             %lua_bits = []
             %string_buffer = ""
             for % in %tree:
@@ -104,12 +113,12 @@ action [compile %tree using %compile_actions]:
                 if (%string_buffer != ""):
                     %lua_bits::add (%string_buffer::as lua)
                     %string_buffer = ""
-                %bit_lua = (compile %bit using %compile_actions)
+                %bit_lua = (compile % using %compile_actions)
                 unless %bit_lua.is_value:
-                    compile error at %bit "\
+                    report compile error at % "\
                         ..Can't use this as a string interpolation value, since it doesn't have a value."
-                if (%bit.type != "Text"):
-                    %bit_lua = (Lua Value from %bit ["tostring(",%bit_lua,")"])
+                if (%.type != "Text"):
+                    %bit_lua = (Lua Value from % ["tostring(",%bit_lua,")"])
                 %lua_bits::add %bit_lua
 
             if ((%string_buffer != "") or ((size of %lua_bits) == 0)):
@@ -136,13 +145,13 @@ action [compile %tree using %compile_actions]:
             set {%key:%tree.1, %value:%tree.2}
             %key_lua = (compile %key using %compile_actions)
             unless %key_lua.is_value:
-                compile error at %tree.1 "\
+                report compile error at %tree.1 "\
                     ..Can't use this as a dict key, since it's not an expression."
             %value_lua = (..)
                 (compile %value using %compile_actions) if %value
                 ..else (Lua Value from %key ["true"])
             unless %value_lua.is_value:
-                compile error at %tree.2 "\
+                report compile error at %tree.2 "\
                     ..Can't use this as a dict value, since it's not an expression."
             %key_str = ("\%key_lua"::matching "^[\"']([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
             if:
@@ -159,7 +168,7 @@ action [compile %tree using %compile_actions]:
         "IndexChain":
             %lua = (compile %tree.1 using %compile_actions)
             unless %lua.is_value:
-                compile error at %tree.1 "\
+                report compile error at %tree.1 "\
                     ..Can't index into this, since it's not an expression."
             %first_char = "\%lua".1
             if (any of [%first_char == "{", %first_char == "\"", %first_char == "["]):
@@ -169,7 +178,7 @@ action [compile %tree using %compile_actions]:
                 %key = %tree.%i
                 %key_lua = (compile %key using %compile_actions)
                 unless %key_lua.is_value:
-                    compile error at %key "\
+                    report compile error at %key "\
                         ..Can't use this as an index, since it's not an expression."
                 %key_lua_str = "\%key_lua"
                 %lua_id = (%key_lua_str::matching "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
@@ -205,3 +214,4 @@ action [compile %tree using %compile_actions]:
 
         else:
             barf "Unknown type: \(%tree.type)"
+

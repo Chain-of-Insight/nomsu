@@ -9,6 +9,8 @@ set {..}
     (action (S 1)): %lpeg.S,
     (action (Cc 1)): %lpeg.Cc, (action (lpeg re pattern 1)): %re.compile,
     (action (lpeg re pattern 1 using 2)): %re.compile
+    (action (lpeg pattern 1's match of 2)): %lpeg.match
+    (action (lpeg pattern 1's match of 2 with 3)): [%1, %2, %3] -> (call %lpeg.match with [%1, %2, nil, %3])
 
 %source_code_for_tree = {}
 %defs = (..)
@@ -27,7 +29,7 @@ set {..}
 
         Tree: [%t, %userdata] ->:
             %source = (..)
-                Source {filename:%userdata.filename, start:%tree.start, stop:%tree.stop}
+                Source {filename:%userdata.filename, start:%t.start, stop:%t.stop}
             set {%t.start: nil, %t.stop: nil}
             %t = (Syntax Tree %t)
             (Syntax Tree).source_code_for_tree.%t = %userdata.source
@@ -44,12 +46,12 @@ set {..}
 
 %id_patt = (((P "") - (R "09")) *  ((%defs.utf8_char + (R "az") + (R "AZ") + (P "_") + (R "09"))^1 * -1))
 %operator_patt = ((S "'`~!@$^&*+=|<>?/-")^1 * -1)
-%text_methods = (""'s metatable).__methods
-%text_methods.("is a nomsu identifier"::as lua id) = (..)
-    [%str] -> (call %id_patt.match with [%id_patt, %str])
-%text_methods.("is a nomsu id"::as lua id) = %text_methods.("is a nomsu identifier"::as lua id)
-%text_methods.("is a nomsu operator"::as lua id) = (..)
-    [%str] -> (call %operator_patt.match with [%operator_patt, %str])
+
+action [%text is a nomsu id, %text is a nomsu identifier] (..)
+    lpeg pattern %id_patt's match of %text
+
+action [%text is a nomsu operator] (..)
+    lpeg pattern %operator_patt's match of %text
 
 %peg_tidier = (..)
     lpeg re pattern "\
@@ -68,7 +70,7 @@ set {..}
 action [make parser from %peg] (make parser from %peg using (nil))
 
 action [make parser from %peg using %make_tree]:
-    %peg = (call %peg_tidier.match with [%peg_tidier, %peg])
+    %peg = (lpeg pattern %peg_tidier's match of %peg)
     %peg = (lpeg re pattern %peg using %defs)
     local action [parse %input from %filename]:
         %input = "\%input"
@@ -76,7 +78,7 @@ action [make parser from %peg using %make_tree]:
         %userdata = {..}
             make_tree: %make_tree or ([%]-> (: set %'s metatable to %tree_mt; return %))
             filename:%filename, source:%input
-        %tree = (call %peg.match with [%peg, %input, (nil), %userdata])
+        %tree = (lpeg pattern %peg's match of %input with %userdata)
         assume %tree or barf "File \%filename failed to parse:\n\%input"
         return %tree
     return (action (parse 1 from 2))

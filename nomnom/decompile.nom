@@ -1,6 +1,6 @@
 # This file contains the code to convert syntax trees to Nomsu code
-#use "nomnom/code_obj.nom"
-#use "nomnom/parser.nom"
+use "nomnom/code_obj.nom"
+use "nomnom/parser.nom"
 
 # TODO: maybe re-implement the fancy coroutine checker that aborts early if nomsu gets too long
 action [decompile %tree inline]:
@@ -21,7 +21,7 @@ action [decompile %tree inline]:
                         any of [..]
                             %i == 1,
                             %tree.(%i - 1) isn't text,
-                            (%bit::is a nomsu operator) == (%tree.(%i - 1)::is a nomsu operator)
+                            (%bit is a nomsu operator) == (%tree.(%i - 1) is a nomsu operator)
                     ..: %nomsu::add " "
                     %nomsu::add %bit
                 ..else:
@@ -86,7 +86,7 @@ action [decompile %tree inline]:
         
         "DictEntry":
             set {%key:%tree.1, %value:%tree.2}
-            if (all of [%key.type == "Text", (size of %key) == 1, %key.1::is a nomsu identifier]):
+            if (all of [%key.type == "Text", (size of %key) == 1, %key.1 is a nomsu identifier]):
                 %nomsu = (Nomsu Code from %key [key.1])
             ..else:
                 %nomsu = (decompile %key inline)
@@ -105,7 +105,7 @@ action [decompile %tree inline]:
                 if (..)
                     all of [..]
                         %i > 1, %bit.type == "Text", (size of %bit) == 1, %bit.1 is text,
-                        %bit.1::is a nomsu identifier
+                        %bit.1 is a nomsu identifier
                 ..:%nomsu::add %bit.1
                 ..else:
                     %bit_nomsu = (decompile %bit inline)
@@ -214,7 +214,7 @@ action [decompile %tree]:
                     unless (..)
                         all of [..]
                             %tree.(%i - 1) is text
-                            (%tree.(%i - 1)::is a nomsu operator) != (%bit::is a nomsu operator)
+                            (%tree.(%i - 1) is a nomsu operator) != (%bit is a nomsu operator)
                     ..: %nomsu::add %next_space
                     %nomsu::add %bit
                     %next_space = " "
@@ -317,7 +317,7 @@ action [decompile %tree]:
         
         "DictEntry":
             set {%key:%tree.1, %value:%tree.2}
-            if (all of [%key.type == "Text", (size of %key) == 1, %key.1::is a nomsu identifier]):
+            if (all of [%key.type == "Text", (size of %key) == 1, %key.1 is a nomsu identifier]):
                 %nomsu::add %key.1
             ..else:
                 %nomsu::add (decompile %key inline)

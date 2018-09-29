@@ -6,6 +6,7 @@ use "lib/object.nom"
 
 object (Code):
     my action [set up]:
+        assume %me.source
         %old_bits = %me.bits
         %me.bits = []
         if (%me.source is text):
@@ -13,19 +14,24 @@ object (Code):
         for % in %old_bits:
             %me::add %
 
+    %depth = 0
     my action [as text]:
+        external %depth = (%depth + 1)
+        if (%depth > 10):
+            lua> "require('ldt').breakpoint()"
         if (%me.__str == (nil)):
             set {%buff:[], %indent:0}
-            for % in %me.bits:
-                if (% is text):
-                    %spaces = (%::matching "\n([ ]*)[^\n]*$")
-                    if %spaces.1: %indent = (size of %spaces)
+            for %bit in %me.bits:
+                if (%bit is text):
+                    %spaces = (%bit::matching "\n([ ]*)[^\n]*$")
+                    if %spaces: %indent = (size of %spaces.1)
                 ..else:
-                    % = "\%"
+                    %bit = "\%bit"
                     if (%indent > 0):
-                        % = (%::with "\n" -> "\n\(" "::* %indent)")
-                %buff::add %
+                        %bit = (%bit::with "\n" -> "\n\(" "::* %indent)")
+                %buff::add %bit
             %me.__str = (%buff::joined)
+        external %depth = (%depth - 1)
         return %me.__str
 
     my action [as lua] (..)
@@ -76,19 +82,20 @@ object (Code):
     my action [add %values joined with %joiner or %wrapping_joiner]:
         %line_len = 0
         %bits = %me.bits
-        for %i = % in %values:
+        for %value in %values at %i:
+            assume (%value != %me)
             if (%i > 1):
                 if (%line_len > 80):
                     %bits::add %wrapping_joiner
                     %line_len = 0
                 ..else:
                     %bits::add %joiner
-            %bits::add %
-            %line = ("\%"::matching "\n([^\n]*)$")
+            %bits::add %value
+            %line = ("\%value"::matching "\n([^\n]*)$")
             if %line:
                 %line_len = (size of %line)
             ..else:
-                %line_len += (size of %)
+                %line_len += (size of %value)
         %me::mark as dirty
     
     my action [prepend %]:
@@ -155,7 +162,7 @@ object (Lua Code) extends (Code):
     my action [as statements %prefix %suffix]:
         unless %me.is_value:
             return %me
-        %statements = (Lua Code %me.source [])
+        %statements = (Lua Code from %me.source [])
         if (%prefix != ""):
             %statements::add %prefix
         %statements::add %me
