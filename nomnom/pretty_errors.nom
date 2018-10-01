@@ -4,7 +4,7 @@
 local action [visible size of %text]:
     return (size of (%text::with "\027%[[0-9;]*m" -> ""))
 
-local action [boxed %text]:
+local action [%text boxed]:
     %max_line = (..)
         max of ((visible size of %line) for %line in (%text::lines))
     %ret = (..)
@@ -13,31 +13,35 @@ local action [boxed %text]:
                 "\n\%\(" "::* (%max_line - (visible size of %))) \027[0m"
     return %ret.[2,-1]
 
-action [%err as a pretty error]:
-    %context = 2
-    %err_code = (%err::get source code)
-    %err_line = (%err_code::line at %err.source.start)
-    %err_linenum = (%err_code::line number at %err.source.start)
-    %err_linepos = (%err_code::line position at %err.source.start)
+%CONTEXT = 2
+action [pretty %title error at %tree %err hint %hint]:
+    %source_code = (%tree::get source code)
+    %start = %tree.source.start
+    %stop = %tree.source.stop
+    %filename = (%tree.source.filename or "???")
+
+    %err_line = (%source_code::line at %start)
+    %err_linenum = (%source_code::line number at %start)
+    %err_linepos = (%source_code::line position at %start)
     # TODO: better handle multi-line errors
     %err_size = (..)
         min of [..]
-            %err.source.stop - %err.source.start
+            %stop - %start
             (size of %err_line) - %err_linepos + 1
     %nl_indicator = (" " if (%err_linepos > (size of %err_line)) else "")
-    %fmt_str = " %\(size of "\(%err_linenum + %context)")d|"
-    local action [num %i] (%fmt_str::formatted with 0)
+    %fmt_str = " %\(size of "\(%err_linenum + %CONTEXT)")d|"
+    local action [num %i] (%fmt_str::formatted with %i)
     %linenum_size = (size of (num 0))
 
     %pointer = "\(" "::* (%err_linepos + %linenum_size - 1))"
     if (%err_size >= 2):
-        %pointer += "\(%pointer)╚\("═"::* (%err_size - 2))╝"
+        %pointer += "╚\("═"::* (%err_size - 2))╝"
     ..else:
-        %pointer += "\(%pointer)⬆"
+        %pointer += "⬆"
 
-    %err_msg = "\027[33;41;1m\(%err.title or "Error") at \(%err.source.filename or "???"):\(%err_linenum)\027[0m"
-    for %i in (%err_linenum - %context) to (%err_linenum - 1):
-        %line = (%err_code::line %i)
+    %err_msg = "\027[33;41;1m\(%title or "Error") at \(%filename):\(%err_linenum)\027[0m"
+    for %i in (%err_linenum - %CONTEXT) to (%err_linenum - 1):
+        %line = (%source_code::line %i)
         if %line:
             %err_msg += "\n\027[2m\(num %i)\027[0m\(%line)\027[0m"
     if %err_line:
@@ -45,15 +49,15 @@ action [%err as a pretty error]:
         %during = %err_line.[%err_linepos, %err_linepos + %err_size - 1]
         %after = %err_line.[%err_linepos + %err_size, -1]
         %err_line = "\027[0m\(%before)\027[41;30m\(%during)\(%nl_indicator)\027[0m\(%after)"
-        %err_msg += "\n\027[2m\(%fmt_str::formated with %err_linenum)\(%err_line)\027[0m"
-    %err_linenum_end = (%err_code::line number at %err.source.stop)
-    %err_linepos_end = (%err_code::line position at %err.source.stop)
+        %err_msg += "\n\027[2m\(num %err_linenum)\(%err_line)\027[0m"
+    %err_linenum_end = (%source_code::line number at %stop)
+    %err_linepos_end = (%source_code::line position at %stop)
     %err_linenum_end or= %err_linenum
     if (%err_linenum_end == %err_linenum):
         %err_msg += "\n\(%pointer)"
     ..else:
         for %i in (%err_linenum + 1) to %err_linenum_end:
-            %line = (%err_code::line %i)
+            %line = (%source_code::line %i)
             if %line:
                 if (%i == %err_linenum_end):
                     %during = %line.[1, %err_linepos_end - 1]
@@ -64,13 +68,18 @@ action [%err as a pretty error]:
 
     %box_width = 70
     %err_text = "\
-        ..\027[47;31;1m\((" \(%err.error)"::wrapped to %box_width)::with "\n" -> "\n\027[47;31;1m ")"
-    if %err.hint:
-        err_text += "\n\027[47;30m\((" Suggestion: \(%err.hint)"::wrapped to %box_width)::with "\n" -> "\n\027[47;30m ")"
+        ..\027[47;31;1m\((" \(%err)"::wrapped to %box_width)::with "\n" -> "\n\027[47;31;1m ")"
+    if %hint:
+        %err_text += "\n\027[47;30m\((" Suggestion: \(%hint)"::wrapped to %box_width)::with "\n" -> "\n\027[47;30m ")"
     %err_msg += "\n\027[33;1m \((%err_text boxed)::with "\n" -> "\n ")"
 
-    for %i in (%err_linenum_end + 1) to (%err_linenum_end + %context):
-        %line = (%err_code::line %i)
+    for %i in (%err_linenum_end + 1) to (%err_linenum_end + %CONTEXT):
+        %line = (%source_code::line %i)
         if %line:
             %err_msg += "\n\027[2m\(num %i)\027[0m\(%line)\027[0m"
     return %err_msg
+
+action [pretty %title error at %tree %err] (pretty %title error at %tree %err (nil))
+
+action [%err_tree as a pretty error] (..)
+    pretty %err_tree.title error at %err_tree %err_tree.error hint %err_tree.hint

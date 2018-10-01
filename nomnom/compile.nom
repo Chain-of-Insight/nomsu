@@ -5,11 +5,11 @@ use "nomnom/parser.nom"
 use "nomnom/pretty_errors.nom"
 
 # TODO: use pretty_errors
-local action [report compile error at %pos %err]:
-    barf "Compile error at \%pos: \%err"
+local action [report compile error at %tree %err]:
+    barf (pretty "Compile Error" error at %tree %err)
 
 local action [report compile error at %pos %err hint %hint]:
-    barf "Compile error at \%pos: \%err\n\%hint"
+    barf (pretty "Compile Error" error at %tree %err hint %hint)
 
 action [compile %tree using %compile_actions]:
     assume (%tree is a "Syntax Tree")
@@ -30,13 +30,13 @@ action [compile %tree using %compile_actions]:
                 for % in (%tree::get args): %args::add %
                 %result = (call %compile_action with %args)
                 if (%result == (nil)):
-                    report compile error at %tree.source "\
+                    report compile error at %tree "\
                         ..The compile-time action here (\(%tree.stub)) failed to return any value."
                     ..hint "\
                         ..Look at the implementation of (\(%tree.stub)) and make sure it's returning something."
                 if (%result is a "Syntax Tree"):
                     if (%result == %tree):
-                        report compile error at %tree.source "\
+                        report compile error at %tree "\
                             ..The compile-time action here (\(%tree.stub)) is producing an endless loop."
                         ..hint "\
                             ..Look at the implementation of (\(%tree.stub)) and make sure it's not just returning the original tree."
