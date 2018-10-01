@@ -399,7 +399,7 @@ do
       return List(lines(self))
     end,
     line_1 = line,
-    wrap_to_1 = function(self, maxlen)
+    wrapped_to_1 = function(self, maxlen)
       local _lines = { }
       local _list_0 = self:lines()
       for _index_0 = 1, #_list_0 do
@@ -418,10 +418,10 @@ do
     line_at_1 = function(self, i)
       return (line_at(self, i))
     end,
-    line_number_of_1 = function(self, i)
+    line_number_at_1 = function(self, i)
       return select(2, line_at(self, i))
     end,
-    line_position_of_1 = function(self, i)
+    line_position_at_1 = function(self, i)
       return select(3, line_at(self, i))
     end,
     matches_1 = function(self, patt)

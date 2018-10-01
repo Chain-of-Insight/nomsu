@@ -153,7 +153,7 @@ do
         bytes: => List{byte(tostring(@), 1, -1)},
         lines: => List(lines(@))
         line_1: line
-        wrap_to_1: (maxlen)=>
+        wrapped_to_1: (maxlen)=>
             _lines = {}
             for line in *@lines!
                 while #line > maxlen
@@ -166,8 +166,8 @@ do
             return table.concat(_lines, "\n")
                                 
         line_at_1: (i)=> (line_at(@, i))
-        line_number_of_1: (i)=> select(2, line_at(@, i))
-        line_position_of_1: (i)=> select(3, line_at(@, i))
+        line_number_at_1: (i)=> select(2, line_at(@, i))
+        line_position_at_1: (i)=> select(3, line_at(@, i))
         matches_1: (patt)=> match(@, patt) and true or false
         matching_1: (patt)=> (match(@, patt))
         matching_groups_1: (patt)=> {match(@, patt)}
