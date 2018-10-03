@@ -67,10 +67,6 @@ string2 = {
     -- but not idempotent. In logic terms: (x != y) => (as_lua_id(x) != as_lua_id(y)),
     -- but not (as_lua_id(a) == b) => (as_lua_id(b) == b).
     as_lua_id: (str)->
-        orig = str
-        -- Empty strings are not valid lua identifiers, so treat them like " ",
-        -- and treat " " as "  ", etc. to preserve injectivity.
-        str = gsub str, "^ *$", "%1 "
         -- Escape 'x' (\x78) when it precedes something that looks like an uppercase hex sequence.
         -- This way, all Lua IDs can be unambiguously reverse-engineered, but normal usage
         -- of 'x' won't produce ugly Lua IDs.
@@ -88,13 +84,18 @@ string2 = {
     -- from_lua_id(as_lua_id(str)) == str, but behavior is unspecified for inputs that
     -- did not come from as_lua_id()
     from_lua_id: (str)->
-        unless is_lua_id("^_+(.*)$")
+        unless is_lua_id(str\match("^_*(.*)$"))
             str = str\sub(2,-1)
         str = gsub(str, "_", " ")
         str = gsub(str, "x([0-9A-F][0-9A-F])", (hex)-> char(tonumber(hex, 16)))
-        str = gsub(str, "^ ([ ]*)$", "%1")
         return str
 }
 for k,v in pairs(string) do string2[k] or= v
+
+for test in *{"", "_", " ", "return", "asdf", "one two", "one_two", "Hex2Dec", "He-ec", "\3"}
+    lua_id = string2.as_lua_id(test)
+    assert is_lua_id(lua_id), "failed to convert '#{test}' to a valid Lua identifier (got '#{lua_id}')"
+    roundtrip = string2.from_lua_id(lua_id)
+    assert roundtrip == test, "Failed lua_id roundtrip: '#{test}' -> #{lua_id} -> #{roundtrip}"
 
 return string2

@@ -143,8 +143,6 @@ local string2 = {
     return '"' .. escaped .. '"'
   end,
   as_lua_id = function(str)
-    local orig = str
-    str = gsub(str, "^ *$", "%1 ")
     str = gsub(str, "x([0-9A-F][0-9A-F])", "x78%1")
     str = gsub(str, "%W", function(c)
       if c == ' ' then
@@ -159,18 +157,37 @@ local string2 = {
     return str
   end,
   from_lua_id = function(str)
-    if not (is_lua_id("^_+(.*)$")) then
+    if not (is_lua_id(str:match("^_*(.*)$"))) then
       str = str:sub(2, -1)
     end
     str = gsub(str, "_", " ")
     str = gsub(str, "x([0-9A-F][0-9A-F])", function(hex)
       return char(tonumber(hex, 16))
     end)
-    str = gsub(str, "^ ([ ]*)$", "%1")
     return str
   end
 }
 for k, v in pairs(string) do
   string2[k] = string2[k] or v
 end
+local _list_0 = {
+  "",
+  "_",
+  " ",
+  "return",
+  "asdf",
+  "one two",
+  "one_two",
+  "Hex2Dec",
+  "He-ec",
+  "\3"
+}
+for _index_0 = 1, #_list_0 do
+  local test = _list_0[_index_0]
+  local lua_id = string2.as_lua_id(test)
+  assert(is_lua_id(lua_id), "failed to convert '" .. tostring(test) .. "' to a valid Lua identifier (got '" .. tostring(lua_id) .. "')")
+  local roundtrip = string2.from_lua_id(lua_id)
+  assert(roundtrip == test, "Failed lua_id roundtrip: '" .. tostring(test) .. "' -> " .. tostring(lua_id) .. " -> " .. tostring(roundtrip))
+end
+assert(string2.as_lua_id('') == '_')
 return string2
