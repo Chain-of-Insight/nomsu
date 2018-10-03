@@ -82,8 +82,8 @@ for name in *types
         __call: (t)=>
             if type(t.source) == 'string'
                 t.source = Source\from_string(t.source)
-            else
-                assert(Source\is_instance(t.source))
+            --else
+            --    assert(Source\is_instance(t.source))
             setmetatable(t, @)
             if init = t.__init then init(t)
             return t

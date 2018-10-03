@@ -4,14 +4,31 @@ use "nomnom/code_obj.nom"
 use "nomnom/parser.nom"
 use "nomnom/pretty_errors.nom"
 
-# TODO: use pretty_errors
 local action [report compile error at %tree %err]:
     barf (pretty "Compile Error" error at %tree %err)
 
 local action [report compile error at %pos %err hint %hint]:
     barf (pretty "Compile Error" error at %tree %err hint %hint)
 
-action [compile %tree using %compile_actions]:
+action [barf any errors in %t]:
+    assume (%t is a "Syntax Tree")
+    %errs = []
+    for % in recursive %t:
+        if (%.type == "Error"):
+            %errs::add %
+        for %k = %v in %:
+            if (%v is a "Syntax Tree"):
+                recurse % on %v
+    sort %errs by % -> %.source
+    %errs = ((% as a pretty error) for % in %errs)
+    if ((size of %errs) > 0):
+        if ((size of %errs) > 3):
+            %n = ((size of %errs) - 3)
+            for %i in 4 to (size of %errs): %errs.%i = (nil)
+            %errs::add "\027[31;1m +\%n additional errors...\027[0m\n"
+        barf (%errs::joined with "\n\n")
+
+action [%tree compiled with %compile_actions]:
     assume (%tree is a "Syntax Tree")
     if all of [..]
         %tree.version, action (Nomsu version)
@@ -40,12 +57,12 @@ action [compile %tree using %compile_actions]:
                             ..The compile-time action here (\(%tree.stub)) is producing an endless loop."
                         ..hint "\
                             ..Look at the implementation of (\(%tree.stub)) and make sure it's not just returning the original tree."
-                    return (compile %result using %compile_actions)
+                    return (%result compiled with %compile_actions)
                 return %result
 
             %lua = (Lua Value from %tree)
             if %tree.target: # Method call
-                %target_lua = (compile %tree.target using %compile_actions)
+                %target_lua = (%tree.target compiled with %compile_actions)
                 if (((%target_lua::as smext)::matches "^%(.*%)$") or ((%target_lua::as smext)::matches "^[_a-zA-Z][_a-zA-Z0-9]*$")):
                     %lua::add [%target_lua, ":"]
                 ..else:
@@ -60,7 +77,7 @@ action [compile %tree using %compile_actions]:
                     %values = []
                     for %line in %tok:
                         #unless (%line.type == "Comment"):
-                        %values::add (compile %line using %compile_actions)
+                        %values::add (%line compiled with %compile_actions)
                     if all of (%.is_value for % in %values):
                         if ((size of %values) == 1):
                             %arg_lua = %values.1
@@ -76,7 +93,7 @@ action [compile %tree using %compile_actions]:
                             %arg_lua::add ["\n    ", %v]
                         %arg_lua::add "\nend)())"
                 ..else:
-                    %arg_lua = (compile %tok using %compile_actions)
+                    %arg_lua = (%tok compiled with %compile_actions)
                     unless %arg_lua.is_value:
                         if (%tok.type == "Action"):
                             report compile error at %tok "\
@@ -96,12 +113,39 @@ action [compile %tree using %compile_actions]:
             return %lua
 
         "EscapedNomsu":
-            return (Lua Value from %tree ((%tree.1)::as nomsu))
+            #return (Lua Value from %tree ((%tree.1)::as lua))
+
+            %lua = (Lua Value from %tree ["Syntax_Tree_1{type=", quote %tree.1.type])
+            set {%needs_comma:no, %i:1}
+            local action [% as shmua]:
+                if (% is a "Lua number"):
+                    return "\%"
+                if (% is a "Syntax Tree"):
+                    return (% compiled with %compile_actions)
+                if (% is text):
+                    return (quote %)
+                return (%::as lua)
+
+            for %k = %v in (((%tree.1.type == "EscapedNomsu") and %tree) or %tree.1):
+                %lua::add ", "
+                if:
+                    (%k == %i):
+                        %i += 1
+                    ((%k is text) and (%k::is a lua identifier)):
+                        %lua::add [%k, "= "]
+                    else:
+                        %lua::add ["[", % as shmua, "]= "]
+                if (%k == "source"):
+                    %lua::add (quote "\%v")
+                ..else:
+                    %lua::add (%v as shmua)
+            %lua::add "}"
+            return %lua
         
         "Block":
             %lua = (Lua Code from %tree)
             %lua::add (..)
-                ((compile %line using %compile_actions)::as statements)
+                ((%line compiled with %compile_actions)::as statements)
                 ..for %line in %tree
             ..joined with "\n"
             return %lua
@@ -117,7 +161,7 @@ action [compile %tree using %compile_actions]:
                 if (%string_buffer != ""):
                     %lua_bits::add (%string_buffer::as lua)
                     %string_buffer = ""
-                %bit_lua = (compile % using %compile_actions)
+                %bit_lua = (% compiled with %compile_actions)
                 unless %bit_lua.is_value:
                     report compile error at % "\
                         ..Can't use this as a string interpolation value, since it doesn't have a value."
@@ -135,24 +179,24 @@ action [compile %tree using %compile_actions]:
 
         "List":
             %lua = (Lua Value from %tree ["List{"])
-            %lua::add ((compile % using %compile_actions) for % in %tree) joined with ", " or ",\n  "
+            %lua::add ((% compiled with %compile_actions) for % in %tree) joined with ", " or ",\n  "
             %lua::add "}"
             return %lua
 
         "Dict":
             %lua = (Lua Value from %tree ["Dict{"])
-            %lua::add ((compile % using %compile_actions) for % in %tree) joined with ", " or ",\n  "
+            %lua::add ((% compiled with %compile_actions) for % in %tree) joined with ", " or ",\n  "
             %lua::add "}"
             return %lua
 
         "DictEntry":
             set {%key:%tree.1, %value:%tree.2}
-            %key_lua = (compile %key using %compile_actions)
+            %key_lua = (%key compiled with %compile_actions)
             unless %key_lua.is_value:
                 report compile error at %tree.1 "\
                     ..Can't use this as a dict key, since it's not an expression."
             %value_lua = (..)
-                (compile %value using %compile_actions) if %value
+                (%value compiled with %compile_actions) if %value
                 ..else (Lua Value from %key ["true"])
             unless %value_lua.is_value:
                 report compile error at %tree.2 "\
@@ -170,7 +214,7 @@ action [compile %tree using %compile_actions]:
                     return (Lua Code from %tree ["[", %key_lua, "]=", %value_lua])
         
         "IndexChain":
-            %lua = (compile %tree.1 using %compile_actions)
+            %lua = (%tree.1 compiled with %compile_actions)
             unless %lua.is_value:
                 report compile error at %tree.1 "\
                     ..Can't index into this, since it's not an expression."
@@ -180,7 +224,7 @@ action [compile %tree using %compile_actions]:
 
             for %i in 2 to (size of %tree):
                 %key = %tree.%i
-                %key_lua = (compile %key using %compile_actions)
+                %key_lua = (%key compiled with %compile_actions)
                 unless %key_lua.is_value:
                     report compile error at %key "\
                         ..Can't use this as an index, since it's not an expression."
@@ -202,7 +246,7 @@ action [compile %tree using %compile_actions]:
             return (Lua Value from %tree ["\(%tree.1)"])
 
         "Var":
-            return (Lua Value from %tree [%tree.1::as lua id])
+            return (Lua Variable from %tree [%tree.1::as lua id])
 
         "FileChunks":
             barf "\
@@ -214,7 +258,7 @@ action [compile %tree using %compile_actions]:
             return (Lua Code from %tree "-- \(%tree.1::with "\n" -> "\n-- ")")
         
         "Error":
-            barf "Can't compile errors"
+            barf (%tree as a pretty error)
 
         else:
             barf "Unknown type: \(%tree.type)"

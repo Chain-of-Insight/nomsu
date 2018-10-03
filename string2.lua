@@ -189,5 +189,4 @@ for _index_0 = 1, #_list_0 do
   local roundtrip = string2.from_lua_id(lua_id)
   assert(roundtrip == test, "Failed lua_id roundtrip: '" .. tostring(test) .. "' -> " .. tostring(lua_id) .. " -> " .. tostring(roundtrip))
 end
-assert(string2.as_lua_id('') == '_')
 return string2

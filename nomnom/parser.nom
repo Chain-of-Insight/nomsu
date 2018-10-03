@@ -72,7 +72,7 @@ action [make parser from %peg] (make parser from %peg using (nil))
 action [make parser from %peg using %make_tree]:
     %peg = (lpeg pattern %peg_tidier's match of %peg)
     %peg = (lpeg re pattern %peg using %defs)
-    local action [parse %input from %filename]:
+    local action [%input from %filename parsed]:
         %input = "\%input"
         %tree_mt = {__index: {source:%input, filename:%filename}}
         %userdata = {..}
@@ -81,4 +81,4 @@ action [make parser from %peg using %make_tree]:
         %tree = (lpeg pattern %peg's match of %input with %userdata)
         assume %tree or barf "File \%filename failed to parse:\n\%input"
         return %tree
-    return (action (parse 1 from 2))
+    return (action (1 from 2 parsed))

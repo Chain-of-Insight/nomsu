@@ -64,6 +64,11 @@ object (Syntax Tree):
                     %replacement.%k = %r
             unless %changes: return %me
             return (Syntax Tree %replacement)
+   
+    my action [with %overrides]:
+        %new = (%k = %v for %k = %v in %me)
+        for %k = %v in %overrides: %new.%k = %v
+        return (Syntax Tree %new)
 
     my action [== %other]:
         unless (..)

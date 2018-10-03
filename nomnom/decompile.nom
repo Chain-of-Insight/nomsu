@@ -3,13 +3,13 @@ use "nomnom/code_obj.nom"
 use "nomnom/parser.nom"
 
 # TODO: maybe re-implement the fancy coroutine checker that aborts early if nomsu gets too long
-action [decompile %tree inline]:
+action [%tree decompiled inline]:
     assume (%tree is a "Syntax Tree")
     if %tree.type is:
         "Action":
             %nomsu = (Nomsu Code from %tree)
             if %tree.target:
-                %target_nomsu = (decompile %tree.target inline)
+                %target_nomsu = (%tree.target decompiled inline)
                 if %tree.target.type is:
                     ("Action", "Block"):
                         %target_nomsu::parenthesize
@@ -25,7 +25,7 @@ action [decompile %tree inline]:
                     ..: %nomsu::add " "
                     %nomsu::add %bit
                 ..else:
-                    %arg_nomsu = (decompile %bit inline)
+                    %arg_nomsu = (%bit decompiled inline)
                     unless ((%i == (size of %tree)) and (%bit.type == "Block")):
                         %nomsu::add " "
                         if ((%bit.type == "Action") or (%bit.type == "Block")):
@@ -34,7 +34,7 @@ action [decompile %tree inline]:
             return %nomsu
 
         "EscapedNomsu":
-            %inner_nomsu = (decompile %tree.1 inline)
+            %inner_nomsu = (%tree.1 decompiled inline)
             unless (..)
                 any of [..]
                     %tree.1.type == "List", %tree.1.type == "Dict",
@@ -48,7 +48,7 @@ action [decompile %tree inline]:
             for %line in %tree at %i:
                 %nomsu::add [..]
                     " " if (%i == 1) else "; "
-                    decompile %line inline
+                    %line decompiled inline
             return %nomsu
 
         "Text":
@@ -62,7 +62,7 @@ action [decompile %tree inline]:
                             "Text":
                                 recurse %text on %bit
                             "Var":
-                                %interp_nomsu = (decompile %bit inline)
+                                %interp_nomsu = (%bit decompiled inline)
                                 # Make sure "...\(%x)y..." isn't confused with "...\(%xy)..."
                                 # TODO: make this more robust against "...\%x\("y").."
                                 if (..)
@@ -71,16 +71,16 @@ action [decompile %tree inline]:
                                 ..: %interp_nomsu::parenthesize
                                 %nomsu::add ["\\", %interp_nomsu]
                             ("List", "Dict"):
-                                %nomsu::add ["\\", decompile %bit inline]
+                                %nomsu::add ["\\", %bit decompiled inline]
                             else:
-                                %nomsu::add ["\\(", decompile %bit inline, ")"]
+                                %nomsu::add ["\\(", %bit decompiled inline, ")"]
             return (Nomsu Code from %tree ["\"", %nomsu, "\""])
 
         ("List", "Dict"):
             %nomsu = (Nomsu Code from %tree ["[" if (%tree.type == "List") else "{"])
             for %item in %tree at %i:
                 if (%i > 1): %nomsu::add ", "
-                %nomsu::add (decompile %item inline)
+                %nomsu::add (%item decompiled inline)
             %nomsu::add ("]" if (%tree.type == "List") else "}")
             return %nomsu
         
@@ -89,13 +89,13 @@ action [decompile %tree inline]:
             if (all of [%key.type == "Text", (size of %key) == 1, %key.1 is a nomsu identifier]):
                 %nomsu = (Nomsu Code from %key [key.1])
             ..else:
-                %nomsu = (decompile %key inline)
+                %nomsu = (%key decompiled inline)
 
             if (%key.type == "Action"):
                 %nomsu::parenthesize
             %nomsu::add ":"
             if %value:
-                %nomsu::add (decompile %value inline)
+                %nomsu::add (%value decompiled inline)
             return %nomsu
         
         "IndexChain":
@@ -108,7 +108,7 @@ action [decompile %tree inline]:
                         %bit.1 is a nomsu identifier
                 ..:%nomsu::add %bit.1
                 ..else:
-                    %bit_nomsu = (decompile %bit inline)
+                    %bit_nomsu = (%bit decompiled inline)
                     if (..)
                         any of [..]
                             %bit.type == "Action"
@@ -138,7 +138,7 @@ action [decompile %tree inline]:
             barf "Unknown type: \(%tree.type)"
 
 %MAX_LINE = 90
-action [decompile %tree]:
+action [%tree decompiled]:
     %nomsu = (Nomsu Code from %tree)
     # For concision:
     local action [recurse on %t]:
@@ -149,18 +149,18 @@ action [decompile %tree]:
                 "Block":
                     if ((size of %subtree) > 1):
                         go to (Use Indented)
-                    if ((size of "\(decompile %subtree inline)") > 20):
+                    if ((size of "\(%subtree decompiled inline)") > 20):
                         go to (Use Indented)
             for %k = %v in %subtree:
                 if (%v is a "Syntax Tree"):
                     recurse %subtree on %v
 
-        %inline_nomsu = (decompile %t inline)
+        %inline_nomsu = (%t decompiled inline)
         if (%inline_nomsu and ((size of "\%inline_nomsu") <= %space)):
             return %inline_nomsu
 
         === (Use Indented) ===
-        %indented = (decompile %t)
+        %indented = (%t decompiled)
         if (%t.type == "Action"):
             %indented = (Nomsu Code from %t ["(..)\n    ", %indented])
         return %indented
@@ -176,19 +176,16 @@ action [decompile %tree]:
             for %chunk in %tree at %chunk_no:
                 if (%chunk_no > 1):
                     %nomsu::add "\n\n\("~"::* 80)\n\n"
-                %nomsu::add (pop comments at %chunk.source.start)
                 if (%chunk.type == "Block"):
                     for %line in %chunk at %line_no:
                         if (%line_no > 1):
                             if (%chunk.(%line_no - 1) and %line should clump):
-                                %nomsu::add ["\n", pop comments at %line.source.start "\n"]
+                                %nomsu::add "\n"
                             ..else:
-                                %nomsu::add ["\n\n", pop comments at %line.source.start]
-                        %nomsu::add (decompile %line %pop_comments)
-                    %nomsu::add (pop comments at %chunk.source.stop "\n")
+                                %nomsu::add "\n\n"
+                        %nomsu::add (%line decompiled)
                 ..else:
-                    %nomsu::add (decompile %chunk %pop_comments)
-            %nomsu::add (pop comments at %tree.source.stop "\n")
+                    %nomsu::add (%chunk decompiled)
             unless ("\%nomsu"::matches "\n$"):
                 %nomsu::add "\n"
             return %nomsu
@@ -300,7 +297,7 @@ action [decompile %tree]:
                 %nomsu::add ("[]" if (%tree.type == "List") else "{}")
                 return %nomsu
             for %item in %tree at %i:
-                %item_nomsu = (decompile %item inline)
+                %item_nomsu = (%item decompiled inline)
                 if ((not %item_nomsu) or ((size of "\%item_nomsu") > %MAX_LINE)):
                     %item_nomsu = (recurse on %item_nomsu)
                 %nomsu::add %item_nomsu
@@ -320,7 +317,7 @@ action [decompile %tree]:
             if (all of [%key.type == "Text", (size of %key) == 1, %key.1 is a nomsu identifier]):
                 %nomsu::add %key.1
             ..else:
-                %nomsu::add (decompile %key inline)
+                %nomsu::add (%key decompiled inline)
             if ((%key.type == "Action") or (%key.type == "Block")):
                 %nomsu::parenthesize
             %nomsu::add [": ", recurse on %value]
@@ -331,7 +328,7 @@ action [decompile %tree]:
             return %nomsu
         
         ("IndexChain", "Number", "Var"):
-            return (decompile %tree inline)
+            return (%tree decompiled inline)
         
         "Error":
             barf "Cannot decompile an error"

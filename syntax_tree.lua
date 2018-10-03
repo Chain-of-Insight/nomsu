@@ -196,8 +196,6 @@ for _index_0 = 1, #types do
     __call = function(self, t)
       if type(t.source) == 'string' then
         t.source = Source:from_string(t.source)
-      else
-        assert(Source:is_instance(t.source))
       end
       setmetatable(t, self)
       do

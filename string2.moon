@@ -96,6 +96,6 @@ for test in *{"", "_", " ", "return", "asdf", "one two", "one_two", "Hex2Dec", "
     lua_id = string2.as_lua_id(test)
     assert is_lua_id(lua_id), "failed to convert '#{test}' to a valid Lua identifier (got '#{lua_id}')"
     roundtrip = string2.from_lua_id(lua_id)
-    assert roundtrip == test, "Failed lua_id roundtrip: '#{test}' -> #{lua_id} -> #{roundtrip}"
+    assert roundtrip == test, "Failed lua_id roundtrip: '#{test}' -> '#{lua_id}' -> '#{roundtrip}'"
 
 return string2
