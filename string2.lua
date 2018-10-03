@@ -187,6 +187,6 @@ for _index_0 = 1, #_list_0 do
   local lua_id = string2.as_lua_id(test)
   assert(is_lua_id(lua_id), "failed to convert '" .. tostring(test) .. "' to a valid Lua identifier (got '" .. tostring(lua_id) .. "')")
   local roundtrip = string2.from_lua_id(lua_id)
-  assert(roundtrip == test, "Failed lua_id roundtrip: '" .. tostring(test) .. "' -> " .. tostring(lua_id) .. " -> " .. tostring(roundtrip))
+  assert(roundtrip == test, "Failed lua_id roundtrip: '" .. tostring(test) .. "' -> '" .. tostring(lua_id) .. "' -> '" .. tostring(roundtrip) .. "'")
 end
 return string2
