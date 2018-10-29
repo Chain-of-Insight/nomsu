@@ -93,7 +93,7 @@ MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer 
 NomsuCompiler = setmetatable {}, {__tostring: => "Nomsu"}
 _anon_chunk = 0
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 9
+    .NOMSU_COMPILER_VERSION = 10
     .NOMSU_SYNTAX_VERSION = max_parser_version
     .can_optimize = -> false
 
@@ -116,7 +116,6 @@ with NomsuCompiler
         __imported: Dict{}
         __parent: nil
     }
-    assert .environment.globals
     setmetatable(.environment, {
         __index: (key)=>
             if imported = rawget(@, "__imported")
