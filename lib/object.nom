@@ -2,6 +2,15 @@
 #
     This file contains the implementation of an Object-Oriented programming system.
 
+%globals.METAMETHOD_MAP = {..}
+    "as text": "__tostring", "clean up": "__gc",
+    "+ 1": "__add", "- 1": "__sub", "* 1": "__mul", "/ 1": "__div",
+    "-": "__unm", "// 1": "__idiv", "mod 1": "__mod", "^ 1": "__pow",
+    "& 1": "__band", "| 1": "__bor", "~ 1": "__bxor", "~": "__bnot",
+    "<< 1": "__bshl", ">> 1": "__bshr", "== 1": "__eq", "< 1": "__lt",
+    "<= 1": "__le", "set 1 = 2": "__newindex", "size": "__len",
+    "iterate": "__ipairs", "iterate all": "__pairs",
+
 test:
     object (Dog):
         (Dog).genus = "Canus"
@@ -86,9 +95,7 @@ compile [object %classname extends %parent %class_body] to:
                     __tostring=function(cls) return cls.name end,
                     __call=function(cls, inst)
                         inst = setmetatable(inst or {}, cls)
-                        if inst.set_up then
-                            inst:set_up()
-                        end
+                        if inst.set_up then inst:set_up() end
                         return inst
                     end,
                 })
@@ -100,15 +107,7 @@ compile [object %classname extends %parent %class_body] to:
                     return inst.name..getmetatable(_Dict{}).__tostring(inst)
                 end
                 \(%class_body as lua statements)
-                local metamethod_map = {["as text"]="__tostring", ["clean up"]="__gc",
-                    ["+ 1"]="__add", ["- 1"]="__sub", ["* 1"]="__mul", ["/ 1"]="__div",
-                    ["-"]="__unm", ["// 1"]="__idiv", ["mod 1"]="__mod", ["^ 1"]="__pow",
-                    ["& 1"]="__band", ["| 1"]="__bor", ["~ 1"]="__bxor", ["~"]="__bnot",
-                    ["<< 1"]="__bshl", [">> 1"]="__bshr", ["== 1"]="__eq", ["< 1"]="__lt",
-                    ["<= 1"]="__le", ["set 1 = 2"]="__newindex", ["size"]="__len",
-                    ["iterate"]="__ipairs", ["iterate all"]="__pairs",
-                }
-                for stub,metamethod in pairs(metamethod_map) do
+                for stub,metamethod in pairs(globals.METAMETHOD_MAP) do
                     class[metamethod] = class[stub:as_lua_id()]
                 end
             end"

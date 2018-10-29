@@ -8,6 +8,8 @@ file:
 
 shebang: "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* {:version: [0-9.]+ :} [^%nl]*
 
+eof: !.
+
 file_chunks (FileChunks):
     {:curr_indent: ' '* :}
     shebang? comment? blank_lines?
@@ -71,7 +73,7 @@ tab_error (Error):
 section_division: ("~")^+3 eol
 
 inline_block:
-    "(" ws* inline_block  ws* ")" / raw_inline_block
+    "(" ws* inline_block  ws* (eof / ")") / raw_inline_block
 raw_inline_block (Block):
     (!"::") ":" ws* ((inline_statement (ws* ";" ws* inline_statement)*) / !(eol nl_indent))
 indented_block (Block):
@@ -89,7 +91,7 @@ noindex_inline_expression:
     / ( "("
             ws* (inline_action / inline_expression) ws*
             (ws* ',' ws* (inline_action / inline_expression) ws*)*
-        (")" / missing_paren_err / unexpected_code)
+        (")" / eof / missing_paren_err / unexpected_code)
       )
 inline_expression: index_chain / noindex_inline_expression 
 indented_expression:
@@ -130,7 +132,7 @@ text_word (Text): word
 
 inline_text (Text):
     !(indented_text)
-    '"' _inline_text* ('"' / missing_quote_err / unexpected_code)
+    '"' _inline_text* ('"' / eof / missing_quote_err / unexpected_code)
 _inline_text:
     {~ (('\"' -> '"') / ('\\' -> '\') / escaped_char / text_char+)+ ~}
     / inline_text_interpolation / illegal_char
@@ -140,7 +142,7 @@ inline_text_interpolation:
         / ("("
             ws* (inline_action / inline_expression) ws*
             (ws* ',' ws* (inline_action / inline_expression) ws*)*
-            (")" / missing_paren_err / unexpected_code))
+            (")" / eof / missing_paren_err / unexpected_code))
     )
 
 text_char: %utf8_char / !["\] %print / %tab
@@ -156,7 +158,7 @@ indented_text (Text):
     (('\' %nl+ {:curr_indent: indent :} ('..')?)
      / disallowed_interpolation? {%nl+} {:curr_indent: indent :})
     (indented_plain_text / text_interpolation / illegal_char / {~ %nl+ (=curr_indent -> "") ~})*
-    ('"' eol / missing_quote_err)
+    ('"' eol / eof / missing_quote_err)
     {:curr_indent: %nil :}
 -- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
 indented_plain_text (Text):
@@ -180,7 +182,7 @@ inline_list (List):
     !('[..]')
     "[" ws*
         (inline_list_item (ws* ',' ws* inline_list_item)* (ws* ',')?)? ws*
-    ("]" / (","? (missing_bracket_error / unexpected_code)))
+    ("]" / eof / (","? (missing_bracket_error / unexpected_code)))
 indented_list (List):
     "[..]" eol nl_indent
         list_line (nl_nodent list_line)*
@@ -195,7 +197,7 @@ inline_dict (Dict):
     !('{..}')
     "{" ws*
         (inline_dict_entry (ws* ',' ws* inline_dict_entry)*)? ws*
-    ("}" / (","? (missing_brace_error / unexpected_code)))
+    ("}" / eof / (","? (missing_brace_error / unexpected_code)))
 indented_dict (Dict):
     "{..}" eol nl_indent
         dict_line (nl_nodent dict_line)*

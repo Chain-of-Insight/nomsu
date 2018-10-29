@@ -186,6 +186,13 @@ local _list_mt = {
       end
       return false
     end,
+    remove_1 = function(self, item)
+      for i, x in ipairs(self) do
+        if x == item then
+          remove(self, i)
+        end
+      end
+    end,
     index_of_1 = function(self, item)
       for i, x in ipairs(self) do
         if x == item then

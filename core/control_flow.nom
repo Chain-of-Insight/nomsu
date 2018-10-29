@@ -53,7 +53,7 @@ compile [..]
     %when_true_expr if %condition otherwise %when_false_expr
     %when_false_expr unless %condition else %when_true_expr
     %when_false_expr unless %condition then %when_true_expr
-..to (..)
+..to:
     #   If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
         equivalent of a conditional expression: (cond and if_true or if_false)
     if {Text:yes, List:yes, Dict:yes, Number:yes}.(%when_true_expr.type):
@@ -541,7 +541,7 @@ test:
     assume (sorted %flat) == [1, 2, 3, 4, 5, 6]
 
 # Recurion control flow
-compile [for %var in recursive %structure %body] to (..)
+compile [for %var in recursive %structure %body] to:
     with local compile actions:
         define mangler
         compile [recurse %v on %x] to (..)

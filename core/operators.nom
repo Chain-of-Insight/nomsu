@@ -157,7 +157,7 @@ compile [with %assignments %body] to:
 test:
     assume ((5 wrapped around 2) == 1) or barf "mod not working"
 compile [%x wrapped around %y, %x mod %y] to (..)
-    Lua value "(\(%x as lua expr) % \(%y as lua expr))"
+    Lua value "((\(%x as lua expr)) % (\(%y as lua expr)))"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)

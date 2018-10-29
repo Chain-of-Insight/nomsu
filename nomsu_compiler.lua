@@ -129,17 +129,21 @@ make_tree = function(tree, userdata)
   return tree
 end
 local Parsers = { }
-local max_parser_version = 0
-for version = 1, 999 do
-  do
-    local peg_contents = Files.read("nomsu." .. tostring(version) .. ".peg")
-    if peg_contents then
-      max_parser_version = version
-      Parsers[version] = make_parser(peg_contents, make_tree)
-    else
-      break
+local max_parser_version = 4
+for version = 1, max_parser_version do
+  local peg_file = io.open("nomsu." .. tostring(version) .. ".peg")
+  if not peg_file and package.nomsupath then
+    for path in package.nomsupath:gmatch("[^;]+") do
+      peg_file = io.open(path .. "/nomsu." .. tostring(version) .. ".peg")
+      if peg_file then
+        break
+      end
     end
   end
+  assert(peg_file, "could not find nomsu .peg file")
+  local peg_contents = peg_file:read('*a')
+  peg_file:close()
+  Parsers[version] = make_parser(peg_contents, make_tree)
 end
 local MAX_LINE = 80
 local NomsuCompiler = setmetatable({ }, {
@@ -199,9 +203,8 @@ do
     re = re,
     Files = Files,
     AST = AST,
-    TESTS = Dict({ }, {
-      globals = Dict({ })
-    }),
+    TESTS = Dict({ }),
+    globals = Dict({ }),
     LuaCode = LuaCode,
     NomsuCode = NomsuCode,
     Source = Source,
@@ -209,6 +212,7 @@ do
     __imported = Dict({ }),
     __parent = nil
   }
+  assert(NomsuCompiler.environment.globals)
   setmetatable(NomsuCompiler.environment, {
     __index = function(self, key)
       do

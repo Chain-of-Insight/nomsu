@@ -73,6 +73,10 @@ _list_mt =
                 if x == item
                     return true
             return false
+        remove_1: (item)=>
+            for i,x in ipairs @
+                if x == item
+                    remove(@, i)
         index_of_1: (item)=>
             for i,x in ipairs @
                 if x == item

@@ -52,7 +52,7 @@ action [%tree decompiled inline]:
             return %nomsu
 
         "Text":
-            %nomsu = (Nomsu Code from %tree ["\""])
+            %nomsu = (Nomsu Code from %tree [])
             for %text in recursive %tree:
                 for %bit in %text at %i:
                     if (%bit is text):
@@ -87,14 +87,14 @@ action [%tree decompiled inline]:
         "DictEntry":
             set {%key:%tree.1, %value:%tree.2}
             if (all of [%key.type == "Text", (size of %key) == 1, %key.1 is a nomsu identifier]):
-                %nomsu = (Nomsu Code from %key [key.1])
+                %nomsu = (Nomsu Code from %key [%key.1])
             ..else:
                 %nomsu = (%key decompiled inline)
 
             if (%key.type == "Action"):
                 %nomsu::parenthesize
-            %nomsu::add ":"
             if %value:
+                %nomsu::add ":"
                 %nomsu::add (%value decompiled inline)
             return %nomsu
         

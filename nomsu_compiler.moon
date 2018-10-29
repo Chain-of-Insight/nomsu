@@ -77,12 +77,17 @@ make_tree = (tree, userdata)->
     return tree
 
 Parsers = {}
-max_parser_version = 0
-for version=1,999
-    if peg_contents = Files.read("nomsu.#{version}.peg")
-        max_parser_version = version
-        Parsers[version] = make_parser(peg_contents, make_tree)
-    else break
+max_parser_version = 4
+for version=1,max_parser_version
+    peg_file = io.open("nomsu.#{version}.peg")
+    if not peg_file and package.nomsupath
+        for path in package.nomsupath\gmatch("[^;]+")
+            peg_file = io.open(path.."/nomsu.#{version}.peg")
+            break if peg_file
+    assert(peg_file, "could not find nomsu .peg file")
+    peg_contents = peg_file\read('*a')
+    peg_file\close!
+    Parsers[version] = make_parser(peg_contents, make_tree)
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable {}, {__tostring: => "Nomsu"}
@@ -105,12 +110,13 @@ with NomsuCompiler
         _List:List, _Dict:Dict,
         -- Utilities and misc.
         stringify:stringify, utils:utils, lpeg:lpeg, re:re, Files:Files,
-        :AST, TESTS: Dict{}, globals: Dict{}
+        :AST, TESTS: Dict({}), globals: Dict({}),
         :LuaCode, :NomsuCode, :Source
         nomsu:NomsuCompiler
         __imported: Dict{}
         __parent: nil
     }
+    assert .environment.globals
     setmetatable(.environment, {
         __index: (key)=>
             if imported = rawget(@, "__imported")

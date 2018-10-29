@@ -231,7 +231,7 @@ compile [%tree as nomsu] to (..)
     Lua value "nomsu:tree_to_nomsu(\(%tree as lua expr))"
 
 compile [%tree as inline nomsu] to (..)
-    Lua value "nomsu:tree_to_nomsu(\(%tree as lua expr), true)"
+    Lua value "nomsu:tree_to_inline_nomsu(\(%tree as lua expr), true)"
 
 action [%var as lua identifier, %var as lua id] (..)
     lua> "\
