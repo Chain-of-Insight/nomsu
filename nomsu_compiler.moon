@@ -631,7 +631,10 @@ with NomsuCompiler
             when "Action"
                 nomsu = NomsuCode(tree.source)
                 if tree.target
-                    nomsu\append @tree_to_inline_nomsu(tree.target), "::"
+                    inline_target = @tree_to_inline_nomsu(tree.target)
+                    if tree.target.type == "Action"
+                        inline_target\parenthesize!
+                    nomsu\append inline_target, "::"
                 for i,bit in ipairs tree
                     if type(bit) == "string"
                         clump_words = (type(tree[i-1]) == 'string' and is_operator(bit) != is_operator(tree[i-1]))

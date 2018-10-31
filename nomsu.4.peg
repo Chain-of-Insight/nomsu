@@ -121,9 +121,9 @@ inline_action (Action):
 inline_arg: inline_expression / inline_block
 action (Action):
     !section_division
-    ({:target: arg :} (eol nl_nodent "..")? ws* "::" (eol nl_nodent "..")? ws*)?
-    (  (arg  ((eol nl_nodent "..")? ws* (arg / word))+)
-     / (word ((eol nl_nodent "..")? ws* (arg / word))*))
+    ({:target: arg :} ((ws* "\")? eol nl_nodent "..")? ws* "::" ((ws* "\")? eol nl_nodent "..")? ws*)?
+    (  (arg  (((ws* "\")? eol nl_nodent "..")? ws* (arg / word))+)
+     / (word (((ws* "\")? eol nl_nodent "..")? ws* (arg / word))*))
 arg: expression / inline_block / indented_block
 
 word: !number { operator_char+ / ident_char+ }

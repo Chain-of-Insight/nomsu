@@ -10,22 +10,29 @@ use "lib/os.nom"
 
 %args = (command line args)
 %inplace = (no)
-if (%args.1 is "-i"):
-    %inplace = (yes)
-    %args::remove index 1
-
-if (%args.1 is "-t"):
-    use "lib/consolecolor.nom"
-    %test = (yes)
-    %args::remove index 1
+%version = (Nomsu version)
+repeat:
+    if %args.1 is:
+        "-i":
+            %inplace = (yes)
+            %args::remove index 1
+        "-t":
+            use "lib/consolecolor.nom"
+            %test = (yes)
+            %args::remove index 1
+        "-V":
+            %version = %args.2
+            %args::remove index 1
+            %args::remove index 1
+        else: stop
 
 for %path in %args:
     for file %filename in %path:
         unless (%filename::matches "%.nom$"): do next %filename
         %tree = (parse (read file %filename) from %filename)
-        %uptree = (%tree upgraded)
+        %uptree = (%tree upgraded to %version)
         %text = "\
-            ..#!/usr/bin/env nomsu -V\(Nomsu version)
+            ..#!/usr/bin/env nomsu -V\%version
             \(%uptree as nomsu)"
         
         if:

@@ -1005,7 +1005,11 @@ do
     elseif "Action" == _exp_0 then
       local nomsu = NomsuCode(tree.source)
       if tree.target then
-        nomsu:append(self:tree_to_inline_nomsu(tree.target), "::")
+        local inline_target = self:tree_to_inline_nomsu(tree.target)
+        if tree.target.type == "Action" then
+          inline_target:parenthesize()
+        end
+        nomsu:append(inline_target, "::")
       end
       for i, bit in ipairs(tree) do
         if type(bit) == "string" then
