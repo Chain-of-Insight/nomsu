@@ -35,7 +35,7 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local AST = require("syntax_tree")
+local SyntaxTree = require("syntax_tree")
 local make_parser = require("parser")
 local pretty_error = require("pretty_errors")
 SOURCE_MAP = { }
@@ -97,16 +97,14 @@ escape = function(s)
 end
 local make_tree
 make_tree = function(tree, userdata)
-  local cls = AST[tree.type]
   tree.source = Source(userdata.filename, tree.start, tree.stop)
   tree.start, tree.stop = nil, nil
-  tree.type = nil
   do
     local _accum_0 = { }
     local _len_0 = 1
     for _index_0 = 1, #tree do
       local t = tree[_index_0]
-      if AST.is_syntax_tree(t, "Comment") then
+      if SyntaxTree:is_instance(t) and t.type == "Comment" then
         _accum_0[_len_0] = t
         _len_0 = _len_0 + 1
       end
@@ -117,15 +115,11 @@ make_tree = function(tree, userdata)
     tree.comments = nil
   end
   for i = #tree, 1, -1 do
-    if AST.is_syntax_tree(tree[i], "Comment") then
+    if SyntaxTree:is_instance(tree[i]) and tree[i].type == "Comment" then
       table.remove(tree, i)
     end
   end
-  tree = setmetatable(tree, cls)
-  cls.source_code_for_tree[tree] = userdata.source
-  if tree.__init then
-    tree:__init()
-  end
+  tree = SyntaxTree(tree)
   return tree
 end
 local Parsers = { }
@@ -200,7 +194,7 @@ do
     lpeg = lpeg,
     re = re,
     Files = Files,
-    AST = AST,
+    SyntaxTree = SyntaxTree,
     TESTS = Dict({ }),
     globals = Dict({ }),
     LuaCode = LuaCode,
@@ -245,9 +239,6 @@ do
   if jit or _VERSION == "Lua 5.2" then
     NomsuCompiler.environment.bit = require("bitops")
   end
-  for k, v in pairs(AST) do
-    NomsuCompiler.environment[k] = v
-  end
   NomsuCompiler.fork = function(self)
     local f = setmetatable({ }, {
       __index = self
@@ -288,7 +279,7 @@ do
         for k, v in pairs(t) do
           local _continue_0 = false
           repeat
-            if not (AST.is_syntax_tree(v)) then
+            if not (SyntaxTree:is_instance(v)) then
               _continue_0 = true
               break
             end
@@ -540,7 +531,7 @@ do
       Files.spoof(source.filename, to_run)
     end
     local tree
-    if AST.is_syntax_tree(to_run) then
+    if SyntaxTree:is_instance(to_run) then
       tree = to_run
     else
       tree = self:parse(to_run, source)
@@ -714,7 +705,7 @@ do
           local filename = Source:from_string(info.source).filename
           self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
         end
-        if AST.is_syntax_tree(ret) then
+        if SyntaxTree:is_instance(ret) then
           if ret == tree then
             local info = debug.getinfo(compile_action, "S")
             local filename = Source:from_string(info.source).filename
@@ -763,19 +754,19 @@ do
       lua:append(")")
       return lua
     elseif "EscapedNomsu" == _exp_0 then
-      local lua = LuaCode.Value(tree.source, tree[1].type, "{")
+      local lua = LuaCode.Value(tree.source, "SyntaxTree{")
       local needs_comma, i = false, 1
       local as_lua
       as_lua = function(x)
         if type(x) == 'number' then
           return tostring(x)
-        elseif AST.is_syntax_tree(x) then
+        elseif SyntaxTree:is_instance(x) then
           return self:compile(x, compile_actions)
         else
           return x:as_lua()
         end
       end
-      for k, v in pairs(AST.is_syntax_tree(tree[1], "EscapedNomsu") and tree or tree[1]) do
+      for k, v in pairs((SyntaxTree:is_instance(tree[1]) and tree[1].type == "EscapedNomsu" and tree) or tree[1]) do
         if needs_comma then
           lua:append(", ")
         else
@@ -1175,7 +1166,7 @@ do
         local _list_0 = t
         for _index_0 = 1, #_list_0 do
           local x = _list_0[_index_0]
-          if AST.is_syntax_tree(x) then
+          if SyntaxTree:is_instance(x) then
             find_comments(x)
           end
         end

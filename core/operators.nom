@@ -53,7 +53,7 @@ test:
         for i, item in ipairs(\%assignments) do
             local \%target, \%value = item[1], item[2]
             \%value = \%value:map(function(t)
-                if Action:is_instance(t) and t.stub == "?" then
+                if SyntaxTree:is_instance(t) and t.type == "Action" and t.stub == "?" then
                     return \%target
                 end
             end)

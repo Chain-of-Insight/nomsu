@@ -23,7 +23,7 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring
 unpack or= table.unpack
 {:match, :sub, :gsub, :format, :byte, :find} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-AST = require "syntax_tree"
+SyntaxTree = require "syntax_tree"
 make_parser = require("parser")
 pretty_error = require("pretty_errors")
 -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
@@ -62,18 +62,14 @@ escape = (s)->
 -- Re-implement nomsu-to-lua comment translation?
 
 make_tree = (tree, userdata)->
-    cls = AST[tree.type]
     tree.source = Source(userdata.filename, tree.start, tree.stop)
     tree.start, tree.stop = nil, nil
-    tree.type = nil
-    tree.comments = [t for t in *tree when AST.is_syntax_tree(t, "Comment")]
+    tree.comments = [t for t in *tree when SyntaxTree\is_instance(t) and t.type == "Comment"]
     if #tree.comments == 0 then tree.comments = nil
     for i=#tree,1,-1
-        if AST.is_syntax_tree(tree[i], "Comment")
+        if SyntaxTree\is_instance(tree[i]) and tree[i].type == "Comment"
             table.remove(tree, i)
-    tree = setmetatable(tree, cls)
-    cls.source_code_for_tree[tree] = userdata.source
-    if tree.__init then tree\__init!
+    tree = SyntaxTree(tree)
     return tree
 
 Parsers = {}
@@ -108,7 +104,7 @@ with NomsuCompiler
         _List:List, _Dict:Dict,
         -- Utilities and misc.
         stringify:stringify, utils:utils, lpeg:lpeg, re:re, Files:Files,
-        :AST, TESTS: Dict({}), globals: Dict({}),
+        :SyntaxTree, TESTS: Dict({}), globals: Dict({}),
         :LuaCode, :NomsuCode, :Source
         nomsu:NomsuCompiler
         __imported: Dict{}
@@ -130,7 +126,6 @@ with NomsuCompiler
             return ipairs(x)
     if jit or _VERSION == "Lua 5.2"
         .environment.bit = require("bitops")
-    for k,v in pairs(AST) do .environment[k] = v
 
     .fork = =>
         f = setmetatable({}, {__index:@})
@@ -160,7 +155,7 @@ with NomsuCompiler
                 coroutine.yield t
             else
                 for k,v in pairs(t)
-                    continue unless AST.is_syntax_tree(v)
+                    continue unless SyntaxTree\is_instance(v)
                     find_errors(v)
 
         errs = [err for err in coroutine.wrap(-> find_errors(tree))]
@@ -303,7 +298,7 @@ with NomsuCompiler
         source = to_run.source or Source(to_run, 1, #to_run)
         if type(source) == 'string' then source = Source\from_string(source)
         if not Files.read(source.filename) then Files.spoof(source.filename, to_run)
-        tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source)
+        tree = if SyntaxTree\is_instance(to_run) then to_run else @parse(to_run, source)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
         if tree.type != "FileChunks"
@@ -416,7 +411,7 @@ with NomsuCompiler
                         @compile_error tree,
                             "The compile-time action here (#{stub}) failed to return any value.",
                             "Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's returning something."
-                    if AST.is_syntax_tree(ret)
+                    if SyntaxTree\is_instance(ret)
                         if ret == tree
                             info = debug.getinfo(compile_action, "S")
                             filename = Source\from_string(info.source).filename
@@ -457,16 +452,16 @@ with NomsuCompiler
                 return lua
 
             when "EscapedNomsu"
-                lua = LuaCode.Value tree.source, tree[1].type, "{"
+                lua = LuaCode.Value tree.source, "SyntaxTree{"
                 needs_comma, i = false, 1
                 as_lua = (x)->
                     if type(x) == 'number'
                         tostring(x)
-                    elseif AST.is_syntax_tree(x)
+                    elseif SyntaxTree\is_instance(x)
                         @compile(x, compile_actions)
                     else x\as_lua!
 
-                for k,v in pairs(AST.is_syntax_tree(tree[1], "EscapedNomsu") and tree or tree[1])
+                for k,v in pairs((SyntaxTree\is_instance(tree[1]) and tree[1].type == "EscapedNomsu" and tree) or tree[1])
                     if needs_comma then lua\append ", "
                     else needs_comma = true
                     if k == i
@@ -743,7 +738,7 @@ with NomsuCompiler
             find_comments = (t)->
                 if t.comments and t.source.filename == tree.source.filename
                     comment_set[c] = true for c in *t.comments
-                find_comments(x) for x in *t when AST.is_syntax_tree x
+                find_comments(x) for x in *t when SyntaxTree\is_instance x
             find_comments(tree)
             -- Sort in reversed order so they can be easily popped
             comments = [c for c in pairs comment_set]
