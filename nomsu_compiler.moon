@@ -97,7 +97,7 @@ with NomsuCompiler
 
     -- Discretionary/convenience stuff
     .environment = {
-        NOMSU_COMPILER_VERSION: 9, NOMSU_SYNTAX_VERSION: max_parser_version
+        NOMSU_COMPILER_VERSION: 10, NOMSU_SYNTAX_VERSION: max_parser_version
         -- Lua stuff:
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
@@ -264,14 +264,9 @@ with NomsuCompiler
             return add_lua_bits(@, "value", code)
 
         ["use 1"]: (tree, path)=>
-            lua = LuaCode(tree.source)
             if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
-                for _,f in Files.walk(path[1])
-                    if match(f, "%.lua$") or match(f, "%.nom$") or match(f, "^/dev/fd/[012]$")
-                        @import(@run_file(f))
-                        if #lua.bits > 0 then lua\append "\n"
-                        lua\append "nomsu:import(nomsu:run_file(#{f\as_lua!}))"
-            return lua
+                @import_file(path[1])
+            return LuaCode(tree.source, "nomsu:import_file(#{@compile(path)})")
 
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
         ["test 1"]: (tree, body)=>
@@ -298,6 +293,11 @@ with NomsuCompiler
         for k,v in pairs(mod.COMPILE_ACTIONS)
             continue if k == "__imported" or k == "__parent"
             @environment.COMPILE_ACTIONS.__imported[k] or= v
+
+    .import_file = (path)=>
+        for _,f in Files.walk(path)
+            if match(f, "%.lua$") or match(f, "%.nom$") or match(f, "^/dev/fd/[012]$")
+                @import(@run_file(f))
 
     .run = (to_run, compile_actions)=>
         source = to_run.source or Source(to_run, 1, #to_run)

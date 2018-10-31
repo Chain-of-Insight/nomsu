@@ -89,9 +89,7 @@ nomsu = NomsuCompiler
 nomsu.environment.arg = NomsuCompiler.environment._List(args.nomsu_args)
 
 if args.version
-    nomsu\run [[
-use "core"
-say (Nomsu version)]]
+    nomsu\run [[(: use "core"; say (Nomsu version))]]
     os.exit(EXIT_SUCCESS)
 
 export FILE_CACHE
@@ -123,9 +121,7 @@ run = ->
         return true
 
     unless args.no_core
-        for _,filename in Files.walk('core')
-            if filename\match "%.nom$"
-                nomsu\import(nomsu\run_file(filename))
+        nomsu\import_file('core')
 
     get_file_and_source = (filename)->
         local file, source
@@ -185,8 +181,8 @@ run = ->
         nomsu\run [[
 #!/usr/bin/env nomsu -V4
 use "lib/consolecolor.nom"
-action [quit, exit]: lua> "os.exit(0)"
-action [help]:
+[quit, exit] all mean: lua> "os.exit(0)"
+(help) means:
     say "\
         ..This is the Nomsu v\(Nomsu version) interactive console.
         You can type in Nomsu code here and hit 'enter' twice to run it.
@@ -215,11 +211,12 @@ say "\
                 break -- Exit
             
             buff = table.concat(buff)
+
             pseudo_filename = "user input #"..repl_line
             Files.spoof(pseudo_filename, buff)
             err_hand = (error_message)->
                 Errhand.print_error error_message
-            ok, ret = xpcall(nomsu.run, err_hand, nomsu, buff, Source(pseudo_filename, 1, #buff))
+            ok, ret = xpcall nomsu.run, err_hand, nomsu, NomsuCode(Source(pseudo_filename,1,#buff), buff)
             if ok and ret != nil
                 if type(ret) == 'number'
                     print "= #{ret}"
