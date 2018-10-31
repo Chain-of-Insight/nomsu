@@ -30,8 +30,8 @@ externally (barf any errors in %t) means:
 externally (%tree compiled with %compile_actions) means:
     assume (%tree is a "Syntax Tree")
     if all of [..]
-        %tree.version, (Nomsu version)'s meaning, %tree.version != (Nomsu version)
-        (1 upgraded from 2 to 3)'s meaning
+        %tree.version, ((Nomsu version)'s meaning) != (nil), %tree.version != (Nomsu version)
+        ((1 upgraded from 2 to 3)'s meaning) != (nil)
     ..then:
         %tree = (upgrade %tree from %tree.version to (Nomsu version))
     
