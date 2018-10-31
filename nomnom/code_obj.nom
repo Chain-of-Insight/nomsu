@@ -1,25 +1,19 @@
+#!/usr/bin/env nomsu -V4.8.10
 # This file contains objects that are used to track code positions and incrementally
     build up generated code, while keeping track of where it came from, and managing
     indentation levels.
-
 use "lib/object.nom"
 
 object (Hole):
-    action [Hole from %lua]:
+    externally (Hole from %lua) means:
         return (Hole {lua:%lua})
-
-    my action [as lua]:
-        return %me.lua
-    
+    my action [as lua]: return %me.lua
     my action [as nomsu]:
         return "(Hole {lua:\(%me.lua)})"
-    
     my action [as text]:
         barf "Not implemented"
-    
     my action [as smext]:
         barf "Must fill in holes before smexting"
-    
 
 object (Code):
     my action [set up]:
@@ -28,12 +22,10 @@ object (Code):
         %me.bits = []
         if (%me.source is text):
             %me.source = (Source from text %me.source)
-        for % in %old_bits:
-            %me::add %
-
+        for % in %old_bits: %me::add %
+    
     my action [as text]:
         barf "Not implemented"
-
     my action [as smext]:
         if (%me.__str == (nil)):
             set {%buff:[], %indent:0}
@@ -45,32 +37,41 @@ object (Code):
                     %bit = (%bit::as smext)
                     if (%indent > 0):
                         %bit = (%bit::with "\n" -> "\n\(" "::* %indent)")
+                
                 %buff::add %bit
+            
             %me.__str = (%buff::joined)
+        
         return %me.__str
-
+    
     my action [as lua]:
         barf
-        return "\(%me.class.name::as lua id)_from_1_2(\((%me.source::as lua) if %me.source else "nil"), \(%me.bits::as lua))"
-
-    my action [as nomsu] (..)
-        "(\(%me.class.name) \((%me.source::as nomsu) if %me.source else "(nil)") \(%me.bits::as nomsu))"
-
-    my action [size] (size of (%me::as smext))
+        return "\
+            ..\(%me.class.name::as lua id)_from_1_2(\(..)
+                (%me.source::as lua) if %me.source else "nil"
+            .., \(%me.bits::as lua))"
     
+    my action [as nomsu] "\
+        ..(\(%me.class.name) \((%me.source::as nomsu) if %me.source else "(nil)") \(..)
+            %me.bits::as nomsu
+        ..)"
+    
+    my action [size] (size of (%me::as smext))
     my action [mark as dirty]:
         %me.__str = (nil)
         %me._trailing_line_len = (nil)
         %me._num_lines = (nil)
-            
+    
     my action [add %new_bits]:
         unless (%new_bits is a "List"):
             %new_bits = [%new_bits]
         for % in %new_bits:
             if (% == ""): do next %
+            
             #if ((% isn't text) and (% isn't a (Code))):
                 % = (%::as lua)
             %me.bits::add %
+        
         %me::mark as dirty
     
     my action [trailing line length]:
@@ -86,15 +87,15 @@ object (Code):
                     %num_lines += (size of (%::all matches of "\n"))
                 ..else:
                     %num_lines += ((%::number of lines) - 1)
+            
             %me._num_lines = %num_lines
+        
         return %me._num_lines
-
+    
     my action [is multiline, is multi-line] ((%me::number of lines) > 1)
     my action [is one line, is single line] ((%me::number of lines) == 1)
-
     my action [add %values joined with %joiner]:
         %me::add %values joined with %joiner or %joiner
-
     my action [add %values joined with %joiner or %wrapping_joiner]:
         %line_len = 0
         %bits = %me.bits
@@ -103,8 +104,8 @@ object (Code):
                 if (%line_len > 80):
                     %bits::add %wrapping_joiner
                     %line_len = 0
-                ..else:
-                    %bits::add %joiner
+                ..else: %bits::add %joiner
+            
             %bits::add %value
             unless (%value is text):
                 %value = (%value::as smext)
@@ -113,6 +114,7 @@ object (Code):
                 %line_len = (size of %line)
             ..else:
                 %line_len += (size of %value)
+        
         %me::mark as dirty
     
     my action [prepend %]:
@@ -120,12 +122,11 @@ object (Code):
             % = (%::as lua)
         %me.bits::add % at index 1
         %me::mark as dirty
-
+    
     my action [parenthesize]:
         %me.bits::add "(" at index 1
         %me.bits::add ")"
         %me::mark as dirty
-
 
 object (Lua Code) extends (Code):
     my action [add free vars %vars]:
@@ -136,6 +137,7 @@ object (Lua Code) extends (Code):
             unless %seen.%var:
                 %me.free_vars::add %var
                 %seen.%var = (yes)
+        
         %me::mark as dirty
     
     my action [remove free vars %vars]:
@@ -153,11 +155,13 @@ object (Lua Code) extends (Code):
                     lua> "table.remove(\%lua.free_vars, \%i)"
                     #TODO: reinstate this
                     #%lua.free_vars::remove at index %i
+                    
+            
             for % in %lua.bits:
-                unless (% is text):
-                    %stack::add %
+                unless (% is text): %stack::add %
+        
         %me::mark as dirty
-
+    
     my action [declare locals] (%me::declare locals (nil))
     my action [declare locals %to_declare]:
         unless %to_declare:
@@ -167,19 +171,19 @@ object (Lua Code) extends (Code):
                     unless %seen.%var:
                         %seen.%var = (yes)
                         %to_declare::add %var
+                
                 for % in %lua.bits:
-                    unless (% is text):
-                        recurse %lua on %
+                    unless (% is text): recurse %lua on %
+        
         if ((size of %to_declare) > 0):
             %me::remove free vars %to_declare
             %me::prepend "local \(%to_declare::joined with ", ");\n"
         return %to_declare
-
+    
     my action [as statements] (%me::as statements "" ";")
     my action [as statements %prefix] (%me::as statements %prefix ";")
     my action [as statements %prefix %suffix]:
-        unless %me.is_value:
-            return %me
+        unless %me.is_value: return %me
         %statements = (Lua Code from %me.source [])
         if ((%prefix or "") != ""):
             %statements::add %prefix
@@ -194,46 +198,48 @@ object (Lua Code) extends (Code):
             if %code.is_variable:
                 %vars::add (%code::as smext)
             for % in %code.bits:
-                unless (% is text):
-                    recurse %code on %
+                unless (% is text): recurse %code on %
+        
         return %vars
-
-    action [Lua Code from %source %bits]:
+    
+    externally (Lua Code from %source %bits) means:
         assume %source
         unless (%bits is a "List"): %bits = [%bits]
-        if (%source is a "Syntax Tree"): %source = %source.source
-        return (..)
-            Lua Code {source:%source, bits:%bits, is_value: no, free_vars:[]}
-    action [Lua Code from %source] (Lua Code from %source [])
-
-    action [Lua Value from %source %bits]:
+        if (%source is a "Syntax Tree"):
+            %source = %source.source
+        return (Lua Code {source:%source, bits:%bits, is_value:no, free_vars:[]})
+    
+    externally (Lua Code from %source) means (Lua Code from %source [])
+    externally (Lua Value from %source %bits) means:
         assume %source
         unless (%bits is a "List"): %bits = [%bits]
-        if (%source is a "Syntax Tree"): %source = %source.source
-        return (..)
-            Lua Code {source:%source, bits:%bits, is_value: yes, free_vars:[]}
-    action [Lua Value from %source] (Lua Value from %source [])
-
-    action [Lua Variable from %source] (Lua Variable from %source [])
-    action [Lua Variable from %source %bits]:
+        if (%source is a "Syntax Tree"):
+            %source = %source.source
+        return (Lua Code {source:%source, bits:%bits, is_value:yes, free_vars:[]})
+    
+    externally (Lua Value from %source) means (Lua Value from %source [])
+    externally (Lua Variable from %source) means (Lua Variable from %source [])
+    externally (Lua Variable from %source %bits) means:
         assume %source
         unless (%bits is a "List"): %bits = [%bits]
-        if (%source is a "Syntax Tree"): %source = %source.source
+        if (%source is a "Syntax Tree"):
+            %source = %source.source
         return (..)
-            Lua Code {source:%source, bits:%bits, is_value: yes, is_variable: yes, free_vars:[]}
+            Lua Code {..}
+                source:%source, bits:%bits, is_value:yes, is_variable:yes, free_vars:[]
 
 # TODO: remove this shim
 (Lua Code).add_free_vars = (Lua Code).add_free_vars_1
 (Lua Code).remove_free_vars = (Lua Code).remove_free_vars_1
 (Lua Code).declare_locals = (Lua Code).declare_locals_1
 (Lua Code).as_statements = (Lua Code).as_statements_1_2
-
 object (Nomsu Code) extends (Code):
-    action [Nomsu Code from %source %bits]:
+    externally (Nomsu Code from %source %bits) means:
         if (%bits is text): %bits = [%bits]
-        if (%source is a "Syntax Tree"): %source = %source.source
-        return (..)
-            Nomsu Code {source:%source, bits:%bits}
-    action [Nomsu Code from %source] (Nomsu Code from %source [])
-    action [Nomsu Code %bits] (Nomsu Code from (nil) %bits)
-    action [Nomsu Code] (Nomsu Code from (nil) [])
+        if (%source is a "Syntax Tree"):
+            %source = %source.source
+        return (Nomsu Code {source:%source, bits:%bits})
+    
+    externally (Nomsu Code from %source) means (Nomsu Code from %source [])
+    externally (Nomsu Code %bits) means (Nomsu Code from (nil) %bits)
+    externally (Nomsu Code) means (Nomsu Code from (nil) [])

@@ -247,7 +247,7 @@ say both (my favorite number) and also "foo"
 
 # Macros: 
 # The "lua> %" and "=lua %" macros can be used to write raw lua code: 
-(say the time) means (..)
+(say the time) means:
     lua> "io.write(\"The OS time is: \", os.time(), \"\\n\");"
 
 say the time

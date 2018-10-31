@@ -1,7 +1,7 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     Find an action by its stub. Usage:
-        nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
+    nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
     Will print all the code locations and code that uses the stub.
 
 use "lib/os.nom"
@@ -28,6 +28,6 @@ for %path in %files:
             
             if (%t is syntax tree):
                 for %sub in %t: recurse %t on %sub
+        
         sort %results by % -> %.line
-        for % in %results:
-            say %.text
+        for % in %results: say %.text

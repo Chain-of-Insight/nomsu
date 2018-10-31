@@ -1,3 +1,4 @@
+#!/usr/bin/env nomsu -V4.8.10
 # Some file utilities for searching for files recursively and using package.nomsupath
 use "lib/os.nom"
 
@@ -6,12 +7,12 @@ use "lib/os.nom"
 %_BROWSE_CACHE = {}
 
 # Create a fake file and put it in the cache
-action [spoof file %filename %contents]:
+externally (spoof file %filename %contents) means:
     %_SPOOFED_FILES.%filename = %contents
     return %contents
 
 # Read a file's contents
-action [read file %filename]:
+externally (read file %filename) means:
     %contents = %_FILE_CACHE.%filename
     if %contents: return %contents
     if (%filename == "stdin"):
@@ -23,7 +24,7 @@ action [read file %filename]:
     %_FILE_CACHE.%filename = %contents
     return %contents
 
-action [%path sanitized]:
+externally (%path sanitized) means:
     %path = (%path::with "\\" -> "\\\\")
     %path = (%path::with "`" -> "")
     %path = (%path::with "\"" -> "\\\"")
@@ -34,87 +35,74 @@ action [%path sanitized]:
 try:
     %lfs = (=lua "require('lfs')")
 ..and if it succeeds:
-    local action [filesystem has %filename]:
+    (filesystem has %filename) means:
         %mode = (call %lfs.attributes with [%filename, "mode"])
         if %mode is:
-            ("file", "directory", "link", "char device"):
-                return (yes)
+            "file" "directory" "link" "char device": return (yes)
             else: return (no)
     
-    action [file %path exists]:
-        if (..)
-            any of [..]
-                %_SPOOFED_FILES.%path
-                %path == "stdin"
-                filesystem has %path
-        ..: return (yes)
+    externally (file %path exists) means:
+        if (any of [%_SPOOFED_FILES.%path, %path == "stdin", filesystem has %path]):
+            return (yes)
         for %nomsupath in (%package.nomsupath::all matches of "[^;]+"):
-            if (filesystem has "\%nomsupath/\%path"):
-                return (yes)
+            if (filesystem has "\(%nomsupath)/\%path"): return (yes)
         return (no)
-
-    action [files in %path]:
+    
+    externally (files in %path) means:
         unless %_BROWSE_CACHE.%path:
             if (%_SPOOFED_FILES.%path or (%filename == "stdin")):
                 %_BROWSE_CACHE.%path = [%path]
             ..else:
                 if (call %lfs.attributes with [%filename, "mode"]) is:
-                    ("file", "char device"):
+                    "file" "char device":
                         %_BROWSE_CACHE.%path = [%filename]
-                    ("directory", "link"):
+                    "directory" "link":
                         for %nomsupath in (%package.nomsupath::all matches of "[^;]+"):
                             %files = []
-                            for %member in (call %lfs.dir with ["\%nomsupath/\%filename"]):
-                                if ((%member == ".") or (%member == "..")):
-                                    do next %member
+                            for %member in (call %lfs.dir with ["\(%nomsupath)/\%filename"]):
+                                if ((%member == ".") or (%member == "..")): do next %member
                                 for % in (files in %member): %files::add %
+                            
                             if ((size of %files) > 0):
                                 %_BROWSE_CACHE.%path = %files
                                 go to (Found Files)
-
+                        
                         %_BROWSE_CACHE.%path = []
+                    
                     else:
                         %_BROWSE_CACHE.%path = []
-
+        
         === (Found Files) ===
         return %_BROWSE_CACHE.%filename
-
 ..or if it barfs:
     # LFS not found! Fall back to shell commands, if available.
     unless (sh> "find . -maxdepth 0"):
         barf "\
-            ..Could not find 'luafilesystem' module and couldn't run system command 'find' \
-            ..(this might happen on Windows). Please install 'luafilesystem' (which can be \
-            ..found at \(..)
-                "https://github.com/spacewander/luafilesystem"
-                ..if %jit else "https://github.com/keplerproject/luafilesystem"
+            ..Could not find 'luafilesystem' module and couldn't run system command 'find' (this might happen on Windows). Please install \
+            ..'luafilesystem' (which can be found at \(..)
+                "https://github.com/spacewander/luafilesystem" if %jit else "\
+                    ..https://github.com/keplerproject/luafilesystem"
             .. or obtained through `luarocks install luafilesystem`)"
-
-
-    action [file %path exists]:
-        if (..)
-            any of [..]
-                %_SPOOFED_FILES.%path
-                %path == "stdin"
-                sh> "ls \(%path sanitized)"
+    
+    externally (file %path exists) means:
+        if (any of [%_SPOOFED_FILES.%path, %path == "stdin", sh> "ls \(%path sanitized)"]) \
         ..: return (yes)
         for %nomsupath in (%package.nomsupath::all matches of "[^;]+"):
-            if (sh> "ls \(%nomsupath)/\(%path)"):
-                return (yes)
+            if (sh> "ls \(%nomsupath)/\%path"): return (yes)
         return (no)
-
-    action [files in %path]:
+    
+    externally (files in %path) means:
         unless %_BROWSE_CACHE.%path:
             if %_SPOOFED_FILES.%path:
                 %_BROWSE_CACHE.%path = [%_SPOOFED_FILES.%path]
             ..else:
                 for %nomsupath in (%package.nomsupath::all matches of "[^;]+"):
-                    %files = (sh> "find -L '\%path' -not -path '*/\\.*' -type f'")
+                    %files = (sh> "find -L '\(%path)' -not -path '*/\\.*' -type f'")
                     if %files:
                         %_BROWSE_CACHE.%path = (%files::lines)
                         go to (Found Files)
+                
                 %_BROWSE_CACHE.%path = []
-
+        
         === (Found Files) ===
         return %_BROWSE_CACHE.%path
-

@@ -15,7 +15,7 @@ test:
     
     assume (%x == "outer")
     externally (foo) means "outer foo"
-    with local [action (foo)]:
+    with local [(foo)'s meaning]:
         externally (foo) means "inner foo"
         assume ((foo) == "inner foo")
     

@@ -102,7 +102,7 @@ lua> "\
 
 test:
     (foo %x) means (return "outer")
-    with local [action (foo %)]:
+    with local [(foo %)'s meaning]:
         (foo %x) means:
             %y = (%x + 1)
             return %y
@@ -151,8 +151,8 @@ test:
         return lua"
 
 test:
-    assume ((action (say %)) == (=lua "say_1"))
-(action %action) compiles to (Lua value (%action.stub as lua id))
+    assume (((say %)'s meaning) == (=lua "say_1"))
+(%action's meaning) compiles to (Lua value (%action.stub as lua id))
 
 test:
     (swap %x and %y) parses as (..)

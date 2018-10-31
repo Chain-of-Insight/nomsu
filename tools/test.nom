@@ -1,7 +1,7 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     Tool to run all tests in a file (i.e. the code block inside a call to 'test %'). Usage:
-        nomsu tools/test.nom file1 file2 directory1 ...
+    nomsu tools/test.nom file1 file2 directory1 ...
 
 use "lib/os.nom"
 use "lib/consolecolor.nom"
@@ -17,7 +17,6 @@ for %path in (command line args):
         if (%filename::matches "%.nom$"): use %filename
 
 for %path in (command line args): use %path
-
 %tests = ((=lua "Source:from_string(\%s)") = %t for %s = %t in (tests))
 for %path in (command line args):
     for file %filename in %path:

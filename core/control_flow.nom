@@ -406,7 +406,7 @@ test:
                 ..hint "If you want the code in this block to always execute, you don't \
                     ..need a conditional block around it. Otherwise, make sure the 'else' \
                     ..block comes last."
-
+            
             %code::append "\nelse\n    "
             %code::append (%action as lua statements)
             %else_allowed = (no)

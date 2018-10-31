@@ -1,9 +1,9 @@
+#!/usr/bin/env nomsu -V4.8.10
 use "lib/object.nom"
 
 # The types are [..]
     "Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
     "IndexChain", "Action", "FileChunks", "Error", "Comment"
-
 object (Syntax Tree):
     my action [set up]:
         if (%me.type == "Action"):
@@ -11,38 +11,33 @@ object (Syntax Tree):
             %argnum = 1
             for %bit in %me:
                 if:
-                    (%bit is text): %stub_bits::add %bit
+                    (%bit is text):
+                        %stub_bits::add %bit
                     (%bit.type != "Comment"):
                         %stub_bits::add "\%argnum"
                         %argnum += 1
+            
             %me.stub = (%stub_bits::joined with " ")
             if (%me.stub == "Lua Code 1 2"):
                 lua> "require('ldt').breakpoint()"
-
+    
     (Syntax Tree).source_code_for_tree = (..)
         {} with fallback % -> (read file %.source.filename)
-    
     my action [children]:
         %children = []
         for % in %me:
-            if ((% is a "Syntax Tree") and (%.type != "Comment")):
-                %children::add %
+            if ((% is a "Syntax Tree") and (%.type != "Comment")): %children::add %
         if ((%me.type == "Action") and %me.target):
             %children::add %me.target
         return %children
-
-    my action [as lua] (..)
-        "Syntax_Tree(\(call ({}'s metatable).as_lua with [%me]))"
-
-    my action [as nomsu] (..)
-        "(Syntax Tree \(call ({}'s metatable).as_nomsu with [%me]))"
-
-    my action [as text] (..)
-        "(Syntax Tree \(call ({}'s metatable).__tostring with [%me]))"
-
-    my action [get source code] (..)
-        (Syntax Tree).source_code_for_tree.%me
-
+    
+    my action [as lua] "\
+        ..a_Syntax_Tree_with_1(\(call ({} 's metatable).as_lua with [%me]))"
+    my action [as nomsu] "\
+        ..(a Syntax Tree with \(call ({} 's metatable).as_nomsu with [%me]))"
+    my action [as text] "\
+        ..(Syntax Tree \(call ({} 's metatable).__tostring with [%me]))"
+    my action [get source code] (Syntax Tree).source_code_for_tree.%me
     my action [map %fn]:
         %replacement = (call %fn with [%me])
         if %replacement:
@@ -58,25 +53,23 @@ object (Syntax Tree):
                 %replacement.%k = %v
                 if (%v is a "Syntax Tree"):
                     %r = (%v::map %fn)
-                    if ((%r == %v) or (%r == (nil))):
-                        do next %k
+                    if ((%r == %v) or (%r == (nil))): do next %k
                     %changes = (yes)
                     %replacement.%k = %r
+            
             unless %changes: return %me
             return (Syntax Tree %replacement)
-   
+    
     my action [with %overrides]:
         %new = (%k = %v for %k = %v in %me)
         for %k = %v in %overrides: %new.%k = %v
         return (Syntax Tree %new)
-
+    
     my action [== %other]:
         unless (..)
             all of [..]
-                (type of %me) == (type of %other)
-                (%me's metatable) == (%other's metatable)
-                (size of %me) == (size of %other)
-                %me.type == %other.type
+                (type of %me) == (type of %other), (%me 's metatable) == (%other 's metatable)
+                (size of %me) == (size of %other), %me.type == %other.type
         ..: return (no)
         
         for %item in %me at %i:
@@ -86,11 +79,11 @@ object (Syntax Tree):
         return (yes)
     
     my action [get args]:
-        assume (%me.type == "Action") or barf "Only actions have arguments, not \(%me.type)"
+        assume (%me.type == "Action") or barf "\
+            ..Only actions have arguments, not \(%me.type)"
         %args = []
         for % in %me:
-            unless ((% is text) or (%.type == "Comment")):
-                %args::add %
+            unless ((% is text) or (%.type == "Comment")): %args::add %
         return %args
 
 (Syntax Tree).map = (Syntax Tree).map_1

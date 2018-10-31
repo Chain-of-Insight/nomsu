@@ -1,16 +1,17 @@
+#!/usr/bin/env nomsu -V4.8.10
 # This file contains the parser, which converts text into abstract syntax trees
 #use "nomonom/ast.nom"
-
 %lpeg = (=lua "require('lpeg')")
 %re = (=lua "require('re')")
 call %lpeg.setmaxstack with [20000]
 set {..}
-    (action (P 1)): %lpeg.P, (action (R 1)): %lpeg.R, (action (Carg 1)): %lpeg.Carg,
-    (action (S 1)): %lpeg.S,
-    (action (Cc 1)): %lpeg.Cc, (action (lpeg re pattern 1)): %re.compile,
-    (action (lpeg re pattern 1 using 2)): %re.compile
-    (action (lpeg pattern 1's match of 2)): %lpeg.match
-    (action (lpeg pattern 1's match of 2 with 3)): [%1, %2, %3] -> (call %lpeg.match with [%1, %2, nil, %3])
+    ((P 1)'s meaning):%lpeg.P, ((R 1)'s meaning):%lpeg.R
+    ((Carg 1)'s meaning):%lpeg.Carg, ((S 1)'s meaning):%lpeg.S
+    ((Cc 1)'s meaning):%lpeg.Cc, ((lpeg re pattern 1)'s meaning):%re.compile
+    ((lpeg re pattern 1 using 2)'s meaning):%re.compile
+    ((lpeg pattern 1's match of 2)'s meaning):%lpeg.match
+    ((lpeg pattern 1's match of 2 with 3)'s meaning): (..)
+        [%1, %2, %3] -> (call %lpeg.match with [%1, %2, nil, %3])
 
 %source_code_for_tree = {}
 %defs = (..)
@@ -34,28 +35,30 @@ set {..}
             %t = (Syntax Tree %t)
             (Syntax Tree).source_code_for_tree.%t = %userdata.source
             return %t
-
     ..with fallback %key ->:
         if:
             (%key::matches "^ascii_(%d+)$"):
                 %i = (%key::matching "^ascii_(%d+)$")
                 return (call %string.char with [%i as a number])
+            
             (%key::matches "^number_(%d+)$"):
                 %i = (%key::matching "^number_(%d+)$")
                 return (Cc (%i as a number))
 
-%id_patt = (((P "") - (R "09")) *  ((%defs.utf8_char + (R "az") + (R "AZ") + (P "_") + (R "09"))^1 * -1))
-%operator_patt = ((S "'`~!@$^&*+=|<>?/-")^1 * -1)
+%id_patt = (..)
+    ((P "") - (R "09")) * (..)
+        (%defs.utf8_char + (R "az") + (R "AZ") + (P "_") + (R "09")) ^ 1 * -1
 
-action [%text is a nomsu id, %text is a nomsu identifier] (..)
+%operator_patt = ((S "'`~!@$^&*+=|<>?/-") ^ 1 * -1)
+externally [%text is a nomsu id, %text is a nomsu identifier] all mean (..)
     lpeg pattern %id_patt's match of %text
 
-action [%text is a nomsu operator] (..)
+externally (%text is a nomsu operator) means (..)
     lpeg pattern %operator_patt's match of %text
 
 %peg_tidier = (..)
     lpeg re pattern "\
-        file <- %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
+        ..file <- %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
         def <- anon_def / captured_def
         anon_def <-
             ({ident} (" "*) ":" {[^%nl]* (%nl+ " "+ [^%nl]*)*}) 
@@ -67,18 +70,22 @@ action [%text is a nomsu operator] (..)
         comment <- "--" [^%nl]*
         "
 
-action [make parser from %peg] (make parser from %peg using (nil))
-
-action [make parser from %peg using %make_tree]:
+externally (make parser from %peg) means (make parser from %peg using (nil))
+externally (make parser from %peg using %make_tree) means:
     %peg = (lpeg pattern %peg_tidier's match of %peg)
     %peg = (lpeg re pattern %peg using %defs)
-    local action [%input from %filename parsed]:
+    (%input from %filename parsed) means:
         %input = "\%input"
-        %tree_mt = {__index: {source:%input, filename:%filename}}
+        %tree_mt = {__index:{source:%input, filename:%filename}}
         %userdata = {..}
-            make_tree: %make_tree or ([%]-> (: set %'s metatable to %tree_mt; return %))
+            make_tree:%make_tree or ([%] -> (: set %'s metatable to %tree_mt; return %))
             filename:%filename, source:%input
+        
         %tree = (lpeg pattern %peg's match of %input with %userdata)
-        assume %tree or barf "File \%filename failed to parse:\n\%input"
+        assume %tree or barf "\
+            ..File \%filename failed to parse:
+            \%input"
+        
         return %tree
-    return (action (1 from 2 parsed))
+    
+    return ((1 from 2 parsed)'s meaning)

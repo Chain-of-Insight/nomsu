@@ -80,16 +80,15 @@ externally [..]
                 %tree with % -> (..)
                     if ((% is "Action" syntax tree) and %ACTION_UPGRADES.%ver.(%.stub)):
                         %with_upgraded_args = (..)
-                            %k = (%v upgraded from %start_version to %end_version) \
-                            ..for %k = %v in %
-                        set %with_upgraded_args's metatable to (%'s metatable)
-                        return (call %ACTION_UPGRADES.%ver.(%.stub) with [%with_upgraded_args, %end_version])
+                            %k = (%v upgraded from %start_version to %end_version) for %k = %v in %
+                        set %with_upgraded_args 's metatable to (% 's metatable)
+                        return (..)
+                            call %ACTION_UPGRADES.%ver.(%.stub) with [%with_upgraded_args, %end_version]
         
         if %UPGRADES.%ver:
             %with_upgraded_args = (..)
-                %k = (%v upgraded from %start_version to %end_version) \
-                ..for %k = %v in %tree
-            set %with_upgraded_args's metatable to (%tree's metatable)
+                %k = (%v upgraded from %start_version to %end_version) for %k = %v in %tree
+            set %with_upgraded_args 's metatable to (%tree 's metatable)
             %tree = (call %UPGRADES.%ver with [%with_upgraded_args, %end_version])
     
     return %tree
