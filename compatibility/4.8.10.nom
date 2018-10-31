@@ -1,0 +1,59 @@
+#!/usr/bin/env nomsu -V4.8.10.6
+#
+    This file defines upgrades from Nomsu <4.8.10 to 4.8.10 (renaming "action" -> "means")
+use "compatibility/compatibility.nom"
+
+upgrade action "local action 1 2" to "4.8.10" via (..)
+    [%tree, %end_version] ->:
+        %spec = %tree.3
+        %body = %tree.4
+        if %spec.type is:
+            "List":
+                if ((size of %spec) == 1):
+                    return \(%spec.1 means %body)
+                ..else:
+                    return \(%spec all mean %body)
+            else:
+                return \(%spec means %body)
+
+upgrade action "action 1 2" to "4.8.10" via (..)
+    [%tree, %end_version] ->:
+        %spec = %tree.2
+        %body = %tree.3
+        if %spec.type is:
+            "List":
+                if ((size of %spec) == 1):
+                    return \(externally %spec.1 means %body)
+                ..else:
+                    return \(externally %spec all mean %body)
+            else:
+                return \(externally %spec means %body)
+
+upgrade action "compile 1 to 2" to "4.8.10" via (..)
+    [%tree, %end_version] ->:
+        %spec = %tree.2
+        %body = %tree.4
+        if %spec.type is:
+            "List":
+                if ((size of %spec) == 1):
+                    return \(%spec.1 compiles to %body)
+                ..else:
+                    return \(%spec all compile to %body)
+            else:
+                return \(%spec compiles to %body)
+
+upgrade action "parse 1 as 2" to "4.8.10" via (..)
+    [%tree, %end_version] ->:
+        %spec = %tree.2
+        %body = %tree.4
+        if %spec.type is:
+            "List":
+                if ((size of %spec) == 1):
+                    return \(%spec.1 parses as %body)
+                ..else:
+                    return \(%spec all parse as %body)
+            else:
+                return \(%spec parse as %body)
+
+upgrade action (compile as %) to "4.8.10" as (what % compiles to)
+
