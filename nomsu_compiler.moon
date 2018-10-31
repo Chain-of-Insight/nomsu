@@ -93,13 +93,11 @@ MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer 
 NomsuCompiler = setmetatable {}, {__tostring: => "Nomsu"}
 _anon_chunk = 0
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 10
-    .NOMSU_SYNTAX_VERSION = max_parser_version
     .can_optimize = -> false
 
     -- Discretionary/convenience stuff
     .environment = {
-        NOMSU_COMPILER_VERSION: 8, NOMSU_SYNTAX_VERSION: max_parser_version
+        NOMSU_COMPILER_VERSION: 9, NOMSU_SYNTAX_VERSION: max_parser_version
         -- Lua stuff:
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,

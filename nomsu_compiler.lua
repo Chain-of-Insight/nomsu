@@ -153,13 +153,11 @@ local NomsuCompiler = setmetatable({ }, {
 })
 local _anon_chunk = 0
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 9
-  NomsuCompiler.NOMSU_SYNTAX_VERSION = max_parser_version
   NomsuCompiler.can_optimize = function()
     return false
   end
   NomsuCompiler.environment = {
-    NOMSU_COMPILER_VERSION = 8,
+    NOMSU_COMPILER_VERSION = 9,
     NOMSU_SYNTAX_VERSION = max_parser_version,
     next = next,
     unpack = unpack,
@@ -212,7 +210,6 @@ do
     __imported = Dict({ }),
     __parent = nil
   }
-  assert(NomsuCompiler.environment.globals)
   setmetatable(NomsuCompiler.environment, {
     __index = function(self, key)
       do
