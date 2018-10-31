@@ -1,10 +1,10 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file contains basic input/output code
 
 use "core/metaprogramming.nom"
 
-compile [say %message] to (..)
+(say %message) compiles to (..)
     lua> "\
         ..if \%message.type == "Text" then
             return LuaCode(tree.source, "print(", \(%message as lua expr), ");");
@@ -12,7 +12,7 @@ compile [say %message] to (..)
             return LuaCode(tree.source, "print(tostring(", \(%message as lua expr), "));");
         end"
 
-compile [ask %prompt] to (..)
+(ask %prompt) compiles to (..)
     lua> "\
         ..if \%prompt.type == "Text" then
             return LuaCode.Value(tree.source, "(io.write(", \(%prompt as lua expr), ") and io.read())");

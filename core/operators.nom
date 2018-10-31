@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file contains definitions of operators like "+" and "and".
 
@@ -9,14 +9,14 @@ test:
     assume (all [1 < 2, 2 > 1, 1 <= 2, 2 >= 1, 1 == 1, 1 != 2])
 
 # Comparison Operators
-compile [%x < %y] to (Lua value "(\(%x as lua expr) < \(%y as lua expr))")
-compile [%x > %y] to (Lua value "(\(%x as lua expr) > \(%y as lua expr))")
-compile [%x <= %y] to (Lua value "(\(%x as lua expr) <= \(%y as lua expr))")
-compile [%x >= %y] to (Lua value "(\(%x as lua expr) >= \(%y as lua expr))")
-compile [%a is %b, %a == %b] to (..)
+(%x < %y) compiles to (Lua value "(\(%x as lua expr) < \(%y as lua expr))")
+(%x > %y) compiles to (Lua value "(\(%x as lua expr) > \(%y as lua expr))")
+(%x <= %y) compiles to (Lua value "(\(%x as lua expr) <= \(%y as lua expr))")
+(%x >= %y) compiles to (Lua value "(\(%x as lua expr) >= \(%y as lua expr))")
+[%a is %b, %a == %b] all compile to (..)
     Lua value "(\(%a as lua expr) == \(%b as lua expr))"
 
-compile [%a isn't %b, %a is not %b, %a not= %b, %a != %b] to (..)
+[%a isn't %b, %a is not %b, %a not= %b, %a != %b] all compile to (..)
     Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -26,7 +26,7 @@ test:
     assume (%x == 10)
 
 # Variable assignment operator
-compile [%var = %value] to:
+(%var = %value) compiles to:
     lua> "local \%var_lua = \(%var as lua expr)"
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
     lua> "local \%value_lua = \(%value as lua expr)"
@@ -45,7 +45,7 @@ test:
     assume ((%y == 10) and (%x == 20)) or barf "swapping vars failed."
 
 # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
-compile [set %assignments] to:
+(set %assignments) compiles to:
     assume (%assignments.type is "Dict") or barf "\
         ..Expected a Dict for the assignments part of '<- %' statement, not \%assignments"
     lua> "\
@@ -81,13 +81,13 @@ compile [set %assignments] to:
 
 test:
     set {%foozle:"outer", %y:"outer"}
-    action [set global x local y]:
+    externally (set global x local y) means:
         external %foozle = "inner"
         %y = "inner"
     
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
-compile [external %var = %value] to:
+(external %var = %value) compiles to:
     %var_lua = (%var as lua)
     assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
     %value_lua = (%value as lua)
@@ -96,7 +96,7 @@ compile [external %var = %value] to:
 
 test:
     set {%foozle:"outer", %y:"outer"}
-    action [set global x local y] (..)
+    externally (set global x local y) means (..)
         with external [%foozle]:
             %foozle = "inner"
             %y = "inner"
@@ -104,7 +104,7 @@ test:
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf "\
         ..'with external' failed."
-compile [with external %externs %body] to:
+(with external %externs %body) compiles to:
     %body_lua = (%body as lua statements)
     lua> "\
         ..\%body_lua:remove_free_vars(table.map(\%externs, function(v) return nomsu:compile(v):as_smext() end))"
@@ -119,7 +119,7 @@ test:
     
     assume (%x == 1) or barf "'with' scoping failed"
     assume (%z == (nil)) or barf "'with' scoping failed"
-compile [with %assignments %body] to:
+(with %assignments %body) compiles to:
     %lua = (%body as lua statements)
     lua> "\
         ..local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
@@ -156,53 +156,53 @@ compile [with %assignments %body] to:
 # Math Operators
 test:
     assume ((5 wrapped around 2) == 1) or barf "mod not working"
-compile [%x wrapped around %y, %x mod %y] to (..)
+[%x wrapped around %y, %x mod %y] all compile to (..)
     Lua value "((\(%x as lua expr)) % (\(%y as lua expr)))"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
 test:
     %calls = 0
-    local action [one]:
+    (one) means:
         external %calls = (%calls + 1)
         return 1
     
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
     assume (%calls == 1) or barf "\
         ..Three-way comparison evaluated middle value multiple times"
-parse [%x < %y < %z] as (..)
+(%x < %y < %z) parses as (..)
     call ([%a, %b, %c] -> ((%a < %b) and (%b < %c))) with [%x, %y, %z]
 
-parse [%x <= %y < %z] as (..)
+(%x <= %y < %z) parses as (..)
     call ([%a, %b, %c] -> ((%a <= %b) and (%b < %c))) with [%x, %y, %z]
 
-parse [%x < %y <= %z] as (..)
+(%x < %y <= %z) parses as (..)
     call ([%a, %b, %c] -> ((%a < %b) and (%b <= %c))) with [%x, %y, %z]
 
-parse [%x <= %y <= %z] as (..)
+(%x <= %y <= %z) parses as (..)
     call ([%a, %b, %c] -> ((%a <= %b) and (%b <= %c))) with [%x, %y, %z]
 
-parse [%x > %y > %z] as (..)
+(%x > %y > %z) parses as (..)
     call ([%a, %b, %c] -> ((%a > %b) and (%b > %c))) with [%x, %y, %z]
 
-parse [%x >= %y > %z] as (..)
+(%x >= %y > %z) parses as (..)
     call ([%a, %b, %c] -> ((%a >= %b) and (%b > %c))) with [%x, %y, %z]
 
-parse [%x > %y >= %z] as (..)
+(%x > %y >= %z) parses as (..)
     call ([%a, %b, %c] -> ((%a > %b) and (%b >= %c))) with [%x, %y, %z]
 
-parse [%x >= %y >= %z] as (..)
+(%x >= %y >= %z) parses as (..)
     call ([%a, %b, %c] -> ((%a >= %b) and (%b >= %c))) with [%x, %y, %z]
 
 # TODO: optimize for common case where x,y,z are all either variables or number literals
 # Boolean Operators
 test:
-    local action [barfer] (barf "short circuiting failed")
+    (barfer) means (barf "short circuiting failed")
     assume (((no) and (barfer)) == (no))
     assume ((no) or (yes))
     assume ((yes) or (barfer))
-compile [%x and %y] to (Lua value "(\(%x as lua expr) and \(%y as lua expr))")
-compile [%x or %y] to (Lua value "(\(%x as lua expr) or \(%y as lua expr))")
+(%x and %y) compiles to (Lua value "(\(%x as lua expr) and \(%y as lua expr))")
+(%x or %y) compiles to (Lua value "(\(%x as lua expr) or \(%y as lua expr))")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -219,31 +219,31 @@ test:
 # Lua 5.3 introduced bit operators like | and &. Use them when possible, otherwise
     fall back to bit.bor(), bit.band(), etc.
 %use_bitops = ((is jit) or ((Lua version) == "Lua 5.2"))
-compile [NOT %, ~ %] to (..)
+[NOT %, ~ %] all compile to (..)
     Lua value (..)
         (%use_bitops and "bit.bnot(\(% as lua expr))") or "~(\(% as lua expr))"
 
-compile [%a OR %b, %a | %b] to (..)
+[%a OR %b, %a | %b] all compile to (..)
     Lua value (..)
         (%use_bitops and "bit.bor(\(%a as lua expr), \(%b as lua expr))") or "\
             ..(\(%a as lua expr) | \(%b as lua expr))"
 
-compile [%a XOR %b, %a ~ %b] to (..)
+[%a XOR %b, %a ~ %b] all compile to (..)
     Lua value (..)
         (%use_bitops and "bit.bxor(\(%a as lua expr), \(%b as lua expr))") or "\
             ..(\(%a as lua expr) ~ \(%b as lua expr))"
 
-compile [%a AND %b, %a & %b] to (..)
+[%a AND %b, %a & %b] all compile to (..)
     Lua value (..)
         (%use_bitops and "bit.band(\(%a as lua expr), \(%b as lua expr))") or "\
             ..(\(%a as lua expr) & \(%b as lua expr))"
 
-compile [%x LSHIFT %shift, %x << %shift] to (..)
+[%x LSHIFT %shift, %x << %shift] all compile to (..)
     Lua value (..)
         (%use_bitops and "bit.lshift(\(%x as lua expr), \(%shift as lua expr))") or "\
             ..(\(%x as lua expr) << \(%shift as lua expr))"
 
-compile [%x RSHIFT %shift, %x >> %shift] to (..)
+[%x RSHIFT %shift, %x >> %shift] all compile to (..)
     Lua value (..)
         (%use_bitops and "bit.rshift(\(%x as lua expr), \(%shift as lua expr))") or "\
             ..(\(%x as lua expr) >> \(%shift as lua expr))"
@@ -252,15 +252,15 @@ compile [%x RSHIFT %shift, %x >> %shift] to (..)
 test:
     assume ((- 5) == -5)
     assume ((not (yes)) == (no))
-compile [- %] to (Lua value "(- \(% as lua expr))")
-compile [not %] to (Lua value "(not \(% as lua expr))")
+(- %) compiles to (Lua value "(- \(% as lua expr))")
+(not %) compiles to (Lua value "(not \(% as lua expr))")
 
 test:
     assume ((size of [1, 2, 3]) == 3)
-compile [size of %list, size of %list, size of %list, size of %list] to (..)
+[size of %list, size of %list, size of %list, size of %list] all compile to (..)
     Lua value "(#\(%list as lua expr))"
 
-compile [%list is empty] to (Lua value "(#\(%list as lua expr) == 0)")
+(%list is empty) compiles to (Lua value "(#\(%list as lua expr) == 0)")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -273,11 +273,11 @@ test:
     assume (%x == 4) or barf "*= failed"
     wrap %x around 3
     assume (%x == 1) or barf "wrap around failed"
-parse [%var += %] as (%var = (%var + %))
-parse [%var -= %] as (%var = (%var - %))
-parse [%var *= %] as (%var = (%var * %))
-parse [%var /= %] as (%var = (%var / %))
-parse [%var ^= %] as (%var = (%var ^ %))
-parse [%var and= %] as (%var = (%var and %))
-parse [%var or= %] as (%var = (%var or %))
-parse [wrap %var around %] as (%var = (%var wrapped around %))
+(%var += %) parses as (%var = (%var + %))
+(%var -= %) parses as (%var = (%var - %))
+(%var *= %) parses as (%var = (%var * %))
+(%var /= %) parses as (%var = (%var / %))
+(%var ^= %) parses as (%var = (%var ^ %))
+(%var and= %) parses as (%var = (%var and %))
+(%var or= %) parses as (%var = (%var or %))
+(wrap %var around %) parses as (%var = (%var wrapped around %))

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file contains definitions pertaining to variable scoping
 
@@ -14,19 +14,19 @@ test:
         assume (%x == "inner")
     
     assume (%x == "outer")
-    action [foo] "outer foo"
+    externally (foo) means "outer foo"
     with local [action (foo)]:
-        action [foo] "inner foo"
+        externally (foo) means "inner foo"
         assume ((foo) == "inner foo")
     
     assume ((foo) == "outer foo")
-compile [with local %locals %body, with local %locals do %body] to:
+[with local %locals %body, with local %locals do %body] all compile to:
     %body_lua = (%body as lua statements)
     if %locals.type is:
         "Dict":
             %body_lua = (..)
                 Lua "\
-                    ..\(compile as (<- %locals))
+                    ..\(what (<- %locals) compiles to)
                     \%body_lua"
             
             %body_lua::declare locals ("\(%.1 as lua)" for % in %locals)

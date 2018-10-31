@@ -264,11 +264,14 @@ with NomsuCompiler
             return add_lua_bits(@, "value", code)
 
         ["use 1"]: (tree, path)=>
+            lua = LuaCode(tree.source)
             if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
                 for _,f in Files.walk(path[1])
-                    @import(@run_file(f))
-                    
-            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(path), ") do nomsu:import(nomsu:run_file(f)) end")
+                    if match(f, "%.lua$") or match(f, "%.nom$") or match(f, "^/dev/fd/[012]$")
+                        @import(@run_file(f))
+                        if #lua.bits > 0 then lua\append "\n"
+                        lua\append "nomsu:import(nomsu:run_file(#{f\as_lua!}))"
+            return lua
 
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
         ["test 1"]: (tree, body)=>

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -6,17 +6,17 @@
 use "lib/os.nom"
 
 %UPGRADES = {}
-action [upgrade to %version via %upgrade_fn]:
+externally (upgrade to %version via %upgrade_fn) means:
     %UPGRADES.%version = %upgrade_fn
 
 %ACTION_UPGRADES = ({} with fallback % -> {})
-action [upgrade action %stub to %version via %upgrade_fn]:
+externally (upgrade action %stub to %version via %upgrade_fn) means:
     %ACTION_UPGRADES.%version.%stub = %upgrade_fn
 
-parse [upgrade %tree to %version as %body] as (..)
-    upgrade to %version via ([%] -> (% with %tree -> %body))
+(upgrade %tree to %version as %body) parses as (..)
+    upgrade to %version via ([%, %end_version] -> (% with %tree -> %body))
 
-compile [upgrade action %actions to %version as %body] to:
+(upgrade action %actions to %version as %body) compiles to:
     if (%actions is "Action" syntax tree):
         %actions = \[%actions]
     %lua = (Lua "")
@@ -27,7 +27,7 @@ compile [upgrade action %actions to %version as %body] to:
                 %replacements.(%action.%i.1) = "\(\%tree as lua id)[\%i]"
         
         define mangler
-        local action [make tree %t]:
+        (make tree %t) means:
             when:
                 (%t is "Var" syntax tree):
                     if %replacements.(%t.1):
@@ -60,11 +60,12 @@ compile [upgrade action %actions to %version as %body] to:
     
     return %lua
 
-action [..]
+externally [..]
     %tree upgraded from %start_version to %end_version
     %tree upgraded to %end_version from %start_version
-..:
-    local action [%ver as list] ((% as number) for % in %ver matching "[0-9]+")
+..all mean:
+    unless (%tree is syntax tree): return %tree
+    (%ver as list) means ((% as number) for % in %ver matching "[0-9]+")
     %versions = {}
     for %v = % in %UPGRADES:
         %versions.%v = (yes)
@@ -78,25 +79,31 @@ action [..]
             %tree = (..)
                 %tree with % -> (..)
                     if ((% is "Action" syntax tree) and %ACTION_UPGRADES.%ver.(%.stub)):
-                        return (call %ACTION_UPGRADES.%ver.(%.stub) with [%])
+                        %with_upgraded_args = (..)
+                            %k = (%v upgraded from %start_version to %end_version) \
+                            ..for %k = %v in %
+                        set %with_upgraded_args's metatable to (%'s metatable)
+                        return (call %ACTION_UPGRADES.%ver.(%.stub) with [%with_upgraded_args, %end_version])
         
         if %UPGRADES.%ver:
-            %tree = (call %UPGRADES.%ver with [%tree])
+            %with_upgraded_args = (..)
+                %k = (%v upgraded from %start_version to %end_version) \
+                ..for %k = %v in %tree
+            set %with_upgraded_args's metatable to (%tree's metatable)
+            %tree = (call %UPGRADES.%ver with [%with_upgraded_args, %end_version])
     
     return %tree
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-parse [%tree upgraded from %start_version] as (..)
+externally (%tree upgraded from %start_version) means (..)
     %tree upgraded from %start_version to (Nomsu version)
 
-parse [%tree upgraded to %end_version] as (..)
+externally (%tree upgraded to %end_version) means (..)
     %tree upgraded from (%tree.version or (Nomsu version)) to %end_version
 
-parse [%tree upgraded] as (..)
+externally (%tree upgraded) means (..)
     %tree upgraded from (%tree.version or (Nomsu version)) to (Nomsu version)
 
-action [use %path from version %version]:
+externally (use %path from version %version) means:
     for file %filename in %path:
         if (=lua "LOADED[\%filename]"): do next %filename
         %file = (read file %filename)

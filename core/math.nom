@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file defines some common math literals and functions
 
@@ -14,17 +14,18 @@ test:
         ..math constants failed"
     %nan = (NaN)
     assume (%nan != %nan) or barf "NaN failed"
-compile [infinity, inf] to (Lua value "math.huge")
-compile [not a number, NaN, nan] to (Lua value "(0/0)")
-compile [pi, Pi, PI] to (Lua value "math.pi")
-compile [tau, Tau, TAU] to (Lua value "(2*math.pi)")
-compile [golden ratio] to (Lua value "((1+math.sqrt(5))/2)")
-compile [e] to (Lua value "math.exp(1)")
+[infinity, inf] all compile to (Lua value "math.huge")
+[not a number, NaN, nan] all compile to (Lua value "(0/0)")
+[pi, Pi, PI] all compile to (Lua value "math.pi")
+[tau, Tau, TAU] all compile to (Lua value "(2*math.pi)")
+(golden ratio) compiles to (Lua value "((1+math.sqrt(5))/2)")
+(e) compiles to (Lua value "math.exp(1)")
 
 # Functions:
 test:
     assume (("5" as a number) == 5)
-compile [% as a number, % as number] to (Lua value "tonumber(\(% as lua expr))")
+[% as a number, % as number] all compile to (..)
+    Lua value "tonumber(\(% as lua expr))"
 
 test:
     assume (..)
@@ -33,105 +34,127 @@ test:
             arc tangent 5, arc tangent 5 / 10, hyperbolic sine 5, hyperbolic cosine 5
             hyperbolic tangent 5, e^ 5, ln 5, log base 2 of 5, floor 5, ceiling 5, round 5
     ..or barf "math functions failed"
-compile [absolute value %, | % |, abs %] to (..)
+[absolute value %, | % |, abs %] all compile to (..)
     Lua value "math.abs(\(% as lua expr))"
 
-compile [square root %, square root of %, √ %, sqrt %] to (..)
+[square root %, square root of %, √ %, sqrt %] all compile to (..)
     Lua value "math.sqrt(\(% as lua expr))"
 
-compile [sine %, sin %] to (Lua value "math.sin(\(% as lua expr))")
-compile [cosine %, cos %] to (Lua value "math.cos(\(% as lua expr))")
-compile [tangent %, tan %] to (Lua value "math.tan(\(% as lua expr))")
-compile [arc sine %, asin %] to (Lua value "math.asin(\(% as lua expr))")
-compile [arc cosine %, acos %] to (Lua value "math.acos(\(% as lua expr))")
-compile [arc tangent %, atan %] to (Lua value "math.atan(\(% as lua expr))")
-compile [arc tangent %y / %x, atan2 %y %x] to (..)
+[sine %, sin %] all compile to (Lua value "math.sin(\(% as lua expr))")
+[cosine %, cos %] all compile to (Lua value "math.cos(\(% as lua expr))")
+[tangent %, tan %] all compile to (Lua value "math.tan(\(% as lua expr))")
+[arc sine %, asin %] all compile to (Lua value "math.asin(\(% as lua expr))")
+[arc cosine %, acos %] all compile to (Lua value "math.acos(\(% as lua expr))")
+[arc tangent %, atan %] all compile to (Lua value "math.atan(\(% as lua expr))")
+[arc tangent %y / %x, atan2 %y %x] all compile to (..)
     Lua value "math.atan2(\(%y as lua expr), \(%x as lua expr))"
 
-compile [hyperbolic sine %, sinh %] to (Lua value "math.sinh(\(% as lua expr))")
-compile [hyperbolic cosine %, cosh %] to (Lua value "math.cosh(\(% as lua expr))")
-compile [hyperbolic tangent %, tanh %] to (..)
+[hyperbolic sine %, sinh %] all compile to (..)
+    Lua value "math.sinh(\(% as lua expr))"
+
+[hyperbolic cosine %, cosh %] all compile to (..)
+    Lua value "math.cosh(\(% as lua expr))"
+
+[hyperbolic tangent %, tanh %] all compile to (..)
     Lua value "math.tanh(\(% as lua expr))"
 
-compile [e^ %, exp %] to (Lua value "math.exp(\(% as lua expr))")
-compile [natural log %, ln %, log %] to (Lua value "math.log(\(% as lua expr))")
-compile [log % base %base, log base %base of %] to (..)
+[e^ %, exp %] all compile to (Lua value "math.exp(\(% as lua expr))")
+[natural log %, ln %, log %] all compile to (..)
+    Lua value "math.log(\(% as lua expr))"
+
+[log % base %base, log base %base of %] all compile to (..)
     Lua value "math.log(\(% as lua expr), \(%base as lua expr))"
 
-compile [floor %] to (Lua value "math.floor(\(% as lua expr))")
-compile [ceiling %, ceil %] to (Lua value "math.ceil(\(% as lua expr))")
-compile [round %, % rounded] to (Lua value "math.floor(\(% as lua expr) + .5)")
+(floor %) compiles to (Lua value "math.floor(\(% as lua expr))")
+[ceiling %, ceil %] all compile to (Lua value "math.ceil(\(% as lua expr))")
+[round %, % rounded] all compile to (..)
+    Lua value "math.floor(\(% as lua expr) + .5)"
 
 test:
     assume ((463 to the nearest 100) == 500) or barf "rounding failed"
     assume ((2.6 to the nearest 0.25) == 2.5) or barf "rounding failed"
-action [%n to the nearest %rounder] (..)
+externally (%n to the nearest %rounder) means (..)
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 
 # Any/all/none
-compile [all of %items, all %items] to:
+[all of %items, all %items] all compile to:
     unless (%items.type is "List"):
         return (Lua value "utils.all(\(%items as lua expr))")
     %clauses = (((% as lua expr)::as smext) for % in %items)
     return (Lua value "(\(%clauses::joined with " and "))")
 
-parse [not all of %items, not all %items] as (not (all of %items))
-compile [any of %items, any %items] to:
+[not all of %items, not all %items] all parse as (not (all of %items))
+[any of %items, any %items] all compile to:
     unless (%items.type is "List"):
         return (Lua value "utils.any(\(%items as lua expr))")
     %clauses = (((% as lua expr)::as smext) for % in %items)
     return (Lua value "(\(%clauses::joined with " or "))")
 
-parse [none of %items, none %items] as (not (any of %items))
-compile [sum of %items, sum %items] to:
+[none of %items, none %items] all parse as (not (any of %items))
+[sum of %items, sum %items] all compile to:
     unless (%items.type is "List"):
         return (Lua value "utils.sum(\(%items as lua expr))")
     %clauses = (((% as lua expr)::as smext) for % in %items)
     return (Lua value "(\(%clauses::joined with " + "))")
 
-parse [if all of %items %body, if all of %items then %body] as (..)
+[if all of %items %body, if all of %items then %body] all parse as (..)
     if (all of %items) %body
-parse [unless all of %items %body, unless all of %items then %body] as (..)
+
+[unless all of %items %body, unless all of %items then %body] all parse as (..)
     if (not (all of %items)) %body
-parse [if any of %items %body, if any of %items then %body] as (..)
-    if (any of %items) %body
-parse [unless any of %items %body, unless any of %items then %body] as (..)
-    if (not (any of %items)) %body
-parse [if none of %items %body, if none of %items then %body] as (..)
-    if (not (any of %items)) %body
-parse [unless none of %items %body, unless none of %items then %body] as (..)
+
+[if any of %items %body, if any of %items then %body] all parse as (..)
     if (any of %items) %body
 
-parse [if all of %items %body else %else, if all of %items then %body else %else] as (..)
-    if (all of %items) %body else %else
-parse [unless all of %items %body else %else, unless all of %items then %body else %else] as (..)
-    if (not (all of %items)) %body else %else
-parse [if any of %items %body else %else, if any of %items then %body else %else] as (..)
-    if (any of %items) %body else %else
-parse [unless any of %items %body else %else, unless any of %items then %body else %else] as (..)
-    if (not (any of %items)) %body else %else
-parse [if none of %items %body else %else, if none of %items then %body else %else] as (..)
-    if (not (any of %items)) %body else %else
-parse [unless none of %items %body else %else, unless none of %items then %body else %else] as (..)
-    if (any of %items) %body else %else
+[unless any of %items %body, unless any of %items then %body] all parse as (..)
+    if (not (any of %items)) %body
 
-compile [product of %items, product %items] to:
+[if none of %items %body, if none of %items then %body] all parse as (..)
+    if (not (any of %items)) %body
+
+[unless none of %items %body, unless none of %items then %body] all parse as (..)
+    if (any of %items) %body
+
+[if all of %items %body else %else, if all of %items then %body else %else] all parse \
+..as (if (all of %items) %body else %else)
+
+[..]
+    unless all of %items %body else %else, unless all of %items then %body else %else
+..all parse as (if (not (all of %items)) %body else %else)
+
+[if any of %items %body else %else, if any of %items then %body else %else] all parse \
+..as (if (any of %items) %body else %else)
+
+[..]
+    unless any of %items %body else %else, unless any of %items then %body else %else
+..all parse as (if (not (any of %items)) %body else %else)
+
+[if none of %items %body else %else, if none of %items then %body else %else] all \
+..parse as (if (not (any of %items)) %body else %else)
+
+[..]
+    unless none of %items %body else %else, unless none of %items then %body else %else
+..all parse as (if (any of %items) %body else %else)
+
+[product of %items, product %items] all compile to:
     unless (%items.type is "List"):
         return (Lua value "utils.product(\(%items as lua expr))")
     %clauses = (((% as lua expr)::as smext) for % in %items)
     return (Lua value "(\(%clauses::joined with " * "))")
 
-action [avg of %items, average of %items] (=lua "(utils.sum(\%items)/#\%items)")
-compile [min of %items, smallest of %items, lowest of %items] to (..)
+externally [avg of %items, average of %items] all mean (..)
+    =lua "(utils.sum(\%items)/#\%items)"
+
+[min of %items, smallest of %items, lowest of %items] all compile to (..)
     Lua value "utils.min(\(%items as lua expr))"
 
-compile [max of %items, biggest of %items, largest of %items, highest of %items] to (..)
-    Lua value "utils.max(\(%items as lua expr))"
+[max of %items, biggest of %items, largest of %items, highest of %items] all compile \
+..to (Lua value "utils.max(\(%items as lua expr))")
 
 test:
     assume ((min of [3, -4, 1, 2] by % = (% * %)) == 1)
     assume ((max of [3, -4, 1, 2] by % = (% * %)) == -4)
-parse [min of %items by %item = %value_expr] as (..)
+(min of %items by %item = %value_expr) parses as (..)
     result of:
         set {%best:nil, %best_key:nil}
         for %item in %items:
@@ -141,7 +164,7 @@ parse [min of %items by %item = %value_expr] as (..)
         
         return %best
 
-parse [max of %items by %item = %value_expr] as (..)
+(max of %items by %item = %value_expr) parses as (..)
     result of:
         set {%best:nil, %best_key:nil}
         for %item in %items:
@@ -152,20 +175,19 @@ parse [max of %items by %item = %value_expr] as (..)
         return %best
 
 # Random functions
-action [seed random with %] (..)
+externally (seed random with %) means (..)
     lua> "\
         ..math.randomseed(\%);
         for i=1,20 do math.random(); end"
 
-parse [seed random] as (seed random with (=lua "os.time()"))
-compile [random number, random, rand] to (Lua value "math.random()")
-compile [random int %n, random integer %n, randint %n] to (..)
+(seed random) parses as (seed random with (=lua "os.time()"))
+[random number, random, rand] all compile to (Lua value "math.random()")
+[random int %n, random integer %n, randint %n] all compile to (..)
     Lua value "math.random(\(%n as lua expr))"
 
-compile [..]
-    random from %low to %high, random number from %low to %high
-    rand %low %high
-..to (Lua value "math.random(\(%low as lua expr), \(%high as lua expr))")
+[random from %low to %high, random number from %low to %high, rand %low %high] all \
+..compile to (Lua value "math.random(\(%low as lua expr), \(%high as lua expr))")
 
-action [random choice from %elements, random choice %elements, random %elements] (..)
-    =lua "\%elements[math.random(#\%elements)]"
+externally [..]
+    random choice from %elements, random choice %elements, random %elements
+..all mean (=lua "\%elements[math.random(#\%elements)]")

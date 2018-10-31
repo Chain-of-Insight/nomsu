@@ -459,12 +459,19 @@ do
       return add_lua_bits(self, "value", code)
     end,
     ["use 1"] = function(self, tree, path)
+      local lua = LuaCode(tree.source)
       if path.type == 'Text' and #path == 1 and type(path[1]) == 'string' then
         for _, f in Files.walk(path[1]) do
-          self:import(self:run_file(f))
+          if match(f, "%.lua$") or match(f, "%.nom$") or match(f, "^/dev/fd/[012]$") then
+            self:import(self:run_file(f))
+            if #lua.bits > 0 then
+              lua:append("\n")
+            end
+            lua:append("nomsu:import(nomsu:run_file(" .. tostring(f:as_lua()) .. "))")
+          end
         end
       end
-      return LuaCode(tree.source, "for i,f in Files.walk(", self:compile(path), ") do nomsu:import(nomsu:run_file(f)) end")
+      return lua
     end,
     ["tests"] = function(self, tree)
       return LuaCode.Value(tree.source, "TESTS")

@@ -1,14 +1,14 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file defines some actions that interact with the operating system and filesystem.
 
 test:
     path of Nomsu file "lib/os.nom"
-action [path of Nomsu file %filename]:
+externally (path of Nomsu file %filename) means:
     lua> "for i,f in Files.walk(\%filename) do return f end"
     barf "Could not find file: \%filename"
 
-action [sh> %cmd]:
+externally (sh> %cmd) means:
     lua> "\
         ..local result = io.popen(\%cmd)
         local contents = result:read("*a")
@@ -17,19 +17,19 @@ action [sh> %cmd]:
 
 test:
     read file "lib/os.nom"
-action [read file %filename] (=lua "Files.read(\%filename)")
+externally (read file %filename) means (=lua "Files.read(\%filename)")
 
 test:
     for file %f in "core": do nothing
-compile [for file %f in %path %body] to (..)
+(for file %f in %path %body) compiles to (..)
     Lua "\
         ..for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
             \(%body as lua statements)
-            \(compile as (===next %f ===))
+            \(what (===next %f ===) compiles to)
         end
-        \(compile as (===stop %f ===))"
+        \(what (===stop %f ===) compiles to)"
 
-compile [%expr for file %f in %path] to (..)
+(%expr for file %f in %path) compiles to (..)
     Lua value "\
         ..(function()
             local ret = _List{}
@@ -39,10 +39,10 @@ compile [%expr for file %f in %path] to (..)
             return ret
         end)()"
 
-action [..]
+externally [..]
     write to file %filename %text, to file %filename write %text
     write %text to file %filename
-..:
+..all mean:
     assume (%filename != "stdin") or barf "Cannot write to stdin"
     lua> "\
         ..local file = io.open(\%filename, 'w')
@@ -51,15 +51,17 @@ action [..]
 
 test:
     assume (line number of 3 in "x\ny") == 2
-action [line number of %pos in %str] (=lua "Files.get_line_number(\%str, \%pos)")
+externally (line number of %pos in %str) means (..)
+    =lua "Files.get_line_number(\%str, \%pos)"
 
 test:
     assume (line 2 in "one\ntwo\nthree") == "two"
-action [line %line_num in %str] (=lua "Files.get_line(\%str, \%line_num)")
+externally (line %line_num in %str) means (..)
+    =lua "Files.get_line(\%str, \%line_num)"
 
 test:
     assume (source lines of \(this))
-action [source lines of %tree]:
+externally (source lines of %tree) means:
     %source = (%tree.source if (%tree is syntax tree) else %tree)
     %file = (read file %source.filename)
     return (..)

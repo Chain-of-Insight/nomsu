@@ -1,17 +1,17 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file contains basic error reporting code
 
 use "core/metaprogramming.nom"
 
-compile [barf] to (Lua "error(nil, 0);")
-compile [barf %msg] to (Lua "error(\(%msg as lua expr), 0);")
-compile [compile error at %tree %msg] to (..)
+(barf) compiles to (Lua "error(nil, 0);")
+(barf %msg) compiles to (Lua "error(\(%msg as lua expr), 0);")
+(compile error at %tree %msg) compiles to (..)
     Lua "nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr))"
-compile [compile error at %tree %msg hint %hint] to (..)
+(compile error at %tree %msg hint %hint) compiles to (..)
     Lua "nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr), \(%hint as lua expr))"
 
-compile [assume %condition] to:
+(assume %condition) compiles to:
     lua> "\
         ..local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\%condition))"
     return (..)
@@ -20,7 +20,7 @@ compile [assume %condition] to:
                 error(\(quote "\%assumption"), 0)
             end"
 
-compile [assume %a == %b] to:
+(assume %a == %b) compiles to:
     lua> "\
         ..local \%assumption = 'Assumption failed: '..tostring(nomsu:tree_to_nomsu(\(\(%a == %b))))"
     define mangler
@@ -35,7 +35,7 @@ compile [assume %a == %b] to:
                 end
             end"
 
-compile [assume %condition or barf %message] to (..)
+(assume %condition or barf %message) compiles to (..)
     Lua "\
         ..if not \(%condition as lua expr) then
             error(\(%message as lua expr), 0)
@@ -55,10 +55,10 @@ test:
     assume (%x == 3) or barf "do/then always failed"
 
 # Try/except
-compile [..]
+[..]
     try %action and if it succeeds %success or if it barfs %msg %fallback
     try %action and if it barfs %msg %fallback or if it succeeds %success
-..to (..)
+..all compile to (..)
     Lua "\
         ..do
             local fell_through = false
@@ -84,21 +84,22 @@ compile [..]
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-parse [..]
+[..]
     try %action and if it succeeds %success or if it barfs %fallback
     try %action and if it barfs %fallback or if it succeeds %success
-..as (try %action and if it succeeds %success or if it barfs (=lua "") %fallback)
+..all parse as (..)
+    try %action and if it succeeds %success or if it barfs (=lua "") %fallback
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-parse [try %action] as (..)
+(try %action) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs (do nothing)
 
-parse [try %action and if it barfs %fallback] as (..)
+(try %action and if it barfs %fallback) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs %fallback
 
-parse [try %action and if it barfs %msg %fallback] as (..)
+(try %action and if it barfs %msg %fallback) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs %msg %fallback
 
-parse [try %action and if it succeeds %success] as (..)
+(try %action and if it succeeds %success) parses as (..)
     try %action and if it succeeds %success or if it barfs (do nothing)

@@ -1,15 +1,13 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file contains the implementation of an Object-Oriented programming system.
 
 %globals.METAMETHOD_MAP = {..}
-    "as text": "__tostring", "clean up": "__gc",
-    "+ 1": "__add", "- 1": "__sub", "* 1": "__mul", "/ 1": "__div",
-    "-": "__unm", "// 1": "__idiv", "mod 1": "__mod", "^ 1": "__pow",
-    "& 1": "__band", "| 1": "__bor", "~ 1": "__bxor", "~": "__bnot",
-    "<< 1": "__bshl", ">> 1": "__bshr", "== 1": "__eq", "< 1": "__lt",
-    "<= 1": "__le", "set 1 = 2": "__newindex", "size": "__len",
-    "iterate": "__ipairs", "iterate all": "__pairs",
+    "as text":"__tostring", "clean up":"__gc", "+ 1":"__add", "- 1":"__sub"
+    "* 1":"__mul", "/ 1":"__div", "-":"__unm", "// 1":"__idiv", "mod 1":"__mod"
+    "^ 1":"__pow", "& 1":"__band", "| 1":"__bor", "~ 1":"__bxor", "~":"__bnot"
+    "<< 1":"__bshl", ">> 1":"__bshr", "== 1":"__eq", "< 1":"__lt", "<= 1":"__le"
+    "set 1 = 2":"__newindex", size:"__len", iterate:"__ipairs", "iterate all":"__pairs"
 
 test:
     object (Dog):
@@ -53,13 +51,13 @@ test:
     
     with {%d:Dog {barks:2}}:
         assume ((%d::bark) == "Bark! Bark!")
-compile [my action %actions %body] to:
+(my action %actions %body) compiles to:
     lua> "\
         ..local fn_name = \%actions[1].stub:as_lua_id()
         local \%args = table.map(\%actions[1]:get_args(), function(a) return tostring(nomsu:compile(a)) end)
         table.insert(\%args, 1, \(\%me as lua id))
         local lua = LuaCode(tree.source, "class.", fn_name, " = ", \(..)
-            compile as (%args -> %body)
+            what (%args -> %body) compiles to
         ..)
         for i=2,#\%actions do
             local alias = \%actions[i]
@@ -79,12 +77,13 @@ compile [my action %actions %body] to:
         end
         return lua"
 
-compile [object %classname extends %parent %class_body] to:
+(object %classname extends %parent %class_body) compiles to:
     unless (%classname.type == "Action"):
         compile error at %classname "Expected this to be an action, not a \(%classname.type)"
     for % in %classname:
         unless (% is text):
             compile error at % "Class names should not have arguments."
+    
     return (..)
         Lua "\
             ..do
@@ -112,6 +111,5 @@ compile [object %classname extends %parent %class_body] to:
                 end
             end"
 
-parse [object %classname %class_body] as (..)
+(object %classname %class_body) parses as (..)
     object %classname extends (nil) %class_body
-

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file defines some actions for hashing files and looking up files by hash.
 
@@ -26,14 +26,14 @@ test:
     if %use_sha1:
         assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
 if %use_sha1:
-    action [hash %]:
+    externally (hash %) means:
         %hash = (=lua "\%hashlib.new('sha1'):final(\%)")
         return (base64 %hash)
 ..else:
     # TODO: remove warning?
     say "\
         ..\027[31;1mWARNING: OpenSSL module not found. Defaulting to a non-cryptographically secure hash function.\027[0m"
-    action [hash %]:
+    externally (hash %) means:
         %bytes = (%::bytes)
         %hash = (%bytes.1 << 7)
         for %i in 2 to (size of %bytes):
@@ -41,10 +41,10 @@ if %use_sha1:
         %hash = (%hash ~ (size of %bytes))
         return "\%hash"
 
-action [file with hash %hash]:
+externally (file with hash %hash) means:
     for file %filename in ".":
         %contents = (read file %filename)
         %file_hash = (hash %contents)
         if (%file_hash == %hash): return %filename
 
-parse [hash of file %filename] as (hash (read file %filename))
+(hash of file %filename) parses as (hash (read file %filename))
