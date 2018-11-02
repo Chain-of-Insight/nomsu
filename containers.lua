@@ -3,15 +3,52 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local repr, stringify, equivalent, nth_to_last, size
+local equivalent, nth_to_last, size
 do
   local _obj_0 = require('utils')
-  repr, stringify, equivalent, nth_to_last, size = _obj_0.repr, _obj_0.stringify, _obj_0.equivalent, _obj_0.nth_to_last, _obj_0.size
+  equivalent, nth_to_last, size = _obj_0.equivalent, _obj_0.nth_to_last, _obj_0.size
 end
 local lpeg = require('lpeg')
 local re = require('re')
 local List, Dict
+local as_nomsu
+as_nomsu = function(self)
+  if type(self) == 'number' then
+    return tostring(self)
+  end
+  do
+    local mt = getmetatable(self)
+    if mt then
+      do
+        local _as_nomsu = mt.as_nomsu
+        if _as_nomsu then
+          return _as_nomsu(self)
+        end
+      end
+    end
+  end
+  return tostring(self)
+end
+local as_lua
+as_lua = function(self)
+  if type(self) == 'number' then
+    return tostring(self)
+  end
+  do
+    local mt = getmetatable(self)
+    if mt then
+      do
+        local _as_lua = mt.as_lua
+        if _as_lua then
+          return _as_lua(self)
+        end
+      end
+    end
+  end
+  return tostring(self)
+end
 local _list_mt = {
+  __type = "List",
   __eq = equivalent,
   __tostring = function(self)
     return "[" .. concat((function()
@@ -19,11 +56,35 @@ local _list_mt = {
       local _len_0 = 1
       for _index_0 = 1, #self do
         local b = self[_index_0]
-        _accum_0[_len_0] = repr(b)
+        _accum_0[_len_0] = as_nomsu(b)
         _len_0 = _len_0 + 1
       end
       return _accum_0
     end)(), ", ") .. "]"
+  end,
+  as_nomsu = function(self)
+    return "[" .. concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #self do
+        local b = self[_index_0]
+        _accum_0[_len_0] = as_nomsu(b)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ") .. "]"
+  end,
+  as_lua = function(self)
+    return "_List{" .. concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for _index_0 = 1, #self do
+        local b = self[_index_0]
+        _accum_0[_len_0] = as_lua(b)
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ") .. "}"
   end,
   __lt = function(self, other)
     assert(type(self) == 'table' and type(other) == 'table', "Incompatible types for comparison")
@@ -73,15 +134,15 @@ local _list_mt = {
     return ret
   end,
   __index = {
-    add_1 = insert,
-    append_1 = insert,
-    add_1_at_index_2 = function(t, x, i)
+    add = insert,
+    append = insert,
+    add_1_at_index = function(t, x, i)
       return insert(t, i, x)
     end,
-    at_index_1_add_2 = insert,
+    at_index_1_add = insert,
     pop = remove,
     remove_last = remove,
-    remove_index_1 = remove,
+    remove_index = remove,
     last = (function(self)
       return self[#self]
     end),
@@ -104,7 +165,7 @@ local _list_mt = {
         return _accum_0
       end)())
     end,
-    joined_with_1 = function(self, glue)
+    joined_with = function(self, glue)
       return table.concat((function()
         local _accum_0 = { }
         local _len_0 = 1
@@ -116,7 +177,7 @@ local _list_mt = {
         return _accum_0
       end)(), glue)
     end,
-    has_1 = function(self, item)
+    has = function(self, item)
       for _index_0 = 1, #self do
         local x = self[_index_0]
         if x == item then
@@ -125,13 +186,36 @@ local _list_mt = {
       end
       return false
     end,
-    index_of_1 = function(self, item)
+    remove = function(self, item)
+      for i, x in ipairs(self) do
+        if x == item then
+          remove(self, i)
+        end
+      end
+    end,
+    index_of = function(self, item)
       for i, x in ipairs(self) do
         if x == item then
           return i
         end
       end
       return nil
+    end,
+    from_1_to = function(self, start, stop)
+      local n = #self
+      if n < 0 then
+        start = (n + 1 - start)
+      end
+      if n < 0 then
+        stop = (n + 1 - stop)
+      end
+      local _accum_0 = { }
+      local _len_0 = 1
+      for i = start, stop do
+        _accum_0[_len_0] = self[i]
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
     end
   },
   __newindex = function(self, k, v)
@@ -139,6 +223,8 @@ local _list_mt = {
     return rawset(self, k, v)
   end
 }
+_list_mt.__index.as_lua = _list_mt.as_lua
+_list_mt.__index.as_nomsu = _list_mt.as_nomsu
 List = function(t)
   return setmetatable(t, _list_mt)
 end
@@ -155,6 +241,7 @@ walk_items = function(self, i)
   end
 end
 local _dict_mt = {
+  __type = "Dict",
   __eq = equivalent,
   __len = size,
   __tostring = function(self)
@@ -162,7 +249,29 @@ local _dict_mt = {
       local _accum_0 = { }
       local _len_0 = 1
       for k, v in pairs(self) do
-        _accum_0[_len_0] = tostring(repr(k)) .. ": " .. tostring(repr(v))
+        _accum_0[_len_0] = tostring(as_nomsu(k)) .. ": " .. tostring(as_nomsu(v))
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ") .. "}"
+  end,
+  as_nomsu = function(self)
+    return "{" .. concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for k, v in pairs(self) do
+        _accum_0[_len_0] = tostring(as_nomsu(k)) .. ": " .. tostring(as_nomsu(v))
+        _len_0 = _len_0 + 1
+      end
+      return _accum_0
+    end)(), ", ") .. "}"
+  end,
+  as_lua = function(self)
+    return "_Dict{" .. concat((function()
+      local _accum_0 = { }
+      local _len_0 = 1
+      for k, v in pairs(self) do
+        _accum_0[_len_0] = "[ " .. tostring(as_lua(k)) .. "]= " .. tostring(as_lua(v))
         _len_0 = _len_0 + 1
       end
       return _accum_0
@@ -271,19 +380,23 @@ do
     reverse, upper, lower, find, byte, match, gmatch, gsub, sub, format, rep = _obj_0.reverse, _obj_0.upper, _obj_0.lower, _obj_0.find, _obj_0.byte, _obj_0.match, _obj_0.gmatch, _obj_0.gsub, _obj_0.sub, _obj_0.format, _obj_0.rep
   end
   local string2 = require('string2')
-  local lines, line, line_at, as_lua_id
-  lines, line, line_at, as_lua_id = string2.lines, string2.line, string2.line_at, string2.as_lua_id
+  local lines, line, line_at, as_lua_id, is_lua_id
+  lines, line, line_at, as_lua_id, is_lua_id = string2.lines, string2.line, string2.line_at, string2.as_lua_id, string2.is_lua_id
   local text_methods = {
-    formatted_with_1 = format,
-    byte_1 = byte,
-    position_of_1 = find,
-    position_of_1_after_2 = find,
-    bytes_1_to_2 = function(self, start, stop)
+    formatted_with = format,
+    byte = byte,
+    position_of = find,
+    position_of_1_after = find,
+    as_a_lua_identifier = as_lua_id,
+    is_a_lua_identifier = is_lua_id,
+    as_a_lua_id = as_lua_id,
+    is_a_lua_id = is_lua_id,
+    bytes_1_to = function(self, start, stop)
       return List({
         byte(tostring(self), start, stop)
       })
     end,
-    [as_lua_id("with 1 -> 2")] = gsub,
+    [as_lua_id("with 1 ->")] = gsub,
     bytes = function(self)
       return List({
         byte(tostring(self), 1, -1)
@@ -292,8 +405,8 @@ do
     lines = function(self)
       return List(lines(self))
     end,
-    line_1 = line,
-    wrap_to_1 = function(self, maxlen)
+    line = line,
+    wrapped_to = function(self, maxlen)
       local _lines = { }
       local _list_0 = self:lines()
       for _index_0 = 1, #_list_0 do
@@ -309,22 +422,30 @@ do
       end
       return table.concat(_lines, "\n")
     end,
-    line_at_1 = function(self, i)
+    line_at = function(self, i)
       return (line_at(self, i))
     end,
-    line_number_of_1 = function(self, i)
+    line_number_at = function(self, i)
       return select(2, line_at(self, i))
     end,
-    line_position_of_1 = function(self, i)
+    line_position_at = function(self, i)
       return select(3, line_at(self, i))
     end,
-    matches_1 = function(self, patt)
+    matches = function(self, patt)
       return match(self, patt) and true or false
+    end,
+    matching = function(self, patt)
+      return (match(self, patt))
+    end,
+    matching_groups = function(self, patt)
+      return {
+        match(self, patt)
+      }
     end,
     [as_lua_id("* 1")] = function(self, n)
       return rep(self, n)
     end,
-    matching_1 = function(self, patt)
+    all_matches_of = function(self, patt)
       local result = { }
       local stepper, x, i = gmatch(self, patt)
       while true do
@@ -343,6 +464,7 @@ do
   setmetatable(text_methods, {
     __index = string2
   })
+  getmetatable("").__methods = text_methods
   getmetatable("").__index = function(self, i)
     if type(i) == 'number' then
       return sub(self, i, i)
@@ -351,6 +473,9 @@ do
     else
       return text_methods[i]
     end
+  end
+  getmetatable("").__add = function(self, x)
+    return tostring(self) .. tostring(x)
   end
 end
 return {

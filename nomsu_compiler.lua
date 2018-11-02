@@ -4,8 +4,8 @@ R, P, S = lpeg.R, lpeg.P, lpeg.S
 local re = require('re')
 local utils = require('utils')
 local Files = require('files')
-local repr, stringify, equivalent
-repr, stringify, equivalent = utils.repr, utils.stringify, utils.equivalent
+local stringify, equivalent
+stringify, equivalent = utils.stringify, utils.equivalent
 local List, Dict, Text
 do
   local _obj_0 = require('containers')
@@ -35,7 +35,7 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local AST = require("syntax_tree")
+local SyntaxTree = require("syntax_tree")
 local make_parser = require("parser")
 local pretty_error = require("pretty_errors")
 SOURCE_MAP = { }
@@ -97,16 +97,14 @@ escape = function(s)
 end
 local make_tree
 make_tree = function(tree, userdata)
-  local cls = AST[tree.type]
   tree.source = Source(userdata.filename, tree.start, tree.stop)
   tree.start, tree.stop = nil, nil
-  tree.type = nil
   do
     local _accum_0 = { }
     local _len_0 = 1
     for _index_0 = 1, #tree do
       local t = tree[_index_0]
-      if AST.is_syntax_tree(t, "Comment") then
+      if SyntaxTree:is_instance(t) and t.type == "Comment" then
         _accum_0[_len_0] = t
         _len_0 = _len_0 + 1
       end
@@ -117,34 +115,29 @@ make_tree = function(tree, userdata)
     tree.comments = nil
   end
   for i = #tree, 1, -1 do
-    if AST.is_syntax_tree(tree[i], "Comment") then
+    if SyntaxTree:is_instance(tree[i]) and tree[i].type == "Comment" then
       table.remove(tree, i)
     end
   end
-  tree = setmetatable(tree, cls)
-  cls.source_code_for_tree[tree] = userdata.source
-  if tree.__init then
-    tree:__init()
-  end
+  tree = SyntaxTree(tree)
   return tree
 end
 local Parsers = { }
-local max_parser_version = 0
-for version = 1, 999 do
-  local found_version = false
-  for _, full_path in Files.walk("nomsu." .. tostring(version) .. ".peg") do
-    do
-      local peg_contents = Files.read(full_path)
-      if peg_contents then
-        found_version = true
-        max_parser_version = version
-        Parsers[version] = make_parser(peg_contents, make_tree)
+local max_parser_version = 4
+for version = 1, max_parser_version do
+  local peg_file = io.open("nomsu." .. tostring(version) .. ".peg")
+  if not peg_file and package.nomsupath then
+    for path in package.nomsupath:gmatch("[^;]+") do
+      peg_file = io.open(path .. "/nomsu." .. tostring(version) .. ".peg")
+      if peg_file then
+        break
       end
     end
   end
-  if not (found_version) then
-    break
-  end
+  assert(peg_file, "could not find nomsu .peg file")
+  local peg_contents = peg_file:read('*a')
+  peg_file:close()
+  Parsers[version] = make_parser(peg_contents, make_tree)
 end
 local MAX_LINE = 80
 local NomsuCompiler = setmetatable({ }, {
@@ -154,13 +147,11 @@ local NomsuCompiler = setmetatable({ }, {
 })
 local _anon_chunk = 0
 do
-  NomsuCompiler.NOMSU_COMPILER_VERSION = 9
-  NomsuCompiler.NOMSU_SYNTAX_VERSION = max_parser_version
   NomsuCompiler.can_optimize = function()
     return false
   end
   NomsuCompiler.environment = {
-    NOMSU_COMPILER_VERSION = 8,
+    NOMSU_COMPILER_VERSION = 11,
     NOMSU_SYNTAX_VERSION = max_parser_version,
     next = next,
     unpack = unpack,
@@ -189,7 +180,7 @@ do
     assert = assert,
     dofile = dofile,
     loadstring = loadstring,
-    type = type,
+    lua_type_of = type,
     select = select,
     math = math,
     io = io,
@@ -198,16 +189,14 @@ do
     ipairs = ipairs,
     _List = List,
     _Dict = Dict,
-    repr = repr,
     stringify = stringify,
     utils = utils,
     lpeg = lpeg,
     re = re,
     Files = Files,
-    AST = AST,
-    TESTS = Dict({ }, {
-      globals = Dict({ })
-    }),
+    SyntaxTree = SyntaxTree,
+    TESTS = Dict({ }),
+    globals = Dict({ }),
     LuaCode = LuaCode,
     NomsuCode = NomsuCode,
     Source = Source,
@@ -250,9 +239,6 @@ do
   if jit or _VERSION == "Lua 5.2" then
     NomsuCompiler.environment.bit = require("bitops")
   end
-  for k, v in pairs(AST) do
-    NomsuCompiler.environment[k] = v
-  end
   NomsuCompiler.fork = function(self)
     local f = setmetatable({ }, {
       __index = self
@@ -293,7 +279,7 @@ do
         for k, v in pairs(t) do
           local _continue_0 = false
           repeat
-            if not (AST.is_syntax_tree(v)) then
+            if not (SyntaxTree:is_instance(v)) then
               _continue_0 = true
               break
             end
@@ -390,7 +376,7 @@ do
   add_lua_string_bits = function(self, val_or_stmt, code)
     local cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
     if code.type ~= "Text" then
-      return LuaCode.Value(code.source, cls_str, repr(tostring(code.source)), ", ", self:compile(code), ")")
+      return LuaCode.Value(code.source, cls_str, tostring(code.source):as_lua(), ", ", self:compile(code), ")")
     end
     local add_bit_lua
     add_bit_lua = function(lua, bit_lua)
@@ -400,11 +386,11 @@ do
     end
     local operate_on_text
     operate_on_text = function(text)
-      local lua = LuaCode.Value(text.source, cls_str, repr(tostring(text.source)))
+      local lua = LuaCode.Value(text.source, cls_str, tostring(text.source):as_lua())
       for _index_0 = 1, #text do
         local bit = text[_index_0]
         if type(bit) == "string" then
-          add_bit_lua(lua, repr(bit))
+          add_bit_lua(lua, bit:as_lua())
         elseif bit.type == "Text" then
           add_bit_lua(lua, operate_on_text(bit))
         else
@@ -420,7 +406,7 @@ do
     end
     return operate_on_text(code)
   end
-  local math_expression = re.compile([[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]])
+  local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
   local compile_math_expression
   compile_math_expression = function(self, tree, ...)
     local lua = LuaCode.Value(tree.source)
@@ -445,36 +431,36 @@ do
   end
   NomsuCompiler.environment.COMPILE_ACTIONS = setmetatable({
     __imported = Dict({ }),
-    ["Lua 1"] = function(self, tree, code)
+    ["Lua"] = function(self, tree, code)
       return add_lua_string_bits(self, 'statements', code)
     end,
-    ["Lua value 1"] = function(self, tree, code)
+    ["Lua value"] = function(self, tree, code)
       return add_lua_string_bits(self, 'value', code)
     end,
-    ["lua > 1"] = function(self, tree, code)
+    ["lua >"] = function(self, tree, code)
       if code.type ~= "Text" then
         return LuaCode(tree.source, "nomsu:run_lua(", self:compile(code), ", nomsu);")
       end
       return add_lua_bits(self, "statements", code)
     end,
-    ["= lua 1"] = function(self, tree, code)
+    ["= lua"] = function(self, tree, code)
       if code.type ~= "Text" then
         return LuaCode.Value(tree.source, "nomsu:run_lua(", self:compile(code), ":as_statements('return '), nomsu)")
       end
       return add_lua_bits(self, "value", code)
     end,
-    ["use 1"] = function(self, tree, path)
+    ["use"] = function(self, tree, path)
       if path.type == 'Text' and #path == 1 and type(path[1]) == 'string' then
-        for _, f in Files.walk(path[1]) do
-          self:import(self:run_file(f))
+        if not (self:import_file(path[1])) then
+          self:compile_error(tree, "Could not find anything to import for " .. tostring(path))
         end
       end
-      return LuaCode(tree.source, "for i,f in Files.walk(", self:compile(path), ") do nomsu:import(nomsu:run_file(f)) end")
+      return LuaCode(tree.source, "nomsu:import_file(" .. tostring(self:compile(path)) .. ")")
     end,
     ["tests"] = function(self, tree)
       return LuaCode.Value(tree.source, "TESTS")
     end,
-    ["test 1"] = function(self, tree, body)
+    ["test"] = function(self, tree, body)
       local test_str = table.concat((function()
         local _accum_0 = { }
         local _len_0 = 1
@@ -485,13 +471,13 @@ do
         end
         return _accum_0
       end)(), "\n")
-      return LuaCode(tree.source, "TESTS[" .. tostring(repr(tostring(tree.source))) .. "] = ", repr(test_str))
+      return LuaCode(tree.source, "TESTS[" .. tostring(tostring(tree.source):as_lua()) .. "] = ", test_str:as_lua())
     end,
     ["is jit"] = function(self, tree, code)
       return LuaCode.Value(tree.source, jit and "true" or "false")
     end,
     ["Lua version"] = function(self, tree, code)
-      return LuaCode.Value(tree.source, repr(_VERSION))
+      return LuaCode.Value(tree.source, _VERSION:as_lua())
     end,
     __parent = setmetatable({ }, {
       __index = function(self, key)
@@ -531,6 +517,16 @@ do
       end
     end
   end
+  NomsuCompiler.import_file = function(self, path)
+    local found = false
+    for _, f in Files.walk(path) do
+      if match(f, "%.lua$") or match(f, "%.nom$") or match(f, "^/dev/fd/[012]$") then
+        found = true
+        self:import(self:run_file(f))
+      end
+    end
+    return found
+  end
   NomsuCompiler.run = function(self, to_run, compile_actions)
     local source = to_run.source or Source(to_run, 1, #to_run)
     if type(source) == 'string' then
@@ -540,7 +536,7 @@ do
       Files.spoof(source.filename, to_run)
     end
     local tree
-    if AST.is_syntax_tree(to_run) then
+    if SyntaxTree:is_instance(to_run) then
       tree = to_run
     else
       tree = self:parse(to_run, source)
@@ -682,7 +678,7 @@ do
         local get_version = self[("Nomsu version"):as_lua_id()]
         if get_version then
           do
-            local upgrade = self[("1 upgraded from 2 to 3"):as_lua_id()]
+            local upgrade = self[("1 upgraded from 2 to"):as_lua_id()]
             if upgrade then
               tree = upgrade(tree, tree.version, get_version())
             end
@@ -693,38 +689,36 @@ do
     local _exp_0 = tree.type
     if "Action" == _exp_0 then
       local stub = tree.stub
-      do
-        local compile_action = compile_actions[stub]
-        if compile_action then
-          local args
-          do
-            local _accum_0 = { }
-            local _len_0 = 1
-            for _index_0 = 1, #tree do
-              local arg = tree[_index_0]
-              if type(arg) ~= "string" then
-                _accum_0[_len_0] = arg
-                _len_0 = _len_0 + 1
-              end
+      local compile_action = compile_actions[stub]
+      if compile_action and not tree.target then
+        local args
+        do
+          local _accum_0 = { }
+          local _len_0 = 1
+          for _index_0 = 1, #tree do
+            local arg = tree[_index_0]
+            if type(arg) ~= "string" then
+              _accum_0[_len_0] = arg
+              _len_0 = _len_0 + 1
             end
-            args = _accum_0
           end
-          local ret = compile_action(self, tree, unpack(args))
-          if ret == nil then
+          args = _accum_0
+        end
+        local ret = compile_action(self, tree, unpack(args))
+        if ret == nil then
+          local info = debug.getinfo(compile_action, "S")
+          local filename = Source:from_string(info.source).filename
+          self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
+        end
+        if SyntaxTree:is_instance(ret) then
+          if ret == tree then
             local info = debug.getinfo(compile_action, "S")
             local filename = Source:from_string(info.source).filename
-            self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
+            self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") is producing an endless loop.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's not just returning the original tree.")
           end
-          if AST.is_syntax_tree(ret) then
-            if ret == tree then
-              local info = debug.getinfo(compile_action, "S")
-              local filename = Source:from_string(info.source).filename
-              self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") is producing an endless loop.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's not just returning the original tree.")
-            end
-            return self:compile(ret, compile_actions)
-          end
-          return ret
+          return self:compile(ret, compile_actions)
         end
+        return ret
       end
       local lua = LuaCode.Value(tree.source)
       if tree.target then
@@ -749,9 +743,9 @@ do
             if tok.type == "Block" then
               self:compile_error(tok, "Can't compile action (" .. tostring(stub) .. ") with a Block as an argument.", "Maybe there should be a compile-time action with that name that isn't being found?")
             elseif tok.type == "Action" then
-              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(repr(arg_lua)), "Check the implementation of (" .. tostring(tok.stub) .. ") to see if it is actually meant to produce an expression.")
+              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(tostring(arg_lua)), "Check the implementation of (" .. tostring(tok.stub) .. ") to see if it is actually meant to produce an expression.")
             else
-              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(repr(arg_lua)))
+              self:compile_error(tok, "Can't use this as an argument to (" .. tostring(stub) .. "), since it's not an expression, it produces: " .. tostring(tostring(arg_lua)))
             end
           end
           insert(args, arg_lua)
@@ -765,9 +759,19 @@ do
       lua:append(")")
       return lua
     elseif "EscapedNomsu" == _exp_0 then
-      local lua = LuaCode.Value(tree.source, tree[1].type, "{")
+      local lua = LuaCode.Value(tree.source, "SyntaxTree{")
       local needs_comma, i = false, 1
-      for k, v in pairs(AST.is_syntax_tree(tree[1], "EscapedNomsu") and tree or tree[1]) do
+      local as_lua
+      as_lua = function(x)
+        if type(x) == 'number' then
+          return tostring(x)
+        elseif SyntaxTree:is_instance(x) then
+          return self:compile(x, compile_actions)
+        else
+          return x:as_lua()
+        end
+      end
+      for k, v in pairs((SyntaxTree:is_instance(tree[1]) and tree[1].type == "EscapedNomsu" and tree) or tree[1]) do
         if needs_comma then
           lua:append(", ")
         else
@@ -778,12 +782,12 @@ do
         elseif type(k) == 'string' and match(k, "[_a-zA-Z][_a-zA-Z0-9]*") then
           lua:append(k, "= ")
         else
-          lua:append("[", (AST.is_syntax_tree(k) and self:compile(k, compile_actions) or repr(k)), "]= ")
+          lua:append("[", as_lua(k), "]= ")
         end
         if k == "source" then
-          lua:append(repr(tostring(v)))
+          lua:append(tostring(v):as_lua())
         else
-          lua:append(AST.is_syntax_tree(v) and self:compile(v, compile_actions) or repr(v))
+          lua:append(as_lua(v))
         end
       end
       lua:append("}")
@@ -854,7 +858,7 @@ do
             if #lua.bits > 0 then
               lua:append("..")
             end
-            lua:append(repr(string_buffer))
+            lua:append(string_buffer:as_lua())
             string_buffer = ""
           end
           local bit_lua = self:compile(bit, compile_actions)
@@ -880,7 +884,7 @@ do
         if #lua.bits > 0 then
           lua:append("..")
         end
-        lua:append(repr(string_buffer))
+        lua:append(string_buffer:as_lua())
       end
       if #lua.bits > 1 then
         lua:parenthesize()
@@ -925,7 +929,7 @@ do
         self:compile_error(tree[2], "Can't use this as a dict value, since it's not an expression.")
       end
       local key_str = match(tostring(key_lua), [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
-      if key_str then
+      if key_str and key_str:is_lua_id() then
         return LuaCode(tree.source, key_str, "=", value_lua)
       elseif sub(tostring(key_lua), 1, 1) == "[" then
         return LuaCode(tree.source, "[ ", key_lua, "]=", value_lua)
@@ -948,15 +952,13 @@ do
           self:compile_error(key, "Can't use this as an index, since it's not an expression.")
         end
         local key_lua_str = tostring(key_lua)
-        do
-          local lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
-          if lua_id then
-            lua:append("." .. tostring(lua_id))
-          elseif sub(key_lua_str, 1, 1) == '[' then
-            lua:append("[ ", key_lua, " ]")
-          else
-            lua:append("[", key_lua, "]")
-          end
+        local lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
+        if lua_id and lua_id:is_lua_id() then
+          lua:append("." .. tostring(lua_id))
+        elseif sub(key_lua_str, 1, 1) == '[' then
+          lua:append("[ ", key_lua, " ]")
+        else
+          lua:append("[", key_lua, "]")
         end
       end
       return lua
@@ -1004,7 +1006,11 @@ do
     elseif "Action" == _exp_0 then
       local nomsu = NomsuCode(tree.source)
       if tree.target then
-        nomsu:append(self:tree_to_inline_nomsu(tree.target), "::")
+        local inline_target = self:tree_to_inline_nomsu(tree.target)
+        if tree.target.type == "Action" then
+          inline_target:parenthesize()
+        end
+        nomsu:append(inline_target, "::")
       end
       for i, bit in ipairs(tree) do
         if type(bit) == "string" then
@@ -1165,7 +1171,7 @@ do
         local _list_0 = t
         for _index_0 = 1, #_list_0 do
           local x = _list_0[_index_0]
-          if AST.is_syntax_tree(x) then
+          if SyntaxTree:is_instance(x) then
             find_comments(x)
           end
         end
@@ -1272,13 +1278,13 @@ do
       local should_clump
       should_clump = function(prev_line, line)
         if prev_line.type == "Action" and line.type == "Action" then
-          if prev_line.stub == "use 1" then
-            return line.stub == "use 1"
+          if prev_line.stub == "use" then
+            return line.stub == "use"
           end
-          if prev_line.stub == "test 1" then
+          if prev_line.stub == "test" then
             return true
           end
-          if line.stub == "test 1" then
+          if line.stub == "test" then
             return false
           end
         end

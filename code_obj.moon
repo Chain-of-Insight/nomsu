@@ -2,7 +2,6 @@
 -- build up generated code, while keeping track of where it came from, and managing
 -- indentation levels.
 {:insert, :remove, :concat} = table
-{:repr} = require 'utils'
 unpack or= table.unpack
 local LuaCode, NomsuCode, Source
 
@@ -19,7 +18,7 @@ class Source
 
     __tostring: => "@#{@filename}[#{@start}#{@stop and ':'..@stop or ''}]"
 
-    __repr: => "Source(#{repr @filename}, #{@start}#{@stop and ', '..@stop or ''})"
+    as_lua: => "Source(#{@filename\as_lua!}, #{@start}#{@stop and ', '..@stop or ''})"
     
     __eq: (other)=>
         getmetatable(@) == getmetatable(other) and @filename == other.filename and @start == other.start and @stop == other.stop
@@ -48,10 +47,10 @@ class Code
         @bits = {}
         if type(@source) == 'string'
             @source = Source\from_string(@source)
-        assert(@source and Source\is_instance(@source), "Source has the wrong type")
+        --assert(@source and Source\is_instance(@source), "Source has the wrong type")
         @append(...)
 
-    __tostring: =>
+    text: =>
         if @__str == nil
             buff, indent = {}, 0
             {:match, :gsub, :rep} = string
@@ -60,21 +59,23 @@ class Code
                     if spaces = match(b, "\n([ ]*)[^\n]*$")
                         indent = #spaces
                 else
-                    b = tostring(b)
+                    b = b\text!
                     if indent > 0
                         b = gsub(b, "\n", "\n"..rep(" ", indent))
                 buff[#buff+1] = b
             @__str = concat(buff, "")
         return @__str
 
-    __repr: =>
-        "#{@__class.__name}(#{concat {repr(tostring(@source)), unpack([repr(b) for b in *@bits])}, ", "})"
+    __tostring: => @text!
 
-    __len: => #tostring(@)
+    as_lua: =>
+        "#{@__class.__name}(#{concat {tostring(@source)\as_lua!, unpack([b\as_lua! for b in *@bits])}, ", "})"
+
+    __len: => #@text!
     
-    match: (...)=> tostring(@)\match(...)
+    match: (...)=> @text!\match(...)
 
-    gmatch: (...)=> tostring(@)\gmatch(...)
+    gmatch: (...)=> @text!\gmatch(...)
     
     dirty: =>
         @__str = nil
@@ -92,14 +93,14 @@ class Code
             assert(not Source\is_instance(b), "code bit is a Source")
             if b == '' then continue
             b.dirty = error if b.is_code
-            if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
-                b = repr(b)
+            --if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
+            --    b = b\as_lua!
             bits[#bits+1] = b
         @dirty!
     
     trailing_line_len: =>
         if @_trailing_line_len == nil
-            @_trailing_line_len = #tostring(@)\match("[^\n]*$")
+            @_trailing_line_len = #@text!\match("[^\n]*$")
         return @_trailing_line_len
     
     is_multiline: =>
@@ -131,7 +132,8 @@ class Code
                     bits[#bits+1] = joiner
             bits[#bits+1] = b
             b.dirty = error if b.is_code
-            b = tostring(b)
+            unless type(b) == 'string'
+                b = b\text!
             line = match(b, "\n([^\n]*)$")
             if line
                 line_len = #line
@@ -147,8 +149,8 @@ class Code
         for i=1,n
             b = select(i, ...)
             b.dirty = error if b.is_code
-            if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
-                b = repr(b)
+            --if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
+            --    b = b\as_lua!
             bits[i] = b
         @dirty!
 
@@ -158,7 +160,7 @@ class Code
 
 class LuaCode extends Code
     __tostring: Code.__tostring
-    __repr: Code.__repr
+    as_lua: Code.as_lua
     __len: Code.__len
     new: (...)=>
         super ...
@@ -208,7 +210,7 @@ class LuaCode extends Code
                         seen[var] = true
                         to_declare[#to_declare+1] = var
                 for bit in *@bits
-                    if bit.__class == LuaCode
+                    unless type(bit) == 'string'
                         gather_from bit
             gather_from self
         if #to_declare > 0
@@ -238,7 +240,8 @@ class LuaCode extends Code
                         nomsu_to_lua[lua.source.start] = pos
                 else
                     walk b, pos
-                pos += #tostring(b)
+                    b = b\text!
+                pos += #b
         walk self, 1
         return {
             nomsu_filename:@source.filename
@@ -253,14 +256,9 @@ class LuaCode extends Code
 
 class NomsuCode extends Code
     __tostring: Code.__tostring
-    __repr: Code.__repr
+    as_lua: Code.as_lua
     __len: Code.__len
 
-Code.__base.append_1 = assert Code.__base.append
-Code.__base.append_1_joined_by_2 = assert Code.__base.concat_append
-Code.__base.prepend_1 = assert Code.__base.prepend
-LuaCode.__base.declare_locals_1 = assert LuaCode.__base.declare_locals
-LuaCode.__base.remove_free_vars_1 = assert LuaCode.__base.remove_free_vars
-LuaCode.__base.add_free_vars_1 = assert LuaCode.__base.add_free_vars
+Code.__base.add_1_joined_with = assert Code.__base.concat_append
 
 return {:Code, :NomsuCode, :LuaCode, :Source}

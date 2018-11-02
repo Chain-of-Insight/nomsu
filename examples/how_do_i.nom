@@ -1,10 +1,10 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
     After a comment line, any indented text
     is considered part of the comment
-        (including any deeper-level indented text)
+    (including any deeper-level indented text)
     The comment ends when the indentation ends
 # How do I import a file?
 use "lib/os.nom"
@@ -167,14 +167,14 @@ do:
 
 # How do I define a function/method/procedure?
 # In nomsu, they're called "action"s, and they can be declared like this:
-action [say both %first and also %second]:
+(say both %first and also %second) means:
     say %first
     
     # Function arguments are accessed just like variables
     say %second
 
 # Actions can use "return" to return a value early
-action [first fibonacci above %n]:
+(first fibonacci above %n) means:
     %f1 = 0
     %f2 = 1
     repeat:
@@ -186,11 +186,11 @@ action [first fibonacci above %n]:
 say (first fibonacci above 10)
 
 # Actions can have aliases, which may or may not have the arguments in different order
-action [..]
+[..]
     I hate %worse_things more than %better_things
     I think %worse_things are worse than %better_things
     I like %better_things more than %worse_things
-..:
+..all mean:
     say "\(%better_things::capitalized) rule and \%worse_things drool!"
 
 I like "dogs" more than "cats"
@@ -201,7 +201,7 @@ I think "chihuahuas" are worse than "corgis"
 say both "Hello" and also "again!"
 
 # Actions can even start with a parameter
-action [%what_she_said is what she said]:
+(%what_she_said is what she said) means:
     say %what_she_said
     say "-- she said"
 
@@ -209,7 +209,7 @@ action [%what_she_said is what she said]:
 
 # The language only reserves []{}().,:;% as special characters, so actions
     can have really funky names!
-action [>> %foo_bar $$$^ --> % @&_~-^-~_~-^ %1 !]:
+(>> %foo_bar $$$^ --> % @&_~-^-~_~-^ %1 !) means:
     say %foo_bar
     say %
     say %1
@@ -218,7 +218,7 @@ action [>> %foo_bar $$$^ --> % @&_~-^-~_~-^ %1 !]:
 
 # There's also full unicode support
 %こんにちは = "こんにちは"
-action [% と言う] "\%世界"
+(% と言う) means "\%世界"
 say (%こんにちは と言う)
 
 # Math and logic operations are just treated the same as actions in the syntax
@@ -226,7 +226,7 @@ say (2 + 3)
 
 # So you can define your own operators, although they will need to be parenthesized to
     play nicely with other operators
-action [%a ++ %b] (2 * (%a + %b))
+(%a ++ %b) means (2 * (%a + %b))
 say (1 ++ (2 * 3))
 
 # How do I do grouping?
@@ -240,36 +240,38 @@ say (2 + 3)
 say both "Very long first argument that needs its own line" and also "\
     ..short second arg"
 
-action [my favorite number] (21 + 2)
+(my favorite number) means (21 + 2)
 
 # This can be nested:
 say both (my favorite number) and also "foo"
 
 # Macros: 
 # The "lua> %" and "=lua %" macros can be used to write raw lua code: 
-action [say the time] (lua> "io.write(\"The OS time is: \", os.time(), \"\\n\");")
+(say the time) means:
+    lua> "io.write(\"The OS time is: \", os.time(), \"\\n\");"
+
 say the time
 say "Math expression result is: \(=lua "(1 + 2*3 + 3*4)^2")"
 
 # Variables can be accessed via \%varname
-action [square root of %n] (=lua "math.sqrt(\%n)")
+(square root of %n) means (=lua "math.sqrt(\%n)")
 say "The square root of 2 is \(square root of 2)"
 
 # Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
-parse [if %condition is untrue %body] as (if (not %condition) %body)
+(if %condition is untrue %body) parses as (if (not %condition) %body)
 
 # Or to transform nomsu code into custom lua code using "compile % to %"
-compile [if %condition on opposite day %body] to (..)
+(if %condition on opposite day %body) compiles to (..)
     Lua "\
         ..if not \(%condition as lua expr) then
             \(%body as lua statements)
         end"
 
 # Constants can be defined as macros
-parse [TWENTY] as 20
+(TWENTY) parses as 20
 
 # When they're invoked, they'll need parentheses just like a function call
-parse [TWENTY ONE] as 21
+(TWENTY ONE) parses as 21
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -286,7 +288,7 @@ if (1 > (TWENTY)) on opposite day:
 
 # How do I use an action as a value?
 # Well... it's always *possible* to fall back to Lua behavior for something like this:
-action [best of %items according to %key_fn]:
+(best of %items according to %key_fn) means:
     set {%best:nil, %best_key:nil}
     for %item in %items:
         %key = (=lua "\%key_fn(\%item)")
@@ -301,7 +303,7 @@ say (best of [2, -3, 4, -8] according to ([%x] -> (%x * %x)))
     one-off function to pass to another function and get called a bunch of times, you
     could use a macro to generate a single block of code that inlines the expression you
     want to use:
-parse [best of %items where %item_var has score %key_expr] as (..)
+(best of %items where %item_var has score %key_expr) parses as (..)
     result of:
         set {%best:nil, %best_key:nil}
         for %item_var in %items:

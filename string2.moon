@@ -13,15 +13,21 @@ isplit = (sep='%s+')=>
     return step, {str:@, pos:1, :sep}, 0
 
 lua_keywords = {
-    "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if",
-    "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"
+    ["and"]:true, ["break"]:true, ["do"]:true, ["else"]:true, ["elseif"]:true, ["end"]:true,
+    ["false"]:true, ["for"]:true, ["function"]:true, ["goto"]:true, ["if"]:true,
+    ["in"]:true, ["local"]:true, ["nil"]:true, ["not"]:true, ["or"]:true, ["repeat"]:true,
+    ["return"]:true, ["then"]:true, ["true"]:true, ["until"]:true, ["while"]:true
 }
+is_lua_id = (str)->
+    match(str, "^[_a-zA-Z][_a-zA-Z0-9]*$") and not lua_keywords[str]
 
 string2 = {
-    :isplit, uppercase:upper, lowercase:lower, reversed:reverse
+    :isplit, uppercase:upper, lowercase:lower, reversed:reverse, :is_lua_id
     capitalized: => gsub(@, '%l', upper, 1)
     byte: byte, bytes: (i, j)=> {byte(@, i or 1, j or -1)}
     split: (sep)=> [chunk for i,chunk in isplit(@, sep)]
+    starts_with: (s)=> sub(@, 1, #s) == s
+    ends_with: (s)=> #@ >= #s and sub(@, #@-#s, -1) == s
     lines: => [line for i,line in isplit(@, '\n')]
     line: (line_num)=>
         for i, line, start in isplit(@, '\n')
@@ -37,22 +43,32 @@ string2 = {
         lines = {}
         for line in *@lines!
             while #line > maxlen
-                chunk = line\sub(1, maxlen)
-                split = chunk\find(' ', maxlen-buffer, true) or maxlen
-                chunk = line\sub(1, split)
-                line = line\sub(split+1, -1)
+                chunk = sub(line, 1, maxlen)
+                split = find(chunk, ' ', maxlen-buffer, true) or maxlen
+                chunk = sub(line, 1, split)
+                line = sub(line, split+1, -1)
                 lines[#lines+1] = chunk
             lines[#lines+1] = line
         return table.concat(lines, "\n")
+
+    as_lua: =>
+        escaped = gsub(@, "\\", "\\\\")
+        escaped = gsub(escaped, "\n", "\\n")
+        escaped = gsub(escaped, '"', '\\"')
+        escaped = gsub(escaped, "[^ %g]", (c)-> format("\\%03d", byte(c, 1)))
+        return '"'..escaped..'"'
+
+    as_nomsu: =>
+        escaped = gsub(@, "\\", "\\\\")
+        escaped = gsub(escaped, "\n", "\\n")
+        escaped = gsub(escaped, '"', '\\"')
+        escaped = gsub(escaped, "[^ %g]", (c)-> format("\\%03d", byte(c, 1)))
+        return '"'..escaped..'"'
 
     -- Convert an arbitrary text into a valid Lua identifier. This function is injective,
     -- but not idempotent. In logic terms: (x != y) => (as_lua_id(x) != as_lua_id(y)),
     -- but not (as_lua_id(a) == b) => (as_lua_id(b) == b).
     as_lua_id: (str)->
-        orig = str
-        -- Empty strings are not valid lua identifiers, so treat them like " ",
-        -- and treat " " as "  ", etc. to preserve injectivity.
-        str = gsub str, "^ *$", "%1 "
         -- Escape 'x' (\x78) when it precedes something that looks like an uppercase hex sequence.
         -- This way, all Lua IDs can be unambiguously reverse-engineered, but normal usage
         -- of 'x' won't produce ugly Lua IDs.
@@ -62,29 +78,26 @@ string2 = {
         str = gsub str, "%W", (c)->
             if c == ' ' then '_'
             else format("x%02X", byte(c))
-        -- Lua IDs can't start with numbers, so map "1" -> "_1", "_1" -> "__1", etc.
-        str = gsub str, "^_*%d", "_%1"
-        -- This pattern is guaranteed to match all keywords, but also matches some other stuff.
-        if match str, "^_*[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$"
-            for kw in *lua_keywords
-                if match str, ("^_*"..kw.."$")
-                    str = "_"..str
+
+        unless is_lua_id(match(str, "^_*(.*)$"))
+            str = "_"..str
         return str
 
     -- from_lua_id(as_lua_id(str)) == str, but behavior is unspecified for inputs that
     -- did not come from as_lua_id()
     from_lua_id: (str)->
-        -- This pattern is guaranteed to match all keywords, but also matches some other stuff.
-        if match str, "^_+[abdefgilnortuw][aefhilnoru][acdefiklnoprstu]*$"
-            for kw in *lua_keywords
-                if match str, ("^_+"..kw.."$")
-                    str = str\sub(2,-1)
-        str = gsub(str, "^_(_*%d.*)", "%1")
+        unless is_lua_id(match(str, "^_*(.*)$"))
+            str = sub(str,2,-1)
         str = gsub(str, "_", " ")
         str = gsub(str, "x([0-9A-F][0-9A-F])", (hex)-> char(tonumber(hex, 16)))
-        str = gsub(str, "^ ([ ]*)$", "%1")
         return str
 }
 for k,v in pairs(string) do string2[k] or= v
+
+for test in *{"", "_", " ", "return", "asdf", "one two", "one_two", "Hex2Dec", "He-ec", "\3"}
+    lua_id = string2.as_lua_id(test)
+    assert is_lua_id(lua_id), "failed to convert '#{test}' to a valid Lua identifier (got '#{lua_id}')"
+    roundtrip = string2.from_lua_id(lua_id)
+    assert roundtrip == test, "Failed lua_id roundtrip: '#{test}' -> '#{lua_id}' -> '#{roundtrip}'"
 
 return string2

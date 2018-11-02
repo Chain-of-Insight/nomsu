@@ -3,8 +3,6 @@ do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local repr
-repr = require('utils').repr
 local unpack = unpack or table.unpack
 local LuaCode, NomsuCode, Source
 do
@@ -13,8 +11,8 @@ do
     __tostring = function(self)
       return "@" .. tostring(self.filename) .. "[" .. tostring(self.start) .. tostring(self.stop and ':' .. self.stop or '') .. "]"
     end,
-    __repr = function(self)
-      return "Source(" .. tostring(repr(self.filename)) .. ", " .. tostring(self.start) .. tostring(self.stop and ', ' .. self.stop or '') .. ")"
+    as_lua = function(self)
+      return "Source(" .. tostring(self.filename:as_lua()) .. ", " .. tostring(self.start) .. tostring(self.stop and ', ' .. self.stop or '') .. ")"
     end,
     __eq = function(self, other)
       return getmetatable(self) == getmetatable(other) and self.filename == other.filename and self.start == other.start and self.stop == other.stop
@@ -80,7 +78,7 @@ do
   local _class_0
   local _base_0 = {
     is_code = true,
-    __tostring = function(self)
+    text = function(self)
       if self.__str == nil then
         local buff, indent = { }, 0
         local match, gsub, rep
@@ -97,7 +95,7 @@ do
               end
             end
           else
-            b = tostring(b)
+            b = b:text()
             if indent > 0 then
               b = gsub(b, "\n", "\n" .. rep(" ", indent))
             end
@@ -108,16 +106,19 @@ do
       end
       return self.__str
     end,
-    __repr = function(self)
+    __tostring = function(self)
+      return self:text()
+    end,
+    as_lua = function(self)
       return tostring(self.__class.__name) .. "(" .. tostring(concat({
-        repr(tostring(self.source)),
+        tostring(self.source):as_lua(),
         unpack((function()
           local _accum_0 = { }
           local _len_0 = 1
           local _list_0 = self.bits
           for _index_0 = 1, #_list_0 do
             local b = _list_0[_index_0]
-            _accum_0[_len_0] = repr(b)
+            _accum_0[_len_0] = b:as_lua()
             _len_0 = _len_0 + 1
           end
           return _accum_0
@@ -125,13 +126,13 @@ do
       }, ", ")) .. ")"
     end,
     __len = function(self)
-      return #tostring(self)
+      return #self:text()
     end,
     match = function(self, ...)
-      return tostring(self):match(...)
+      return self:text():match(...)
     end,
     gmatch = function(self, ...)
-      return tostring(self):gmatch(...)
+      return self:text():gmatch(...)
     end,
     dirty = function(self)
       self.__str = nil
@@ -157,9 +158,6 @@ do
           if b.is_code then
             b.dirty = error
           end
-          if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
-            b = repr(b)
-          end
           bits[#bits + 1] = b
           _continue_0 = true
         until true
@@ -171,7 +169,7 @@ do
     end,
     trailing_line_len = function(self)
       if self._trailing_line_len == nil then
-        self._trailing_line_len = #tostring(self):match("[^\n]*$")
+        self._trailing_line_len = #self:text():match("[^\n]*$")
       end
       return self._trailing_line_len
     end,
@@ -214,7 +212,9 @@ do
         if b.is_code then
           b.dirty = error
         end
-        b = tostring(b)
+        if not (type(b) == 'string') then
+          b = b:text()
+        end
         local line = match(b, "\n([^\n]*)$")
         if line then
           line_len = #line
@@ -235,9 +235,6 @@ do
         if b.is_code then
           b.dirty = error
         end
-        if type(b) ~= 'string' and not (type(b) == 'table' and b.is_code) then
-          b = repr(b)
-        end
         bits[i] = b
       end
       return self:dirty()
@@ -255,7 +252,6 @@ do
       if type(self.source) == 'string' then
         self.source = Source:from_string(self.source)
       end
-      assert(self.source and Source:is_instance(self.source), "Source has the wrong type")
       return self:append(...)
     end,
     __base = _base_0,
@@ -276,7 +272,7 @@ do
   local _parent_0 = Code
   local _base_0 = {
     __tostring = Code.__tostring,
-    __repr = Code.__repr,
+    as_lua = Code.as_lua,
     __len = Code.__len,
     add_free_vars = function(self, vars)
       if not (#vars > 0) then
@@ -357,7 +353,7 @@ do
           local _list_1 = self.bits
           for _index_0 = 1, #_list_1 do
             local bit = _list_1[_index_0]
-            if bit.__class == LuaCode then
+            if not (type(bit) == 'string') then
               gather_from(bit)
             end
           end
@@ -404,8 +400,9 @@ do
             end
           else
             walk(b, pos)
+            b = b:text()
           end
-          pos = pos + #tostring(b)
+          pos = pos + #b
         end
       end
       walk(self, 1)
@@ -469,7 +466,7 @@ do
   local _parent_0 = Code
   local _base_0 = {
     __tostring = Code.__tostring,
-    __repr = Code.__repr,
+    as_lua = Code.as_lua,
     __len = Code.__len
   }
   _base_0.__index = _base_0
@@ -505,12 +502,7 @@ do
   end
   NomsuCode = _class_0
 end
-Code.__base.append_1 = assert(Code.__base.append)
-Code.__base.append_1_joined_by_2 = assert(Code.__base.concat_append)
-Code.__base.prepend_1 = assert(Code.__base.prepend)
-LuaCode.__base.declare_locals_1 = assert(LuaCode.__base.declare_locals)
-LuaCode.__base.remove_free_vars_1 = assert(LuaCode.__base.remove_free_vars)
-LuaCode.__base.add_free_vars_1 = assert(LuaCode.__base.add_free_vars)
+Code.__base.add_1_joined_with = assert(Code.__base.concat_append)
 return {
   Code = Code,
   NomsuCode = NomsuCode,

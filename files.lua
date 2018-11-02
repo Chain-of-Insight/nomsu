@@ -181,6 +181,8 @@ Files.walk = function(path, flush_cache)
     files = {
       path
     }
+  elseif path:match("^[~/]") or path:match("^%./") or path:match("^%.%./") then
+    files = browse(path)
   else
     for nomsupath in package.nomsupath:gmatch("[^;]+") do
       do
@@ -191,20 +193,18 @@ Files.walk = function(path, flush_cache)
       end
     end
   end
-  local iter
-  iter = function(files, i)
-    if not (files) then
-      return 
+  files = files or { }
+  do
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _index_0 = 1, #files do
+      local f = files[_index_0]
+      _accum_0[_len_0] = gsub(f, "^%./", "")
+      _len_0 = _len_0 + 1
     end
-    i = i + 1
-    do
-      local f = files[i]
-      if f then
-        return i, f
-      end
-    end
+    files = _accum_0
   end
-  return iter, files, 0
+  return ipairs(files)
 end
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
     line <- {} (!%nl .)*

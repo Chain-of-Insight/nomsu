@@ -25,12 +25,12 @@ say "Hello"
 for %num in %my_nums:
     say "\%num is one of my nums"
 
-action [sing %n bottles of beer]:
+(sing %n bottles of beer) means:
     for %i in %n to 1 by -1:
-        say ".."
-            \%i bottle\("s" if (%i > 1) else "") of beer on the wall,
+        say "\
+            ..\%i bottle\("s" if (%i > 1) else "") of beer on the wall,
             \%i bottle\("s" if (%i > 1) else "") of beer!
-            Take one down, pass it around...
+            Take one down, pass it around..."
     say "No bottles of beer on the wall. Go to the store, buy some more..."
 
 sing 99 bottles of beer

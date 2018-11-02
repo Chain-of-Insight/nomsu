@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -22,12 +22,12 @@ test:
     assume ("asdf"::uppercase) == "ASDF"
     assume ("asdf"::with "s" -> "X") == "aXdf"
     assume ("one\ntwo\n"::lines) == ["one", "two", ""]
-    parse [アクション %spec %body] as (action %spec %body)
+    (アクション %spec %body) parses as (externally %spec means %body)
 test:
     %こんにちは = "こんにちは"
     アクション [% と言う] "\(%)世界"
     assume (%こんにちは と言う) == "こんにちは世界"
-compile [%expr for %match in %text matching %patt] to (..)
+(%expr for %match in %text matching %patt) compiles to (..)
     Lua value "\
         ..(function()
             local ret = _List{}

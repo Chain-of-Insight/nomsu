@@ -3,7 +3,6 @@ lpeg = require 'lpeg'
 re = require 're'
 lpeg.setmaxstack 20000
 {:P,:R,:S,:C,:Cmt,:Carg,:Cc} = lpeg
-{:repr} = require 'utils'
 
 DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF

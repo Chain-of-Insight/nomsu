@@ -14,7 +14,7 @@ lpeg = require 'lpeg'
 re = require 're'
 utils = require 'utils'
 Files = require 'files'
-{:repr, :stringify, :equivalent} = utils
+{:stringify, :equivalent} = utils
 {:List, :Dict, :Text} = require 'containers'
 export colors, colored
 colors = require 'consolecolors'
@@ -23,7 +23,7 @@ colored = setmetatable({}, {__index:(_,color)-> ((msg)-> colors[color]..tostring
 unpack or= table.unpack
 {:match, :sub, :gsub, :format, :byte, :find} = string
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-AST = require "syntax_tree"
+SyntaxTree = require "syntax_tree"
 make_parser = require("parser")
 pretty_error = require("pretty_errors")
 -- Mapping from source string (e.g. "@core/metaprogramming.nom[1:100]") to a mapping
@@ -62,53 +62,49 @@ escape = (s)->
 -- Re-implement nomsu-to-lua comment translation?
 
 make_tree = (tree, userdata)->
-    cls = AST[tree.type]
     tree.source = Source(userdata.filename, tree.start, tree.stop)
     tree.start, tree.stop = nil, nil
-    tree.type = nil
-    tree.comments = [t for t in *tree when AST.is_syntax_tree(t, "Comment")]
+    tree.comments = [t for t in *tree when SyntaxTree\is_instance(t) and t.type == "Comment"]
     if #tree.comments == 0 then tree.comments = nil
     for i=#tree,1,-1
-        if AST.is_syntax_tree(tree[i], "Comment")
+        if SyntaxTree\is_instance(tree[i]) and tree[i].type == "Comment"
             table.remove(tree, i)
-    tree = setmetatable(tree, cls)
-    cls.source_code_for_tree[tree] = userdata.source
-    if tree.__init then tree\__init!
+    tree = SyntaxTree(tree)
     return tree
 
 Parsers = {}
-max_parser_version = 0
-for version=1,999
-    found_version = false
-    for _, full_path in Files.walk("nomsu.#{version}.peg")
-        if peg_contents = Files.read(full_path)
-            found_version = true
-            max_parser_version = version
-            Parsers[version] = make_parser(peg_contents, make_tree)
-    break unless found_version
+max_parser_version = 4
+for version=1,max_parser_version
+    peg_file = io.open("nomsu.#{version}.peg")
+    if not peg_file and package.nomsupath
+        for path in package.nomsupath\gmatch("[^;]+")
+            peg_file = io.open(path.."/nomsu.#{version}.peg")
+            break if peg_file
+    assert(peg_file, "could not find nomsu .peg file")
+    peg_contents = peg_file\read('*a')
+    peg_file\close!
+    Parsers[version] = make_parser(peg_contents, make_tree)
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 NomsuCompiler = setmetatable {}, {__tostring: => "Nomsu"}
 _anon_chunk = 0
 with NomsuCompiler
-    .NOMSU_COMPILER_VERSION = 9
-    .NOMSU_SYNTAX_VERSION = max_parser_version
     .can_optimize = -> false
 
     -- Discretionary/convenience stuff
     .environment = {
-        NOMSU_COMPILER_VERSION: 8, NOMSU_SYNTAX_VERSION: max_parser_version
+        NOMSU_COMPILER_VERSION: 11, NOMSU_SYNTAX_VERSION: max_parser_version
         -- Lua stuff:
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
         :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
-        :table, :assert, :dofile, :loadstring, :type, :select, :math, :io, :load,
+        :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
         :pairs, :ipairs,
         -- Nomsu types:
         _List:List, _Dict:Dict,
         -- Utilities and misc.
-        repr:repr, stringify:stringify, utils:utils, lpeg:lpeg, re:re, Files:Files,
-        :AST, TESTS: Dict{}, globals: Dict{}
+        stringify:stringify, utils:utils, lpeg:lpeg, re:re, Files:Files,
+        :SyntaxTree, TESTS: Dict({}), globals: Dict({}),
         :LuaCode, :NomsuCode, :Source
         nomsu:NomsuCompiler
         __imported: Dict{}
@@ -130,7 +126,6 @@ with NomsuCompiler
             return ipairs(x)
     if jit or _VERSION == "Lua 5.2"
         .environment.bit = require("bitops")
-    for k,v in pairs(AST) do .environment[k] = v
 
     .fork = =>
         f = setmetatable({}, {__index:@})
@@ -160,7 +155,7 @@ with NomsuCompiler
                 coroutine.yield t
             else
                 for k,v in pairs(t)
-                    continue unless AST.is_syntax_tree(v)
+                    continue unless SyntaxTree\is_instance(v)
                     find_errors(v)
 
         errs = [err for err in coroutine.wrap(-> find_errors(tree))]
@@ -205,16 +200,16 @@ with NomsuCompiler
     add_lua_string_bits = (val_or_stmt, code)=>
         cls_str = val_or_stmt == "value" and "LuaCode.Value(" or "LuaCode("
         if code.type != "Text"
-            return LuaCode.Value(code.source, cls_str, repr(tostring(code.source)), ", ", @compile(code), ")")
+            return LuaCode.Value(code.source, cls_str, tostring(code.source)\as_lua!, ", ", @compile(code), ")")
         add_bit_lua = (lua, bit_lua)->
             bit_leading_len = #(bit_lua\match("^[^\n]*"))
             lua\append(lua\trailing_line_len! + bit_leading_len > MAX_LINE and ",\n    " or ", ")
             lua\append(bit_lua)
         operate_on_text = (text)->
-            lua = LuaCode.Value(text.source, cls_str, repr(tostring(text.source)))
+            lua = LuaCode.Value(text.source, cls_str, tostring(text.source)\as_lua!)
             for bit in *text
                 if type(bit) == "string"
-                    add_bit_lua(lua, repr(bit))
+                    add_bit_lua(lua, bit\as_lua!)
                 elseif bit.type == "Text"
                     add_bit_lua(lua, operate_on_text(bit))
                 else
@@ -230,7 +225,7 @@ with NomsuCompiler
     -- This is a bit of a hack, but this code handles arbitrarily complex
     -- math expressions like 2*x + 3^2 without having to define a single
     -- action for every possibility.
-    math_expression = re.compile [[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]]
+    math_expression = re.compile [[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]]
     compile_math_expression = (tree, ...)=>
         lua = LuaCode.Value(tree.source)
         for i,tok in ipairs tree
@@ -247,39 +242,38 @@ with NomsuCompiler
         return lua
     .environment.COMPILE_ACTIONS = setmetatable({
         __imported: Dict{}
-        ["Lua 1"]: (tree, code)=>
+        ["Lua"]: (tree, code)=>
             return add_lua_string_bits(@, 'statements', code)
     
-        ["Lua value 1"]: (tree, code)=>
+        ["Lua value"]: (tree, code)=>
             return add_lua_string_bits(@, 'value', code)
 
-        ["lua > 1"]: (tree, code)=>
+        ["lua >"]: (tree, code)=>
             if code.type != "Text"
                 return LuaCode tree.source, "nomsu:run_lua(", @compile(code), ", nomsu);"
             return add_lua_bits(@, "statements", code)
 
-        ["= lua 1"]: (tree, code)=>
+        ["= lua"]: (tree, code)=>
             if code.type != "Text"
                 return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(code), ":as_statements('return '), nomsu)"
             return add_lua_bits(@, "value", code)
 
-        ["use 1"]: (tree, path)=>
+        ["use"]: (tree, path)=>
             if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
-                for _,f in Files.walk(path[1])
-                    @import(@run_file(f))
-                    
-            return LuaCode(tree.source, "for i,f in Files.walk(", @compile(path), ") do nomsu:import(nomsu:run_file(f)) end")
+                unless @import_file(path[1])
+                    @compile_error tree, "Could not find anything to import for #{path}"
+            return LuaCode(tree.source, "nomsu:import_file(#{@compile(path)})")
 
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
-        ["test 1"]: (tree, body)=>
+        ["test"]: (tree, body)=>
             test_str = table.concat [tostring(@tree_to_nomsu(line)) for line in *body], "\n"
-            LuaCode tree.source, "TESTS[#{repr(tostring(tree.source))}] = ", repr(test_str)
+            LuaCode tree.source, "TESTS[#{tostring(tree.source)\as_lua!}] = ", test_str\as_lua!
 
         ["is jit"]: (tree, code)=>
             return LuaCode.Value(tree.source, jit and "true" or "false")
 
         ["Lua version"]: (tree, code)=>
-            return LuaCode.Value(tree.source, repr(_VERSION))
+            return LuaCode.Value(tree.source, _VERSION\as_lua!)
 
         __parent: setmetatable({}, {
             __index: (key)=>
@@ -296,11 +290,19 @@ with NomsuCompiler
             continue if k == "__imported" or k == "__parent"
             @environment.COMPILE_ACTIONS.__imported[k] or= v
 
+    .import_file = (path)=>
+        found = false
+        for _,f in Files.walk(path)
+            if match(f, "%.lua$") or match(f, "%.nom$") or match(f, "^/dev/fd/[012]$")
+                found = true
+                @import(@run_file(f))
+        return found
+
     .run = (to_run, compile_actions)=>
         source = to_run.source or Source(to_run, 1, #to_run)
         if type(source) == 'string' then source = Source\from_string(source)
         if not Files.read(source.filename) then Files.spoof(source.filename, to_run)
-        tree = if AST.is_syntax_tree(to_run) then to_run else @parse(to_run, source)
+        tree = if SyntaxTree\is_instance(to_run) then to_run else @parse(to_run, source)
         if tree == nil -- Happens if pattern matches, but there are no captures, e.g. an empty string
             return nil
         if tree.type != "FileChunks"
@@ -396,12 +398,13 @@ with NomsuCompiler
         compile_actions or= @environment.COMPILE_ACTIONS
         if tree.version
             if get_version = @[("Nomsu version")\as_lua_id!]
-                if upgrade = @[("1 upgraded from 2 to 3")\as_lua_id!]
+                if upgrade = @[("1 upgraded from 2 to")\as_lua_id!]
                     tree = upgrade(tree, tree.version, get_version!)
         switch tree.type
             when "Action"
                 stub = tree.stub
-                if compile_action = compile_actions[stub]
+                compile_action = compile_actions[stub]
+                if compile_action and not tree.target
                     args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force Lua to avoid tail call optimization for debugging purposes
                     -- TODO: use tail call?
@@ -412,7 +415,7 @@ with NomsuCompiler
                         @compile_error tree,
                             "The compile-time action here (#{stub}) failed to return any value.",
                             "Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's returning something."
-                    if AST.is_syntax_tree(ret)
+                    if SyntaxTree\is_instance(ret)
                         if ret == tree
                             info = debug.getinfo(compile_action, "S")
                             filename = Source\from_string(info.source).filename
@@ -442,20 +445,27 @@ with NomsuCompiler
 
                         elseif tok.type == "Action"
                             @compile_error tok,
-                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{repr arg_lua}",
+                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{tostring(arg_lua)}",
                                 "Check the implementation of (#{tok.stub}) to see if it is actually meant to produce an expression."
                         else
                             @compile_error tok,
-                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{repr arg_lua}"
+                                "Can't use this as an argument to (#{stub}), since it's not an expression, it produces: #{tostring(arg_lua)}"
                     insert args, arg_lua
                 lua\concat_append args, ", "
                 lua\append ")"
                 return lua
 
             when "EscapedNomsu"
-                lua = LuaCode.Value tree.source, tree[1].type, "{"
+                lua = LuaCode.Value tree.source, "SyntaxTree{"
                 needs_comma, i = false, 1
-                for k,v in pairs(AST.is_syntax_tree(tree[1], "EscapedNomsu") and tree or tree[1])
+                as_lua = (x)->
+                    if type(x) == 'number'
+                        tostring(x)
+                    elseif SyntaxTree\is_instance(x)
+                        @compile(x, compile_actions)
+                    else x\as_lua!
+
+                for k,v in pairs((SyntaxTree\is_instance(tree[1]) and tree[1].type == "EscapedNomsu" and tree) or tree[1])
                     if needs_comma then lua\append ", "
                     else needs_comma = true
                     if k == i
@@ -463,11 +473,11 @@ with NomsuCompiler
                     elseif type(k) == 'string' and match(k,"[_a-zA-Z][_a-zA-Z0-9]*")
                         lua\append(k, "= ")
                     else
-                        lua\append("[", (AST.is_syntax_tree(k) and @compile(k, compile_actions) or repr(k)), "]= ")
+                        lua\append("[", as_lua(k), "]= ")
                     if k == "source"
-                        lua\append repr(tostring(v))
+                        lua\append tostring(v)\as_lua!
                     else
-                        lua\append(AST.is_syntax_tree(v) and @compile(v, compile_actions) or repr(v))
+                        lua\append as_lua(v)
                 lua\append "}"
                 return lua
             
@@ -502,9 +512,9 @@ with NomsuCompiler
                     if type(bit) == "string"
                         string_buffer ..= bit
                         continue
-                    if string_buffer ~= ""
+                    if string_buffer != ""
                         if #lua.bits > 0 then lua\append ".."
-                        lua\append repr(string_buffer)
+                        lua\append string_buffer\as_lua!
                         string_buffer = ""
                     bit_lua = @compile(bit, compile_actions)
                     unless bit_lua.is_value
@@ -519,7 +529,7 @@ with NomsuCompiler
 
                 if string_buffer ~= "" or #lua.bits == 0
                     if #lua.bits > 0 then lua\append ".."
-                    lua\append repr(string_buffer)
+                    lua\append string_buffer\as_lua!
 
                 if #lua.bits > 1
                     lua\parenthesize!
@@ -547,9 +557,8 @@ with NomsuCompiler
                 unless value_lua.is_value
                     @compile_error tree[2],
                         "Can't use this as a dict value, since it's not an expression."
-                -- TODO: support arbitrary words here, like operators and unicode
                 key_str = match(tostring(key_lua), [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
-                return if key_str
+                return if key_str and key_str\is_lua_id!
                     LuaCode tree.source, key_str,"=",value_lua
                 elseif sub(tostring(key_lua),1,1) == "["
                     -- NOTE: this *must* use a space after the [ to avoid freaking out
@@ -575,7 +584,8 @@ with NomsuCompiler
                         @compile_error key,
                             "Can't use this as an index, since it's not an expression."
                     key_lua_str = tostring(key_lua)
-                    if lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
+                    lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
+                    if lua_id and lua_id\is_lua_id!
                         lua\append ".#{lua_id}"
                     elseif sub(key_lua_str,1,1) == '['
                         -- NOTE: this *must* use a space after the [ to avoid freaking out
@@ -623,7 +633,10 @@ with NomsuCompiler
             when "Action"
                 nomsu = NomsuCode(tree.source)
                 if tree.target
-                    nomsu\append @tree_to_inline_nomsu(tree.target), "::"
+                    inline_target = @tree_to_inline_nomsu(tree.target)
+                    if tree.target.type == "Action"
+                        inline_target\parenthesize!
+                    nomsu\append inline_target, "::"
                 for i,bit in ipairs tree
                     if type(bit) == "string"
                         clump_words = (type(tree[i-1]) == 'string' and is_operator(bit) != is_operator(tree[i-1]))
@@ -729,7 +742,7 @@ with NomsuCompiler
             find_comments = (t)->
                 if t.comments and t.source.filename == tree.source.filename
                     comment_set[c] = true for c in *t.comments
-                find_comments(x) for x in *t when AST.is_syntax_tree x
+                find_comments(x) for x in *t when SyntaxTree\is_instance x
             find_comments(tree)
             -- Sort in reversed order so they can be easily popped
             comments = [c for c in pairs comment_set]
@@ -778,9 +791,9 @@ with NomsuCompiler
                 nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
                 should_clump = (prev_line, line)->
                     if prev_line.type == "Action" and line.type == "Action"
-                        if prev_line.stub == "use 1" then return line.stub == "use 1"
-                        if prev_line.stub == "test 1" then return true
-                        if line.stub == "test 1" then return false
+                        if prev_line.stub == "use" then return line.stub == "use"
+                        if prev_line.stub == "test" then return true
+                        if line.stub == "test" then return false
                     return not recurse(prev_line)\is_multiline!
                 for chunk_no, chunk in ipairs tree
                     nomsu\append "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1

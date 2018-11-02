@@ -33,7 +33,6 @@ Files.read = (filename)->
     _FILE_CACHE[filename] = contents
     return contents
 
--- `walk` returns an iterator over all files matching a path.
 {:match, :gsub} = string
 
 -- TODO: improve sanitization
@@ -105,15 +104,14 @@ Files.walk = (path, flush_cache=false)->
     local files
     if path == 'stdin' or _SPOOFED_FILES[path]
         files = {path}
+    elseif path\match("^[~/]") or path\match("^%./") or path\match("^%.%./")
+        files = browse(path)
     else
         for nomsupath in package.nomsupath\gmatch("[^;]+")
             if files = browse(nomsupath.."/"..path) then break
-    iter = (files, i)->
-        return unless files
-        i += 1
-        if f = files[i]
-            return i, f
-    return iter, files, 0
+    files or= {}
+    files = [gsub(f, "^%./", "") for f in *files]
+    return ipairs(files)
 
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}

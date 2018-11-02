@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.8.6
+#!/usr/bin/env nomsu -V4.8.10
 #
     A simple UUID function based on RFC 4122: http://www.ietf.org/rfc/rfc4122.txt
 
@@ -27,7 +27,7 @@ set %id_by_obj 's metatable to {..}
             %obj_by_id.%id = %key
             return %id
 
-action [uuid]:
+externally (uuid) means:
     # Set all the other bits to randomly (or pseudo-randomly) chosen values.
     %bytes = [..]
         # time-low, time-mid, time-high-and-version
@@ -56,4 +56,4 @@ test:
     seed random with 0
     assume ((id of %x) != (id of []))
     seed random
-action [id of %, %'s id, %' id] %id_by_obj.%
+externally [id of %, %'s id, %'id] all mean %id_by_obj.%
