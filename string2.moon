@@ -27,6 +27,7 @@ string2 = {
     byte: byte, bytes: (i, j)=> {byte(@, i or 1, j or -1)}
     split: (sep)=> [chunk for i,chunk in isplit(@, sep)]
     starts_with: (s)=> sub(@, 1, #s) == s
+    ends_with: (s)=> #@ >= #s and sub(@, #@-#s, -1) == s
     lines: => [line for i,line in isplit(@, '\n')]
     line: (line_num)=>
         for i, line, start in isplit(@, '\n')

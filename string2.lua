@@ -81,6 +81,9 @@ local string2 = {
   starts_with = function(self, s)
     return sub(self, 1, #s) == s
   end,
+  ends_with = function(self, s)
+    return #self >= #s and sub(self, #self - #s, -1) == s
+  end,
   lines = function(self)
     local _accum_0 = { }
     local _len_0 = 1
