@@ -14,7 +14,12 @@ for %path in %files:
     for file %filename in %path:
         unless (%filename::matches "%.nom$") (do next %filename)
         %file = (read file %filename)
-        %tree = (parse %file from %filename)
+        try:
+            %tree = (parse %file from %filename)
+        ..and if it barfs:
+            say (red "\%filename failed to parse")
+            %tree = (nil)
+        unless %tree: do next %filename
         %results = []
         for %t in recursive %tree:
             if (%t is "Action" syntax tree):

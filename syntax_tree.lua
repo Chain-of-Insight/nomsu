@@ -160,9 +160,12 @@ do
         if type(a) == 'string' then
           stub_bits[#stub_bits + 1] = a
         else
-          stub_bits[#stub_bits + 1] = tostring(arg_i)
+          stub_bits[#stub_bits + 1] = arg_i
           arg_i = arg_i + 1
         end
+      end
+      while type(stub_bits[#stub_bits]) == 'number' do
+        stub_bits[#stub_bits] = nil
       end
       return concat(stub_bits, " ")
     end

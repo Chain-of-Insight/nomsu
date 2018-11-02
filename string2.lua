@@ -78,6 +78,9 @@ local string2 = {
     end
     return _accum_0
   end,
+  starts_with = function(self, s)
+    return sub(self, 1, #s) == s
+  end,
   lines = function(self)
     local _accum_0 = { }
     local _len_0 = 1
@@ -114,10 +117,10 @@ local string2 = {
     for _index_0 = 1, #_list_0 do
       local line = _list_0[_index_0]
       while #line > maxlen do
-        local chunk = line:sub(1, maxlen)
-        local split = chunk:find(' ', maxlen - buffer, true) or maxlen
-        chunk = line:sub(1, split)
-        line = line:sub(split + 1, -1)
+        local chunk = sub(line, 1, maxlen)
+        local split = find(chunk, ' ', maxlen - buffer, true) or maxlen
+        chunk = sub(line, 1, split)
+        line = sub(line, split + 1, -1)
         lines[#lines + 1] = chunk
       end
       lines[#lines + 1] = line
@@ -151,14 +154,14 @@ local string2 = {
         return format("x%02X", byte(c))
       end
     end)
-    if not (is_lua_id(str:match("^_*(.*)$"))) then
+    if not (is_lua_id(match(str, "^_*(.*)$"))) then
       str = "_" .. str
     end
     return str
   end,
   from_lua_id = function(str)
-    if not (is_lua_id(str:match("^_*(.*)$"))) then
-      str = str:sub(2, -1)
+    if not (is_lua_id(match(str, "^_*(.*)$"))) then
+      str = sub(str, 2, -1)
     end
     str = gsub(str, "_", " ")
     str = gsub(str, "x([0-9A-F][0-9A-F])", function(hex)

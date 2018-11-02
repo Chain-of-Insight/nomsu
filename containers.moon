@@ -58,31 +58,31 @@ _list_mt =
             insert(ret, x)
         return ret
     __index:
-        add_1: insert, append_1: insert
-        add_1_at_index_2: (t,x,i)-> insert(t,i,x)
-        at_index_1_add_2: insert
-        pop: remove, remove_last: remove, remove_index_1: remove
+        add: insert, append: insert
+        add_1_at_index: (t,x,i)-> insert(t,i,x)
+        at_index_1_add: insert
+        pop: remove, remove_last: remove, remove_index: remove
         last: (=> @[#@]), first: (=> @[1])
         _1_st_to_last:nth_to_last, _1_nd_to_last:nth_to_last
         _1_rd_to_last:nth_to_last, _1_th_to_last:nth_to_last
         -- TODO: use stringify() to allow joining misc. objects?
         joined: => table.concat([tostring(x) for x in *@]),
-        joined_with_1: (glue)=> table.concat([tostring(x) for x in *@], glue),
-        has_1: (item)=>
+        joined_with: (glue)=> table.concat([tostring(x) for x in *@], glue),
+        has: (item)=>
             for x in *@
                 if x == item
                     return true
             return false
-        remove_1: (item)=>
+        remove: (item)=>
             for i,x in ipairs @
                 if x == item
                     remove(@, i)
-        index_of_1: (item)=>
+        index_of: (item)=>
             for i,x in ipairs @
                 if x == item
                     return i
             return nil
-        from_1_to_2: (start, stop)=>
+        from_1_to: (start, stop)=>
             n = #@
             start = (n+1-start) if n < 0
             stop = (n+1-stop) if n < 0
@@ -149,15 +149,15 @@ do
     string2 = require 'string2'
     {:lines, :line, :line_at, :as_lua_id, :is_lua_id} = string2
     text_methods =
-        formatted_with_1:format, byte_1:byte, position_of_1:find, position_of_1_after_2:find,
+        formatted_with:format, byte:byte, position_of:find, position_of_1_after:find,
         as_a_lua_identifier: as_lua_id, is_a_lua_identifier: is_lua_id,
         as_a_lua_id: as_lua_id, is_a_lua_id: is_lua_id,
-        bytes_1_to_2: (start, stop)=> List{byte(tostring(@), start, stop)}
-        [as_lua_id "with 1 -> 2"]: gsub
+        bytes_1_to: (start, stop)=> List{byte(tostring(@), start, stop)}
+        [as_lua_id "with 1 ->"]: gsub
         bytes: => List{byte(tostring(@), 1, -1)},
         lines: => List(lines(@))
-        line_1: line
-        wrapped_to_1: (maxlen)=>
+        line: line
+        wrapped_to: (maxlen)=>
             _lines = {}
             for line in *@lines!
                 while #line > maxlen
@@ -169,14 +169,14 @@ do
                 _lines[#_lines+1] = line
             return table.concat(_lines, "\n")
                                 
-        line_at_1: (i)=> (line_at(@, i))
-        line_number_at_1: (i)=> select(2, line_at(@, i))
-        line_position_at_1: (i)=> select(3, line_at(@, i))
-        matches_1: (patt)=> match(@, patt) and true or false
-        matching_1: (patt)=> (match(@, patt))
-        matching_groups_1: (patt)=> {match(@, patt)}
+        line_at: (i)=> (line_at(@, i))
+        line_number_at: (i)=> select(2, line_at(@, i))
+        line_position_at: (i)=> select(3, line_at(@, i))
+        matches: (patt)=> match(@, patt) and true or false
+        matching: (patt)=> (match(@, patt))
+        matching_groups: (patt)=> {match(@, patt)}
         [as_lua_id "* 1"]: (n)=> rep(@, n)
-        all_matches_of_1: (patt)=>
+        all_matches_of: (patt)=>
             result = {}
             stepper,x,i = gmatch(@, patt)
             while true

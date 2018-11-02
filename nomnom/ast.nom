@@ -32,7 +32,7 @@ object (Syntax Tree):
         return %children
     
     my action [as lua] "\
-        ..a_Syntax_Tree_with_1(\(call ({} 's metatable).as_lua with [%me]))"
+        ..a_Syntax_Tree_with(\(call ({} 's metatable).as_lua with [%me]))"
     my action [as nomsu] "\
         ..(a Syntax Tree with \(call ({} 's metatable).as_nomsu with [%me]))"
     my action [as text] "\
@@ -86,4 +86,3 @@ object (Syntax Tree):
             unless ((% is text) or (%.type == "Comment")): %args::add %
         return %args
 
-(Syntax Tree).map = (Syntax Tree).map_1

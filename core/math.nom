@@ -80,21 +80,21 @@ externally (%n to the nearest %rounder) means (..)
 [all of %items, all %items] all compile to:
     unless (%items.type is "List"):
         return (Lua value "utils.all(\(%items as lua expr))")
-    %clauses = (((% as lua expr)::as smext) for % in %items)
+    %clauses = (((% as lua expr)::text) for % in %items)
     return (Lua value "(\(%clauses::joined with " and "))")
 
 [not all of %items, not all %items] all parse as (not (all of %items))
 [any of %items, any %items] all compile to:
     unless (%items.type is "List"):
         return (Lua value "utils.any(\(%items as lua expr))")
-    %clauses = (((% as lua expr)::as smext) for % in %items)
+    %clauses = (((% as lua expr)::text) for % in %items)
     return (Lua value "(\(%clauses::joined with " or "))")
 
 [none of %items, none %items] all parse as (not (any of %items))
 [sum of %items, sum %items] all compile to:
     unless (%items.type is "List"):
         return (Lua value "utils.sum(\(%items as lua expr))")
-    %clauses = (((% as lua expr)::as smext) for % in %items)
+    %clauses = (((% as lua expr)::text) for % in %items)
     return (Lua value "(\(%clauses::joined with " + "))")
 
 [if all of %items %body, if all of %items then %body] all parse as (..)
@@ -139,7 +139,7 @@ externally (%n to the nearest %rounder) means (..)
 [product of %items, product %items] all compile to:
     unless (%items.type is "List"):
         return (Lua value "utils.product(\(%items as lua expr))")
-    %clauses = (((% as lua expr)::as smext) for % in %items)
+    %clauses = (((% as lua expr)::text) for % in %items)
     return (Lua value "(\(%clauses::joined with " * "))")
 
 externally [avg of %items, average of %items] all mean (..)

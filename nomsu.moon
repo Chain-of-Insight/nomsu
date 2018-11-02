@@ -212,6 +212,7 @@ say "\
             
             buff = table.concat(buff)
 
+            -- TODO: support local variables
             pseudo_filename = "user input #"..repl_line
             Files.spoof(pseudo_filename, buff)
             err_hand = (error_message)->

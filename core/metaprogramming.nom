@@ -3,7 +3,7 @@
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
 
-lua> "NOMSU_CORE_VERSION = 8"
+lua> "NOMSU_CORE_VERSION = 9"
 lua> "\
     ..do
         local mangle_index = 0
@@ -16,14 +16,14 @@ lua> "\
         end
     end
     COMPILE_ACTIONS["define mangler"] = function(nomsu, tree)
-        return LuaCode(tree.source, "local mangle_1 = mangler()")
+        return LuaCode(tree.source, "local mangle = mangler()")
     end"
 
 lua> "\
-    ..COMPILE_ACTIONS["1 -> 2"] = function(nomsu, tree, \%args, \%body)
+    ..COMPILE_ACTIONS["1 ->"] = function(nomsu, tree, \%args, \%body)
         local lua = LuaCode.Value(tree.source, "(function(")
         if SyntaxTree:is_instance(\%args) and \%args.type == "Action" then \%args = \%args:get_args() end
-        local lua_args = table.map(\%args, function(a) return SyntaxTree:is_instance(a) and nomsu:compile(a):as_smext() or a end)
+        local lua_args = table.map(\%args, function(a) return SyntaxTree:is_instance(a) and nomsu:compile(a):text() or a end)
         lua:concat_append(lua_args, ", ")
         local body_lua = SyntaxTree:is_instance(\%body) and nomsu:compile(\%body):as_statements("return ") or \%body
         body_lua:remove_free_vars(lua_args)
@@ -63,15 +63,15 @@ test:
     asdf
     assume (%tmp is (nil)) or barf "compile to is leaking variables"
 lua> "\
-    ..COMPILE_ACTIONS["1 compiles to 2"] = function(nomsu, tree, \%actions, \%body)
+    ..COMPILE_ACTIONS["1 compiles to"] = function(nomsu, tree, \%actions, \%body)
         if \%actions.type ~= "List" then \%actions = {\%actions, type="List"} end
-        local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return nomsu:compile(a):as_smext() end))}
+        local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return nomsu:compile(a):text() end))}
         local lua = LuaCode(tree.source, "COMPILE_ACTIONS[", \%actions[1].stub:as_lua(),
             "] = ", \(what (%args -> %body) compiles to))
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return nomsu:compile(a):as_\
-    ..smext() end))}
+            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return nomsu:compile(a):text() \
+    ..end))}
             lua:append("\\nCOMPILE_ACTIONS[", alias.stub:as_lua(), "] = ")
             if utils.equivalent(\%args, \%alias_args) then
                 lua:append("COMPILE_ACTIONS[", \%actions[1].stub:as_lua(), "]")
@@ -85,7 +85,7 @@ lua> "\
         end
         return lua
     end
-    COMPILE_ACTIONS["1 all compile to 2"] = COMPILE_ACTIONS["1 compiles to 2"]"
+    COMPILE_ACTIONS["1 all compile to"] = COMPILE_ACTIONS["1 compiles to"]"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -116,14 +116,14 @@ test:
     lua> "\
         ..if \%actions.type ~= "List" then \%actions = {\%actions, type="List"} end
         local fn_name = \%actions[1].stub:as_lua_id()
-        local \%args = table.map(\%actions[1]:get_args(), function(a) return nomsu:compile(a):as_smext() end)
+        local \%args = table.map(\%actions[1]:get_args(), function(a) return nomsu:compile(a):text() end)
         local lua = LuaCode(tree.source, fn_name, " = ", \(what (%args -> %body) compiles to))
         lua:add_free_vars({fn_name})
         for i=2,#\%actions do
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
             lua:add_free_vars({alias_name})
-            local \%alias_args = table.map(alias:get_args(), function(a) return nomsu:compile(a):as_smext() end)
+            local \%alias_args = table.map(alias:get_args(), function(a) return nomsu:compile(a):text() end)
             lua:append("\\n", alias_name, " = ")
             if utils.equivalent(\%args, \%alias_args) then
                 lua:append(fn_name)
@@ -151,7 +151,7 @@ test:
         return lua"
 
 test:
-    assume (((say %)'s meaning) == (=lua "say_1"))
+    assume (((say %)'s meaning) == (=lua "say"))
 (%action's meaning) compiles to (Lua value (%action.stub as lua id))
 
 test:
@@ -174,7 +174,7 @@ test:
         ..local replacements = {}
         if \%actions.type ~= "List" then \%actions = {\%actions, type="List"} end
         for i,arg in ipairs(\%actions[1]:get_args()) do
-            replacements[arg[1]] = nomsu:compile(arg):as_smext()
+            replacements[arg[1]] = nomsu:compile(arg):text()
         end
         local function make_tree(t)
             if SyntaxTree:is_instance(t) and t.type == "Var" then
@@ -192,14 +192,14 @@ test:
                         i = i + 1
                     elseif k == "source" then
                         ret[#ret+1] = k.."= "..tostring(v):as_lua()
-                    elseif lua_type_of_1(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
+                    elseif lua_type_of(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
                         ret[#ret+1] = k.."= "..make_tree(v)
                     else
                         ret[#ret+1] = "["..make_tree(k).."]= "..make_tree(v)
                     end
                 end
                 return "SyntaxTree{"..table.concat(ret, ", ").."}"
-            elseif lua_type_of_1(t) == 'number' then
+            elseif lua_type_of(t) == 'number' then
                 return tostring(t)
             else
                 return t:as_lua()
@@ -226,9 +226,6 @@ test:
 (%tree as lua return) compiles to (..)
     Lua value "nomsu:compile(\(%tree as lua expr)):as_statements('return ')"
 
-(remove action %action) compiles to (..)
-    Lua "\(=lua "(\(%action.stub)):as_lua_id()") = nil"
-
 test:
     assume ("\(\(foo \%x) as nomsu)" == "foo %x") or barf "\
         ..action source code failed."
@@ -240,11 +237,11 @@ test:
 
 externally [%var as lua identifier, %var as lua id] all mean:
     lua> "\
-        ..if lua_type_of_1(\%var) == 'string' then return \%var:as_lua_id()
+        ..if lua_type_of(\%var) == 'string' then return \%var:as_lua_id()
         elseif SyntaxTree:is_instance(\%var, 'Var') then return \%var[1]:as_lua_id()
         elseif SyntaxTree:is_instance(\%var) then
             local lua = \(%var as lua expr)
-            if not lua:as_smext():match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
+            if not lua:text():match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
                 nomsu:compile_error(\%var, "This is not a valid Lua identifier.")
             end
             return lua

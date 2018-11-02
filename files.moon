@@ -104,6 +104,8 @@ Files.walk = (path, flush_cache=false)->
     local files
     if path == 'stdin' or _SPOOFED_FILES[path]
         files = {path}
+    elseif path\match("^[~/]") or path\match("^%./") or path\match("^%.%./")
+        files = browse(path)
     else
         for nomsupath in package.nomsupath\gmatch("[^;]+")
             if files = browse(nomsupath.."/"..path) then break

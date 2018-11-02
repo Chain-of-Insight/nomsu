@@ -14,8 +14,10 @@ test:
 
 for %name = %colornum in %colors:
     %colornum = "\%colornum"
-    (=lua "COMPILE_ACTIONS").%name = (..)
+    #(=lua "COMPILE_ACTIONS").%name = (..)
         [%nomsu, %tree] -> (Lua value "'\\027[\(%colornum)m'")
-    (=lua "COMPILE_ACTIONS")."\%name 1" = (..)
-        [%nomsu, %tree, %text] -> (..)
-            Lua value "('\\027[\(%colornum)m'..\(%text as lua expr)..'\\027[0m')"
+    (=lua "COMPILE_ACTIONS")."\%name" = (..)
+        [%nomsu, %tree, %text] ->:
+            if %text:
+                return (Lua value "('\\027[\(%colornum)m'..\(%text as lua expr)..'\\027[0m')")
+            ..else: return (Lua value "'\\027[\(%colornum)m'")

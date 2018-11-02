@@ -45,7 +45,7 @@ externally (%tree compiled with %compile_actions) means:
                 # TODO: restore this:
                 #%args = [%tree, %compile_actions]
                 %args = [%nomsu, %tree]
-                for % in (%tree::get args): %args::add %
+                for % in (%tree::arguments): %args::add %
                 %result = (call %compile_action with %args)
                 if (%result == (nil)):
                     report compile error at %tree "\
@@ -64,13 +64,13 @@ externally (%tree compiled with %compile_actions) means:
                 
                 return %result
             
-            %lua = (Lua Value from %tree)
+            %lua = (a Lua Buffer with {source:%tree})
             if %tree.target:
                 # Method call
                 %target_lua = (%tree.target compiled with %compile_actions)
                 if (..)
-                    ((%target_lua::as smext)::matches "^%(.*%)$") or (..)
-                        (%target_lua::as smext)::matches "^[_a-zA-Z][_a-zA-Z0-9]*$"
+                    ((%target_lua::text)::matches "^%(.*%)$") or (..)
+                        (%target_lua::text)::matches "^[_a-zA-Z][_a-zA-Z0-9]*$"
                 ..:
                     %lua::add [%target_lua, ":"]
                 ..else:
@@ -93,14 +93,14 @@ externally (%tree compiled with %compile_actions) means:
                         if ((size of %values) == 1):
                             %arg_lua = %values.1
                         ..else:
-                            %arg_lua = (Lua Value from %tok ["("])
+                            %arg_lua = (a Lua Buffer with {source:%tok, is_value:yes, bits:["("]})
                             %arg_lua::add %values joined with " and nil or "
                             %arg_lua::add ")"
                     ..else:
-                        %arg_lua = (Lua Value from %tok ["((function()"])
+                        %arg_lua = (a Lua Buffer with {source:%tok, is_value:yes, bits:["((function()"]})
                         for %v in %values at %i:
                             if %v.is_value:
-                                %v = (%v::as statements ("return " if (%i == (size of %values) else "")))
+                                %v = (%v::as statements with ("return " if (%i == (size of %values) else "")))
                             %arg_lua::add ["\n    ", %v]
                         
                         %arg_lua::add "\nend)())"
@@ -124,8 +124,7 @@ externally (%tree compiled with %compile_actions) means:
             return %lua
         
         "EscapedNomsu":
-            #return (Lua Value from %tree ((%tree.1)::as lua))
-            %lua = (Lua Value from %tree ["a_Syntax_Tree_with_1{type=", quote %tree.(1).type])
+            %lua = (a Lua Buffer with {source:%tree, is_value:yes, bits:["a_Syntax_Tree_with{type=", quote %tree.(1).type]})
             set {%needs_comma:no, %i:1}
             (% as shmua) means:
                 if (% is a "Lua number"): return "\%"
@@ -152,7 +151,7 @@ externally (%tree compiled with %compile_actions) means:
             return %lua
         
         "Block":
-            %lua = (Lua Code from %tree)
+            %lua = (a Lua Buffer with {source:%tree})
             %lua::add (..)
                 ((%line compiled with %compile_actions)::as statements) for %line in %tree
             ..joined with "\n"
@@ -160,7 +159,7 @@ externally (%tree compiled with %compile_actions) means:
             return %lua
         
         "Text":
-            %lua = (Lua Value from %tree)
+            %lua = (a Lua Buffer with {source:%tree})
             %lua_bits = []
             %string_buffer = ""
             for % in %tree:
@@ -178,7 +177,7 @@ externally (%tree compiled with %compile_actions) means:
                         ..Can't use this as a string interpolation value, since it doesn't have a value."
                 
                 if (%.type != "Text"):
-                    %bit_lua = (Lua Value from % ["tostring(", %bit_lua, ")"])
+                    %bit_lua = (a Lua Buffer with {source:%, is_value:yes, bits:["tostring(", %bit_lua, ")"]})
                 %lua_bits::add %bit_lua
             
             if ((%string_buffer != "") or ((size of %lua_bits) == 0)):
@@ -188,13 +187,13 @@ externally (%tree compiled with %compile_actions) means:
             return %lua
         
         "List":
-            %lua = (Lua Value from %tree ["List{"])
+            %lua = (a Lua Buffer with {source:%tree, is_value:yes, bits:["List{"]})
             %lua::add ((% compiled with %compile_actions) for % in %tree) joined with ", " or ",\n  "
             %lua::add "}"
             return %lua
         
         "Dict":
-            %lua = (Lua Value from %tree ["Dict{"])
+            %lua = (a Lua Buffer with {source:%tree, is_value:yes, bits:["Dict{"]})
             %lua::add ((% compiled with %compile_actions) for % in %tree) joined with ", " or ",\n  "
             %lua::add "}"
             return %lua
@@ -208,24 +207,24 @@ externally (%tree compiled with %compile_actions) means:
             
             %value_lua = (..)
                 (%value compiled with %compile_actions) if %value else (..)
-                    Lua Value from %key ["true"]
+                    a Lua Buffer with {source:%key, is_value:yes, bits:["true"]}
             
             unless %value_lua.is_value:
                 report compile error at %tree.2 "\
                     ..Can't use this as a dict value, since it's not an expression."
             
-            %key_str = ((%key_lua::as smext)::matching "^[\"']([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
+            %key_str = ((%key_lua::text)::matching "^[\"']([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
             if:
                 %key_str:
-                    return (Lua Code from %tree [%key_str, "=", %value_lua])
-                ((%key_lua::as smext).1 == "["):
+                    return (a Lua Buffer with {source:%tree, bits:[%key_str, "=", %value_lua]})
+                ((%key_lua::text).1 == "["):
                     # NOTE: this *must* use a space after the [ to avoid freaking out
                         Lua's parser if the inner expression is a long string. Lua
                         parses x[[[y]]] as x("[y]"), not as x["y"]
-                    return (Lua Code from %tree ["[ ", %key_lua, "]=", %value_lua])
+                    return (a Lua Buffer with {source:%tree, bits:["[ ", %key_lua, "]=", %value_lua]})
                 
                 else:
-                    return (Lua Code from %tree ["[", %key_lua, "]=", %value_lua])
+                    return (a Lua Buffer with {source:%tree, bits:["[", %key_lua, "]=", %value_lua]})
         
         "IndexChain":
             %lua = (%tree.1 compiled with %compile_actions)
@@ -233,7 +232,7 @@ externally (%tree compiled with %compile_actions) means:
                 report compile error at %tree.1 "\
                     ..Can't index into this, since it's not an expression."
             
-            %first_char = (%lua::as smext).1
+            %first_char = (%lua::text).1
             if (any of [%first_char == "{", %first_char == "\"", %first_char == "["]):
                 %lua::parenthesize
             for %i in 2 to (size of %tree):
@@ -243,7 +242,7 @@ externally (%tree compiled with %compile_actions) means:
                     report compile error at %key "\
                         ..Can't use this as an index, since it's not an expression."
                 
-                %key_lua_str = (%key_lua::as smext)
+                %key_lua_str = (%key_lua::text)
                 %lua_id = (%key_lua_str::matching "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
                 if:
                     %lua_id:
@@ -260,16 +259,16 @@ externally (%tree compiled with %compile_actions) means:
             return %lua
         
         "Number":
-            return (Lua Value from %tree ["\(%tree.1)"])
+            return (a Lua Buffer with {source:%tree, is_value:yes, bits:["\(%tree.1)"]})
         "Var":
-            return (Lua Variable from %tree [%tree.1::as lua id])
+            return (a Lua Buffer with {source:%tree, is_value:yes, is_variable:yes, bits:[%tree.1::as lua id]})
         "FileChunks":
             barf "\
                 ..Can't convert FileChunks to a single block of lua, since each chunk's compilation depends on the earlier chunks"
         
         "Comment":
             # TODO: de-implement?
-            return (Lua Code from %tree "-- \(%tree.1::with "\n" -> "\n-- ")")
+            return (a Lua Buffer with {source:%tree, bits:["-- \(%tree.1::with "\n" -> "\n-- ")"]})
         
         "Error":
             barf (%tree as a pretty error)

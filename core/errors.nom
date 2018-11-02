@@ -4,8 +4,7 @@
 
 use "core/metaprogramming.nom"
 
-(barf) compiles to (Lua "error(nil, 0);")
-(barf %msg) compiles to (Lua "error(\(%msg as lua expr), 0);")
+(barf %msg) compiles to (Lua "error(\(=lua "\%msg and \(%msg as lua expr) or 'nil'"), 0);")
 (compile error at %tree %msg) compiles to (..)
     Lua "nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr))"
 (compile error at %tree %msg hint %hint) compiles to (..)
@@ -66,9 +65,9 @@ test:
             local ok, ret = xpcall(function()
                 \(%action as lua statements)
                 fell_through = true
-            end, function(\(%msg as lua expr))
+            end, function(\(=lua "\%fallback and \(%msg as lua expr) or ''"))
                 local ok, ret = pcall(function()
-                    \(%fallback as lua statements)
+                    \((=lua "\%fallback or \%msg") as lua statements)
                 end)
                 if not ok then err, erred = ret, true end
             end)
@@ -84,18 +83,19 @@ test:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-[..]
-    try %action and if it succeeds %success or if it barfs %fallback
-    try %action and if it barfs %fallback or if it succeeds %success
-..all parse as (..)
-    try %action and if it succeeds %success or if it barfs (=lua "") %fallback
+#
+    [..]
+        try %action and if it succeeds %success or if it barfs %fallback
+        try %action and if it barfs %fallback or if it succeeds %success
+    ..all parse as (..)
+        try %action and if it succeeds %success or if it barfs (=lua "") %fallback
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (try %action) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs (do nothing)
 
-(try %action and if it barfs %fallback) parses as (..)
+#(try %action and if it barfs %fallback) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs %fallback
 
 (try %action and if it barfs %msg %fallback) parses as (..)

@@ -57,3 +57,4 @@ upgrade action "parse 1 as 2" to "4.8.10" via (..)
 
 upgrade action (compile as %) to "4.8.10" as (what % compiles to)
 upgrade action (action %) to "4.8.10" as (%'s meaning)
+upgrade action (remove action %) to "4.8.10" as ((%'s meaning) = (nil))

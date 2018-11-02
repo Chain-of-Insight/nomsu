@@ -26,6 +26,7 @@ string2 = {
     capitalized: => gsub(@, '%l', upper, 1)
     byte: byte, bytes: (i, j)=> {byte(@, i or 1, j or -1)}
     split: (sep)=> [chunk for i,chunk in isplit(@, sep)]
+    starts_with: (s)=> sub(@, 1, #s) == s
     lines: => [line for i,line in isplit(@, '\n')]
     line: (line_num)=>
         for i, line, start in isplit(@, '\n')
@@ -41,10 +42,10 @@ string2 = {
         lines = {}
         for line in *@lines!
             while #line > maxlen
-                chunk = line\sub(1, maxlen)
-                split = chunk\find(' ', maxlen-buffer, true) or maxlen
-                chunk = line\sub(1, split)
-                line = line\sub(split+1, -1)
+                chunk = sub(line, 1, maxlen)
+                split = find(chunk, ' ', maxlen-buffer, true) or maxlen
+                chunk = sub(line, 1, split)
+                line = sub(line, split+1, -1)
                 lines[#lines+1] = chunk
             lines[#lines+1] = line
         return table.concat(lines, "\n")
@@ -77,15 +78,15 @@ string2 = {
             if c == ' ' then '_'
             else format("x%02X", byte(c))
 
-        unless is_lua_id(str\match("^_*(.*)$"))
+        unless is_lua_id(match(str, "^_*(.*)$"))
             str = "_"..str
         return str
 
     -- from_lua_id(as_lua_id(str)) == str, but behavior is unspecified for inputs that
     -- did not come from as_lua_id()
     from_lua_id: (str)->
-        unless is_lua_id(str\match("^_*(.*)$"))
-            str = str\sub(2,-1)
+        unless is_lua_id(match(str, "^_*(.*)$"))
+            str = sub(str,2,-1)
         str = gsub(str, "_", " ")
         str = gsub(str, "x([0-9A-F][0-9A-F])", (hex)-> char(tonumber(hex, 16)))
         return str

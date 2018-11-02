@@ -151,7 +151,7 @@ do
     return false
   end
   NomsuCompiler.environment = {
-    NOMSU_COMPILER_VERSION = 10,
+    NOMSU_COMPILER_VERSION = 11,
     NOMSU_SYNTAX_VERSION = max_parser_version,
     next = next,
     unpack = unpack,
@@ -180,7 +180,7 @@ do
     assert = assert,
     dofile = dofile,
     loadstring = loadstring,
-    lua_type_of_1 = type,
+    lua_type_of = type,
     select = select,
     math = math,
     io = io,
@@ -406,7 +406,7 @@ do
     end
     return operate_on_text(code)
   end
-  local math_expression = re.compile([[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]])
+  local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
   local compile_math_expression
   compile_math_expression = function(self, tree, ...)
     local lua = LuaCode.Value(tree.source)
@@ -431,34 +431,36 @@ do
   end
   NomsuCompiler.environment.COMPILE_ACTIONS = setmetatable({
     __imported = Dict({ }),
-    ["Lua 1"] = function(self, tree, code)
+    ["Lua"] = function(self, tree, code)
       return add_lua_string_bits(self, 'statements', code)
     end,
-    ["Lua value 1"] = function(self, tree, code)
+    ["Lua value"] = function(self, tree, code)
       return add_lua_string_bits(self, 'value', code)
     end,
-    ["lua > 1"] = function(self, tree, code)
+    ["lua >"] = function(self, tree, code)
       if code.type ~= "Text" then
         return LuaCode(tree.source, "nomsu:run_lua(", self:compile(code), ", nomsu);")
       end
       return add_lua_bits(self, "statements", code)
     end,
-    ["= lua 1"] = function(self, tree, code)
+    ["= lua"] = function(self, tree, code)
       if code.type ~= "Text" then
         return LuaCode.Value(tree.source, "nomsu:run_lua(", self:compile(code), ":as_statements('return '), nomsu)")
       end
       return add_lua_bits(self, "value", code)
     end,
-    ["use 1"] = function(self, tree, path)
+    ["use"] = function(self, tree, path)
       if path.type == 'Text' and #path == 1 and type(path[1]) == 'string' then
-        self:import_file(path[1])
+        if not (self:import_file(path[1])) then
+          self:compile_error(tree, "Could not find anything to import for " .. tostring(path))
+        end
       end
       return LuaCode(tree.source, "nomsu:import_file(" .. tostring(self:compile(path)) .. ")")
     end,
     ["tests"] = function(self, tree)
       return LuaCode.Value(tree.source, "TESTS")
     end,
-    ["test 1"] = function(self, tree, body)
+    ["test"] = function(self, tree, body)
       local test_str = table.concat((function()
         local _accum_0 = { }
         local _len_0 = 1
@@ -516,11 +518,14 @@ do
     end
   end
   NomsuCompiler.import_file = function(self, path)
+    local found = false
     for _, f in Files.walk(path) do
       if match(f, "%.lua$") or match(f, "%.nom$") or match(f, "^/dev/fd/[012]$") then
+        found = true
         self:import(self:run_file(f))
       end
     end
+    return found
   end
   NomsuCompiler.run = function(self, to_run, compile_actions)
     local source = to_run.source or Source(to_run, 1, #to_run)
@@ -673,7 +678,7 @@ do
         local get_version = self[("Nomsu version"):as_lua_id()]
         if get_version then
           do
-            local upgrade = self[("1 upgraded from 2 to 3"):as_lua_id()]
+            local upgrade = self[("1 upgraded from 2 to"):as_lua_id()]
             if upgrade then
               tree = upgrade(tree, tree.version, get_version())
             end
@@ -1273,13 +1278,13 @@ do
       local should_clump
       should_clump = function(prev_line, line)
         if prev_line.type == "Action" and line.type == "Action" then
-          if prev_line.stub == "use 1" then
-            return line.stub == "use 1"
+          if prev_line.stub == "use" then
+            return line.stub == "use"
           end
-          if prev_line.stub == "test 1" then
+          if prev_line.stub == "test" then
             return true
           end
-          if line.stub == "test 1" then
+          if line.stub == "test" then
             return false
           end
         end

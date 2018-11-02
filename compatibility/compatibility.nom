@@ -52,7 +52,7 @@ externally (upgrade action %stub to %version via %upgrade_fn) means:
         %retval = (make tree %body)
         %lua::append (..)
             Lua "\
-                ..upgrade_action_1_to_2_via_3(\(quote %action.stub), \(%version as lua expr), function(\(..)
+                ..upgrade_action_1_to_2_via(\(quote %action.stub), \(%version as lua expr), function(\(..)
                     \%tree as lua id
                 ..)
                     return \%retval

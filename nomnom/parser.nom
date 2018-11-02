@@ -32,7 +32,7 @@ set {..}
             %source = (..)
                 Source {filename:%userdata.filename, start:%t.start, stop:%t.stop}
             set {%t.start: nil, %t.stop: nil, %t.source: %source}
-            %t = (Syntax Tree %t)
+            %t = (a Syntax Tree with %t)
             (Syntax Tree).source_code_for_tree.%t = %userdata.source
             return %t
     ..with fallback %key ->:

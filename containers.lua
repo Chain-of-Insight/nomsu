@@ -134,15 +134,15 @@ local _list_mt = {
     return ret
   end,
   __index = {
-    add_1 = insert,
-    append_1 = insert,
-    add_1_at_index_2 = function(t, x, i)
+    add = insert,
+    append = insert,
+    add_1_at_index = function(t, x, i)
       return insert(t, i, x)
     end,
-    at_index_1_add_2 = insert,
+    at_index_1_add = insert,
     pop = remove,
     remove_last = remove,
-    remove_index_1 = remove,
+    remove_index = remove,
     last = (function(self)
       return self[#self]
     end),
@@ -165,7 +165,7 @@ local _list_mt = {
         return _accum_0
       end)())
     end,
-    joined_with_1 = function(self, glue)
+    joined_with = function(self, glue)
       return table.concat((function()
         local _accum_0 = { }
         local _len_0 = 1
@@ -177,7 +177,7 @@ local _list_mt = {
         return _accum_0
       end)(), glue)
     end,
-    has_1 = function(self, item)
+    has = function(self, item)
       for _index_0 = 1, #self do
         local x = self[_index_0]
         if x == item then
@@ -186,14 +186,14 @@ local _list_mt = {
       end
       return false
     end,
-    remove_1 = function(self, item)
+    remove = function(self, item)
       for i, x in ipairs(self) do
         if x == item then
           remove(self, i)
         end
       end
     end,
-    index_of_1 = function(self, item)
+    index_of = function(self, item)
       for i, x in ipairs(self) do
         if x == item then
           return i
@@ -201,7 +201,7 @@ local _list_mt = {
       end
       return nil
     end,
-    from_1_to_2 = function(self, start, stop)
+    from_1_to = function(self, start, stop)
       local n = #self
       if n < 0 then
         start = (n + 1 - start)
@@ -383,20 +383,20 @@ do
   local lines, line, line_at, as_lua_id, is_lua_id
   lines, line, line_at, as_lua_id, is_lua_id = string2.lines, string2.line, string2.line_at, string2.as_lua_id, string2.is_lua_id
   local text_methods = {
-    formatted_with_1 = format,
-    byte_1 = byte,
-    position_of_1 = find,
-    position_of_1_after_2 = find,
+    formatted_with = format,
+    byte = byte,
+    position_of = find,
+    position_of_1_after = find,
     as_a_lua_identifier = as_lua_id,
     is_a_lua_identifier = is_lua_id,
     as_a_lua_id = as_lua_id,
     is_a_lua_id = is_lua_id,
-    bytes_1_to_2 = function(self, start, stop)
+    bytes_1_to = function(self, start, stop)
       return List({
         byte(tostring(self), start, stop)
       })
     end,
-    [as_lua_id("with 1 -> 2")] = gsub,
+    [as_lua_id("with 1 ->")] = gsub,
     bytes = function(self)
       return List({
         byte(tostring(self), 1, -1)
@@ -405,8 +405,8 @@ do
     lines = function(self)
       return List(lines(self))
     end,
-    line_1 = line,
-    wrapped_to_1 = function(self, maxlen)
+    line = line,
+    wrapped_to = function(self, maxlen)
       local _lines = { }
       local _list_0 = self:lines()
       for _index_0 = 1, #_list_0 do
@@ -422,22 +422,22 @@ do
       end
       return table.concat(_lines, "\n")
     end,
-    line_at_1 = function(self, i)
+    line_at = function(self, i)
       return (line_at(self, i))
     end,
-    line_number_at_1 = function(self, i)
+    line_number_at = function(self, i)
       return select(2, line_at(self, i))
     end,
-    line_position_at_1 = function(self, i)
+    line_position_at = function(self, i)
       return select(3, line_at(self, i))
     end,
-    matches_1 = function(self, patt)
+    matches = function(self, patt)
       return match(self, patt) and true or false
     end,
-    matching_1 = function(self, patt)
+    matching = function(self, patt)
       return (match(self, patt))
     end,
-    matching_groups_1 = function(self, patt)
+    matching_groups = function(self, patt)
       return {
         match(self, patt)
       }
@@ -445,7 +445,7 @@ do
     [as_lua_id("* 1")] = function(self, n)
       return rep(self, n)
     end,
-    all_matches_of_1 = function(self, patt)
+    all_matches_of = function(self, patt)
       local result = { }
       local stepper, x, i = gmatch(self, patt)
       while true do

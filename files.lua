@@ -181,6 +181,8 @@ Files.walk = function(path, flush_cache)
     files = {
       path
     }
+  elseif path:match("^[~/]") or path:match("^%./") or path:match("^%.%./") then
+    files = browse(path)
   else
     for nomsupath in package.nomsupath:gmatch("[^;]+") do
       do

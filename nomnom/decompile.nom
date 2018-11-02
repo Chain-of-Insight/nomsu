@@ -8,7 +8,7 @@ externally (%tree decompiled inline) means:
     assume (%tree is a "Syntax Tree")
     if %tree.type is:
         "Action":
-            %nomsu = (Nomsu Code from %tree)
+            %nomsu = (a Nomsu Buffer with {source: %tree})
             if %tree.target:
                 %target_nomsu = (%tree.target decompiled inline)
                 if %tree.target.type is:
@@ -44,17 +44,17 @@ externally (%tree decompiled inline) means:
             ..:
                 %inner_nomsu::parenthesize
             
-            %nomsu = (Nomsu Code from %tree ["\\", %inner_nomsu])
+            %nomsu = (a Nomsu Buffer with {source: %tree, bits: ["\\", %inner_nomsu]})
             return %nomsu
         
         "Block":
-            %nomsu = (Nomsu Code from %tree [":"])
+            %nomsu = (a Nomsu Buffer with {source: %tree, bits: [":"]})
             for %line in %tree at %i:
                 %nomsu::add [" " if (%i == 1) else "; ", %line decompiled inline]
             return %nomsu
         
         "Text":
-            %nomsu = (Nomsu Code from %tree [])
+            %nomsu = (a Nomsu Buffer with {source: %tree, bits: []})
             for %text in recursive %tree:
                 for %bit in %text at %i:
                     if (%bit is text): %nomsu::add %bit
@@ -78,10 +78,10 @@ externally (%tree decompiled inline) means:
                             else:
                                 %nomsu::add ["\\(", %bit decompiled inline, ")"]
             
-            return (Nomsu Code from %tree ["\"", %nomsu, "\""])
+            return (a Nomsu Buffer with {source: %tree, bits: ["\"", %nomsu, "\""]})
         
         "List" "Dict":
-            %nomsu = (Nomsu Code from %tree ["[" if (%tree.type == "List") else "{"])
+            %nomsu = (a Nomsu Buffer with {source: %tree, bits: ["[" if (%tree.type == "List") else "{"]})
             for %item in %tree at %i:
                 if (%i > 1): %nomsu::add ", "
                 %nomsu::add (%item decompiled inline)
@@ -94,7 +94,7 @@ externally (%tree decompiled inline) means:
             if (..)
                 all of [%key.type == "Text", (size of %key) == 1, %key.1 is a nomsu identifier]
             ..:
-                %nomsu = (Nomsu Code from %key [%key.1])
+                %nomsu = (a Nomsu Buffer with {source: %key, bits: [%key.1]})
             ..else:
                 %nomsu = (%key decompiled inline)
             
@@ -107,7 +107,7 @@ externally (%tree decompiled inline) means:
             return %nomsu
         
         "IndexChain":
-            %nomsu = (Nomsu Code from %tree)
+            %nomsu = (a Nomsu Buffer with {source: %tree})
             for %bit in %tree at %i:
                 if (%i > 1): %nomsu::add "."
                 if (..)
@@ -128,9 +128,9 @@ externally (%tree decompiled inline) means:
             return %nomsu
         
         "Number":
-            return (Nomsu Code from %tree [(%tree.1 as hex) if %tree.hex else "\(%tree.1)"])
+            return (a Nomsu Buffer with {source: %tree, bits: [(%tree.1 as hex) if %tree.hex else "\(%tree.1)"]})
         "Var":
-            return (Nomsu Code from %tree ["%\(%tree.1)"])
+            return (a Nomsu Buffer with {source: %tree, bits: ["%\(%tree.1)"]})
         "Comment": return (nil)
         "FileChunks":
             barf "Can't inline a FileChunks"
@@ -141,7 +141,7 @@ externally (%tree decompiled inline) means:
 
 %MAX_LINE = 90
 externally (%tree decompiled) means:
-    %nomsu = (Nomsu Code from %tree)
+    %nomsu = (a Nomsu Buffer with {source: %tree})
     
     # For concision:
     (recurse on %t) means:
@@ -167,8 +167,7 @@ externally (%tree decompiled) means:
         %indented = (%t decompiled)
         if (%t.type == "Action"):
             %indented = (..)
-                Nomsu Code from %t [..]
-                    "(..)\n    ", %indented
+                a Nomsu Buffer with {source: %t, bits: ["(..)\n    ", %indented]}
         
         return %indented
     
@@ -253,13 +252,12 @@ externally (%tree decompiled) means:
                     ..else: %nomsu::add "\n"
             
             return (..)
-                Nomsu Code from %tree [..]
-                    ":\n    ", %nomsu
+                a Nomsu Buffer with {source: %tree, bits: [":\n    ", %nomsu]}
         
         "Text":
             # Multi-line text has more generous wrap margins
             %max_line = ((1.5 * %MAX_LINE) rounded down)
-            %nomsu = (Nomsu Code from %tree)
+            %nomsu = (a Nomsu Buffer with {source: %tree})
             (add text from %tree) means:
                 for %bit in %tree at %i:
                     if (%bit is text):
@@ -301,8 +299,7 @@ externally (%tree decompiled) means:
             
             add text from %tree
             return (..)
-                Nomsu Code from %tree [..]
-                    "\"\\\n    ..", %nomsu, "\""
+                a Nomsu Buffer with {source: %tree, bits: ["\"\\\n    ..", %nomsu, "\""]}
         
         "List" "Dict":
             if ((size of %tree) == 0):
@@ -321,9 +318,9 @@ externally (%tree decompiled) means:
                     ..else: %nomsu::add ", "
             
             return (..)
-                Nomsu Code from %tree [..]
-                    "[..]\n    " if (%tree.type == "List") else "{..}\n    "
-                    %nomsu
+                a Nomsu Buffer with {..}
+                    source: %tree, bits: [..]
+                        "[..]\n    " if (%tree.type == "List") else "{..}\n    ", %nomsu
         
         "DictEntry":
             set {%key:%tree.1, %value:%tree.2}

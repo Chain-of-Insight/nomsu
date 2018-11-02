@@ -50,7 +50,7 @@ class Code
         --assert(@source and Source\is_instance(@source), "Source has the wrong type")
         @append(...)
 
-    as_smext: =>
+    text: =>
         if @__str == nil
             buff, indent = {}, 0
             {:match, :gsub, :rep} = string
@@ -59,23 +59,23 @@ class Code
                     if spaces = match(b, "\n([ ]*)[^\n]*$")
                         indent = #spaces
                 else
-                    b = b\as_smext!
+                    b = b\text!
                     if indent > 0
                         b = gsub(b, "\n", "\n"..rep(" ", indent))
                 buff[#buff+1] = b
             @__str = concat(buff, "")
         return @__str
 
-    __tostring: => @as_smext!
+    __tostring: => @text!
 
     as_lua: =>
         "#{@__class.__name}(#{concat {tostring(@source)\as_lua!, unpack([b\as_lua! for b in *@bits])}, ", "})"
 
-    __len: => #@as_smext!
+    __len: => #@text!
     
-    match: (...)=> @as_smext!\match(...)
+    match: (...)=> @text!\match(...)
 
-    gmatch: (...)=> @as_smext!\gmatch(...)
+    gmatch: (...)=> @text!\gmatch(...)
     
     dirty: =>
         @__str = nil
@@ -100,7 +100,7 @@ class Code
     
     trailing_line_len: =>
         if @_trailing_line_len == nil
-            @_trailing_line_len = #@as_smext!\match("[^\n]*$")
+            @_trailing_line_len = #@text!\match("[^\n]*$")
         return @_trailing_line_len
     
     is_multiline: =>
@@ -133,7 +133,7 @@ class Code
             bits[#bits+1] = b
             b.dirty = error if b.is_code
             unless type(b) == 'string'
-                b = b\as_smext!
+                b = b\text!
             line = match(b, "\n([^\n]*)$")
             if line
                 line_len = #line
@@ -240,7 +240,7 @@ class LuaCode extends Code
                         nomsu_to_lua[lua.source.start] = pos
                 else
                     walk b, pos
-                    b = b\as_smext!
+                    b = b\text!
                 pos += #b
         walk self, 1
         return {
@@ -259,11 +259,6 @@ class NomsuCode extends Code
     as_lua: Code.as_lua
     __len: Code.__len
 
-Code.__base.append_1 = assert Code.__base.append
-Code.__base.append_1_joined_by_2 = assert Code.__base.concat_append
-Code.__base.prepend_1 = assert Code.__base.prepend
-LuaCode.__base.declare_locals_1 = assert LuaCode.__base.declare_locals
-LuaCode.__base.remove_free_vars_1 = assert LuaCode.__base.remove_free_vars
-LuaCode.__base.add_free_vars_1 = assert LuaCode.__base.add_free_vars
+Code.__base.add_1_joined_with = assert Code.__base.concat_append
 
 return {:Code, :NomsuCode, :LuaCode, :Source}

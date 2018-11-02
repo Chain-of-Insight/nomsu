@@ -80,8 +80,10 @@ class SyntaxTree
             if type(a) == 'string'
                 stub_bits[#stub_bits+1] = a
             else
-                stub_bits[#stub_bits+1] = tostring(arg_i)
+                stub_bits[#stub_bits+1] = arg_i
                 arg_i += 1
+        while type(stub_bits[#stub_bits]) == 'number'
+            stub_bits[#stub_bits] = nil
         return concat stub_bits, " "
 
     @is_instance: (t)=>

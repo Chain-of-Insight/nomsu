@@ -93,12 +93,12 @@ with NomsuCompiler
 
     -- Discretionary/convenience stuff
     .environment = {
-        NOMSU_COMPILER_VERSION: 10, NOMSU_SYNTAX_VERSION: max_parser_version
+        NOMSU_COMPILER_VERSION: 11, NOMSU_SYNTAX_VERSION: max_parser_version
         -- Lua stuff:
         :next, :unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
         :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
         :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
-        :table, :assert, :dofile, :loadstring, lua_type_of_1:type, :select, :math, :io, :load,
+        :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
         :pairs, :ipairs,
         -- Nomsu types:
         _List:List, _Dict:Dict,
@@ -225,7 +225,7 @@ with NomsuCompiler
     -- This is a bit of a hack, but this code handles arbitrarily complex
     -- math expressions like 2*x + 3^2 without having to define a single
     -- action for every possibility.
-    math_expression = re.compile [[ ([+-] " ")* [0-9]+ (" " [*/^+-] (" " [+-])* " " [0-9]+)+ !. ]]
+    math_expression = re.compile [[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]]
     compile_math_expression = (tree, ...)=>
         lua = LuaCode.Value(tree.source)
         for i,tok in ipairs tree
@@ -242,29 +242,30 @@ with NomsuCompiler
         return lua
     .environment.COMPILE_ACTIONS = setmetatable({
         __imported: Dict{}
-        ["Lua 1"]: (tree, code)=>
+        ["Lua"]: (tree, code)=>
             return add_lua_string_bits(@, 'statements', code)
     
-        ["Lua value 1"]: (tree, code)=>
+        ["Lua value"]: (tree, code)=>
             return add_lua_string_bits(@, 'value', code)
 
-        ["lua > 1"]: (tree, code)=>
+        ["lua >"]: (tree, code)=>
             if code.type != "Text"
                 return LuaCode tree.source, "nomsu:run_lua(", @compile(code), ", nomsu);"
             return add_lua_bits(@, "statements", code)
 
-        ["= lua 1"]: (tree, code)=>
+        ["= lua"]: (tree, code)=>
             if code.type != "Text"
                 return LuaCode.Value tree.source, "nomsu:run_lua(", @compile(code), ":as_statements('return '), nomsu)"
             return add_lua_bits(@, "value", code)
 
-        ["use 1"]: (tree, path)=>
+        ["use"]: (tree, path)=>
             if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
-                @import_file(path[1])
+                unless @import_file(path[1])
+                    @compile_error tree, "Could not find anything to import for #{path}"
             return LuaCode(tree.source, "nomsu:import_file(#{@compile(path)})")
 
         ["tests"]: (tree)=> LuaCode.Value(tree.source, "TESTS")
-        ["test 1"]: (tree, body)=>
+        ["test"]: (tree, body)=>
             test_str = table.concat [tostring(@tree_to_nomsu(line)) for line in *body], "\n"
             LuaCode tree.source, "TESTS[#{tostring(tree.source)\as_lua!}] = ", test_str\as_lua!
 
@@ -290,9 +291,12 @@ with NomsuCompiler
             @environment.COMPILE_ACTIONS.__imported[k] or= v
 
     .import_file = (path)=>
+        found = false
         for _,f in Files.walk(path)
             if match(f, "%.lua$") or match(f, "%.nom$") or match(f, "^/dev/fd/[012]$")
+                found = true
                 @import(@run_file(f))
+        return found
 
     .run = (to_run, compile_actions)=>
         source = to_run.source or Source(to_run, 1, #to_run)
@@ -394,7 +398,7 @@ with NomsuCompiler
         compile_actions or= @environment.COMPILE_ACTIONS
         if tree.version
             if get_version = @[("Nomsu version")\as_lua_id!]
-                if upgrade = @[("1 upgraded from 2 to 3")\as_lua_id!]
+                if upgrade = @[("1 upgraded from 2 to")\as_lua_id!]
                     tree = upgrade(tree, tree.version, get_version!)
         switch tree.type
             when "Action"
@@ -787,9 +791,9 @@ with NomsuCompiler
                 nomsu = NomsuCode(tree.source, pop_comments(tree.source.start))
                 should_clump = (prev_line, line)->
                     if prev_line.type == "Action" and line.type == "Action"
-                        if prev_line.stub == "use 1" then return line.stub == "use 1"
-                        if prev_line.stub == "test 1" then return true
-                        if line.stub == "test 1" then return false
+                        if prev_line.stub == "use" then return line.stub == "use"
+                        if prev_line.stub == "test" then return true
+                        if line.stub == "test" then return false
                     return not recurse(prev_line)\is_multiline!
                 for chunk_no, chunk in ipairs tree
                     nomsu\append "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1

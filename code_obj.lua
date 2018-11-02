@@ -78,7 +78,7 @@ do
   local _class_0
   local _base_0 = {
     is_code = true,
-    as_smext = function(self)
+    text = function(self)
       if self.__str == nil then
         local buff, indent = { }, 0
         local match, gsub, rep
@@ -95,7 +95,7 @@ do
               end
             end
           else
-            b = b:as_smext()
+            b = b:text()
             if indent > 0 then
               b = gsub(b, "\n", "\n" .. rep(" ", indent))
             end
@@ -107,7 +107,7 @@ do
       return self.__str
     end,
     __tostring = function(self)
-      return self:as_smext()
+      return self:text()
     end,
     as_lua = function(self)
       return tostring(self.__class.__name) .. "(" .. tostring(concat({
@@ -126,13 +126,13 @@ do
       }, ", ")) .. ")"
     end,
     __len = function(self)
-      return #self:as_smext()
+      return #self:text()
     end,
     match = function(self, ...)
-      return self:as_smext():match(...)
+      return self:text():match(...)
     end,
     gmatch = function(self, ...)
-      return self:as_smext():gmatch(...)
+      return self:text():gmatch(...)
     end,
     dirty = function(self)
       self.__str = nil
@@ -169,7 +169,7 @@ do
     end,
     trailing_line_len = function(self)
       if self._trailing_line_len == nil then
-        self._trailing_line_len = #self:as_smext():match("[^\n]*$")
+        self._trailing_line_len = #self:text():match("[^\n]*$")
       end
       return self._trailing_line_len
     end,
@@ -213,7 +213,7 @@ do
           b.dirty = error
         end
         if not (type(b) == 'string') then
-          b = b:as_smext()
+          b = b:text()
         end
         local line = match(b, "\n([^\n]*)$")
         if line then
@@ -400,7 +400,7 @@ do
             end
           else
             walk(b, pos)
-            b = b:as_smext()
+            b = b:text()
           end
           pos = pos + #b
         end
@@ -502,12 +502,7 @@ do
   end
   NomsuCode = _class_0
 end
-Code.__base.append_1 = assert(Code.__base.append)
-Code.__base.append_1_joined_by_2 = assert(Code.__base.concat_append)
-Code.__base.prepend_1 = assert(Code.__base.prepend)
-LuaCode.__base.declare_locals_1 = assert(LuaCode.__base.declare_locals)
-LuaCode.__base.remove_free_vars_1 = assert(LuaCode.__base.remove_free_vars)
-LuaCode.__base.add_free_vars_1 = assert(LuaCode.__base.add_free_vars)
+Code.__base.add_1_joined_with = assert(Code.__base.concat_append)
 return {
   Code = Code,
   NomsuCode = NomsuCode,

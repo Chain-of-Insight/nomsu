@@ -102,8 +102,20 @@ test:
         .."
 
 # Basic loop control
-(do next) compiles to (Lua "goto continue")
-(stop) compiles to (Lua "break")
+(stop %var) compiles to:
+    if %var:
+        return (..)
+            Lua "goto stop_\((%var.stub if (%var.type == "action") else %var) as lua identifier)"
+    ..else: return (Lua "break")
+(do next %var) compiles to:
+    if %var:
+        return (..)
+            Lua "goto continue_\((%var.stub if (%var.type == "action") else %var) as lua identifier)"
+    ..else: return (Lua "goto continue")
+[===stop %var ===, ---stop %var ---, ***stop %var ***] all compile to (..)
+    Lua "::stop_\((%var.stub if (%var.type == "action") else %var) as lua identifier)::"
+[===next %var ===, ---next %var ---, ***next %var ***] all compile to (..)
+    Lua "::continue_\((%var.stub if (%var.type == "action") else %var) as lua identifier)::"
 
 # While loops
 test:
@@ -176,16 +188,6 @@ test:
             end -- end of 'stop repeating' label scope"
     
     return %lua
-
-# For loop control flow
-(stop %var) compiles to (..)
-    Lua "goto stop_\((%var.stub if (%var.type == "Action") else %var) as lua identifier)"
-(do next %var) compiles to (..)
-    Lua "goto continue_\((%var.stub if (%var.type == "Action") else %var) as lua identifier)"
-[===stop %var ===, ---stop %var ---, ***stop %var ***] all compile to (..)
-    Lua "::stop_\((%var.stub if (%var.type == "Action") else %var) as lua identifier)::"
-[===next %var ===, ---next %var ---, ***next %var ***] all compile to (..)
-    Lua "::continue_\((%var.stub if (%var.type == "Action") else %var) as lua identifier)::"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -365,7 +367,7 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    if:
+    when:
         (1 == 2) (100 < 0):
             barf "bad conditional"
         (1 == 0) (1 == 1) %not_a_variable.x: do nothing
@@ -377,7 +379,7 @@ test:
             barf "bad conditional"
 
 # Multi-branch conditional (if..elseif..else)
-[if %body, when %body] all compile to:
+(when %body) compiles to:
     %code = (Lua "")
     %clause = "if"
     %else_allowed = (yes)
@@ -512,8 +514,6 @@ test:
             %d.x = "bad"
             barf
         ..then always: %d.x = "good"
-    ..and if it barfs: do nothing
-    
     assume (%d.x == "good")
 (do %action then always %final_action) compiles to:
     define mangler

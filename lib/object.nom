@@ -93,13 +93,13 @@ test:
                     __index=\(%parent as lua expr),
                     __tostring=function(cls) return cls.name end,
                     __call=function(cls, inst)
-                        inst = setmetatable(inst or {}, cls)
+                        if inst == nil then return cls end
+                        inst = setmetatable(inst, cls)
                         if inst.set_up then inst:set_up() end
                         return inst
                     end,
                 })
-                nomsu.environment[(class.name.." 1"):as_lua_id()] = class
-                nomsu.environment[class.name:as_lua_id()] = function() return class end
+                nomsu.environment[class.name:as_lua_id()] = class
                 class.__index = class
                 class.class = class
                 class.__tostring = function(inst)
