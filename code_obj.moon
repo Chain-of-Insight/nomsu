@@ -245,7 +245,7 @@ class LuaCode extends Code
         walk self, 1
         return {
             nomsu_filename:@source.filename
-            lua_filename:tostring(@source)..".lua", lua_file:@stringify!
+            lua_filename:tostring(@source)..".lua", lua_file:@text!
             :lua_to_nomsu, :nomsu_to_lua
         }
 

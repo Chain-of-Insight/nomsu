@@ -1,16 +1,9 @@
+local List, Dict
 local insert, remove, concat
 do
   local _obj_0 = table
   insert, remove, concat = _obj_0.insert, _obj_0.remove, _obj_0.concat
 end
-local equivalent, nth_to_last, size
-do
-  local _obj_0 = require('utils')
-  equivalent, nth_to_last, size = _obj_0.equivalent, _obj_0.nth_to_last, _obj_0.size
-end
-local lpeg = require('lpeg')
-local re = require('re')
-local List, Dict
 local as_nomsu
 as_nomsu = function(self)
   if type(self) == 'number' then
@@ -47,9 +40,23 @@ as_lua = function(self)
   end
   return tostring(self)
 end
+local nth_to_last
+nth_to_last = function(self, n)
+  return self[#self - n + 1]
+end
 local _list_mt = {
   __type = "List",
-  __eq = equivalent,
+  __eq = function(self, other)
+    if not (type(other) == 'table' and getmetatable(other) == getmetatable(self) and #other == #self) then
+      return false
+    end
+    for i, x in ipairs(self) do
+      if not (x == other[i]) then
+        return false
+      end
+    end
+    return true
+  end,
   __tostring = function(self)
     return "[" .. concat((function()
       local _accum_0 = { }
@@ -75,7 +82,7 @@ local _list_mt = {
     end)(), ", ") .. "]"
   end,
   as_lua = function(self)
-    return "_List{" .. concat((function()
+    return "List{" .. concat((function()
       local _accum_0 = { }
       local _len_0 = 1
       for _index_0 = 1, #self do
@@ -242,8 +249,29 @@ walk_items = function(self, i)
 end
 local _dict_mt = {
   __type = "Dict",
-  __eq = equivalent,
-  __len = size,
+  __eq = function(self, other)
+    if not (type(other) == 'table' and getmetatable(other) == getmetatable(self)) then
+      return false
+    end
+    for k, v in pairs(self) do
+      if not (v == other[k]) then
+        return false
+      end
+    end
+    for k, v in pairs(other) do
+      if not (v == self[k]) then
+        return false
+      end
+    end
+    return true
+  end,
+  __len = function(self)
+    local n = 0
+    for _ in pairs(self) do
+      n = n + 1
+    end
+    return n
+  end,
   __tostring = function(self)
     return "{" .. concat((function()
       local _accum_0 = { }
@@ -267,7 +295,7 @@ local _dict_mt = {
     end)(), ", ") .. "}"
   end,
   as_lua = function(self)
-    return "_Dict{" .. concat((function()
+    return "Dict{" .. concat((function()
       local _accum_0 = { }
       local _len_0 = 1
       for k, v in pairs(self) do

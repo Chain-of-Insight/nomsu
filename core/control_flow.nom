@@ -560,7 +560,7 @@ test:
         %lua = (..)
             Lua "\
                 ..do
-                    local \(mangle "stack \(%var.1)") = _List{\(%structure as lua expr)}
+                    local \(mangle "stack \(%var.1)") = List{\(%structure as lua expr)}
                     while #\(mangle "stack \(%var.1)") > 0 do
                         \(%var as lua expr) = table.remove(\(mangle "stack \(%var.1)"), 1)"
         %lua::append "\n        "

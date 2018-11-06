@@ -52,7 +52,6 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * [syntax\_tree.moon](syntax_tree.moon) - Datastructures used for Nomsu Abstract Syntax Trees.
 * [code\_obj.moon](code_obj.moon) - Datastructures used for incrementally building generated code, while preserving code origins.
 * [error\_handling.moon](error_handling.moon) - The logic for producing good error messages within Lua that reference the Nomsu source code that led to them.
-* [utils.lua](utils.lua) - A set of utility actions used by nomsu.moon.
 * [consolecolors.lua](consolecolors.lua) - Lua module that defines ANSI color codes for colored console output (used internally in nomsu.moon).
 * [examples/how\_do\_i.nom](examples/how_do_i.nom) - A simple walkthrough of some of the features of Nomsu, written in Nomsu code. **This is a good place to start.**
 * [core/\*.nom](core) - Core language definitions of stuff like control flow, operators, and metaprogramming, broken down into different files.

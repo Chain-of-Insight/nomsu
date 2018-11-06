@@ -2,10 +2,7 @@ local lpeg = require('lpeg')
 local R, P, S
 R, P, S = lpeg.R, lpeg.P, lpeg.S
 local re = require('re')
-local utils = require('utils')
 local Files = require('files')
-local stringify, equivalent
-stringify, equivalent = utils.stringify, utils.equivalent
 local List, Dict, Text
 do
   local _obj_0 = require('containers')
@@ -187,10 +184,8 @@ do
     load = load,
     pairs = pairs,
     ipairs = ipairs,
-    _List = List,
-    _Dict = Dict,
-    stringify = stringify,
-    utils = utils,
+    List = List,
+    Dict = Dict,
     lpeg = lpeg,
     re = re,
     Files = Files,
@@ -431,6 +426,22 @@ do
   end
   NomsuCompiler.environment.COMPILE_ACTIONS = setmetatable({
     __imported = Dict({ }),
+    [""] = function(self, tree, fn, ...)
+      local lua = LuaCode.Value(tree.source)
+      lua:append(self:compile(fn, compile_actions))
+      if not (lua:text():is_lua_id()) then
+        lua:parenthesize()
+      end
+      lua:append("(")
+      for i = 1, select('#', ...) do
+        if i > 1 then
+          lua:append(", ")
+        end
+        lua:append(self:compile(select(i, ...), compile_actions))
+      end
+      lua:append(")")
+      return lua
+    end,
     ["Lua"] = function(self, tree, code)
       return add_lua_string_bits(self, 'statements', code)
     end,
@@ -710,15 +721,12 @@ do
           local filename = Source:from_string(info.source).filename
           self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
         end
-        if SyntaxTree:is_instance(ret) then
-          if ret == tree then
-            local info = debug.getinfo(compile_action, "S")
-            local filename = Source:from_string(info.source).filename
-            self:compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") is producing an endless loop.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's not just returning the original tree.")
-          end
+        if not (SyntaxTree:is_instance(ret)) then
+          return ret
+        end
+        if ret ~= tree then
           return self:compile(ret, compile_actions)
         end
-        return ret
       end
       local lua = LuaCode.Value(tree.source)
       if tree.target then
@@ -871,7 +879,7 @@ do
             lua:append("..")
           end
           if bit.type ~= "Text" then
-            bit_lua = LuaCode.Value(bit.source, "stringify(", bit_lua, ")")
+            bit_lua = LuaCode.Value(bit.source, "tostring(", bit_lua, ")")
           end
           lua:append(bit_lua)
           _continue_0 = true
@@ -891,7 +899,7 @@ do
       end
       return lua
     elseif "List" == _exp_0 then
-      local lua = LuaCode.Value(tree.source, "_List{")
+      local lua = LuaCode.Value(tree.source, "List{")
       lua:concat_append((function()
         local _accum_0 = { }
         local _len_0 = 1
@@ -905,7 +913,7 @@ do
       lua:append("}")
       return lua
     elseif "Dict" == _exp_0 then
-      local lua = LuaCode.Value(tree.source, "_Dict{")
+      local lua = LuaCode.Value(tree.source, "Dict{")
       lua:concat_append((function()
         local _accum_0 = { }
         local _len_0 = 1

@@ -22,10 +22,10 @@ test:
     assume ("asdf"::uppercase) == "ASDF"
     assume ("asdf"::with "s" -> "X") == "aXdf"
     assume ("one\ntwo\n"::lines) == ["one", "two", ""]
-    (アクション %spec %body) parses as (externally %spec means %body)
+    (%spec とは %body) parses as (%spec means %body)
 test:
     %こんにちは = "こんにちは"
-    アクション [% と言う] "\(%)世界"
+    (% と言う) とは "\(%)世界"
     assume (%こんにちは と言う) == "こんにちは世界"
 (%expr for %match in %text matching %patt) compiles to (..)
     Lua value "\

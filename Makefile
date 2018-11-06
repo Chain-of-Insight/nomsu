@@ -14,7 +14,7 @@ MOON_FILES= code_obj.moon error_handling.moon files.moon nomsu.moon nomsu_compil
 			syntax_tree.moon containers.moon bitops.moon parser.moon pretty_errors.moon \
 			string2.moon
 LUA_FILES= code_obj.lua consolecolors.lua error_handling.lua files.lua nomsu.lua nomsu_compiler.lua \
-		   syntax_tree.lua containers.lua bitops.lua utils.lua parser.lua pretty_errors.lua \
+		   syntax_tree.lua containers.lua bitops.lua parser.lua pretty_errors.lua \
 		   string2.lua
 CORE_NOM_FILES= $(wildcard core/*.nom)
 CORE_LUA_FILES= $(patsubst %.nom,%.lua,$(CORE_NOM_FILES))

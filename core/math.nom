@@ -76,27 +76,54 @@ test:
 externally (%n to the nearest %rounder) means (..)
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 
-# Any/all/none
+# Any/all
+externally [all of %items, all %items] all mean:
+    for % in %items:
+        unless %: return (no)
+    return (yes)
 [all of %items, all %items] all compile to:
     unless (%items.type is "List"):
-        return (Lua value "utils.all(\(%items as lua expr))")
+        return %tree
     %clauses = (((% as lua expr)::text) for % in %items)
     return (Lua value "(\(%clauses::joined with " and "))")
-
 [not all of %items, not all %items] all parse as (not (all of %items))
+
+externally [any of %items, any %items] all mean:
+    for % in %items:
+        if %: return (yes)
+    return (no)
 [any of %items, any %items] all compile to:
     unless (%items.type is "List"):
-        return (Lua value "utils.any(\(%items as lua expr))")
+        return %tree
     %clauses = (((% as lua expr)::text) for % in %items)
     return (Lua value "(\(%clauses::joined with " or "))")
-
 [none of %items, none %items] all parse as (not (any of %items))
+
+# Sum/product
+externally [sum of %items, sum %items] all mean:
+    %total = 0
+    for % in %items: %total += %
+    return %total
 [sum of %items, sum %items] all compile to:
     unless (%items.type is "List"):
-        return (Lua value "utils.sum(\(%items as lua expr))")
+        return %tree
     %clauses = (((% as lua expr)::text) for % in %items)
     return (Lua value "(\(%clauses::joined with " + "))")
 
+externally [product of %items, product %items] all mean:
+    %prod = 1
+    for % in %items: %prod *= %
+    return %prod
+[product of %items, product %items] all compile to:
+    unless (%items.type is "List"):
+        return %tree
+    %clauses = (((% as lua expr)::text) for % in %items)
+    return (Lua value "(\(%clauses::joined with " * "))")
+
+externally [avg of %items, average of %items] all mean (..)
+    (sum of %items) / (size of %items)
+
+# Shorthand for control flow
 [if all of %items %body, if all of %items then %body] all parse as (..)
     if (all of %items) %body
 
@@ -136,42 +163,44 @@ externally (%n to the nearest %rounder) means (..)
     unless none of %items %body else %else, unless none of %items then %body else %else
 ..all parse as (if (any of %items) %body else %else)
 
-[product of %items, product %items] all compile to:
-    unless (%items.type is "List"):
-        return (Lua value "utils.product(\(%items as lua expr))")
-    %clauses = (((% as lua expr)::text) for % in %items)
-    return (Lua value "(\(%clauses::joined with " * "))")
+# Min/max
+externally [min of %items, smallest of %items, lowest of %items] all mean:
+    %best = (nil)
+    for % in %items:
+        if ((%best == (nil)) or (% < %best)):
+            %best = %
+    return %best
 
-externally [avg of %items, average of %items] all mean (..)
-    =lua "(utils.sum(\%items)/#\%items)"
-
-[min of %items, smallest of %items, lowest of %items] all compile to (..)
-    Lua value "utils.min(\(%items as lua expr))"
-
-[max of %items, biggest of %items, largest of %items, highest of %items] all compile \
-..to (Lua value "utils.max(\(%items as lua expr))")
+externally [max of %items, biggest of %items, largest of %items, highest of %items] all mean:
+    %best = (nil)
+    for % in %items:
+        if ((%best == (nil)) or (% > %best)):
+            %best = %
+    return %best
 
 test:
     assume ((min of [3, -4, 1, 2] by % = (% * %)) == 1)
     assume ((max of [3, -4, 1, 2] by % = (% * %)) == -4)
 (min of %items by %item = %value_expr) parses as (..)
     result of:
-        set {%best:nil, %best_key:nil}
+        %best = (nil)
+        %best_key = (nil)
         for %item in %items:
             %key = %value_expr
             if ((%best == (nil)) or (%key < %best_key)):
-                set {%best:%item, %best_key:%key}
-        
+                %best = %item
+                %best_key = %key
         return %best
 
 (max of %items by %item = %value_expr) parses as (..)
     result of:
-        set {%best:nil, %best_key:nil}
+        %best = (nil)
+        %best_key = (nil)
         for %item in %items:
             %key = %value_expr
             if ((%best == (nil)) or (%key > %best_key)):
-                set {%best:%item, %best_key:%key}
-        
+                %best = %item
+                %best_key = %key
         return %best
 
 # Random functions

@@ -32,7 +32,7 @@ test:
 (%expr for file %f in %path) compiles to (..)
     Lua value "\
         ..(function()
-            local ret = _List{}
+            local ret = List{}
             for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
                 ret[#ret+1] = \(%expr as lua statements)
             end

@@ -409,7 +409,7 @@ do
       return {
         nomsu_filename = self.source.filename,
         lua_filename = tostring(self.source) .. ".lua",
-        lua_file = self:stringify(),
+        lua_file = self:text(),
         lua_to_nomsu = lua_to_nomsu,
         nomsu_to_lua = nomsu_to_lua
       }

@@ -63,29 +63,33 @@ test:
     asdf
     assume (%tmp is (nil)) or barf "compile to is leaking variables"
 lua> "\
-    ..COMPILE_ACTIONS["1 compiles to"] = function(nomsu, tree, \%actions, \%body)
-        if \%actions.type ~= "List" then \%actions = {\%actions, type="List"} end
-        local \%args = {"nomsu", "tree", unpack(table.map(\%actions[1]:get_args(), function(a) return nomsu:compile(a):text() end))}
-        local lua = LuaCode(tree.source, "COMPILE_ACTIONS[", \%actions[1].stub:as_lua(),
+    ..COMPILE_ACTIONS["1 compiles to"] = function(nomsu, tree, \%action, \%body)
+        local \%args = List{\(\%nomsu), \(\%tree), unpack(\%action:get_args())}
+        local lua = LuaCode(tree.source, "COMPILE_ACTIONS[", \%action.stub:as_lua(),
             "] = ", \(what (%args -> %body) compiles to))
+        return lua
+    end"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(%actions all compile to %body) compiles to:
+    lua> "\
+        ..if \%actions.type ~= "List" then
+            nomsu:compile_error(\%actions, "This should be a list of actions.")
+        end
+        local lua = LuaCode(tree.source, \(what (%actions.1 compiles to %body) compiles to))
+        local \%args = List{\(\%nomsu), \(\%tree), unpack(\%actions[1]:get_args())}
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local \%alias_args = {"nomsu", "tree", unpack(table.map(alias:get_args(), function(a) return nomsu:compile(a):text() \
-    ..end))}
+            local \%alias_args = List{\(\%nomsu), \(\%tree), unpack(alias:get_args())}
             lua:append("\\nCOMPILE_ACTIONS[", alias.stub:as_lua(), "] = ")
-            if utils.equivalent(\%args, \%alias_args) then
+            if \%alias_args == \%args then
                 lua:append("COMPILE_ACTIONS[", \%actions[1].stub:as_lua(), "]")
             else
-                lua:append("function(")
-                lua:concat_append(\%alias_args, ", ")
-                lua:append(")\\n    return COMPILE_ACTIONS[", \%actions[1].stub:as_lua(), "](")
-                lua:concat_append(\%args, ", ")
-                lua:append(")\\nend")
+                lua:append(\(what (%alias_args -> \(what %actions.1 compiles to)) compiles to))
             end
         end
-        return lua
-    end
-    COMPILE_ACTIONS["1 all compile to"] = COMPILE_ACTIONS["1 compiles to"]"
+        return lua"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -112,27 +116,29 @@ test:
         (baz %) parses as (foo %)
     
     assume ((foo 1) == "outer")
-[%actions means %body, %actions all mean %body] all compile to:
+
+(%action means %body) compiles to:
     lua> "\
-        ..if \%actions.type ~= "List" then \%actions = {\%actions, type="List"} end
-        local fn_name = \%actions[1].stub:as_lua_id()
-        local \%args = table.map(\%actions[1]:get_args(), function(a) return nomsu:compile(a):text() end)
+        ..local fn_name = \%action.stub:as_lua_id()
+        local \%args = \%action:get_args()
         local lua = LuaCode(tree.source, fn_name, " = ", \(what (%args -> %body) compiles to))
         lua:add_free_vars({fn_name})
+        return lua"
+(%actions all mean %body) compiles to:
+    lua> "\
+        ..local fn_name = \%actions[1].stub:as_lua_id()
+        local \%args = List(\%actions[1]:get_args())
+        local lua = LuaCode(tree.source, \(what (%actions.1 means %body) compiles to))
         for i=2,#\%actions do
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
             lua:add_free_vars({alias_name})
-            local \%alias_args = table.map(alias:get_args(), function(a) return nomsu:compile(a):text() end)
+            local \%alias_args = List(alias:get_args())
             lua:append("\\n", alias_name, " = ")
-            if utils.equivalent(\%args, \%alias_args) then
+            if \%args == \%alias_args then
                 lua:append(fn_name)
             else
-                lua:append("function(")
-                lua:concat_append(\%alias_args, ", ")
-                lua:append(")\\n    return ", fn_name, "(")
-                lua:concat_append(\%args, ", ")
-                lua:append(")\\nend")
+                lua:append(\(what (%alias_args -> %actions.1) compiles to))
             end
         end
         return lua"
@@ -143,10 +149,14 @@ test:
 test:
     assume ((baz1) == "baz1")
     assume ((baz2) == "baz2")
-[externally %actions means %body, externally %actions all mean %body] all compile to:
+(externally %action means %body) compiles to:
     lua> "\
-        ..local lua = \(what (%actions means %body) compiles to)
-        if \%actions.type ~= "List" then \%actions = {\%actions, type="List"} end
+        ..local lua = \(what (%action means %body) compiles to)
+        lua:remove_free_vars({\%action.stub:as_lua_id()})
+        return lua"
+(externally %actions all mean %body) compiles to:
+    lua> "\
+        ..local lua = \(what (%actions all mean %body) compiles to)
         lua:remove_free_vars(table.map(\%actions, function(a) return a.stub:as_lua_id() end))
         return lua"
 
@@ -169,10 +179,12 @@ test:
     swap %tmp and %tmp2
     assume ((%tmp == 2) and (%tmp2 == 1)) or barf "\
         ..'parse % as %' variable mangling failed."
-[%actions parses as %body, %actions all parse as %body] all compile to:
+(%actions all parse as %body) compiles to:
     lua> "\
         ..local replacements = {}
-        if \%actions.type ~= "List" then \%actions = {\%actions, type="List"} end
+        if \%actions.type ~= "List" then
+            nomsu:compile_error(\%actions, "This should be a list.")
+        end
         for i,arg in ipairs(\%actions[1]:get_args()) do
             replacements[arg[1]] = nomsu:compile(arg):text()
         end
@@ -208,10 +220,12 @@ test:
         local \%new_body = LuaCode(\%body.source,
             "local mangle = mangler()",
             "\\nreturn ", make_tree(\%body))
-        local ret = \(what (%actions compiles to %new_body) compiles to)
+        local ret = \(what (%actions all compile to %new_body) compiles to)
         return ret"
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[%action parses as %body] all parse as ([%action] all parse as %body)
 
 # TODO: add check for .is_value
 (%tree as lua expr) compiles to (..)
@@ -287,10 +301,10 @@ externally (%tree with vars %replacements) means (..)
 
 externally (match %tree with %patt) means:
     lua> "\
-        ..if \%patt.type == "Var" then return _Dict{[\%patt[1]]=\%tree} end
+        ..if \%patt.type == "Var" then return Dict{[\%patt[1]]=\%tree} end
         if \%patt.type == "Action" and \%patt.stub ~= \%tree.stub then return nil end
         if #\%patt ~= #\%tree then return nil end
-        local matches = _Dict{}
+        local matches = Dict{}
         for \%i=1,#\%patt do
             if SyntaxTree:is_instance(\%tree[\%i]) then
                 local submatch = \(match %tree.%i with %patt.%i)
@@ -341,11 +355,11 @@ externally (type of %) means:
     lua> "\
         ..local lua_type = \(lua type of %)
         if lua_type == 'string' then return 'Text'
-        elseif lua_type == 'table' then
+        elseif lua_type == 'table' or lua_type == 'userdata' then
             local mt = getmetatable(\%)
             if mt and mt.__type then return mt.__type end
-            return 'Lua table'
-        else return lua_type end"
+        end
+        return lua_type"
 
 [% is a %type, % is an %type] all parse as ((type of %) == %type)
 [% isn't a %type, % isn't an %type, % is not a %type, % is not an %type] all parse as (..)

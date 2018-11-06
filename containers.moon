@@ -1,11 +1,6 @@
--- This file contains container classes, i.e. Lists, Dicts, and Sets
-
-{:insert,:remove,:concat} = table
-{:equivalent, :nth_to_last, :size} = require 'utils'
-lpeg = require 'lpeg'
-re = require 're'
-
+-- This file contains container classes, i.e. Lists and Dicts, plus some extended string functionality
 local List, Dict
+{:insert,:remove,:concat} = table
 
 as_nomsu = =>
     if type(@) == 'number'
@@ -23,19 +18,26 @@ as_lua = =>
             return _as_lua(@)
     return tostring(@)
 
+nth_to_last = (n)=> @[#@-n+1]
+
 -- List and Dict classes to provide basic equality/tostring functionality for the tables
 -- used in Nomsu. This way, they retain a notion of whether they were originally lists or dicts.
 
 _list_mt =
     __type: "List"
-    __eq:equivalent
+    __eq: (other)=>
+        unless type(other) == 'table' and getmetatable(other) == getmetatable(@) and #other == #@
+            return false
+        for i,x in ipairs(@)
+            return false unless x == other[i]
+        return true
     -- Could consider adding a __newindex to enforce list-ness, but would hurt performance
     __tostring: =>
         "["..concat([as_nomsu(b) for b in *@], ", ").."]"
     as_nomsu: =>
         "["..concat([as_nomsu(b) for b in *@], ", ").."]"
     as_lua: =>
-        "_List{"..concat([as_lua(b) for b in *@], ", ").."}"
+        "List{"..concat([as_lua(b) for b in *@], ", ").."}"
     __lt: (other)=>
         assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
         for i=1,math.max(#@, #other)
@@ -65,7 +67,6 @@ _list_mt =
         last: (=> @[#@]), first: (=> @[1])
         _1_st_to_last:nth_to_last, _1_nd_to_last:nth_to_last
         _1_rd_to_last:nth_to_last, _1_th_to_last:nth_to_last
-        -- TODO: use stringify() to allow joining misc. objects?
         joined: => table.concat([tostring(x) for x in *@]),
         joined_with: (glue)=> table.concat([tostring(x) for x in *@], glue),
         has: (item)=>
@@ -105,14 +106,24 @@ walk_items = (i)=>
 
 _dict_mt =
     __type: "Dict"
-    __eq:equivalent
-    __len:size
+    __eq: (other)=>
+        unless type(other) == 'table' and getmetatable(other) == getmetatable(@)
+            return false
+        for k,v in pairs(@)
+            return false unless v == other[k]
+        for k,v in pairs(other)
+            return false unless v == @[k]
+        return true
+    __len: =>
+        n = 0
+        for _ in pairs(@) do n += 1
+        return n
     __tostring: =>
         "{"..concat(["#{as_nomsu(k)}: #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_nomsu: =>
         "{"..concat(["#{as_nomsu(k)}: #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_lua: =>
-        "_Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
+        "Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
     __ipairs: => walk_items, {table:@, key:nil}, 0
     __band: (other)=>
         Dict{k,v for k,v in pairs(@) when other[k] != nil}

@@ -131,7 +131,7 @@ if not args or args.help then
   os.exit(EXIT_FAILURE)
 end
 local nomsu = NomsuCompiler
-nomsu.environment.arg = NomsuCompiler.environment._List(args.nomsu_args)
+nomsu.environment.arg = NomsuCompiler.environment.List(args.nomsu_args)
 if args.version then
   nomsu:run([[(: use "core"; say (Nomsu version))]])
   os.exit(EXIT_SUCCESS)

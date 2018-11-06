@@ -12,9 +12,7 @@
 lpeg = require 'lpeg'
 {:R,:P,:S} = lpeg
 re = require 're'
-utils = require 'utils'
 Files = require 'files'
-{:stringify, :equivalent} = utils
 {:List, :Dict, :Text} = require 'containers'
 export colors, colored
 colors = require 'consolecolors'
@@ -101,9 +99,9 @@ with NomsuCompiler
         :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
         :pairs, :ipairs,
         -- Nomsu types:
-        _List:List, _Dict:Dict,
+        List:List, Dict:Dict,
         -- Utilities and misc.
-        stringify:stringify, utils:utils, lpeg:lpeg, re:re, Files:Files,
+        lpeg:lpeg, re:re, Files:Files,
         :SyntaxTree, TESTS: Dict({}), globals: Dict({}),
         :LuaCode, :NomsuCode, :Source
         nomsu:NomsuCompiler
@@ -242,6 +240,17 @@ with NomsuCompiler
         return lua
     .environment.COMPILE_ACTIONS = setmetatable({
         __imported: Dict{}
+        [""]: (tree, fn, ...)=>
+            lua = LuaCode.Value(tree.source)
+            lua\append @compile(fn, compile_actions)
+            lua\parenthesize! unless lua\text!\is_lua_id!
+            lua\append "("
+            for i=1,select('#',...)
+                lua\append(", ") if i > 1
+                lua\append @compile(select(i, ...), compile_actions)
+            lua\append ")"
+            return lua
+
         ["Lua"]: (tree, code)=>
             return add_lua_string_bits(@, 'statements', code)
     
@@ -415,15 +424,10 @@ with NomsuCompiler
                         @compile_error tree,
                             "The compile-time action here (#{stub}) failed to return any value.",
                             "Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's returning something."
-                    if SyntaxTree\is_instance(ret)
-                        if ret == tree
-                            info = debug.getinfo(compile_action, "S")
-                            filename = Source\from_string(info.source).filename
-                            @compile_error tree,
-                                "The compile-time action here (#{stub}) is producing an endless loop.",
-                                "Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's not just returning the original tree."
+                    unless SyntaxTree\is_instance(ret)
+                        return ret
+                    if ret != tree
                         return @compile(ret, compile_actions)
-                    return ret
 
                 lua = LuaCode.Value(tree.source)
                 if tree.target -- Method call
@@ -524,7 +528,7 @@ with NomsuCompiler
                             "Can't this as a string interpolation value, since it's not an expression."
                     if #lua.bits > 0 then lua\append ".."
                     if bit.type != "Text"
-                        bit_lua = LuaCode.Value(bit.source, "stringify(",bit_lua,")")
+                        bit_lua = LuaCode.Value(bit.source, "tostring(",bit_lua,")")
                     lua\append bit_lua
 
                 if string_buffer ~= "" or #lua.bits == 0
@@ -536,13 +540,13 @@ with NomsuCompiler
                 return lua
 
             when "List"
-                lua = LuaCode.Value tree.source, "_List{"
+                lua = LuaCode.Value tree.source, "List{"
                 lua\concat_append([@compile(e, compile_actions) for e in *tree], ", ", ",\n  ")
                 lua\append "}"
                 return lua
 
             when "Dict"
-                lua = LuaCode.Value tree.source, "_Dict{"
+                lua = LuaCode.Value tree.source, "Dict{"
                 lua\concat_append([@compile(e, compile_actions) for e in *tree], ", ", ",\n  ")
                 lua\append "}"
                 return lua
