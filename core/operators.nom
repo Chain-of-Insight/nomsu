@@ -5,6 +5,8 @@
 use "core/metaprogramming.nom"
 use "core/errors.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 test:
     assume (all [1 < 2, 2 > 1, 1 <= 2, 2 >= 1, 1 == 1, 1 != 2])
 
@@ -27,14 +29,12 @@ test:
 
 # Variable assignment operator
 (%var = %value) compiles to:
-    lua> "local \%var_lua = \(%var as lua expr)"
-    assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-    lua> "local \%value_lua = \(%value as lua expr)"
-    assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
     lua> "\
-        ..local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
+        ..local \%var_lua = \(%var as lua expr)
+        local \%value_lua = \(%value as lua expr)
+        local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
         if \%var.type == 'Var' then
-            lua:add_free_vars({nomsu:compile(\%var):text()})
+            lua:add_free_vars({compile(\%var):text()})
         end
         return lua"
 
@@ -58,13 +58,7 @@ test:
                 end
             end)
             local target_lua = \(%target as lua)
-            if not target_lua.is_value then error("Invalid target for assignment: "..\(..)
-            %target as text
-        ..) end
             local value_lua = \(%value as lua)
-            if not value_lua.is_value then error("Invalid value for assignment: "..\(..)
-            %value as text
-        ..) end
             if \%target.type == "Var" then
                 lhs:add_free_vars({target_lua:text()})
             end
@@ -87,16 +81,11 @@ test:
     
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
-(external %var = %value) compiles to:
-    %var_lua = (%var as lua)
-    assume %var_lua.is_value or barf "Invalid target for assignment: \%var"
-    %value_lua = (%value as lua)
-    assume %value_lua.is_value or barf "Invalid value for assignment: \%value"
-    return (Lua "\%var_lua = \%value_lua;")
+(external %var = %value) compiles to "\(%var as lua) = \(%value as lua)"
 
 test:
     set {%foozle:"outer", %y:"outer"}
-    externally (set global x local y) means (..)
+    externally (set global x local y) means:
         with external [%foozle]:
             %foozle = "inner"
             %y = "inner"
@@ -107,7 +96,7 @@ test:
 (with external %externs %body) compiles to:
     %body_lua = (%body as lua statements)
     lua> "\
-        ..\%body_lua:remove_free_vars(table.map(\%externs, function(v) return nomsu:compile(v):text() end))"
+        ..\%body_lua:remove_free_vars(table.map(\%externs, function(v) return compile(v):text() end))"
     return %body_lua
 
 test:
@@ -131,9 +120,6 @@ test:
             end
             local target_lua = \(%target as lua)
             local value_lua = \(%value as lua)
-            if not value_lua.is_value then
-                error("Invalid value for assignment: "..tostring(\%value))
-            end
             if i > 1 then
                 lhs:append(", ")
                 rhs:append(", ")

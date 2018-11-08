@@ -5,6 +5,8 @@
 use "lib/os.nom"
 use "lib/base64.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 lua> "local \%use_sha1, \%hashlib = pcall(require, 'openssl.digest')"
 
 test:

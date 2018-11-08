@@ -4,6 +4,8 @@
 
 use "compatibility/compatibility.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 upgrade action (for %1 where %2 matches %3 %4) to "2.5" as (..)
     for %1 in %2 matching %3 %4
 

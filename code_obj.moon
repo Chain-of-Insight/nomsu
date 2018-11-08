@@ -50,6 +50,8 @@ class Code
         --assert(@source and Source\is_instance(@source), "Source has the wrong type")
         @append(...)
 
+    @is_instance: (x)=> type(x) == 'table' and x.__class == @
+
     text: =>
         if @__str == nil
             buff, indent = {}, 0
@@ -165,13 +167,7 @@ class LuaCode extends Code
     new: (...)=>
         super ...
         @free_vars = {}
-        @is_value = false
     
-    @Value = (...)->
-        lua = LuaCode(...)
-        lua.is_value = true
-        return lua
-
     add_free_vars: (vars)=>
         return unless #vars > 0
         seen = {[v]:true for v in *@free_vars}
@@ -219,7 +215,7 @@ class LuaCode extends Code
         return to_declare
 
     as_statements: (prefix="", suffix=";")=>
-        unless @is_value
+        if @text!\matches(";$") or @text! == ""
             return self
         statements = LuaCode(@source)
         if prefix != ""
@@ -250,7 +246,6 @@ class LuaCode extends Code
         }
 
     parenthesize: =>
-        assert @is_value, "Cannot parenthesize lua statements"
         @prepend "("
         @append ")"
 

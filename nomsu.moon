@@ -46,14 +46,18 @@ if not ok
     os.exit(EXIT_FAILURE)
 Files = require "files"
 Errhand = require "error_handling"
-NomsuCompiler = require "nomsu_compiler"
+--NomsuCompiler = require "nomsu_compiler"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
+--{:Importer, :import_to_1_from, :_1_forked} = require 'importer'
+{:List, :Dict, :Text} = require 'containers'
+--SyntaxTree = require "syntax_tree"
+nomsu_environment = require('nomsu_environment')
 
 -- If this file was reached via require(), then just return the Nomsu compiler
 if not arg or debug.getinfo(2).func == require
-    return NomsuCompiler
+    return nomsu_environment
 
-file_queue = {}
+file_queue = List{}
 sep = "\3"
 parser = re.compile([[
     args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: %true :} %sep)?
@@ -73,36 +77,24 @@ parser = re.compile([[
     file <- ("-" -> "stdin") / {(!%sep .)+}
 ]], {
     true:lpeg.Cc(true), number:lpeg.R("09")^1/tonumber, sep:lpeg.P(sep)
-    add_file: (f)-> table.insert(file_queue, f)
+    add_file: (f)-> file_queue\add(f)
     add_exec_string: (pos, s)->
         name = "command line arg @#{pos}.nom"
         Files.spoof(name, s)
-        table.insert(file_queue, name)
+        file_queue\add name
 })
 arg_string = table.concat(arg, sep)..sep
 args = parser\match(arg_string)
 if not args or args.help
     print usage
     os.exit(EXIT_FAILURE)
-
-nomsu = NomsuCompiler
-nomsu.environment.arg = NomsuCompiler.environment.List(args.nomsu_args)
+nomsu_environment.command_line_args = List(args.nomsu_args)
+nomsu_environment.optimization = args.optimization or 1
 
 if args.version
-    nomsu\run [[(: use "core"; say (Nomsu version))]]
+    nomsu_environment.run_file_1_in 'core', nomsu_environment
+    nomsu_environment.run_1_in([[say (Nomsu version)]], nomsu_environment)
     os.exit(EXIT_SUCCESS)
-
-export FILE_CACHE
--- FILE_CACHE is a map from filename (string) -> string of file contents
-FILE_CACHE = setmetatable {}, {
-    __index: (filename)=>
-        file = io.open(filename)
-        return nil unless file
-        contents = file\read("*a")
-        file\close!
-        self[filename] = contents
-        return contents
-}
 
 run = ->
     input_files = {}
@@ -115,116 +107,52 @@ run = ->
         for _,filename in Files.walk(f)
             input_files[filename] = true
 
-    nomsu.can_optimize = (f)->
-        return false if args.optimization == 0
-        return false if args.compile and input_files[f]
-        return true
-
     unless args.no_core
-        nomsu\import_file('core')
-
-    get_file_and_source = (filename)->
-        local file, source
-        if filename == 'stdin' or filename\match("%.nom$")
-            file = Files.read(filename)
-            if not file
-                error("File does not exist: #{filename}", 0)
-            source = Source(filename, 1, #file)
-        else return nil
-        source = Source(filename,1,#file)
-        return file, source
-
-    run_file = (filename, lua_handler=nil)->
-        file, source = get_file_and_source(filename)
-        return unless file
-        tree = nomsu\parse(file, source)
-        if tree
-            if tree.type != "FileChunks"
-                tree = {tree}
-            -- Each chunk's compilation is affected by the code in the previous chunks
-            -- (typically), so each chunk needs to compile and run before the next one
-            -- compiles.
-            for chunk in *tree
-                lua = nomsu\compile(chunk)\as_statements("return ")
-                lua\declare_locals!
-                lua\prepend "-- File: #{source.filename\gsub("\n.*", "...")}\n"
-                if lua_handler and input_files[filename] then lua_handler(tostring(lua))
-                nomsu\run_lua(lua)
-
-    parse_errs = {}
+        nomsu_environment.run_file_1_in 'core', nomsu_environment
+    
     for f in *file_queue
         for _,filename in Files.walk(f)
             continue unless filename == "stdin" or filename\match("%.nom$")
             if args.check_syntax
                 -- Check syntax
-                file, source = get_file_and_source(filename)
-                continue unless file
-                tree = nomsu\parse(file, source)
+                code = Files.read(filename)
+                source = Source(filename, 1, #code)
+                nomsu_environment._1_parsed(NomsuCode(source, code))
                 print("Parse succeeded: #{filename}")
-
-            if args.compile
+            elseif args.compile
                 -- Compile .nom files into .lua
                 output = if filename == 'stdin' then io.output()
                 else io.open(filename\gsub("%.nom$", ".lua"), "w")
-                run_file filename, (lua)->
+                code = Files.read(filename)
+                source = Source(filename, 1, #code)
+                code = NomsuCode(source, code)
+                tree = nomsu_environment._1_parsed(code)
+                tree = {tree} unless tree.type == 'FileChunks'
+                for chunk in *tree
+                    lua = nomsu_environment.compile(chunk)
+                    lua\declare_locals!
+                    nomsu_environment.run_1_in(chunk, nomsu_environment)
                     output\write(tostring(lua), "\n")
                     if args.verbose then print(tostring(lua))
                 print ("Compiled %-25s -> %s")\format(filename, filename\gsub("%.nom$", ".lua"))
                 output\close!
-
-            if not args.check_syntax and not args.compile
+            elseif args.verbose
+                code = Files.read(filename)
+                source = Source(filename, 1, #code)
+                code = NomsuCode(source, code)
+                tree = nomsu_environment._1_parsed(code)
+                tree = {tree} unless tree.type == 'FileChunks'
+                for chunk in *tree
+                    lua = nomsu_environment.compile(chunk)
+                    lua\declare_locals!
+                    nomsu_environment.run_1_in(chunk, nomsu_environment)
+                    print(tostring(lua))
+            else
                 -- Just run the file
-                run_file filename, (args.verbose and print or nil)
+                nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
 
     unless args.primary_file or args.exec_strings
-        -- Run in interactive mode (REPL)
-        nomsu\run [[
-#!/usr/bin/env nomsu -V4
-use "lib/consolecolor.nom"
-[quit, exit] all mean: lua> "os.exit(0)"
-(help) means:
-    say "\
-        ..This is the Nomsu v\(Nomsu version) interactive console.
-        You can type in Nomsu code here and hit 'enter' twice to run it.
-        To exit, type 'exit' or 'quit' and hit enter twice."
-
-say "\
-    ..
-    \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
-        press 'enter' twice to run a command
-    "]]
-        for repl_line=1,math.huge
-            io.write(colored.bright colored.yellow ">> ")
-            buff = {}
-            while true
-                io.write(colors.bright)
-                line = io.read("*L")
-                io.write(colors.reset)
-                if line == "\n" or not line
-                    if #buff > 0
-                        io.write("\027[1A\027[2K")
-                    break -- Run buffer
-                line = line\gsub("\t", "    ")
-                table.insert buff, line
-                io.write(colored.dim colored.yellow ".. ")
-            if #buff == 0
-                break -- Exit
-            
-            buff = table.concat(buff)
-
-            -- TODO: support local variables
-            pseudo_filename = "user input #"..repl_line
-            Files.spoof(pseudo_filename, buff)
-            err_hand = (error_message)->
-                Errhand.print_error error_message
-            ok, ret = xpcall nomsu.run, err_hand, nomsu, NomsuCode(Source(pseudo_filename,1,#buff), buff)
-            if ok and ret != nil
-                if type(ret) == 'number'
-                    print "= #{ret}"
-                else
-                    print "= #{ret\as_nomsu!}"
-            elseif not ok
-                Errhand.print_error ret
+        nomsu_environment.run_file_1_in("tools/repl.nom", nomsu_environment)
 
 debugger = if args.debugger == "nil" then {}
 else require(args.debugger or 'error_handling')

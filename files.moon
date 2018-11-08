@@ -16,16 +16,22 @@ _FILE_CACHE = setmetatable {}, __index:_SPOOFED_FILES
 _BROWSE_CACHE = {}
 
 -- Create a fake file and put it in the cache
+_anon_number = 0
 Files.spoof = (filename, contents)->
+    if not contents
+        filename, contents = "<anonymous file ##{_anon_number}>", filename
+        _anon_number += 1
     _SPOOFED_FILES[filename] = contents
-    return contents
+    return filename
 
 -- Read a file's contents (searching first locally, then in the nomsupath)
 Files.read = (filename)->
     if file_contents = _FILE_CACHE[filename]
         return file_contents
     if filename == 'stdin'
-        return Files.spoof('stdin', io.read('*a'))
+        contents = io.read('*a')
+        Files.spoof('stdin', contents)
+        return contents
     file = io.open(filename)
     return nil unless file
     contents = file\read("*a")

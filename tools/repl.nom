@@ -1,0 +1,61 @@
+#!/usr/bin/env nomsu -V4
+use "lib/consolecolor.nom"
+use "lib/os.nom"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[quit, exit] all mean: lua> "os.exit(0)"
+
+(help) means:
+    say "\
+        ..This is the Nomsu v\(Nomsu version) interactive console.
+        You can type in Nomsu code here and hit 'enter' twice to run it.
+        To exit, type 'exit' or 'quit' and hit enter twice."
+
+say "\
+    ..
+    \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
+    press 'enter' twice to run a command
+    "
+
+%repl_line = 0
+repeat:
+    %repl_line += 1
+    %io.write (bright (yellow ">> "))
+    %buff = []
+    repeat:
+        %io.write (bright)
+        %line = (%io.read "*L")
+        %io.write (reset color)
+        if ((%line == "\n") or (not %line)):
+            if ((size of %buff) > 0):
+                %io.write "\027[1A\027[2K"
+            go to (run buffer)
+        %buff::add (%line::with "\t" -> "    ")
+        %io.write (dim (yellow ".. "))
+    
+    === (run buffer) ===
+    if ((size of %buff) == 0):
+        stop
+    
+    %buff = (%buff::joined)
+
+    # TODO: support local variables
+    spoof file %buff
+    try:
+        %ret = (run %buff)
+    ..and if it barfs %err:
+        say %err
+    ..or if it succeeds:
+        if (type of %ret) is:
+            "nil":
+                do nothing
+            "boolean":
+                say "= \("yes" if %ret else "no")"
+            "table":
+                if %ret.as_nomsu:
+                    say "= \(%ret::as nomsu)"
+                ..else:
+                    say "= \%ret"
+            else:
+                say "= \%ret"

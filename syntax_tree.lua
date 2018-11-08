@@ -22,6 +22,9 @@ as_lua = function(self)
       end
     end
   end
+  if self.as_lua then
+    return self:as_lua()
+  end
   return error("Not supported: " .. tostring(self))
 end
 local SyntaxTree

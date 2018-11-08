@@ -4,7 +4,9 @@
 
 use "core/metaprogramming.nom"
 
-(say %message) compiles to (..)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(say %message) compiles to:
     lua> "\
         ..if \%message.type == "Text" then
             return LuaCode(tree.source, "print(", \(%message as lua expr), ");");
@@ -12,7 +14,7 @@ use "core/metaprogramming.nom"
             return LuaCode(tree.source, "print(tostring(", \(%message as lua expr), "));");
         end"
 
-(ask %prompt) compiles to (..)
+(ask %prompt) compiles to:
     lua> "\
         ..if \%prompt.type == "Text" then
             return LuaCode.Value(tree.source, "(io.write(", \(%prompt as lua expr), ") and io.read())");

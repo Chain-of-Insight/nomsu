@@ -3,7 +3,7 @@
     This file defines actions for ANSI console color escape codes.
 
 test:
-    bright "\(green)Color test passed."
+    % = (bright "\(green)Color test passed.")
 %colors = {..}
     normal:0, "reset color":0, bright:1, bold:1, dim:2, italic:3, underscore:4
     "slow blink":5, "fast blink":6, reverse:7, inverse:7, inverted:7, hidden:8
@@ -16,7 +16,7 @@ for %name = %colornum in %colors:
     %colornum = "\%colornum"
     #(=lua "COMPILE_ACTIONS").%name = (..)
         [%nomsu, %tree] -> (Lua value "'\\027[\(%colornum)m'")
-    (=lua "COMPILE_ACTIONS")."\%name" = (..)
+    %compile.action.%name = (..)
         [%nomsu, %tree, %text] ->:
             if %text:
                 return (Lua value "('\\027[\(%colornum)m'..\(%text as lua expr)..'\\027[0m')")

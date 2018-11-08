@@ -4,6 +4,8 @@
 
 use "compatibility/compatibility.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 upgrade action [hash %, sha1 %] to "2.5.5.5" as (..)
     =lua "\
         ..\(base64 decode (hash %)):gsub('.', function(c) return ('%x02'):format(c) end)"

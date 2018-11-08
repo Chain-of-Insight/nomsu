@@ -7,6 +7,8 @@
 use "lib/os.nom"
 use "lib/consolecolor.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 %stub = (command line args).1
 say "Looking for stub: \%stub..."
 %files = ((command line args).% for % in 2 to (size of (command line args)))

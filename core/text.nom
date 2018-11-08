@@ -5,6 +5,8 @@
 
 use "core/metaprogramming.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 test:
     assume "\[1, 2, 3]" == "[1, 2, 3]"
     assume "foo = \(1 + 2)!" == "foo = 3!"
@@ -52,8 +54,8 @@ lua> "\
         };
         for name, e in pairs(escapes) do
             local lua = "'"..e.."'"
-            COMPILE_ACTIONS[name] = function(nomsu, tree)
-                return LuaCode.Value(tree.source, lua)
+            compile.action[name] = function(compile, tree)
+                return LuaCode(tree.source, lua)
             end
         end
     end"

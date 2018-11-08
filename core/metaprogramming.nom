@@ -3,7 +3,9 @@
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
 
-lua> "NOMSU_CORE_VERSION = 9"
+lua> "\
+    ..NOMSU_CORE_VERSION = 10
+    NOMSU_LIB_VERSION = 7"
 lua> "\
     ..do
         local mangle_index = 0
@@ -15,17 +17,18 @@ lua> "\
             end
         end
     end
-    COMPILE_ACTIONS["define mangler"] = function(nomsu, tree)
+    compile.action["define mangler"] = function(compile, tree)
         return LuaCode(tree.source, "local mangle = mangler()")
     end"
 
 lua> "\
-    ..COMPILE_ACTIONS["1 ->"] = function(nomsu, tree, \%args, \%body)
-        local lua = LuaCode.Value(tree.source, "(function(")
+    ..compile.action["1 ->"] = function(compile, tree, \%args, \%body)
+        local lua = LuaCode(tree.source, "(function(")
         if SyntaxTree:is_instance(\%args) and \%args.type == "Action" then \%args = \%args:get_args() end
-        local lua_args = table.map(\%args, function(a) return SyntaxTree:is_instance(a) and nomsu:compile(a):text() or a end)
+        local lua_args = table.map(\%args, function(a) return SyntaxTree:is_instance(a) and compile(a):text() or a end)
         lua:concat_append(lua_args, ", ")
-        local body_lua = SyntaxTree:is_instance(\%body) and nomsu:compile(\%body):as_statements("return ") or \%body
+        local body_lua = SyntaxTree:is_instance(\%body) and compile(\%body) or \%body
+        if SyntaxTree:is_instance(\%body) and \%body.type ~= "Block" then body_lua:prepend("return ") end
         body_lua:remove_free_vars(lua_args)
         body_lua:declare_locals()
         lua:append(")\\n    ", body_lua, "\\nend)")
@@ -33,10 +36,10 @@ lua> "\
     end"
 
 lua> "\
-    ..COMPILE_ACTIONS["what 1 compiles to"] = function(nomsu, tree, \%action)
-        local lua = LuaCode.Value(tree.source, "COMPILE_ACTIONS[", \%action.stub:as_lua(), "](")
-        local lua_args = table.map(\%action:get_args(), function(a) return nomsu:compile(a) end)
-        table.insert(lua_args, 1, "nomsu")
+    ..compile.action["what 1 compiles to"] = function(compile, tree, \%action)
+        local lua = LuaCode(tree.source, "compile.action[", \%action.stub:as_lua(), "](")
+        local lua_args = table.map(\%action:get_args(), function(a) return compile(a) end)
+        table.insert(lua_args, 1, "compile")
         table.insert(lua_args, 2, "tree")
         lua:concat_append(lua_args, ", ")
         lua:append(")")
@@ -46,10 +49,10 @@ lua> "\
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    (five) compiles to (Lua value "5")
+    (five) compiles to "5"
 test:
     assume ((five) == 5) or barf "Compile to expression failed."
-    (loc x) compiles to (Lua "local x = 99;")
+    (loc x) compiles to "local x = 99;"
 test:
     lua> "do"
     loc x
@@ -63,9 +66,12 @@ test:
     asdf
     assume (%tmp is (nil)) or barf "compile to is leaking variables"
 lua> "\
-    ..COMPILE_ACTIONS["1 compiles to"] = function(nomsu, tree, \%action, \%body)
-        local \%args = List{\(\%nomsu), \(\%tree), unpack(\%action:get_args())}
-        local lua = LuaCode(tree.source, "COMPILE_ACTIONS[", \%action.stub:as_lua(),
+    ..compile.action["1 compiles to"] = function(compile, tree, \%action, \%body)
+        local \%args = List{\(\%compile), \(\%tree), unpack(\%action:get_args())}
+        if \%body.type == "Text" then
+            \%body = SyntaxTree{source=\%body.source, type="Action", "Lua", \%body}
+        end
+        local lua = LuaCode(tree.source, "compile.action[", \%action.stub:as_lua(),
             "] = ", \(what (%args -> %body) compiles to))
         return lua
     end"
@@ -75,16 +81,16 @@ lua> "\
 (%actions all compile to %body) compiles to:
     lua> "\
         ..if \%actions.type ~= "List" then
-            nomsu:compile_error(\%actions, "This should be a list of actions.")
+            compile_error(\%actions, "This should be a list of actions.")
         end
         local lua = LuaCode(tree.source, \(what (%actions.1 compiles to %body) compiles to))
-        local \%args = List{\(\%nomsu), \(\%tree), unpack(\%actions[1]:get_args())}
+        local \%args = List{\(\%compile), \(\%tree), unpack(\%actions[1]:get_args())}
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local \%alias_args = List{\(\%nomsu), \(\%tree), unpack(alias:get_args())}
-            lua:append("\\nCOMPILE_ACTIONS[", alias.stub:as_lua(), "] = ")
+            local \%alias_args = List{\(\%compile), \(\%tree), unpack(alias:get_args())}
+            lua:append("\\ncompile.action[", alias.stub:as_lua(), "] = ")
             if \%alias_args == \%args then
-                lua:append("COMPILE_ACTIONS[", \%actions[1].stub:as_lua(), "]")
+                lua:append("compile.action[", \%actions[1].stub:as_lua(), "]")
             else
                 lua:append(\(what (%alias_args -> \(what %actions.1 compiles to)) compiles to))
             end
@@ -95,17 +101,17 @@ lua> "\
 
 (call %fn with %args) compiles to:
     lua> "\
-        ..local lua = LuaCode.Value(tree.source, nomsu:compile(\%fn), "(")
+        ..local lua = LuaCode(tree.source, compile(\%fn), "(")
         if \%args.type == 'List' then
-            lua:concat_append(table.map(\%args, function(a) return nomsu:compile(a) end), ", ")
+            lua:concat_append(table.map(\%args, function(a) return compile(a) end), ", ")
         else
-            lua:append('unpack(', nomsu:compile(\%args), ')')
+            lua:append('unpack(', compile(\%args), ')')
         end
         lua:append(")")
         return lua"
 
 test:
-    (foo %x) means (return "outer")
+    (foo %x) means "outer"
     with local [(foo %)'s meaning]:
         (foo %x) means:
             %y = (%x + 1)
@@ -162,7 +168,7 @@ test:
 
 test:
     assume (((say %)'s meaning) == (=lua "say"))
-(%action's meaning) compiles to (Lua value (%action.stub as lua id))
+(%action's meaning) compiles to (Lua (%action.stub as lua id))
 
 test:
     (swap %x and %y) parses as (..)
@@ -183,10 +189,10 @@ test:
     lua> "\
         ..local replacements = {}
         if \%actions.type ~= "List" then
-            nomsu:compile_error(\%actions, "This should be a list.")
+            compile_error(\%actions, "This should be a list.")
         end
         for i,arg in ipairs(\%actions[1]:get_args()) do
-            replacements[arg[1]] = nomsu:compile(arg):text()
+            replacements[arg[1]] = compile(arg):text()
         end
         local function make_tree(t)
             if SyntaxTree:is_instance(t) and t.type == "Var" then
@@ -227,27 +233,17 @@ test:
 
 [%action parses as %body] all parse as ([%action] all parse as %body)
 
-# TODO: add check for .is_value
-(%tree as lua expr) compiles to (..)
-    Lua value "nomsu:compile(\(=lua "nomsu:compile(\%tree, nil, true)"), nil, true)"
+(%tree as lua expr) compiles to "\
+    ..compile(\(=lua "compile(\%tree, nil, true)"), nil, true)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(%tree as lua) compiles to (Lua value "nomsu:compile(\(%tree as lua expr))")
-(%tree as lua statements) compiles to (..)
-    Lua value "nomsu:compile(\(%tree as lua expr)):as_statements()"
+(%tree as lua) compiles to "compile(\(%tree as lua expr))"
+(%tree as lua statements) compiles to "\
+    ..compile(\(%tree as lua expr)):as_statements()"
 
-(%tree as lua return) compiles to (..)
-    Lua value "nomsu:compile(\(%tree as lua expr)):as_statements('return ')"
-
-test:
-    assume ("\(\(foo \%x) as nomsu)" == "foo %x") or barf "\
-        ..action source code failed."
-(%tree as nomsu) compiles to (..)
-    Lua value "nomsu:tree_to_nomsu(\(%tree as lua expr))"
-
-(%tree as inline nomsu) compiles to (..)
-    Lua value "nomsu:tree_to_inline_nomsu(\(%tree as lua expr), true)"
+(%tree as lua return) compiles to "\
+    ..compile(\(%tree as lua expr)):as_statements('return ')"
 
 externally [%var as lua identifier, %var as lua id] all mean:
     lua> "\
@@ -256,7 +252,7 @@ externally [%var as lua identifier, %var as lua id] all mean:
         elseif SyntaxTree:is_instance(\%var) then
             local lua = \(%var as lua expr)
             if not lua:text():match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
-                nomsu:compile_error(\%var, "This is not a valid Lua identifier.")
+                compile_error(\%var, "This is not a valid Lua identifier.")
             end
             return lua
         else error("Unknown type: "..tostring(\%var))
@@ -264,15 +260,14 @@ externally [%var as lua identifier, %var as lua id] all mean:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(% is syntax tree) compiles to (Lua value "SyntaxTree:is_instance(\(% as lua expr))")
-(% is %kind syntax tree) compiles to (..)
-    Lua value "SyntaxTree:is_instance(\(% as lua expr), \(%kind as lua expr))"
+(% is syntax tree) compiles to "SyntaxTree:is_instance(\(% as lua expr))"
+externally (% is %kind syntax tree) means (..)
+    =lua "SyntaxTree:is_instance(\%) and \%.type == \%kind"
 
-(%tree with %t -> %replacement) compiles to (..)
-    Lua value "\
-        ..\(%tree as lua expr):map(function(\(%t as lua expr))
-            \(%replacement as lua return)
-        end)"
+(%tree with %t -> %replacement) compiles to "\
+    ..\(%tree as lua expr):map(function(\(%t as lua expr))
+        \(%replacement as lua return)
+    end)"
 
 externally (%tree with vars %replacements) means (..)
     =lua "\
@@ -282,22 +277,20 @@ externally (%tree with vars %replacements) means (..)
             end
         end)"
 
-(tree %tree with vars %replacements) compiles to (..)
-    Lua value "\
-        ..\(=lua "(\%tree):as_lua()"):map(function(t)
-            if t.type == "Var" then
-                return \(%replacements as lua expr)[t[1]]
-            end
-        end)"
+(tree %tree with vars %replacements) compiles to "\
+    ..\(=lua "(\%tree):as_lua()"):map(function(t)
+        if t.type == "Var" then
+            return \(%replacements as lua expr)[t[1]]
+        end
+    end)"
 
-(%tree has subtree %match_tree) compiles to (..)
-    Lua value "\
-        ..(function()
-            local match_tree = \(%match_tree as lua expr)
-            for subtree in coroutine.wrap(function() \(%tree as lua expr):map(coroutine.yield) end) do
-                if subtree == match_tree then return true end
-            end
-        end)()"
+(%tree has subtree %match_tree) compiles to "\
+    ..(function()
+        local match_tree = \(%match_tree as lua expr)
+        for subtree in coroutine.wrap(function() \(%tree as lua expr):map(coroutine.yield) end) do
+            if subtree == match_tree then return true end
+        end
+    end)()"
 
 externally (match %tree with %patt) means:
     lua> "\
@@ -339,7 +332,7 @@ test:
                 ..one
                 "two""
         ..== "\"one\\n\\\"two\\\"\""
-(quote %s) compiles to (Lua value "tostring(\(%s as lua expr)):as_lua()")
+(quote %s) compiles to (Lua "tostring(\(%s as lua expr)):as_lua()")
 
 test:
     assume (lua type of {}) == "table"
@@ -368,63 +361,43 @@ externally (type of %) means:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    assume ((parse "foo %") == \(foo \%))
-    %a = (parse "\\1")
-    %b = \(\(1))
-    assume ((parse "\\1") == \(\(1)))
-(parse %text) compiles to (Lua value "nomsu:parse(\(%text as lua expr))")
-(parse %text from %filename) compiles to (..)
-    Lua value "\
-        ..nomsu:parse(NomsuCode(Source(\(%filename as lua expr), 1, #\(%text as lua expr)), \(..)
-            %text as lua expr
-        ..))"
-
-test:
     assume ((run "return (2 + 99)") == 101)
     external %passed = (no)
     run "external %passed = (yes)"
     assume %passed
-(run %nomsu_code) compiles to (..)
-    Lua value "\
-        ..nomsu:run(NomsuCode(\(=lua "tostring(\(%nomsu_code.source)):as_lua()"), \(..)
-            %nomsu_code as lua expr
-        ..))"
+    assume (run \(return \(\(5) + \(5)))) == 10
+(run %nomsu_code) compiles to "\
+    ..run_1_in(\(%nomsu_code as lua expr), _ENV)"
 
-test:
-    assume ((\(\(5) + \(5)) as value) == 10) or barf "%tree as value failed."
-[run tree %tree, %tree as value] all compile to (..)
-    Lua value "nomsu:run(\(%tree as lua expr))"
-
-[compile %block, compiled %block, %block compiled] all compile to (..)
-    Lua value "nomsu:compile(\(%block as lua))"
+[compile %block, compiled %block, %block compiled] all compile to "\
+    ..compile(\(%block as lua))"
 
 # Return statement is wrapped in a do..end block because Lua is unhappy if you
     put code after a return statement, unless you wrap it in a block.
-(return) compiles to (Lua "do return; end")
-(return %return_value) compiles to (..)
-    Lua "do return \(%return_value as lua expr) end"
+(return) compiles to "do return; end"
+(return %return_value) compiles to "do return \(%return_value as lua expr) end"
 
 # Literals
-(yes) compiles to (Lua value "true")
-(no) compiles to (Lua value "false")
-[nothing, nil, null] all compile to (Lua value "nil")
-(Nomsu syntax version) compiles to (Lua value "NOMSU_SYNTAX_VERSION")
-(Nomsu compiler version) compiles to (Lua value "NOMSU_COMPILER_VERSION")
-(core version) compiles to (Lua value "NOMSU_CORE_VERSION")
-(lib version) compiles to (Lua value "NOMSU_LIB_VERSION")
-(command line args) compiles to (Lua value "arg")
+(yes) compiles to "true"
+(no) compiles to "false"
+[nothing, nil, null] all compile to "nil"
+(Nomsu syntax version) compiles to "NOMSU_SYNTAX_VERSION"
+(Nomsu compiler version) compiles to "NOMSU_COMPILER_VERSION"
+(core version) compiles to "NOMSU_CORE_VERSION"
+(lib version) compiles to "NOMSU_LIB_VERSION"
+(command line args) compiles to "command_line_args"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(with local compile actions %body) compiles to (..)
-    Lua "\
-        ..do
-            local nomsu = nomsu:fork()
-            local COMPILE_ACTIONS = nomsu.environment.COMPILE_ACTIONS
-            \(%body as lua statements)
-        end"
+(with local compile actions %body) compiles to "\
+    ..do
+        --local compile = _1_forked(compile)
+        local old_action = compile.action
+        compile.action = _1_forked(old_action)
+        \(%body as lua statements)
+        compile.action = old_action
+    end"
 
 externally (Nomsu version) means:
-    use "lib/version.nom"
     return "\
         ..\(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)"

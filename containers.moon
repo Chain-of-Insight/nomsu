@@ -164,7 +164,7 @@ do
         as_a_lua_identifier: as_lua_id, is_a_lua_identifier: is_lua_id,
         as_a_lua_id: as_lua_id, is_a_lua_id: is_lua_id,
         bytes_1_to: (start, stop)=> List{byte(tostring(@), start, stop)}
-        [as_lua_id "with 1 ->"]: gsub
+        [as_lua_id "with 1 ->"]: (...)-> (gsub(...))
         bytes: => List{byte(tostring(@), 1, -1)},
         lines: => List(lines(@))
         line: line

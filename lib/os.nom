@@ -69,3 +69,6 @@ externally (source lines of %tree) means:
             (line % in %file) for % in (line number of %source.start in %file) to (..)
                 line number of %source.stop in %file
         ..::joined with "\n"
+
+externally (spoof file %text) means (%Files.spoof %text)
+externally (spoof file %filename = %text) means (%Files.spoof %filename %text)

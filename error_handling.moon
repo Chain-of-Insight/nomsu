@@ -3,6 +3,15 @@ files = require "files"
 debug_getinfo = debug.getinfo
 export SOURCE_MAP
 
+RED = "\027[31m"
+BRIGHT_RED = "\027[31;1m"
+RESET = "\027[0m"
+YELLOW = "\027[33m"
+CYAN = "\027[36m"
+GREEN = "\027[32m"
+BLUE = "\027[34m"
+DIM = "\027[37;2m"
+
 ok, to_lua = pcall -> require('moonscript.base').to_lua
 if not ok then to_lua = -> nil
 MOON_SOURCE_MAP = setmetatable {},
@@ -40,7 +49,7 @@ debug.getinfo = (thread,f,what)->
     return info
 
 print_error = (error_message, start_fn, stop_fn)->
-    io.stderr\write("#{colored.red "ERROR:"} #{colored.bright colored.red (error_message or "")}\n")
+    io.stderr\write("#{RED}ERROR: #{BRIGHT_RED}#{error_message or ""}#{RESET}\n")
     io.stderr\write("stack traceback:\n")
 
     level = 1
@@ -76,10 +85,10 @@ print_error = (error_message, start_fn, stop_fn)->
             else "main chunk"
 
             if err_line = files.get_line(file, calling_fn.currentline)
-                offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)")))
-                line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}")
+                offending_statement = "#{BRIGHT_RED}#{err_line\match("^[ ]*(.*)")}#{RESET}"
+                line = "#{YELLOW}#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}#{RESET}"
             else
-                line = colored.yellow("#{filename}:#{calling_fn.currentline} in #{name}")
+                line = "#{YELLOW}#{filename}:#{calling_fn.currentline} in #{name}#{RESET}"
         else
             ok, file = pcall ->files.read(calling_fn.short_src)
             if not ok then file = nil
@@ -111,21 +120,21 @@ print_error = (error_message, start_fn, stop_fn)->
                 char = MOON_SOURCE_MAP[file][calling_fn.currentline]
                 line_num = 1
                 for _ in file\sub(1,char)\gmatch("\n") do line_num += 1
-                line = colored.cyan("#{calling_fn.short_src}:#{line_num} in #{name or '?'}")
+                line = "#{CYAN}#{calling_fn.short_src}:#{line_num} in #{name or '?'}#{RESET}"
             else
                 line_num = calling_fn.currentline
                 if calling_fn.short_src == '[C]'
-                    line = colored.green("#{calling_fn.short_src} in #{name or '?'}")
+                    line = "#{GREEN}#{calling_fn.short_src} in #{name or '?'}#{RESET}"
                 else
-                    line = colored.blue("#{calling_fn.short_src}:#{calling_fn.currentline} in #{name or '?'}")
+                    line = "#{BLUE}#{calling_fn.short_src}:#{calling_fn.currentline} in #{name or '?'}#{RESET}"
 
             if file
                 if err_line = files.get_line(file, line_num)
-                    offending_statement = colored.bright(colored.red(err_line\match("^[ ]*(.*)$")))
+                    offending_statement = "#{BRIGHT_RED}#{err_line\match("^[ ]*(.*)$")}#{RESET}"
                     line ..= "\n        "..offending_statement
         io.stderr\write(line,"\n")
         if calling_fn.istailcall
-            io.stderr\write("    #{colored.dim colored.white "  (...tail calls...)"}\n")
+            io.stderr\write("      #{DIM}(...tail calls...)#{RESET}\n")
         if calling_fn.func == stop_fn then break
 
     io.stderr\flush!

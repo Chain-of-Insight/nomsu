@@ -95,7 +95,7 @@ test:
                         return inst
                     end,
                 })
-                nomsu.environment[class.name:as_lua_id()] = class
+                _ENV[class.name:as_lua_id()] = class
                 class.__index = class
                 class.class = class
                 class.__tostring = function(inst)

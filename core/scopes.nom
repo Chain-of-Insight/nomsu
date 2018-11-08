@@ -7,6 +7,8 @@ use "core/operators.nom"
 use "core/collections.nom"
 use "core/control_flow.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 test:
     %x = "outer"
     with local %x:

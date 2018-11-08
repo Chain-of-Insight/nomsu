@@ -72,9 +72,9 @@ test:
                 lua:append("class.", fn_name)
             else
                 lua:append("function(")
-                lua:concat_append(table.map(\%alias_args, function(a) return nomsu:compile(a) end), ", ")
+                lua:concat_append(table.map(\%alias_args, function(a) return compile(a) end), ", ")
                 lua:append(")\\n    return class.", fn_name, "(")
-                lua:concat_append(table.map(\%args, function(a) return nomsu:compile(a) end), ", ")
+                lua:concat_append(table.map(\%args, function(a) return compile(a) end), ", ")
                 lua:append(")\\nend")
             end
         end
@@ -113,11 +113,11 @@ test:
                     end,
                 })
                 class.__members = \(%members as lua expr)
-                nomsu.environment[("a "..class.name):as_lua_id()] = class
-                nomsu.environment[("an "..class.name):as_lua_id()] = class
-                nomsu.environment[("a "..class.name.." with"):as_lua_id()] = class
-                nomsu.environment[("an "..class.name.." with"):as_lua_id()] = class
-                nomsu.environment[class.name:as_lua_id()] = function() return class end
+                _ENV[("a "..class.name):as_lua_id()] = class
+                _ENV[("an "..class.name):as_lua_id()] = class
+                _ENV[("a "..class.name.." with"):as_lua_id()] = class
+                _ENV[("an "..class.name.." with"):as_lua_id()] = class
+                _ENV[class.name:as_lua_id()] = function() return class end
                 class.__index = class
                 class.class = class
                 local dict_tostring = getmetatable(Dict{}).__tostring

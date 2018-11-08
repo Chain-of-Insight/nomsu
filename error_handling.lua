@@ -1,5 +1,13 @@
 local files = require("files")
 local debug_getinfo = debug.getinfo
+local RED = "\027[31m"
+local BRIGHT_RED = "\027[31;1m"
+local RESET = "\027[0m"
+local YELLOW = "\027[33m"
+local CYAN = "\027[36m"
+local GREEN = "\027[32m"
+local BLUE = "\027[34m"
+local DIM = "\027[37;2m"
 local ok, to_lua = pcall(function()
   return require('moonscript.base').to_lua
 end)
@@ -66,7 +74,7 @@ debug.getinfo = function(thread, f, what)
 end
 local print_error
 print_error = function(error_message, start_fn, stop_fn)
-  io.stderr:write(tostring(colored.red("ERROR:")) .. " " .. tostring(colored.bright(colored.red((error_message or "")))) .. "\n")
+  io.stderr:write(tostring(RED) .. "ERROR: " .. tostring(BRIGHT_RED) .. tostring(error_message or "") .. tostring(RESET) .. "\n")
   io.stderr:write("stack traceback:\n")
   local level = 1
   local found_start = false
@@ -126,10 +134,10 @@ print_error = function(error_message, start_fn, stop_fn)
           do
             local err_line = files.get_line(file, calling_fn.currentline)
             if err_line then
-              local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)")))
-              line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement))
+              local offending_statement = tostring(BRIGHT_RED) .. tostring(err_line:match("^[ ]*(.*)")) .. tostring(RESET)
+              line = tostring(YELLOW) .. tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement) .. tostring(RESET)
             else
-              line = colored.yellow(tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name))
+              line = tostring(YELLOW) .. tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. tostring(RESET)
             end
           end
         else
@@ -184,20 +192,20 @@ print_error = function(error_message, start_fn, stop_fn)
             for _ in file:sub(1, char):gmatch("\n") do
               line_num = line_num + 1
             end
-            line = colored.cyan(tostring(calling_fn.short_src) .. ":" .. tostring(line_num) .. " in " .. tostring(name or '?'))
+            line = tostring(CYAN) .. tostring(calling_fn.short_src) .. ":" .. tostring(line_num) .. " in " .. tostring(name or '?') .. tostring(RESET)
           else
             line_num = calling_fn.currentline
             if calling_fn.short_src == '[C]' then
-              line = colored.green(tostring(calling_fn.short_src) .. " in " .. tostring(name or '?'))
+              line = tostring(GREEN) .. tostring(calling_fn.short_src) .. " in " .. tostring(name or '?') .. tostring(RESET)
             else
-              line = colored.blue(tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name or '?'))
+              line = tostring(BLUE) .. tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name or '?') .. tostring(RESET)
             end
           end
           if file then
             do
               local err_line = files.get_line(file, line_num)
               if err_line then
-                local offending_statement = colored.bright(colored.red(err_line:match("^[ ]*(.*)$")))
+                local offending_statement = tostring(BRIGHT_RED) .. tostring(err_line:match("^[ ]*(.*)$")) .. tostring(RESET)
                 line = line .. ("\n        " .. offending_statement)
               end
             end
@@ -206,7 +214,7 @@ print_error = function(error_message, start_fn, stop_fn)
       end
       io.stderr:write(line, "\n")
       if calling_fn.istailcall then
-        io.stderr:write("    " .. tostring(colored.dim(colored.white("  (...tail calls...)"))) .. "\n")
+        io.stderr:write("      " .. tostring(DIM) .. "(...tail calls...)" .. tostring(RESET) .. "\n")
       end
       if calling_fn.func == stop_fn then
         break

@@ -424,7 +424,9 @@ do
         byte(tostring(self), start, stop)
       })
     end,
-    [as_lua_id("with 1 ->")] = gsub,
+    [as_lua_id("with 1 ->")] = function(...)
+      return (gsub(...))
+    end,
     bytes = function(self)
       return List({
         byte(tostring(self), 1, -1)

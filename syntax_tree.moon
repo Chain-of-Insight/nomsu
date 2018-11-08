@@ -10,6 +10,7 @@ as_lua = =>
     if mt = getmetatable(@)
         if _as_lua = mt.as_lua
             return _as_lua(@)
+    return @as_lua! if @as_lua
     error("Not supported: #{@}")
 
 --types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",

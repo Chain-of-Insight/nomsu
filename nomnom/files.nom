@@ -2,6 +2,8 @@
 # Some file utilities for searching for files recursively and using package.nomsupath
 use "lib/os.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 %_SPOOFED_FILES = {}
 %_FILE_CACHE = ({} with fallback % -> %_SPOOFED_FILES.%)
 %_BROWSE_CACHE = {}

@@ -25,9 +25,14 @@ local _FILE_CACHE = setmetatable({ }, {
   __index = _SPOOFED_FILES
 })
 local _BROWSE_CACHE = { }
+local _anon_number = 0
 Files.spoof = function(filename, contents)
+  if not contents then
+    filename, contents = "<anonymous file #" .. tostring(_anon_number) .. ">", filename
+    _anon_number = _anon_number + 1
+  end
   _SPOOFED_FILES[filename] = contents
-  return contents
+  return filename
 end
 Files.read = function(filename)
   do
@@ -37,7 +42,9 @@ Files.read = function(filename)
     end
   end
   if filename == 'stdin' then
-    return Files.spoof('stdin', io.read('*a'))
+    local contents = io.read('*a')
+    Files.spoof('stdin', contents)
+    return contents
   end
   local file = io.open(filename)
   if not (file) then

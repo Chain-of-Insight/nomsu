@@ -114,14 +114,15 @@ index_chain (IndexChain):
 -- Actions need either at least 1 word, or at least 2 tokens
 inline_action (Action):
     !section_division
-    ({:target: inline_arg :} ws* "::" ws*)?
+    ({:target: (inline_expression / "(" inline_block ")") :} ws* "::" ws*)?
     (   (inline_arg (ws* (inline_arg / word))+)
       / (word       (ws* (inline_arg / word))*))
     (ws* inline_block)?
 inline_arg: inline_expression / inline_block
 action (Action):
     !section_division
-    ({:target: arg :} ((ws* "\")? eol nl_nodent "..")? ws* "::" ((ws* "\")? eol nl_nodent "..")? ws*)?
+    ({:target: (expression / "(" inline_block ")" / indented_block) :}
+        ((ws* "\")? eol nl_nodent "..")? ws* "::" ((ws* "\")? eol nl_nodent "..")? ws*)?
     (  (arg  (((ws* "\")? eol nl_nodent "..")? ws* (arg / word))+)
      / (word (((ws* "\")? eol nl_nodent "..")? ws* (arg / word))*))
 arg: expression / inline_block / indented_block
@@ -190,8 +191,8 @@ indented_list (List):
     (","? unexpected_code)?
 list_line:
       (inline_list_item ws* "," ws*)+ eol
-    / (inline_list_item ws* "," ws*)* (action / expression) eol
-inline_list_item: inline_action / inline_expression
+    / (inline_list_item ws* "," ws*)* (action / expression / inline_block / indented_block) eol
+inline_list_item: inline_action / inline_expression / inline_block
 
 inline_dict (Dict):
     !('{..}')
@@ -206,10 +207,14 @@ indented_dict (Dict):
 dict_line:
       (inline_dict_entry ws* "," ws*)+ eol
     / (inline_dict_entry ws* "," ws*)* dict_entry eol
-dict_entry(DictEntry):
+_dict_entry(DictEntry):
     dict_key (ws* ":" ws* (action / expression))?
-inline_dict_entry(DictEntry):
+dict_entry:
+    _dict_entry / inline_block / indented_block
+_inline_dict_entry(DictEntry):
     dict_key (ws* ":" ws* (inline_action / inline_expression)?)?
+inline_dict_entry:
+    _inline_dict_entry / inline_block
 dict_key:
     text_word / inline_expression
 

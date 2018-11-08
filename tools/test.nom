@@ -6,6 +6,8 @@
 use "lib/os.nom"
 use "lib/consolecolor.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 %args = (command line args)
 if (%args.1 == "-v"):
     %args::remove index 1

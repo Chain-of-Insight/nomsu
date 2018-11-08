@@ -265,6 +265,10 @@ do
     end
   })
   _base_0.__class = _class_0
+  local self = _class_0
+  self.is_instance = function(self, x)
+    return type(x) == 'table' and x.__class == self
+  end
   Code = _class_0
 end
 do
@@ -373,7 +377,7 @@ do
       if suffix == nil then
         suffix = ";"
       end
-      if not (self.is_value) then
+      if self:text():matches(";$") or self:text() == "" then
         return self
       end
       local statements = LuaCode(self.source)
@@ -415,7 +419,6 @@ do
       }
     end,
     parenthesize = function(self)
-      assert(self.is_value, "Cannot parenthesize lua statements")
       self:prepend("(")
       return self:append(")")
     end
@@ -426,7 +429,6 @@ do
     __init = function(self, ...)
       _class_0.__parent.__init(self, ...)
       self.free_vars = { }
-      self.is_value = false
     end,
     __base = _base_0,
     __name = "LuaCode",
@@ -450,12 +452,6 @@ do
     end
   })
   _base_0.__class = _class_0
-  local self = _class_0
-  self.Value = function(...)
-    local lua = LuaCode(...)
-    lua.is_value = true
-    return lua
-  end
   if _parent_0.__inherited then
     _parent_0.__inherited(_parent_0, _class_0)
   end

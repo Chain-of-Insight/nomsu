@@ -3,6 +3,8 @@
 use "nomnom/code_obj.nom"
 use "nomnom/parser.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # TODO: maybe re-implement the fancy coroutine checker that aborts early if nomsu gets too long
 externally (%tree decompiled inline) means:
     assume (%tree is a "Syntax Tree")
@@ -175,10 +177,10 @@ externally (%tree decompiled) means:
         "FileChunks":
             (%1 and %2 should clump) means:
                 if ((%1.type == "Action") and (%2.type == "Action")):
-                    if (%1.stub == "use 1"):
-                        return (%2.stub == "use 1")
-                    if (%1.stub == "test 1"): return (yes)
-                    if (%2.stub == "test 1"): return (no)
+                    if (%1.stub == "use"):
+                        return (%2.stub == "use")
+                    if (%1.stub == "test"): return (yes)
+                    if (%2.stub == "test"): return (no)
                 
                 return (not ((recurse on %1)::is multi-line))
             
@@ -199,14 +201,12 @@ externally (%tree decompiled) means:
             return %nomsu
         
         "Action":
-            %pos = %tree.source.start
             %next_space = ""
             if %tree.target:
                 %target_nomsu = (recurse on %tree.target)
                 if ((%tree.target.type == "Action") and (%target_nomsu::is one line)):
                     %target_nomsu::parenthesize
                 %nomsu::add %target_nomsu
-                %pos = %tree.target.source.stop
                 %next_space = ("\n..::" if (%target_nomsu::is multi-line) else "::")
             
             for %bit in %tree at %i:
@@ -290,8 +290,9 @@ externally (%tree decompiled) means:
                                 "Var":
                                     if ((%tree.(%i+1) is text) and (not (%tree.(%i+1)::matches "^[ \n\t,.:#(){}[%]]"))):
                                         %interp_nomsu::parenthesize
-                                
                                 "List" "Dict":
+                                    do nothing
+                                else:
                                     %interp_nomsu::parenthesize
                         
                         %nomsu::add %interp_nomsu

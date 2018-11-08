@@ -4,6 +4,8 @@ use "nomnom/code_obj.nom"
 use "nomnom/parser.nom"
 use "nomnom/pretty_errors.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 externally (report compile error at %tree %err) means:
     barf (pretty "Compile Error" error at %tree %err)
 

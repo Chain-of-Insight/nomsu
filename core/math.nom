@@ -8,6 +8,8 @@ use "core/operators.nom"
 use "core/control_flow.nom"
 use "core/collections.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # Literals:
 test:
     assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf "\
@@ -204,7 +206,7 @@ test:
         return %best
 
 # Random functions
-externally (seed random with %) means (..)
+externally (seed random with %) means:
     lua> "\
         ..math.randomseed(\%);
         for i=1,20 do math.random(); end"

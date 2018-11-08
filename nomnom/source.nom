@@ -1,6 +1,8 @@
 #!/usr/bin/env nomsu -V4.8.10
 use "lib/object.nom"
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 object (Source):
     externally (Source from text %text) means:
         %match = (%text::matching groups "^@(.-)%[(%d+):(%d+)%]$")
