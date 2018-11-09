@@ -29,17 +29,19 @@ test:
     %こんにちは = "こんにちは"
     (% と言う) とは "\(%)世界"
     assume (%こんにちは と言う) == "こんにちは世界"
-(%expr for %match in %text matching %patt) compiles to (..)
-    Lua value "\
-        ..(function()
-            local ret = _List{}
-            for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(..)
-            %patt as lua expr
-        ..) do
-                ret[#ret+1] = \(%expr as lua statements)
-            end
-            return ret
-        end)()"
+(%expr for %match in %text matching %patt) compiles to:
+    define mangler
+    return (..)
+        Lua "\
+            ..(function()
+                local \(mangle "comprehension") = _List{}
+                for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(..)
+                %patt as lua expr
+            ..) do
+                    \(mangle "comprehension")[#\(mangle "comprehension")+1] = \(%expr as lua statements)
+                end
+                return \(mangle "comprehension")
+            end)()"
 
 test:
     assume "\n" == (newline)

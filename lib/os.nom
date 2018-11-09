@@ -21,23 +21,21 @@ externally (read file %filename) means (=lua "Files.read(\%filename)")
 
 test:
     for file %f in "core": do nothing
-(for file %f in %path %body) compiles to (..)
-    Lua "\
-        ..for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
-            \(%body as lua statements)
-            \(what (===next %f ===) compiles to)
-        end
-        \(what (===stop %f ===) compiles to)"
+(for file %f in %path %body) compiles to "\
+    ..for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
+        \(%body as lua statements)
+        \(what (===next %f ===) compiles to)
+    end
+    \(what (===stop %f ===) compiles to)"
 
-(%expr for file %f in %path) compiles to (..)
-    Lua value "\
-        ..(function()
-            local ret = List{}
-            for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
-                ret[#ret+1] = \(%expr as lua statements)
-            end
-            return ret
-        end)()"
+(%expr for file %f in %path) compiles to "\
+    ..(function()
+        local ret = List{}
+        for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
+            ret[#ret+1] = \(%expr as lua statements)
+        end
+        return ret
+    end)()"
 
 externally [..]
     write to file %filename %text, to file %filename write %text

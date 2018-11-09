@@ -45,7 +45,8 @@ class SyntaxTree
         f = Files.read(s.filename)
         return f
     })
-    get_source_code: => @@source_code_for_tree[@]
+    get_source_file: => @@source_code_for_tree[@]
+    get_source_code: => @@source_code_for_tree[@]\sub(@source.start, @source.stop)
     map: (fn)=>
         replacement = fn(@)
         if replacement == false then return nil

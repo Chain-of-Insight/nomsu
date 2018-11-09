@@ -256,7 +256,7 @@ Files.get_line = function(str, line_no)
   if not (stop) then
     return 
   end
-  return str:sub(start, stop - 2)
+  return (str:sub(start, stop - 2))
 end
 local get_lines = re.compile([[    lines <- {| line (%nl line)* |}
     line <- {[^%nl]*}

@@ -71,9 +71,8 @@ lua> "\
         if \%body.type == "Text" then
             \%body = SyntaxTree{source=\%body.source, type="Action", "Lua", \%body}
         end
-        local lua = LuaCode(tree.source, "compile.action[", \%action.stub:as_lua(),
+        return LuaCode(tree.source, "compile.action[", \%action.stub:as_lua(),
             "] = ", \(what (%args -> %body) compiles to))
-        return lua
     end"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -332,7 +331,7 @@ test:
                 ..one
                 "two""
         ..== "\"one\\n\\\"two\\\"\""
-(quote %s) compiles to (Lua "tostring(\(%s as lua expr)):as_lua()")
+(quote %s) compiles to "tostring(\(%s as lua expr)):as_lua()"
 
 test:
     assume (lua type of {}) == "table"

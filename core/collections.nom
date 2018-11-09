@@ -151,26 +151,25 @@ test:
     %t = {}
     set %t 's metatable to {__tostring:[%] -> "XXX"}
     assume ("\%t" == "XXX")
-(set %dict 's metatable to %metatable) compiles to (..)
-    Lua "setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
+(set %dict 's metatable to %metatable) compiles to "\
+    ..setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
 
-[% 's metatable, % 'metatable] all compile to (..)
-    Lua value "getmetatable(\(% as lua expr))"
+[% 's metatable, % 'metatable] all compile to "\
+    ..getmetatable(\(% as lua expr))"
 
 test:
     assume (({} with fallback % -> (% + 1)).10 == 11)
-(%dict with fallback %key -> %value) compiles to (..)
-    Lua value "\
-        ..(function(d)
-            local mt = {}
-            for k,v in pairs(getmetatable(d) or {}) do mt[k] = v end
-            mt.__index = function(self, \(%key as lua expr))
-                local value = \(%value as lua expr)
-                self[\(%key as lua expr)] = value
-                return value
-            end
-            return setmetatable(d, mt)
-        end)(\(%dict as lua expr))"
+(%dict with fallback %key -> %value) compiles to "\
+    ..(function(d)
+        local mt = {}
+        for k,v in pairs(getmetatable(d) or {}) do mt[k] = v end
+        mt.__index = function(self, \(%key as lua expr))
+            local value = \(%value as lua expr)
+            self[\(%key as lua expr)] = value
+            return value
+        end
+        return setmetatable(d, mt)
+    end)(\(%dict as lua expr))"
 
 # Sorting
 test:
@@ -182,7 +181,7 @@ test:
     %keys = {1:999, 2:0, 3:50}
     sort %x by % = %keys.%
     assume (%x == [2, 3, 1])
-(sort %items) compiles to (Lua "table.sort(\(%items as lua expr));")
+(sort %items) compiles to "table.sort(\(%items as lua expr));"
 [..]
     sort %items by %item = %key_expr, sort %items by %item -> %key_expr
 ..all parse as (..)

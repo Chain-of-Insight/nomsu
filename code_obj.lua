@@ -499,6 +499,7 @@ do
   NomsuCode = _class_0
 end
 Code.__base.add_1_joined_with = assert(Code.__base.concat_append)
+Code.__base.add = assert(Code.__base.append)
 return {
   Code = Code,
   NomsuCode = NomsuCode,

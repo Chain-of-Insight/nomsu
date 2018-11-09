@@ -255,5 +255,6 @@ class NomsuCode extends Code
     __len: Code.__len
 
 Code.__base.add_1_joined_with = assert Code.__base.concat_append
+Code.__base.add = assert Code.__base.append
 
 return {:Code, :NomsuCode, :LuaCode, :Source}

@@ -11,15 +11,14 @@ test:
     assume (all [1 < 2, 2 > 1, 1 <= 2, 2 >= 1, 1 == 1, 1 != 2])
 
 # Comparison Operators
-(%x < %y) compiles to (Lua value "(\(%x as lua expr) < \(%y as lua expr))")
-(%x > %y) compiles to (Lua value "(\(%x as lua expr) > \(%y as lua expr))")
-(%x <= %y) compiles to (Lua value "(\(%x as lua expr) <= \(%y as lua expr))")
-(%x >= %y) compiles to (Lua value "(\(%x as lua expr) >= \(%y as lua expr))")
-[%a is %b, %a == %b] all compile to (..)
-    Lua value "(\(%a as lua expr) == \(%b as lua expr))"
+(%x < %y) compiles to "(\(%x as lua expr) < \(%y as lua expr))"
+(%x > %y) compiles to "(\(%x as lua expr) > \(%y as lua expr))"
+(%x <= %y) compiles to "(\(%x as lua expr) <= \(%y as lua expr))"
+(%x >= %y) compiles to "(\(%x as lua expr) >= \(%y as lua expr))"
+[%a is %b, %a == %b] all compile to "(\(%a as lua expr) == \(%b as lua expr))"
 
-[%a isn't %b, %a is not %b, %a not= %b, %a != %b] all compile to (..)
-    Lua value "(\(%a as lua expr) ~= \(%b as lua expr))"
+[%a isn't %b, %a is not %b, %a not= %b, %a != %b] all compile to "\
+    ..(\(%a as lua expr) ~= \(%b as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -45,6 +44,7 @@ test:
     assume ((%y == 10) and (%x == 20)) or barf "swapping vars failed."
 
 # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
+# TODO: deprecate?
 (set %assignments) compiles to:
     assume (%assignments.type is "Dict") or barf "\
         ..Expected a Dict for the assignments part of '<- %' statement, not \%assignments"
@@ -143,7 +143,7 @@ test:
 test:
     assume ((5 wrapped around 2) == 1) or barf "mod not working"
 [%x wrapped around %y, %x mod %y] all compile to (..)
-    Lua value "((\(%x as lua expr)) % (\(%y as lua expr)))"
+    "((\(%x as lua expr)) % (\(%y as lua expr)))"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
@@ -187,8 +187,8 @@ test:
     assume (((no) and (barfer)) == (no))
     assume ((no) or (yes))
     assume ((yes) or (barfer))
-(%x and %y) compiles to (Lua value "(\(%x as lua expr) and \(%y as lua expr))")
-(%x or %y) compiles to (Lua value "(\(%x as lua expr) or \(%y as lua expr))")
+(%x and %y) compiles to "(\(%x as lua expr) and \(%y as lua expr))"
+(%x or %y) compiles to "(\(%x as lua expr) or \(%y as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -204,49 +204,39 @@ test:
 
 # Lua 5.3 introduced bit operators like | and &. Use them when possible, otherwise
     fall back to bit.bor(), bit.band(), etc.
-%use_bitops = ((is jit) or ((Lua version) == "Lua 5.2"))
-[NOT %, ~ %] all compile to (..)
-    Lua value (..)
-        (%use_bitops and "bit.bnot(\(% as lua expr))") or "~(\(% as lua expr))"
-
-[%a OR %b, %a | %b] all compile to (..)
-    Lua value (..)
-        (%use_bitops and "bit.bor(\(%a as lua expr), \(%b as lua expr))") or "\
-            ..(\(%a as lua expr) | \(%b as lua expr))"
-
-[%a XOR %b, %a ~ %b] all compile to (..)
-    Lua value (..)
-        (%use_bitops and "bit.bxor(\(%a as lua expr), \(%b as lua expr))") or "\
-            ..(\(%a as lua expr) ~ \(%b as lua expr))"
-
-[%a AND %b, %a & %b] all compile to (..)
-    Lua value (..)
-        (%use_bitops and "bit.band(\(%a as lua expr), \(%b as lua expr))") or "\
-            ..(\(%a as lua expr) & \(%b as lua expr))"
-
-[%x LSHIFT %shift, %x << %shift] all compile to (..)
-    Lua value (..)
-        (%use_bitops and "bit.lshift(\(%x as lua expr), \(%shift as lua expr))") or "\
-            ..(\(%x as lua expr) << \(%shift as lua expr))"
-
-[%x RSHIFT %shift, %x >> %shift] all compile to (..)
-    Lua value (..)
-        (%use_bitops and "bit.rshift(\(%x as lua expr), \(%shift as lua expr))") or "\
-            ..(\(%x as lua expr) >> \(%shift as lua expr))"
+lua> "if \((is jit) or ((Lua version) == "Lua 5.2")) then"
+[NOT %, ~ %] all compile to "bit.bnot(\(% as lua expr))"
+[%x OR %y, %x | %y] all compile to "bit.bor(\(%x as lua expr), \(%y as lua expr))"
+[%x XOR %y, %x ~ %y] all compile to "bit.bxor(\(%x as lua expr), \(%y as lua expr))"
+[%x AND %y, %x & %y] all compile to "bit.band(\(%x as lua expr), \(%y as lua expr))"
+[%x LSHIFT %shift, %x << %shift] all compile to "\
+    ..bit.lshift(\(%x as lua expr), \(%shift as lua expr))"
+[%x RSHIFT %shift, %x >> %shift] all compile to "\
+    ..bit.rshift(\(%x as lua expr), \(%shift as lua expr))"
+lua> "else"
+[NOT %, ~ %] all compile to "~(\(% as lua expr))"
+[%x OR %y, %x | %y] all compile to "(\(%x as lua expr) | \(%y as lua expr))"
+[%x XOR %y, %x ~ %y] all compile to "(\(%x as lua expr) ~ \(%y as lua expr))"
+[%x AND %y, %x & %y] all compile to "(\(%x as lua expr) & \(%y as lua expr))"
+[%x LSHIFT %shift, %x << %shift] all compile to "\
+    ..(\(%x as lua expr) << \(%shift as lua expr))"
+[%x RSHIFT %shift, %x >> %shift] all compile to "\
+    ..(\(%x as lua expr) >> \(%shift as lua expr))"
+lua> "end"
 
 # Unary operators
 test:
     assume ((- 5) == -5)
     assume ((not (yes)) == (no))
-(- %) compiles to (Lua value "(- \(% as lua expr))")
-(not %) compiles to (Lua value "(not \(% as lua expr))")
+(- %) compiles to "(- \(% as lua expr))"
+(not %) compiles to "(not \(% as lua expr))"
 
 test:
     assume ((size of [1, 2, 3]) == 3)
 [size of %list, size of %list, size of %list, size of %list] all compile to (..)
-    Lua value "(#\(%list as lua expr))"
+    "(#\(%list as lua expr))"
 
-(%list is empty) compiles to (Lua value "(#\(%list as lua expr) == 0)")
+(%list is empty) compiles to "(#\(%list as lua expr) == 0)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

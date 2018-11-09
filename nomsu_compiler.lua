@@ -50,12 +50,17 @@ compile_error = function(tree, err_msg, hint)
     title = "Compile error",
     error = err_msg,
     hint = hint,
-    source = tree:get_source_code(),
+    source = tree:get_source_file(),
     start = tree.source.start,
     stop = tree.source.stop,
     filename = tree.source.filename
   })
   return error(err_str, 0)
+end
+local tree_to_nomsu, tree_to_inline_nomsu
+do
+  local _obj_0 = require("nomsu_decompiler")
+  tree_to_nomsu, tree_to_inline_nomsu = _obj_0.tree_to_nomsu, _obj_0.tree_to_inline_nomsu
 end
 local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
 local compile_math_expression
@@ -125,9 +130,6 @@ local compile = setmetatable({
       end
       return operate_on_text(code)
     end,
-    ["Lua value"] = function(compile, tree, code)
-      return compile.action["Lua"](compile, tree, code)
-    end,
     ["lua >"] = function(compile, tree, code)
       if code.type ~= "Text" then
         return tree
@@ -159,7 +161,17 @@ local compile = setmetatable({
       return LuaCode(tree.source, "TESTS")
     end,
     ["test"] = function(compile, tree, body)
-      return LuaCode(tree.source, "TESTS[" .. tostring(tostring(tree.source):as_lua()) .. "] = ", body:as_lua())
+      if not (body.type == 'Block') then
+        compile_error(tree, "This should be a Block")
+      end
+      local test_nomsu = body:get_source_code():match(":[ ]*(.*)")
+      do
+        local indent = test_nomsu:match("\n([ ]*)")
+        if indent then
+          test_nomsu = test_nomsu:gsub("\n" .. indent, "\n")
+        end
+      end
+      return LuaCode(tree.source, "TESTS[" .. tostring(tostring(tree.source):as_lua()) .. "] = ", test_nomsu:as_lua())
     end,
     ["is jit"] = function(compile, tree, code)
       return LuaCode(tree.source, "jit")

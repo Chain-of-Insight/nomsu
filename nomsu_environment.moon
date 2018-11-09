@@ -75,7 +75,7 @@ nomsu_environment = Importer{
         if num_errs > 0
             err_strings = [pretty_error{
                     title:"Parse error"
-                    error:e.error, hint:e.hint, source:e\get_source_code!
+                    error:e.error, hint:e.hint, source:e\get_source_file!
                     start:e.source.start, stop:e.source.stop, filename:e.source.filename
                 } for i, e in ipairs(errs) when i <= 3]
             if num_errs > #err_strings
@@ -170,7 +170,7 @@ nomsu_environment = Importer{
     compile_error_at: (tree, err_msg, hint=nil)->
         err_str = pretty_error{
             title: "Compile error"
-            error:err_msg, hint:hint, source:tree\get_source_code!
+            error:err_msg, hint:hint, source:tree\get_source_file!
             start:tree.source.start, stop:tree.source.stop, filename:tree.source.filename
         }
         error(err_str, 0)

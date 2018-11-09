@@ -83,8 +83,11 @@ do
       end
       return "SyntaxTree{" .. tostring(table.concat(bits, ", ")) .. "}"
     end,
-    get_source_code = function(self)
+    get_source_file = function(self)
       return self.__class.source_code_for_tree[self]
+    end,
+    get_source_code = function(self)
+      return self.__class.source_code_for_tree[self]:sub(self.source.start, self.source.stop)
     end,
     map = function(self, fn)
       local replacement = fn(self)

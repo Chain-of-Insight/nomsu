@@ -6,11 +6,11 @@ use "core/metaprogramming.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(barf %msg) compiles to (Lua "error(\(=lua "\%msg and \(%msg as lua expr) or 'nil'"), 0);")
-(compile error at %tree %msg) compiles to (..)
-    Lua "nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr))"
-(compile error at %tree %msg hint %hint) compiles to (..)
-    Lua "nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr), \(%hint as lua expr))"
+(barf %msg) compiles to "error(\(=lua "\%msg and \(%msg as lua expr) or 'nil'"), 0);"
+(compile error at %tree %msg) compiles to "\
+    ..nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr))"
+(compile error at %tree %msg hint %hint) compiles to "\
+    ..nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr), \(%hint as lua expr))"
 
 (assume %condition) compiles to:
     lua> "\
@@ -36,11 +36,10 @@ use "core/metaprogramming.nom"
                 end
             end"
 
-(assume %condition or barf %message) compiles to (..)
-    Lua "\
-        ..if not \(%condition as lua expr) then
-            error(\(%message as lua expr), 0)
-        end"
+(assume %condition or barf %message) compiles to "\
+    ..if not \(%condition as lua expr) then
+        error(\(%message as lua expr), 0)
+    end"
 
 test:
     try (barf) and if it succeeds: barf "try failed."
@@ -59,29 +58,28 @@ test:
 [..]
     try %action and if it succeeds %success or if it barfs %msg %fallback
     try %action and if it barfs %msg %fallback or if it succeeds %success
-..all compile to (..)
-    Lua "\
-        ..do
-            local fell_through = false
-            local err, erred = nil, false
-            local ok, ret = xpcall(function()
-                \(%action as lua statements)
-                fell_through = true
-            end, function(\(=lua "\%fallback and \(%msg as lua expr) or ''"))
-                local ok, ret = pcall(function()
-                    \((=lua "\%fallback or \%msg") as lua statements)
-                end)
-                if not ok then err, erred = ret, true end
+..all compile to "\
+    ..do
+        local fell_through = false
+        local err, erred = nil, false
+        local ok, ret = xpcall(function()
+            \(%action as lua statements)
+            fell_through = true
+        end, function(\(=lua "\%fallback and \(%msg as lua expr) or ''"))
+            local ok, ret = pcall(function()
+                \((=lua "\%fallback or \%msg") as lua statements)
             end)
-            if ok then
-                \(%success as lua statements)
-                if not fell_through then
-                    return ret
-                end
-            elseif erred then
-                error(err, 0)
+            if not ok then err, erred = ret, true end
+        end)
+        if ok then
+            \(%success as lua statements)
+            if not fell_through then
+                return ret
             end
-        end"
+        elseif erred then
+            error(err, 0)
+        end
+    end"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

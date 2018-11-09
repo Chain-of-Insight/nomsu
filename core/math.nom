@@ -16,18 +16,18 @@ test:
         ..math constants failed"
     %nan = (NaN)
     assume (%nan != %nan) or barf "NaN failed"
-[infinity, inf] all compile to (Lua value "math.huge")
-[not a number, NaN, nan] all compile to (Lua value "(0/0)")
-[pi, Pi, PI] all compile to (Lua value "math.pi")
-[tau, Tau, TAU] all compile to (Lua value "(2*math.pi)")
-(golden ratio) compiles to (Lua value "((1+math.sqrt(5))/2)")
-(e) compiles to (Lua value "math.exp(1)")
+[infinity, inf] all compile to "math.huge"
+[not a number, NaN, nan] all compile to "(0/0)"
+[pi, Pi, PI] all compile to "math.pi"
+[tau, Tau, TAU] all compile to "(2*math.pi)"
+(golden ratio) compiles to "((1+math.sqrt(5))/2)"
+(e) compiles to "math.exp(1)"
 
 # Functions:
 test:
     assume (("5" as a number) == 5)
-[% as a number, % as number] all compile to (..)
-    Lua value "tonumber(\(% as lua expr))"
+((% as a number)'s meaning) = ((tonumber %)'s meaning)
+((% as number)'s meaning) = ((tonumber %)'s meaning)
 
 test:
     assume (..)
@@ -37,40 +37,40 @@ test:
             hyperbolic tangent 5, e^ 5, ln 5, log base 2 of 5, floor 5, ceiling 5, round 5
     ..or barf "math functions failed"
 [absolute value %, | % |, abs %] all compile to (..)
-    Lua value "math.abs(\(% as lua expr))"
+    "math.abs(\(% as lua expr))"
 
 [square root %, square root of %, √ %, sqrt %] all compile to (..)
-    Lua value "math.sqrt(\(% as lua expr))"
+    "math.sqrt(\(% as lua expr))"
 
-[sine %, sin %] all compile to (Lua value "math.sin(\(% as lua expr))")
-[cosine %, cos %] all compile to (Lua value "math.cos(\(% as lua expr))")
-[tangent %, tan %] all compile to (Lua value "math.tan(\(% as lua expr))")
-[arc sine %, asin %] all compile to (Lua value "math.asin(\(% as lua expr))")
-[arc cosine %, acos %] all compile to (Lua value "math.acos(\(% as lua expr))")
-[arc tangent %, atan %] all compile to (Lua value "math.atan(\(% as lua expr))")
+[sine %, sin %] all compile to "math.sin(\(% as lua expr))"
+[cosine %, cos %] all compile to "math.cos(\(% as lua expr))"
+[tangent %, tan %] all compile to "math.tan(\(% as lua expr))"
+[arc sine %, asin %] all compile to "math.asin(\(% as lua expr))"
+[arc cosine %, acos %] all compile to "math.acos(\(% as lua expr))"
+[arc tangent %, atan %] all compile to "math.atan(\(% as lua expr))"
 [arc tangent %y / %x, atan2 %y %x] all compile to (..)
-    Lua value "math.atan2(\(%y as lua expr), \(%x as lua expr))"
+    "math.atan2(\(%y as lua expr), \(%x as lua expr))"
 
 [hyperbolic sine %, sinh %] all compile to (..)
-    Lua value "math.sinh(\(% as lua expr))"
+    "math.sinh(\(% as lua expr))"
 
 [hyperbolic cosine %, cosh %] all compile to (..)
-    Lua value "math.cosh(\(% as lua expr))"
+    "math.cosh(\(% as lua expr))"
 
 [hyperbolic tangent %, tanh %] all compile to (..)
-    Lua value "math.tanh(\(% as lua expr))"
+    "math.tanh(\(% as lua expr))"
 
-[e^ %, exp %] all compile to (Lua value "math.exp(\(% as lua expr))")
+[e^ %, exp %] all compile to "math.exp(\(% as lua expr))"
 [natural log %, ln %, log %] all compile to (..)
-    Lua value "math.log(\(% as lua expr))"
+    "math.log(\(% as lua expr))"
 
 [log % base %base, log base %base of %] all compile to (..)
-    Lua value "math.log(\(% as lua expr), \(%base as lua expr))"
+    "math.log(\(% as lua expr), \(%base as lua expr))"
 
-(floor %) compiles to (Lua value "math.floor(\(% as lua expr))")
-[ceiling %, ceil %] all compile to (Lua value "math.ceil(\(% as lua expr))")
+(floor %) compiles to "math.floor(\(% as lua expr))"
+[ceiling %, ceil %] all compile to "math.ceil(\(% as lua expr))"
 [round %, % rounded] all compile to (..)
-    Lua value "math.floor(\(% as lua expr) + .5)"
+    "math.floor(\(% as lua expr) + .5)"
 
 test:
     assume ((463 to the nearest 100) == 500) or barf "rounding failed"
@@ -86,8 +86,11 @@ externally [all of %items, all %items] all mean:
 [all of %items, all %items] all compile to:
     unless (%items.type is "List"):
         return %tree
-    %clauses = (((% as lua expr)::text) for % in %items)
-    return (Lua value "(\(%clauses::joined with " and "))")
+    if ((size of %items) == 0): return (Lua "true")
+    %lua = (Lua "(")
+    %lua::add ((% as lua expr) for % in %items) joined with " and "
+    %lua::append ")"
+    return %lua
 [not all of %items, not all %items] all parse as (not (all of %items))
 
 externally [any of %items, any %items] all mean:
@@ -97,8 +100,11 @@ externally [any of %items, any %items] all mean:
 [any of %items, any %items] all compile to:
     unless (%items.type is "List"):
         return %tree
-    %clauses = (((% as lua expr)::text) for % in %items)
-    return (Lua value "(\(%clauses::joined with " or "))")
+    if ((size of %items) == 0): return (Lua "false")
+    %lua = (Lua "(")
+    %lua::add ((% as lua expr) for % in %items) joined with " or "
+    %lua::append ")"
+    return %lua
 [none of %items, none %items] all parse as (not (any of %items))
 
 # Sum/product
@@ -109,8 +115,11 @@ externally [sum of %items, sum %items] all mean:
 [sum of %items, sum %items] all compile to:
     unless (%items.type is "List"):
         return %tree
-    %clauses = (((% as lua expr)::text) for % in %items)
-    return (Lua value "(\(%clauses::joined with " + "))")
+    if ((size of %items) == 0): return (Lua "0")
+    %lua = (Lua "(")
+    %lua::add ((% as lua expr) for % in %items) joined with " + "
+    %lua::append ")"
+    return %lua
 
 externally [product of %items, product %items] all mean:
     %prod = 1
@@ -119,8 +128,11 @@ externally [product of %items, product %items] all mean:
 [product of %items, product %items] all compile to:
     unless (%items.type is "List"):
         return %tree
-    %clauses = (((% as lua expr)::text) for % in %items)
-    return (Lua value "(\(%clauses::joined with " * "))")
+    if ((size of %items) == 0): return (Lua "1")
+    %lua = (Lua "(")
+    %lua::add ((% as lua expr) for % in %items) joined with " * "
+    %lua::append ")"
+    return %lua
 
 externally [avg of %items, average of %items] all mean (..)
     (sum of %items) / (size of %items)
@@ -212,12 +224,12 @@ externally (seed random with %) means:
         for i=1,20 do math.random(); end"
 
 (seed random) parses as (seed random with (=lua "os.time()"))
-[random number, random, rand] all compile to (Lua value "math.random()")
+[random number, random, rand] all compile to "math.random()"
 [random int %n, random integer %n, randint %n] all compile to (..)
-    Lua value "math.random(\(%n as lua expr))"
+    "math.random(\(%n as lua expr))"
 
 [random from %low to %high, random number from %low to %high, rand %low %high] all \
-..compile to (Lua value "math.random(\(%low as lua expr), \(%high as lua expr))")
+..compile to "math.random(\(%low as lua expr), \(%high as lua expr))"
 
 externally [..]
     random choice from %elements, random choice %elements, random %elements

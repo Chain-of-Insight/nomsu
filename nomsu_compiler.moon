@@ -30,11 +30,11 @@ pretty_error = require("pretty_errors")
 compile_error = (tree, err_msg, hint=nil)->
     err_str = pretty_error{
         title: "Compile error"
-        error:err_msg, hint:hint, source:tree\get_source_code!
+        error:err_msg, hint:hint, source:tree\get_source_file!
         start:tree.source.start, stop:tree.source.stop, filename:tree.source.filename
     }
     error(err_str, 0)
-
+{:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
 
 -- This is a bit of a hack, but this code handles arbitrarily complex
 -- math expressions like 2*x + 3^2 without having to define a single
@@ -88,9 +88,6 @@ compile = setmetatable({
                 return lua
             return operate_on_text code
 
-        -- TODO: remove shim
-        ["Lua value"]: (compile, tree, code)-> compile.action["Lua"](compile, tree, code)
-
         ["lua >"]: (compile, tree, code)->
             if code.type != "Text"
                 return tree
@@ -116,8 +113,12 @@ compile = setmetatable({
 
         ["tests"]: (compile, tree)-> LuaCode(tree.source, "TESTS")
         ["test"]: (compile, tree, body)->
-            -- TODO: maybe go back to storing nomsu code instead of syntax tree
-            LuaCode tree.source, "TESTS[#{tostring(tree.source)\as_lua!}] = ", body\as_lua!
+            unless body.type == 'Block'
+                compile_error(tree, "This should be a Block")
+            test_nomsu = body\get_source_code!\match(":[ ]*(.*)")
+            if indent = test_nomsu\match("\n([ ]*)")
+                test_nomsu = test_nomsu\gsub("\n"..indent, "\n")
+            LuaCode tree.source, "TESTS[#{tostring(tree.source)\as_lua!}] = ", test_nomsu\as_lua!
 
         ["is jit"]: (compile, tree, code)-> LuaCode(tree.source, "jit")
         ["Lua version"]: (compile, tree, code)-> LuaCode(tree.source, "_VERSION")
