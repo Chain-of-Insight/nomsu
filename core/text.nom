@@ -38,7 +38,7 @@ test:
                 for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(..)
                 %patt as lua expr
             ..) do
-                    \(mangle "comprehension")[#\(mangle "comprehension")+1] = \(%expr as lua statements)
+                    \(mangle "comprehension")[#\(mangle "comprehension")+1] = \(%expr as lua)
                 end
                 return \(mangle "comprehension")
             end)()"

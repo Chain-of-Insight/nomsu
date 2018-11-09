@@ -94,7 +94,7 @@ test:
     assume ((%foozle == "inner") and (%y == "outer")) or barf "\
         ..'with external' failed."
 (with external %externs %body) compiles to:
-    %body_lua = (%body as lua statements)
+    %body_lua = (%body as lua)
     lua> "\
         ..\%body_lua:remove_free_vars(table.map(\%externs, function(v) return compile(v):text() end))"
     return %body_lua
@@ -109,7 +109,7 @@ test:
     assume (%x == 1) or barf "'with' scoping failed"
     assume (%z == (nil)) or barf "'with' scoping failed"
 (with %assignments %body) compiles to:
-    %lua = (%body as lua statements)
+    %lua = (%body as lua)
     lua> "\
         ..local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
         local vars = {}

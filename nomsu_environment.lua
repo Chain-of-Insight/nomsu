@@ -51,6 +51,7 @@ do
   local _obj_0 = require("nomsu_decompiler")
   tree_to_nomsu, tree_to_inline_nomsu = _obj_0.tree_to_nomsu, _obj_0.tree_to_inline_nomsu
 end
+local compile = require('nomsu_compiler')
 local nomsu_environment = Importer({
   NOMSU_COMPILER_VERSION = 12,
   NOMSU_SYNTAX_VERSION = max_parser_version,
@@ -105,7 +106,8 @@ local nomsu_environment = Importer({
   SOURCE_MAP = Importer({ }),
   _1_as_nomsu = tree_to_nomsu,
   _1_as_inline_nomsu = tree_to_inline_nomsu,
-  compile = require('nomsu_compiler'),
+  compile = compile,
+  _1_as_lua = compile,
   _1_forked = _1_forked,
   import_to_1_from = import_to_1_from,
   _1_parsed = function(nomsu_code)

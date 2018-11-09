@@ -101,7 +101,7 @@ test:
                 class.__tostring = function(inst)
                     return inst.name..getmetatable(_Dict{}).__tostring(inst)
                 end
-                \(%class_body as lua statements)
+                \(%class_body as lua)
                 for stub,metamethod in pairs(globals.METAMETHOD_MAP) do
                     class[metamethod] = class[stub:as_lua_id()]
                 end

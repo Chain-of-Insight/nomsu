@@ -267,7 +267,7 @@ say "The square root of 2 is \(square root of 2)"
 # Or to transform nomsu code into custom lua code using "compile % to %"
 (debug only %body) compiles to:
     if %DEBUG_ENABLED:
-        return (Lua "-- Debug code:\n\(%body as lua statements)")
+        return (Lua "-- Debug code:\n\(%body as lua)")
     ..else:
         return (Lua "-- (debug code removed for production)")
 

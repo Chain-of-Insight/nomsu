@@ -233,16 +233,9 @@ test:
 [%action parses as %body] all parse as ([%action] all parse as %body)
 
 (%tree as lua expr) compiles to "\
-    ..compile(\(=lua "compile(\%tree, nil, true)"), nil, true)"
+    ..compile(\(=lua "compile(\%tree, true)"), true)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-(%tree as lua) compiles to "compile(\(%tree as lua expr))"
-(%tree as lua statements) compiles to "\
-    ..compile(\(%tree as lua expr)):as_statements()"
-
-(%tree as lua return) compiles to "\
-    ..compile(\(%tree as lua expr)):as_statements('return ')"
 
 externally [%var as lua identifier, %var as lua id] all mean:
     lua> "\
@@ -265,7 +258,7 @@ externally (% is %kind syntax tree) means (..)
 
 (%tree with %t -> %replacement) compiles to "\
     ..\(%tree as lua expr):map(function(\(%t as lua expr))
-        \(%replacement as lua return)
+        \((%replacement as lua) if (%replacement.type == "Block") else ("return \(%replacement as lua expr)"))
     end)"
 
 externally (%tree with vars %replacements) means (..)
@@ -393,7 +386,7 @@ test:
         --local compile = _1_forked(compile)
         local old_action = compile.action
         compile.action = _1_forked(old_action)
-        \(%body as lua statements)
+        \(%body as lua)
         compile.action = old_action
     end"
 

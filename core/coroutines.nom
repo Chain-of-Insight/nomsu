@@ -18,11 +18,11 @@ test:
     assume (%nums == [4, 5, 6, 6, 6]) or barf "Coroutine iteration failed"
 [coroutine %body, generator %body] all compile to "\
     ..(function()
-        \(%body as lua statements)
+        \(%body as lua)
     end)"
 
 (-> %) compiles to "coroutine.yield(true, \((% as lua expr) if % else "nil"))"
 (for % in coroutine %co %body) compiles to "\
     ..for _junk,\(% as lua expr) in coroutine.wrap(\(%co as lua expr)) do
-        \(%body as lua statements)
+        \(%body as lua)
     end"

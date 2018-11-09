@@ -20,7 +20,7 @@ test:
         barf "conditional fail"
 (if %condition %if_body) compiles to "\
     ..if \(%condition as lua expr) then
-        \(%if_body as lua statements)
+        \(%if_body as lua)
     end"
 
 test:
@@ -31,9 +31,9 @@ test:
     if %condition %if_body else %else_body, unless %condition %else_body else %if_body
 ..all compile to "\
     ..if \(%condition as lua expr) then
-        \(%if_body as lua statements)
+        \(%if_body as lua)
     else
-        \(%else_body as lua statements)
+        \(%else_body as lua)
     end"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,7 +137,7 @@ test:
     %lua = (..)
         Lua "\
             ..while \(%condition as lua expr) do
-                \(%body as lua statements)"
+                \(%body as lua)"
     
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
@@ -165,7 +165,7 @@ test:
     define mangler
     %lua = (..)
         Lua "for \(mangle "i")=1,\(%n as lua expr) do\n    "
-    %lua::append (%body as lua statements)
+    %lua::append (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next repeat)):
@@ -216,7 +216,7 @@ test:
                 %step as lua expr
             .. do"
     
-    %lua::append "\n    " (%body as lua statements)
+    %lua::append "\n    " (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %var)):
@@ -256,7 +256,7 @@ test:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     %lua = (..)
         Lua "for \(mangle "i"),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do\n    "
-    %lua::append (%body as lua statements)
+    %lua::append (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %var)):
@@ -277,7 +277,7 @@ test:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     %lua = (..)
         Lua "for \(%i as lua identifier),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do\n    "
-    %lua::append (%body as lua statements)
+    %lua::append (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %var)):
@@ -318,7 +318,7 @@ test:
                 %iterable as lua expr
             ..) do"
     
-    %lua::append "\n    " (%body as lua statements)
+    %lua::append "\n    " (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     if (%body has subtree \(do next %key)):
@@ -387,7 +387,7 @@ test:
                     ..need a conditional block around it. Otherwise, make sure the 'else' \
                     ..block comes last."
             
-            %code::append "\nelse\n    " (%action as lua statements)
+            %code::append "\nelse\n    " (%action as lua)
             %else_allowed = (no)
         ..else:
             %code::append %clause " "
@@ -396,7 +396,7 @@ test:
                     %code::append " or "
                 %code::append (%line.%i as lua expr)
             
-            %code::append " then\n    " (%action as lua statements)
+            %code::append " then\n    " (%action as lua)
             %clause = "\nelseif"
     
     if ((size of "\%code") == 0):
@@ -445,7 +445,7 @@ test:
                     ..need a conditional block around it. Otherwise, make sure the 'else' \
                     ..block comes last."
             
-            %code::append "\nelse\n    " (%action as lua statements)
+            %code::append "\nelse\n    " (%action as lua)
             %else_allowed = (no)
         ..else:
             %code::append %clause " "
@@ -454,7 +454,7 @@ test:
                     %code::append " or "
                 %code::append "\(mangle "branch value") == " (%line.%i as lua expr)
             
-            %code::append " then\n    " (%action as lua statements)
+            %code::append " then\n    " (%action as lua)
             %clause = "\nelseif"
     
     if ((size of "\%code") == 0):
@@ -471,7 +471,7 @@ test:
 # Do/finally
 (do %action) compiles to "\
     ..do
-        \(%action as lua statements)
+        \(%action as lua)
     end -- do"
 
 test:
@@ -489,10 +489,10 @@ test:
             ..do
                 local \(mangle "fell_through") = false
                 local \(mangle "ok"), \(mangle "ret") = pcall(function()
-                    \(%action as lua statements)
+                    \(%action as lua)
                     \(mangle "fell_through") = true
                 end)
-                \(%final_action as lua statements)
+                \(%final_action as lua)
                 if not \(mangle "ok") then error(ret, 0) end
                 if not \(mangle "fell_through") then return ret end
             end"
@@ -525,7 +525,7 @@ test:
                     local \(mangle "stack \(%var.1)") = List{\(%structure as lua expr)}
                     while #\(mangle "stack \(%var.1)") > 0 do
                         \(%var as lua expr) = table.remove(\(mangle "stack \(%var.1)"), 1)
-                        \(%body as lua statements)"
+                        \(%body as lua)"
         if (%body has subtree \(do next)):
             %lua::append "\n        ::continue::"
         if (%body has subtree \(do next %var)):

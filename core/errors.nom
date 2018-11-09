@@ -63,16 +63,16 @@ test:
         local fell_through = false
         local err, erred = nil, false
         local ok, ret = xpcall(function()
-            \(%action as lua statements)
+            \(%action as lua)
             fell_through = true
         end, function(\(=lua "\%fallback and \(%msg as lua expr) or ''"))
             local ok, ret = pcall(function()
-                \((=lua "\%fallback or \%msg") as lua statements)
+                \((=lua "\%fallback or \%msg") as lua)
             end)
             if not ok then err, erred = ret, true end
         end)
         if ok then
-            \(%success as lua statements)
+            \(%success as lua)
             if not fell_through then
                 return ret
             end

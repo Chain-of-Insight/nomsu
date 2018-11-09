@@ -23,7 +23,7 @@ test:
     for file %f in "core": do nothing
 (for file %f in %path %body) compiles to "\
     ..for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
-        \(%body as lua statements)
+        \(%body as lua)
         \(what (===next %f ===) compiles to)
     end
     \(what (===stop %f ===) compiles to)"
@@ -32,7 +32,7 @@ test:
     ..(function()
         local ret = List{}
         for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
-            ret[#ret+1] = \(%expr as lua statements)
+            ret[#ret+1] = \(%expr as lua)
         end
         return ret
     end)()"

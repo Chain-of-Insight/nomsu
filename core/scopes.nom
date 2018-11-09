@@ -23,7 +23,7 @@ test:
     
     assume ((foo) == "outer foo")
 [with local %locals %body, with local %locals do %body] all compile to:
-    %body_lua = (%body as lua statements)
+    %body_lua = (%body as lua)
     if %locals.type is:
         "Dict":
             %body_lua = (..)

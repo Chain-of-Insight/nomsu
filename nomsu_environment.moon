@@ -31,6 +31,7 @@ for version=1,999
     Parsers[version] = make_parser(peg_contents, make_tree)
 
 {:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
+compile = require('nomsu_compiler')
 nomsu_environment = Importer{
     NOMSU_COMPILER_VERSION: 12, NOMSU_SYNTAX_VERSION: max_parser_version
     -- Lua stuff:
@@ -50,7 +51,7 @@ nomsu_environment = Importer{
 
     -- Nomsu functions:
     _1_as_nomsu:tree_to_nomsu, _1_as_inline_nomsu:tree_to_inline_nomsu
-    compile: require('nomsu_compiler')
+    compile: compile, _1_as_lua: compile,
     :_1_forked, :import_to_1_from
 
     _1_parsed: (nomsu_code)->
