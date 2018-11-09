@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     Find an action by its stub. Usage:
     nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
@@ -14,24 +14,24 @@ say "Looking for stub: \%stub..."
 %files = ((command line args).% for % in 2 to (size of (command line args)))
 for %path in %files:
     for file %filename in %path:
-        unless (%filename::matches "%.nom$") (do next %filename)
+        unless (%filename::matches "%.nom$"): do next %filename
         %file = (read file %filename)
+        %code = (%NomsuCode (%Source %filename 1 (size of %file)) %file)
         try:
-            %tree = (parse %file from %filename)
-        ..and if it barfs:
-            say (red "\%filename failed to parse")
+            %tree = (%code parsed)
+        ..and if it barfs %msg:
+            say (red "\%filename failed to parse:\n\%msg")
             %tree = (nil)
         unless %tree: do next %filename
         %results = []
         for %t in recursive %tree:
-            if (%t is "Action" syntax tree):
-                if (%t.stub is %stub):
-                    %line_num = (line number of %t.source.start in %file)
-                    %results::add {..}
-                        line: %line_num
-                        text: "\
-                            ..\(blue "\%filename:\%line_num:")
-                            \(yellow (source lines of %t))"
+            if ((%t is "Action" syntax tree) and (%t.stub is %stub)):
+                %line_num = (line number of %t.source.start in %file)
+                %results::add {..}
+                    line: %line_num
+                    text: "\
+                        ..\(blue "\%filename:\%line_num:")
+                        \(yellow (source lines of %t))"
             
             if (%t is syntax tree):
                 for %sub in %t: recurse %t on %sub

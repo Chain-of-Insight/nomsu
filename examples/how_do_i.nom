@@ -328,4 +328,4 @@ say (best of [2, -3, 4, -8] according to ((% squared)'s meaning))
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    say (best of [2, -3, 4, -8] where %x has score (%x * %x))
+say (best of [2, -3, 4, -8] where %x has score (%x * %x))
