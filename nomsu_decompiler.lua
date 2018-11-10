@@ -58,7 +58,7 @@ tree_to_inline_nomsu = function(tree)
     for i, bit in ipairs(tree) do
       if type(bit) == "string" then
         local clump_words
-        if type(tree[i - 1]) then
+        if type(tree[i - 1]) == 'string' then
           clump_words = is_operator(bit) ~= is_operator(tree[i - 1])
         else
           clump_words = is_operator(bit)
