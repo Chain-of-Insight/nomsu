@@ -239,7 +239,7 @@ tree_to_nomsu = function(tree)
           return false
         end
       end
-      return not recurse(prev_line):is_multiline()
+      return not tree_to_nomsu(prev_line):is_multiline()
     end
     for chunk_no, chunk in ipairs(tree) do
       if chunk_no > 1 then

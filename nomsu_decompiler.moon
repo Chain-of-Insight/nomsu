@@ -179,7 +179,7 @@ tree_to_nomsu = (tree)->
                     if prev_line.stub == "use" then return line.stub == "use"
                     if prev_line.stub == "test" then return true
                     if line.stub == "test" then return false
-                return not recurse(prev_line)\is_multiline!
+                return not tree_to_nomsu(prev_line)\is_multiline!
 
             for chunk_no, chunk in ipairs tree
                 nomsu\append "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1
