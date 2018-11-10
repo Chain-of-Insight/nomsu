@@ -160,7 +160,6 @@ nomsu_environment = Importer{
             error("Circular import detected:\n           "..circle\joined_with("\n..imports  "))
         _currently_running_files\add path
         mod = _1_forked(environment)
-        assert mod._1_parsed
         mod._ENV = mod
         for _,filename in Files.walk(path)
             continue unless filename == "stdin" or filename\match("%.nom$")

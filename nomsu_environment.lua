@@ -287,7 +287,6 @@ local nomsu_environment = Importer({
     end
     _currently_running_files:add(path)
     local mod = _1_forked(environment)
-    assert(mod._1_parsed)
     mod._ENV = mod
     for _, filename in Files.walk(path) do
       local _continue_0 = false
