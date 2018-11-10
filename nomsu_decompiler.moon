@@ -42,7 +42,7 @@ tree_to_inline_nomsu = (tree)->
                 if type(bit) == "string"
                     clump_words = if type(tree[i-1]) == 'string'
                         is_operator(bit) != is_operator(tree[i-1])
-                    else is_operator(bit)
+                    else bit == "'"
                     nomsu\append " " if i > 1 and not clump_words
                     nomsu\append bit
                 else

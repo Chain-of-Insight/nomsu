@@ -61,7 +61,7 @@ tree_to_inline_nomsu = function(tree)
         if type(tree[i - 1]) == 'string' then
           clump_words = is_operator(bit) ~= is_operator(tree[i - 1])
         else
-          clump_words = is_operator(bit)
+          clump_words = bit == "'"
         end
         if i > 1 and not clump_words then
           nomsu:append(" ")
