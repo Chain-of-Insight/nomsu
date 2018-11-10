@@ -365,8 +365,10 @@ test:
 
 # Return statement is wrapped in a do..end block because Lua is unhappy if you
     put code after a return statement, unless you wrap it in a block.
-(return) compiles to "do return; end"
-(return %return_value) compiles to "do return \(%return_value as lua expr) end"
+(return %return_value) compiles to "\
+    ..do return \(..)
+        =lua "\%return_value and \(%return_value as lua expr) or ''"
+    .. end"
 
 # Literals
 (yes) compiles to "true"

@@ -99,7 +99,7 @@ test:
                 class.__index = class
                 class.class = class
                 class.__tostring = function(inst)
-                    return inst.name..getmetatable(_Dict{}).__tostring(inst)
+                    return inst.name..getmetatable(Dict{}).__tostring(inst)
                 end
                 \(%class_body as lua)
                 for stub,metamethod in pairs(globals.METAMETHOD_MAP) do

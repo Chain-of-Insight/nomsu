@@ -36,7 +36,7 @@ test:
     return (..)
         Lua "\
             ..(function()
-                local \(mangle "comprehension") = _List{}
+                local \(mangle "comprehension") = List{}
                 for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(..)
                 %patt as lua expr
             ..) do

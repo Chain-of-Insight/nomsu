@@ -179,7 +179,7 @@ tree_to_inline_nomsu = function(tree)
   elseif "FileChunks" == _exp_0 then
     return error("Can't inline a FileChunks")
   elseif "Comment" == _exp_0 then
-    return nil
+    return NomsuCode:from(tree.source)
   elseif "Error" == _exp_0 then
     return error("Can't compile errors")
   else
@@ -397,7 +397,7 @@ tree_to_nomsu = function(tree)
     nomsu:append(": ", value_nomsu)
     return nomsu
   elseif "Comment" == _exp_0 then
-    nomsu:append("#", tree[1]:gsub("\n", "\n    "))
+    nomsu:append("#", (tree[1]:gsub("\n", "\n    ")))
     return nomsu
   elseif "IndexChain" == _exp_0 or "Number" == _exp_0 or "Var" == _exp_0 or "Comment" == _exp_0 or "Error" == _exp_0 then
     return tree_to_inline_nomsu(tree)

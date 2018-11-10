@@ -36,7 +36,7 @@ externally (upgrade action %stub to %version via %upgrade_fn) means:
                         return %replacements.(%t.1)
                     ..else:
                         external %needs_mangle = (yes)
-                        return "\(%t.type){source=\(quote "\(%t.source)"), \(quote (mangle %t.1))}"
+                        return "SyntaxTree{type=\(quote %t.type), source=\(quote "\(%t.source)"), \(quote (mangle %t.1))}"
                 
                 (%t is syntax tree):
                     %args = []
@@ -46,7 +46,7 @@ externally (upgrade action %stub to %version via %upgrade_fn) means:
                         ..else:
                             %args::add "\(%k)=\(make tree %v)"
                     
-                    return "\(%t.type){\(%args::joined with ", ")}"
+                    return "SyntaxTree{\(%args::joined with ", ")}"
                 
                 else: return (quote %t)
         

@@ -3,7 +3,7 @@
     This file defines upgrades from Nomsu <4.9 to 4.9
 use "compatibility/compatibility.nom"
 
-upgrade action "local action 1 2" to "4.9" via (..)
+upgrade action "local action" to "4.9" via (..)
     [%tree, %end_version] ->:
         %spec = %tree.3
         %body = %tree.4
@@ -16,20 +16,23 @@ upgrade action "local action 1 2" to "4.9" via (..)
             else:
                 return \(%spec means %body)
 
-upgrade action "action 1 2" to "4.9" via (..)
+upgrade action "action" to "4.9" via (..)
     [%tree, %end_version] ->:
         %spec = %tree.2
         %body = %tree.3
-        if %spec.type is:
-            "List":
-                if ((size of %spec) == 1):
-                    return \(externally %spec.1 means %body)
-                ..else:
-                    return \(externally %spec all mean %body)
-            else:
-                return \(externally %spec means %body)
+        if %body:
+            if %spec.type is:
+                "List":
+                    if ((size of %spec) == 1):
+                        return \(externally %spec.1 means %body)
+                    ..else:
+                        return \(externally %spec all mean %body)
+                else:
+                    return \(externally %spec means %body)
+        ..else:
+            return \(%spec's meaning)
 
-upgrade action "compile 1 to 2" to "4.9" via (..)
+upgrade action "compile 1 to" to "4.9" via (..)
     [%tree, %end_version] ->:
         %spec = %tree.2
         %body = %tree.4
@@ -42,7 +45,7 @@ upgrade action "compile 1 to 2" to "4.9" via (..)
             else:
                 return \(%spec compiles to %body)
 
-upgrade action "parse 1 as 2" to "4.9" via (..)
+upgrade action "parse 1 as" to "4.9" via (..)
     [%tree, %end_version] ->:
         %spec = %tree.2
         %body = %tree.4
@@ -56,6 +59,5 @@ upgrade action "parse 1 as 2" to "4.9" via (..)
                 return \(%spec parse as %body)
 
 upgrade action (compile as %) to "4.9" as (what % compiles to)
-upgrade action (action %) to "4.9" as (%'s meaning)
 upgrade action (remove action %) to "4.9" as ((%'s meaning) = (nil))
 upgrade action (if %) to "4.9" as (when %)

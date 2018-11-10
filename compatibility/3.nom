@@ -9,7 +9,7 @@ use "compatibility/compatibility.nom"
 upgrade action (method %spec %body) to "3" as (my action %spec %body)
 upgrade action (me) to "3" as %me
 upgrade action (@) to "3" as %me
-upgrade action "as 1 2" to "3" via (..)
+upgrade action "as" to "3" via (..)
     [] -> (..)
         barf "\
-            ..Object API has changed. Use (%obj::action 1 2) instead of (as %obj: action 1 2)"
+            ..Object API has changed. Use (%obj::action ...) instead of (as %obj: action ...)"

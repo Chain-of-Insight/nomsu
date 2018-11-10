@@ -8,7 +8,7 @@ use "compatibility/compatibility.nom"
 
 upgrade %tree to "2" as:
     unless (%tree is "Action" syntax tree): return
-    if (%tree.stub is "if % % else %"):
+    if (%tree.stub is "if 1 2 else"):
         %true_body = (%tree.3 upgraded)
         unless (%true_body is "Block" syntax tree):
             %true_body = \(: %true_body)
@@ -20,10 +20,10 @@ upgrade %tree to "2" as:
                 cond:%tree.2 upgraded, true_body:%true_body, false_body:%false_body
     
     %need_blocks = [..]
-        "if % %", "unless % %", "for % in % %", "for % = % in % %", "repeat while % %"
-        "repeat % times %", "repeat %", "repeat until % %", "for % in % to % by % %"
-        "for % in % to % via % %", "for % in % to % %", "for % % in % %"
-        "do %", "for % in recursive % %", "test %", "with % %", "result of %"
+        "if", "unless", "for 1 in", "for 1 = 2 in", "repeat while 1"
+        "repeat 1 times", "repeat", "repeat until 1", "for 1 in 2 to 3 by"
+        "for 1 in 2 to 3 via", "for 1 in 2 to", "for 1 2 in"
+        "do", "for 1 in recursive", "test", "with", "result of"
     
     for %n in %need_blocks:
         if (%tree.stub is %n):

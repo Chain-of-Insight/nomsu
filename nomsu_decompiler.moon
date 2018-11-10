@@ -137,7 +137,7 @@ tree_to_inline_nomsu = (tree)->
         
         when "Comment"
             -- TODO: implement?
-            return nil
+            return NomsuCode\from(tree.source)
         
         when "Error"
             error("Can't compile errors")
@@ -307,7 +307,7 @@ tree_to_nomsu = (tree)->
             return nomsu
 
         when "Comment"
-            nomsu\append "#", tree[1]\gsub("\n", "\n    ")
+            nomsu\append "#", (tree[1]\gsub("\n", "\n    "))
             return nomsu
         
         when "IndexChain", "Number", "Var", "Comment", "Error"

@@ -9,23 +9,22 @@ use "compatibility/compatibility.nom"
 upgrade %tree to "2.4" as:
     unless (%tree is "Action" syntax tree): return
     if %tree.stub is:
-        "when %":
+        "when":
             %conditions = []
             %new_lines = []
             %body = (..)
                 (%tree.2 upgraded) if (%tree.2 is "Block" syntax tree) else [%tree.2 upgraded]
             for %line in %body:
-                if:
-                    (not (%line is syntax tree)):
-                        compile error at %tree.source "WUT: %s"
+                when:
                     (not (%line is "Action" syntax tree)):
                         %new_lines::add %line
-                    (%line.stub is "* %"):
-                        %conditions::add %line.2
-                    (%line.stub == "* else %"):
+                    (%line.stub is "*"):
+                        if ((size of %line) == 2):
+                            %conditions::add %line.2
+                        ..else:
+                            %new_lines::add %line
+                    (%line.stub == "* else"):
                         %new_lines::add (\(else %block) with vars {block:%line.3})
-                    (%line.stub != "* % %"):
-                        %new_lines::add %line
                     else:
                         %conditions::add %line.2
                         %action = %line.3
@@ -36,23 +35,24 @@ upgrade %tree to "2.4" as:
                         %conditions = []
             
             return (..)
-                \(if %body) with vars {body:=lua "Block(\%tree[2].source, unpack(\%new_lines))"}
+                \(when %body) with vars {body:=lua "Block(\%tree[2].source, unpack(\%new_lines))"}
         
-        "when % is ? %" "when % = ? %":
+        "when 1 is ?" "when 1 = ?":
             %values = []
             %new_lines = []
             %body = (..)
                 (%tree.5 upgraded) if (%tree.5 is "Block" syntax tree) else [%tree.5 upgraded]
             for %line in %body:
-                if:
+                when:
                     (not (%line is "Action" syntax tree)):
                         %new_lines::add %line
-                    (%line.stub is "* %"):
-                        %values::add %line.2
-                    (%line.stub == "* else %"):
+                    (%line.stub is "*"):
+                        if ((size of %line) == 2):
+                            %values::add %line.2
+                        ..else:
+                            %new_lines::add %line
+                    (%line.stub == "* else"):
                         %new_lines::add (\(else %block) with vars {block:%line.3})
-                    (%line.stub != "* % %"):
-                        %new_lines::add %line
                     else:
                         %values::add %line.2
                         %action = %line.3
