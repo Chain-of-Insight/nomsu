@@ -202,7 +202,7 @@ tree_to_nomsu = function(tree)
       return (t:map(coroutine.yield) and nil)
     end) do
       if subtree.type == "Block" then
-        if #subtree > 1 or #tree_to_inline_nomsu(subtree):text() > 20 then
+        if #subtree > 1 then
           inline = false
         end
       end
@@ -231,36 +231,12 @@ tree_to_nomsu = function(tree)
     if tree.shebang then
       nomsu:append(tree.shebang, "\n")
     end
-    local should_clump
-    should_clump = function(prev_line, line)
-      if prev_line.type == "Action" and line.type == "Action" then
-        if prev_line.stub == "use" then
-          return line.stub == "use"
-        end
-        if prev_line.stub == "test" then
-          return true
-        end
-        if line.stub == "test" then
-          return false
-        end
-      end
-      return not tree_to_nomsu(prev_line):is_multiline()
-    end
     for chunk_no, chunk in ipairs(tree) do
       if chunk_no > 1 then
         nomsu:append("\n\n" .. tostring(("~"):rep(80)) .. "\n\n")
       end
       if chunk.type == "Block" then
-        for line_no, line in ipairs(chunk) do
-          if line_no > 1 then
-            if should_clump(chunk[line_no - 1], line) then
-              nomsu:append("\n")
-            else
-              nomsu:append("\n\n")
-            end
-          end
-          nomsu:append(tree_to_nomsu(line))
-        end
+        nomsu:append(NomsuCode:from(chunk.source, unpack(tree_to_nomsu(chunk).bits, 2)))
       else
         nomsu:append(tree_to_nomsu(chunk))
       end
@@ -279,25 +255,36 @@ tree_to_nomsu = function(tree)
       nomsu:append(target_nomsu)
       nomsu:append(target_nomsu:is_multiline() and "\n..::" or "::")
     end
+    local word_buffer = { }
     for i, bit in ipairs(tree) do
-      if type(bit) == "string" then
-        if next_space == " " then
-          local clump_words
-          if type(tree[i - 1]) == 'string' then
-            clump_words = is_operator(bit) ~= is_operator(tree[i - 1])
-          else
-            clump_words = bit == "'"
+      local _continue_0 = false
+      repeat
+        if type(bit) == "string" then
+          if #word_buffer > 0 and is_operator(bit) == is_operator(word_buffer[#word_buffer]) then
+            table.insert(word_buffer, " ")
           end
-          if clump_words then
-            next_space = ""
-          end
+          table.insert(word_buffer, bit)
+          _continue_0 = true
+          break
         end
-        nomsu:append(next_space, bit)
-        next_space = nomsu:trailing_line_len() > MAX_LINE and " \\\n.." or " "
-      else
+        if #word_buffer > 0 then
+          local words = table.concat(word_buffer)
+          if next_space == " " then
+            if nomsu:trailing_line_len() + #words > MAX_LINE then
+              next_space = " \\\n.."
+            elseif word_buffer[1] == "'" then
+              next_space = ""
+            end
+          end
+          nomsu:append(next_space, words)
+          word_buffer = { }
+          next_space = " "
+        end
         local bit_nomsu = recurse(bit)
-        if i < #tree and bit.type == "Block" and not bit_nomsu:is_multiline() then
-          bit_nomsu:parenthesize()
+        if bit.type == "Block" and not bit_nomsu:is_multiline() then
+          if #bit_nomsu:text() > nomsu:trailing_line_len() then
+            bit_nomsu = tree_to_nomsu(bit)
+          end
         end
         if next_space == " " and not bit_nomsu:is_multiline() and nomsu:trailing_line_len() + #bit_nomsu:text() > MAX_LINE then
           if bit.type == 'Action' then
@@ -310,8 +297,23 @@ tree_to_nomsu = function(tree)
           nomsu:append(next_space)
         end
         nomsu:append(bit_nomsu)
-        next_space = bit_nomsu:is_multiline() and "\n.." or " "
+        next_space = (bit_nomsu:is_multiline() or bit.type == 'Block') and "\n.." or " "
+        _continue_0 = true
+      until true
+      if not _continue_0 then
+        break
       end
+    end
+    if #word_buffer > 0 then
+      local words = table.concat(word_buffer)
+      if next_space == " " then
+        if nomsu:trailing_line_len() + #words > MAX_LINE then
+          next_space = " \\\n.."
+        elseif word_buffer[1] == "'" then
+          next_space = ""
+        end
+      end
+      nomsu:append(next_space, words)
     end
     return nomsu
   elseif "EscapedNomsu" == _exp_0 then
@@ -321,12 +323,20 @@ tree_to_nomsu = function(tree)
     end
     return NomsuCode:from(tree.source, "\\", nomsu)
   elseif "Block" == _exp_0 then
+    local prev_line, needs_space = nil, { }
     for i, line in ipairs(tree) do
       local line_nomsu = tree_to_nomsu(line)
-      nomsu:append(line_nomsu)
-      if i < #tree then
-        nomsu:append(line_nomsu:match('\n[^\n]*\n') and "\n\n" or "\n")
+      if i > 1 then
+        nomsu:append("\n")
+        if tree[i - 1].type ~= "Comment" then
+          needs_space[i] = (line_nomsu:is_multiline() and prev_line:is_multiline())
+          if tree[i].type == "Comment" or needs_space[i] or needs_space[i - 1] then
+            nomsu:append("\n")
+          end
+        end
       end
+      nomsu:append(line_nomsu)
+      prev_line = line_nomsu
     end
     return NomsuCode:from(tree.source, ":\n    ", nomsu)
   elseif "Text" == _exp_0 then

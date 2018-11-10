@@ -156,7 +156,7 @@ tree_to_nomsu = (tree)->
         inline = true
         for subtree in coroutine.wrap(-> (t\map(coroutine.yield) and nil))
             if subtree.type == "Block"
-                if #subtree > 1 or #tree_to_inline_nomsu(subtree)\text! > 20
+                if #subtree > 1
                     inline = false
         
         if inline
@@ -176,25 +176,14 @@ tree_to_nomsu = (tree)->
         when "FileChunks"
             if tree.shebang
                 nomsu\append tree.shebang, "\n"
-            should_clump = (prev_line, line)->
-                if prev_line.type == "Action" and line.type == "Action"
-                    if prev_line.stub == "use" then return line.stub == "use"
-                    if prev_line.stub == "test" then return true
-                    if line.stub == "test" then return false
-                return not tree_to_nomsu(prev_line)\is_multiline!
 
             for chunk_no, chunk in ipairs tree
                 nomsu\append "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1
                 if chunk.type == "Block"
-                    for line_no, line in ipairs chunk
-                        if line_no > 1
-                            if should_clump(chunk[line_no-1], line)
-                                nomsu\append "\n"
-                            else
-                                nomsu\append "\n\n"
-                        nomsu\append tree_to_nomsu(line)
+                    nomsu\append NomsuCode\from(chunk.source, table.unpack(tree_to_nomsu(chunk).bits, 2))
                 else
                     nomsu\append tree_to_nomsu(chunk)
+
             nomsu\append('\n') unless nomsu\match("\n$")
             return nomsu
 
@@ -207,30 +196,53 @@ tree_to_nomsu = (tree)->
                 nomsu\append target_nomsu
                 nomsu\append(target_nomsu\is_multiline! and "\n..::" or "::")
 
+            word_buffer = {}
             for i,bit in ipairs tree
                 if type(bit) == "string"
+                    if #word_buffer > 0 and is_operator(bit) == is_operator(word_buffer[#word_buffer])
+                        table.insert word_buffer, " "
+                    table.insert word_buffer, bit
+                    continue
+
+                if #word_buffer > 0
+                    words = table.concat(word_buffer)
                     if next_space == " "
-                        clump_words = if type(tree[i-1]) == 'string'
-                            is_operator(bit) != is_operator(tree[i-1])
-                        else bit == "'"
-                        next_space = "" if clump_words
-                    nomsu\append next_space, bit
-                    next_space = nomsu\trailing_line_len! > MAX_LINE and " \\\n.." or " "
-                else
-                    bit_nomsu = recurse(bit)
-                    if i < #tree and bit.type == "Block" and not bit_nomsu\is_multiline!
-                        bit_nomsu\parenthesize!
-
-                    if next_space == " " and not bit_nomsu\is_multiline! and nomsu\trailing_line_len! + #bit_nomsu\text! > MAX_LINE
-                        if bit.type == 'Action'
-                            bit_nomsu = NomsuCode\from bit.source, "(..)\n    ", tree_to_nomsu(bit)
-                        else
+                        if nomsu\trailing_line_len! + #words > MAX_LINE
                             next_space = " \\\n.."
-                    unless next_space == " " and bit.type == "Block"
-                        nomsu\append next_space
+                        elseif word_buffer[1] == "'"
+                            next_space = ""
+                    nomsu\append next_space, words
+                    word_buffer = {}
+                    next_space = " "
 
-                    nomsu\append bit_nomsu
-                    next_space = bit_nomsu\is_multiline! and "\n.." or " "
+                bit_nomsu = recurse(bit)
+                if bit.type == "Block" and not bit_nomsu\is_multiline!
+                    -- Rule of thumb: one-liner block arguments should be shorter
+                    -- than the proceeding part of the line
+                    if #bit_nomsu\text! > nomsu\trailing_line_len!
+                        bit_nomsu = tree_to_nomsu(bit)
+                    --else
+                    --    bit_nomsu\parenthesize!
+
+                if next_space == " " and not bit_nomsu\is_multiline! and nomsu\trailing_line_len! + #bit_nomsu\text! > MAX_LINE
+                    if bit.type == 'Action'
+                        bit_nomsu = NomsuCode\from bit.source, "(..)\n    ", tree_to_nomsu(bit)
+                    else
+                        next_space = " \\\n.."
+                unless next_space == " " and bit.type == "Block"
+                    nomsu\append next_space
+
+                nomsu\append bit_nomsu
+                next_space = (bit_nomsu\is_multiline! or bit.type == 'Block') and "\n.." or " "
+
+            if #word_buffer > 0
+                words = table.concat(word_buffer)
+                if next_space == " "
+                    if nomsu\trailing_line_len! + #words > MAX_LINE
+                        next_space = " \\\n.."
+                    elseif word_buffer[1] == "'"
+                        next_space = ""
+                nomsu\append next_space, words
 
             return nomsu
 
@@ -241,12 +253,19 @@ tree_to_nomsu = (tree)->
             return NomsuCode\from tree.source, "\\", nomsu
 
         when "Block"
+            prev_line, needs_space = nil, {}
             for i, line in ipairs tree
                 line_nomsu = tree_to_nomsu(line)
+                if i > 1
+                    nomsu\append "\n"
+                    -- Rule of thumb: add a blank line between two lines if both are
+                    -- multi-line non-comments, or if a comment comes after a non-comment.
+                    if tree[i-1].type != "Comment"
+                        needs_space[i] = (line_nomsu\is_multiline! and prev_line\is_multiline!)
+                        if tree[i].type == "Comment" or needs_space[i] or needs_space[i-1]
+                            nomsu\append "\n"
                 nomsu\append line_nomsu
-                if i < #tree
-                    -- number of lines > 2 (TODO: improve this)
-                    nomsu\append(line_nomsu\match('\n[^\n]*\n') and "\n\n" or "\n")
+                prev_line = line_nomsu
             return NomsuCode\from(tree.source, ":\n    ", nomsu)
 
         when "Text"
