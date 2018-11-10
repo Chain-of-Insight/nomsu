@@ -85,7 +85,7 @@ externally [all of %items, all %items] all mean:
     return (yes)
 [all of %items, all %items] all compile to:
     unless (%items.type is "List"):
-        return %tree
+        return \(all of %items)
     if ((size of %items) == 0): return (Lua "true")
     %lua = (Lua "(")
     %lua::add ((% as lua expr) for % in %items) joined with " and "
@@ -99,7 +99,7 @@ externally [any of %items, any %items] all mean:
     return (no)
 [any of %items, any %items] all compile to:
     unless (%items.type is "List"):
-        return %tree
+        return \(any of %items)
     if ((size of %items) == 0): return (Lua "false")
     %lua = (Lua "(")
     %lua::add ((% as lua expr) for % in %items) joined with " or "
@@ -114,7 +114,7 @@ externally [sum of %items, sum %items] all mean:
     return %total
 [sum of %items, sum %items] all compile to:
     unless (%items.type is "List"):
-        return %tree
+        return \(sum of %items)
     if ((size of %items) == 0): return (Lua "0")
     %lua = (Lua "(")
     %lua::add ((% as lua expr) for % in %items) joined with " + "
@@ -127,7 +127,7 @@ externally [product of %items, product %items] all mean:
     return %prod
 [product of %items, product %items] all compile to:
     unless (%items.type is "List"):
-        return %tree
+        return \(product of %items)
     if ((size of %items) == 0): return (Lua "1")
     %lua = (Lua "(")
     %lua::add ((% as lua expr) for % in %items) joined with " * "

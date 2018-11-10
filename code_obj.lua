@@ -110,9 +110,23 @@ do
       return self:text()
     end,
     as_lua = function(self)
-      return tostring(self.__class.__name) .. "(" .. tostring(concat({
-        tostring(self.source):as_lua(),
-        unpack((function()
+      if self.source then
+        return tostring(self.__class.__name) .. ":from(" .. tostring(concat({
+          tostring(self.source):as_lua(),
+          unpack((function()
+            local _accum_0 = { }
+            local _len_0 = 1
+            local _list_0 = self.bits
+            for _index_0 = 1, #_list_0 do
+              local b = _list_0[_index_0]
+              _accum_0[_len_0] = b:as_lua()
+              _len_0 = _len_0 + 1
+            end
+            return _accum_0
+          end)())
+        }, ", ")) .. ")"
+      else
+        return tostring(self.__class.__name) .. "(" .. tostring(concat((function()
           local _accum_0 = { }
           local _len_0 = 1
           local _list_0 = self.bits
@@ -122,8 +136,8 @@ do
             _len_0 = _len_0 + 1
           end
           return _accum_0
-        end)())
-      }, ", ")) .. ")"
+        end)(), ", ")) .. ")"
+      end
     end,
     __len = function(self)
       return #self:text()
@@ -246,12 +260,8 @@ do
   }
   _base_0.__index = _base_0
   _class_0 = setmetatable({
-    __init = function(self, source, ...)
-      self.source = source
+    __init = function(self, ...)
       self.bits = { }
-      if type(self.source) == 'string' then
-        self.source = Source:from_string(self.source)
-      end
       return self:append(...)
     end,
     __base = _base_0,
@@ -266,6 +276,14 @@ do
   })
   _base_0.__class = _class_0
   local self = _class_0
+  self.from = function(self, source, ...)
+    local inst = self(...)
+    if type(source) == 'string' then
+      source = Source:from_string(source)
+    end
+    inst.source = source
+    return inst
+  end
   self.is_instance = function(self, x)
     return type(x) == 'table' and x.__class == self
   end
@@ -370,27 +388,8 @@ do
       end
       return to_declare
     end,
-    as_statements = function(self, prefix, suffix)
-      if prefix == nil then
-        prefix = ""
-      end
-      if suffix == nil then
-        suffix = ";"
-      end
-      if self:text():matches(";$") or self:text() == "" then
-        return self
-      end
-      local statements = LuaCode(self.source)
-      if prefix ~= "" then
-        statements:append(prefix)
-      end
-      statements:append(self)
-      if suffix ~= "" then
-        statements:append(suffix)
-      end
-      return statements
-    end,
     make_offset_table = function(self)
+      assert(self.source, "This code doesn't have a source")
       local lua_to_nomsu, nomsu_to_lua = { }, { }
       local walk
       walk = function(lua, pos)

@@ -117,7 +117,7 @@ run = ->
                 -- Check syntax
                 code = Files.read(filename)
                 source = Source(filename, 1, #code)
-                nomsu_environment._1_parsed(NomsuCode(source, code))
+                nomsu_environment._1_parsed(NomsuCode\from(source, code))
                 print("Parse succeeded: #{filename}")
             elseif args.compile
                 -- Compile .nom files into .lua
@@ -125,7 +125,7 @@ run = ->
                 else io.open(filename\gsub("%.nom$", ".lua"), "w")
                 code = Files.read(filename)
                 source = Source(filename, 1, #code)
-                code = NomsuCode(source, code)
+                code = NomsuCode\from(source, code)
                 tree = nomsu_environment._1_parsed(code)
                 tree = {tree} unless tree.type == 'FileChunks'
                 for chunk in *tree
@@ -139,7 +139,7 @@ run = ->
             elseif args.verbose
                 code = Files.read(filename)
                 source = Source(filename, 1, #code)
-                code = NomsuCode(source, code)
+                code = NomsuCode\from(source, code)
                 tree = nomsu_environment._1_parsed(code)
                 tree = {tree} unless tree.type == 'FileChunks'
                 for chunk in *tree

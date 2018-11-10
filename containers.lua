@@ -210,19 +210,21 @@ local _list_mt = {
     end,
     from_1_to = function(self, start, stop)
       local n = #self
-      if n < 0 then
+      if start < 0 then
         start = (n + 1 - start)
       end
-      if n < 0 then
+      if stop < 0 then
         stop = (n + 1 - stop)
       end
-      local _accum_0 = { }
-      local _len_0 = 1
-      for i = start, stop do
-        _accum_0[_len_0] = self[i]
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
+      return List((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        for i = start, stop do
+          _accum_0[_len_0] = self[i]
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)())
     end
   },
   __newindex = function(self, k, v)

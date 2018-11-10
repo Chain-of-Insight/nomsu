@@ -47,7 +47,7 @@ local tree_to_inline_nomsu
 tree_to_inline_nomsu = function(tree)
   local _exp_0 = tree.type
   if "Action" == _exp_0 then
-    local nomsu = NomsuCode(tree.source)
+    local nomsu = NomsuCode:from(tree.source)
     if tree.target then
       local inline_target = tree_to_inline_nomsu(tree.target)
       if tree.target.type == "Action" then
@@ -88,9 +88,9 @@ tree_to_inline_nomsu = function(tree)
     if not (tree[1].type == "List" or tree[1].type == "Dict" or tree[1].type == "Var") then
       inner_nomsu:parenthesize()
     end
-    return NomsuCode(tree.source, "\\", inner_nomsu)
+    return NomsuCode:from(tree.source, "\\", inner_nomsu)
   elseif "Block" == _exp_0 then
-    local nomsu = NomsuCode(tree.source, ":")
+    local nomsu = NomsuCode:from(tree.source, ":")
     for i, line in ipairs(tree) do
       nomsu:append(i == 1 and " " or "; ")
       nomsu:append(tree_to_inline_nomsu(line))
@@ -119,11 +119,11 @@ tree_to_inline_nomsu = function(tree)
         end
       end
     end
-    local nomsu = NomsuCode(tree.source)
+    local nomsu = NomsuCode:from(tree.source)
     add_text(nomsu, tree)
-    return NomsuCode(tree.source, '"', nomsu, '"')
+    return NomsuCode:from(tree.source, '"', nomsu, '"')
   elseif "List" == _exp_0 or "Dict" == _exp_0 then
-    local nomsu = NomsuCode(tree.source, (tree.type == "List" and "[" or "{"))
+    local nomsu = NomsuCode:from(tree.source, (tree.type == "List" and "[" or "{"))
     for i, item in ipairs(tree) do
       if i > 1 then
         nomsu:append(", ")
@@ -136,7 +136,7 @@ tree_to_inline_nomsu = function(tree)
     local key, value = tree[1], tree[2]
     local nomsu
     if key.type == "Text" and #key == 1 and is_identifier(key[1]) then
-      nomsu = NomsuCode(key.source, key[1])
+      nomsu = NomsuCode:from(key.source, key[1])
     else
       nomsu = tree_to_inline_nomsu(key)
     end
@@ -154,7 +154,7 @@ tree_to_inline_nomsu = function(tree)
     end
     return nomsu
   elseif "IndexChain" == _exp_0 then
-    local nomsu = NomsuCode(tree.source)
+    local nomsu = NomsuCode:from(tree.source)
     for i, bit in ipairs(tree) do
       if i > 1 then
         nomsu:append(".")
@@ -173,9 +173,9 @@ tree_to_inline_nomsu = function(tree)
     end
     return nomsu
   elseif "Number" == _exp_0 then
-    return NomsuCode(tree.source, tostring(tree[1]))
+    return NomsuCode:from(tree.source, tostring(tree[1]))
   elseif "Var" == _exp_0 then
-    return NomsuCode(tree.source, "%", tree[1])
+    return NomsuCode:from(tree.source, "%", tree[1])
   elseif "FileChunks" == _exp_0 then
     return error("Can't inline a FileChunks")
   elseif "Comment" == _exp_0 then
@@ -188,7 +188,7 @@ tree_to_inline_nomsu = function(tree)
 end
 local tree_to_nomsu
 tree_to_nomsu = function(tree)
-  local nomsu = NomsuCode(tree.source)
+  local nomsu = NomsuCode:from(tree.source)
   local recurse
   recurse = function(t)
     local space = MAX_LINE - nomsu:trailing_line_len()
@@ -214,7 +214,7 @@ tree_to_nomsu = function(tree)
     local indented = tree_to_nomsu(t)
     if t.type == "Action" then
       if indented:is_multiline() then
-        return NomsuCode(t.source, "(..)\n    ", indented)
+        return NomsuCode:from(t.source, "(..)\n    ", indented)
       else
         indented:parenthesize()
       end
@@ -304,7 +304,7 @@ tree_to_nomsu = function(tree)
         nomsu:append(line_nomsu:match('\n[^\n]*\n') and "\n\n" or "\n")
       end
     end
-    return NomsuCode(tree.source, ":\n    ", nomsu)
+    return NomsuCode:from(tree.source, ":\n    ", nomsu)
   elseif "Text" == _exp_0 then
     local max_line = math.floor(1.25 * MAX_LINE)
     local add_text
@@ -357,7 +357,7 @@ tree_to_nomsu = function(tree)
       end
     end
     add_text(tree)
-    return NomsuCode(tree.source, '"\\\n    ..', nomsu, '"')
+    return NomsuCode:from(tree.source, '"\\\n    ..', nomsu, '"')
   elseif "List" == _exp_0 or "Dict" == _exp_0 then
     if #tree == 0 then
       nomsu:append(tree.type == "List" and "[]" or "{}")
@@ -376,14 +376,14 @@ tree_to_nomsu = function(tree)
       end
     end
     if tree.type == "List" then
-      return NomsuCode(tree.source, "[..]\n    ", nomsu)
+      return NomsuCode:from(tree.source, "[..]\n    ", nomsu)
     else
-      return NomsuCode(tree.source, "{..}\n    ", nomsu)
+      return NomsuCode:from(tree.source, "{..}\n    ", nomsu)
     end
   elseif "DictEntry" == _exp_0 then
     local key, value = tree[1], tree[2]
     if key.type == "Text" and #key == 1 and is_identifier(key[1]) then
-      nomsu = NomsuCode(key.source, key[1])
+      nomsu = NomsuCode:from(key.source, key[1])
     else
       nomsu = tree_to_inline_nomsu(key)
     end

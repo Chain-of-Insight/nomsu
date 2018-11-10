@@ -85,9 +85,9 @@ _list_mt =
             return nil
         from_1_to: (start, stop)=>
             n = #@
-            start = (n+1-start) if n < 0
-            stop = (n+1-stop) if n < 0
-            return [@[i] for i=start,stop]
+            start = (n+1-start) if start < 0
+            stop = (n+1-stop) if stop < 0
+            return List[@[i] for i=start,stop]
     -- TODO: remove this safety check to get better performance?
     __newindex: (k,v)=>
         assert type(k) == 'number', "List indices must be numbers"

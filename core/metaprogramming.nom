@@ -17,13 +17,13 @@ lua> "\
             end
         end
     end
-    compile.action["define mangler"] = function(compile, tree)
-        return LuaCode(tree.source, "local mangle = mangler()")
+    compile.action["define mangler"] = function(compile)
+        return LuaCode("local mangle = mangler()")
     end"
 
 lua> "\
-    ..compile.action["1 ->"] = function(compile, tree, \%args, \%body)
-        local lua = LuaCode(tree.source, "(function(")
+    ..compile.action["1 ->"] = function(compile, \%args, \%body)
+        local lua = LuaCode("(function(")
         if SyntaxTree:is_instance(\%args) and \%args.type == "Action" then \%args = \%args:get_args() end
         local lua_args = table.map(\%args, function(a) return SyntaxTree:is_instance(a) and compile(a):text() or a end)
         lua:concat_append(lua_args, ", ")
@@ -36,11 +36,10 @@ lua> "\
     end"
 
 lua> "\
-    ..compile.action["what 1 compiles to"] = function(compile, tree, \%action)
-        local lua = LuaCode(tree.source, "compile.action[", \%action.stub:as_lua(), "](")
+    ..compile.action["what 1 compiles to"] = function(compile, \%action)
+        local lua = LuaCode("compile.action[", \%action.stub:as_lua(), "](")
         local lua_args = table.map(\%action:get_args(), function(a) return compile(a) end)
         table.insert(lua_args, 1, "compile")
-        table.insert(lua_args, 2, "tree")
         lua:concat_append(lua_args, ", ")
         lua:append(")")
         return lua
@@ -66,12 +65,12 @@ test:
     asdf
     assume (%tmp is (nil)) or barf "compile to is leaking variables"
 lua> "\
-    ..compile.action["1 compiles to"] = function(compile, tree, \%action, \%body)
-        local \%args = List{\(\%compile), \(\%tree), unpack(\%action:get_args())}
+    ..compile.action["1 compiles to"] = function(compile, \%action, \%body)
+        local \%args = List{\(\%compile), unpack(\%action:get_args())}
         if \%body.type == "Text" then
             \%body = SyntaxTree{source=\%body.source, type="Action", "Lua", \%body}
         end
-        return LuaCode(tree.source, "compile.action[", \%action.stub:as_lua(),
+        return LuaCode("compile.action[", \%action.stub:as_lua(),
             "] = ", \(what (%args -> %body) compiles to))
     end"
 
@@ -82,11 +81,11 @@ lua> "\
         ..if \%actions.type ~= "List" then
             compile_error(\%actions, "This should be a list of actions.")
         end
-        local lua = LuaCode(tree.source, \(what (%actions.1 compiles to %body) compiles to))
-        local \%args = List{\(\%compile), \(\%tree), unpack(\%actions[1]:get_args())}
+        local lua = \(what (%actions.1 compiles to %body) compiles to)
+        local \%args = List{\(\%compile), unpack(\%actions[1]:get_args())}
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local \%alias_args = List{\(\%compile), \(\%tree), unpack(alias:get_args())}
+            local \%alias_args = List{\(\%compile), unpack(alias:get_args())}
             lua:append("\\ncompile.action[", alias.stub:as_lua(), "] = ")
             if \%alias_args == \%args then
                 lua:append("compile.action[", \%actions[1].stub:as_lua(), "]")
@@ -100,7 +99,7 @@ lua> "\
 
 (call %fn with %args) compiles to:
     lua> "\
-        ..local lua = LuaCode(tree.source, compile(\%fn), "(")
+        ..local lua = LuaCode(compile(\%fn), "(")
         if \%args.type == 'List' then
             lua:concat_append(table.map(\%args, function(a) return compile(a) end), ", ")
         else
@@ -126,14 +125,14 @@ test:
     lua> "\
         ..local fn_name = \%action.stub:as_lua_id()
         local \%args = \%action:get_args()
-        local lua = LuaCode(tree.source, fn_name, " = ", \(what (%args -> %body) compiles to))
+        local lua = LuaCode(fn_name, " = ", \(what (%args -> %body) compiles to))
         lua:add_free_vars({fn_name})
         return lua"
 (%actions all mean %body) compiles to:
     lua> "\
         ..local fn_name = \%actions[1].stub:as_lua_id()
         local \%args = List(\%actions[1]:get_args())
-        local lua = LuaCode(tree.source, \(what (%actions.1 means %body) compiles to))
+        local lua = \(what (%actions.1 means %body) compiles to)
         for i=2,#\%actions do
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
@@ -222,7 +221,7 @@ test:
                 return t:as_lua()
             end
         end
-        local \%new_body = LuaCode(\%body.source,
+        local \%new_body = LuaCode:from(\%body.source,
             "local mangle = mangler()",
             "\\nreturn ", make_tree(\%body))
         local ret = \(what (%actions all compile to %new_body) compiles to)

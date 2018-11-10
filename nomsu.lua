@@ -181,7 +181,7 @@ run = function()
         if args.check_syntax then
           local code = Files.read(filename)
           local source = Source(filename, 1, #code)
-          nomsu_environment._1_parsed(NomsuCode(source, code))
+          nomsu_environment._1_parsed(NomsuCode:from(source, code))
           print("Parse succeeded: " .. tostring(filename))
         elseif args.compile then
           local output
@@ -192,7 +192,7 @@ run = function()
           end
           local code = Files.read(filename)
           local source = Source(filename, 1, #code)
-          code = NomsuCode(source, code)
+          code = NomsuCode:from(source, code)
           local tree = nomsu_environment._1_parsed(code)
           if not (tree.type == 'FileChunks') then
             tree = {
@@ -214,7 +214,7 @@ run = function()
         elseif args.verbose then
           local code = Files.read(filename)
           local source = Source(filename, 1, #code)
-          code = NomsuCode(source, code)
+          code = NomsuCode:from(source, code)
           local tree = nomsu_environment._1_parsed(code)
           if not (tree.type == 'FileChunks') then
             tree = {

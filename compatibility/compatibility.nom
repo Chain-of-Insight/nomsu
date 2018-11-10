@@ -79,13 +79,13 @@ externally [..]
         if ((%ver as list) > (%end_version as list)): stop %ver
         if %ACTION_UPGRADES.%ver:
             %tree = (..)
-                %tree with % -> (..)
+                %tree with % ->:
                     if ((% is "Action" syntax tree) and %ACTION_UPGRADES.%ver.(%.stub)):
                         %with_upgraded_args = (..)
                             %k = (%v upgraded from %start_version to %end_version) for %k = %v in %
                         set %with_upgraded_args 's metatable to (% 's metatable)
                         return (..)
-                            call %ACTION_UPGRADES.%ver.(%.stub) with [%with_upgraded_args, %end_version]
+                            %ACTION_UPGRADES.%ver.(%.stub) %with_upgraded_args %end_version
         
         if %UPGRADES.%ver:
             %with_upgraded_args = (..)

@@ -32,6 +32,7 @@ for version=1,999
 
 {:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
 compile = require('nomsu_compiler')
+_currently_running_files = List{} -- Used to check for circular imports in run_file_1_in
 nomsu_environment = Importer{
     NOMSU_COMPILER_VERSION: 12, NOMSU_SYNTAX_VERSION: max_parser_version
     -- Lua stuff:
@@ -57,7 +58,7 @@ nomsu_environment = Importer{
     _1_parsed: (nomsu_code)->
         if type(nomsu_code) == 'string'
             filename = Files.spoof(nomsu_code)
-            nomsu_code = NomsuCode(Source(filename, 1, #nomsu_code), nomsu_code)
+            nomsu_code = NomsuCode\from(Source(filename, 1, #nomsu_code), nomsu_code)
         source = nomsu_code.source
         nomsu_code = tostring(nomsu_code)
         version = nomsu_code\match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
@@ -88,7 +89,7 @@ nomsu_environment = Importer{
     run_1_in: (to_run, environment)->
         if type(to_run) == 'string'
             filename = Files.spoof(to_run)
-            to_run = NomsuCode(Source(filename, 1, #to_run), to_run)
+            to_run = NomsuCode\from(Source(filename, 1, #to_run), to_run)
             ret = environment.run_1_in(to_run, environment)
             return ret
         elseif NomsuCode\is_instance(to_run)
@@ -151,6 +152,13 @@ nomsu_environment = Importer{
         if environment.FILE_CACHE[path]
             import_to_1_from(environment, environment.FILE_CACHE[path])
             return
+        if _currently_running_files\has(path)
+            i = _currently_running_files\index_of(path)
+            _currently_running_files\add path
+            circle = _currently_running_files\from_1_to(i, -1)
+            print(_currently_running_files, path)
+            error("Circular import detected:\n           "..circle\joined_with("\n..imports  "))
+        _currently_running_files\add path
         mod = _1_forked(environment)
         assert mod._1_parsed
         mod._ENV = mod
@@ -160,13 +168,14 @@ nomsu_environment = Importer{
             -- TODO: don't automatically use precompiled version?
             code = if optimization != 0 and Files.read(lua_filename)
                 file = Files.read(lua_filename)
-                LuaCode(Source(filename, 1, #file), file)
+                LuaCode\from(Source(filename, 1, #file), file)
             else
                 file = Files.read(filename)
-                NomsuCode(Source(filename, 1, #file), file)
+                NomsuCode\from(Source(filename, 1, #file), file)
             environment.run_1_in(code, mod)
         import_to_1_from(environment, mod)
         environment.FILE_CACHE[path] = mod
+        _currently_running_files\remove!
 
     compile_error_at: (tree, err_msg, hint=nil)->
         err_str = pretty_error{

@@ -43,12 +43,16 @@ class Source
 
 class Code
     is_code: true
-    new: (@source, ...)=>
+    new: (...)=>
         @bits = {}
-        if type(@source) == 'string'
-            @source = Source\from_string(@source)
-        --assert(@source and Source\is_instance(@source), "Source has the wrong type")
         @append(...)
+
+    @from: (source, ...)=>
+        inst = self(...)
+        if type(source) == 'string'
+            source = Source\from_string(source)
+        inst.source = source
+        return inst
 
     @is_instance: (x)=> type(x) == 'table' and x.__class == @
 
@@ -71,7 +75,10 @@ class Code
     __tostring: => @text!
 
     as_lua: =>
-        "#{@__class.__name}(#{concat {tostring(@source)\as_lua!, unpack([b\as_lua! for b in *@bits])}, ", "})"
+        if @source
+            "#{@__class.__name}:from(#{concat {tostring(@source)\as_lua!, unpack([b\as_lua! for b in *@bits])}, ", "})"
+        else
+            "#{@__class.__name}(#{concat [b\as_lua! for b in *@bits], ", "})"
 
     __len: => #@text!
     
@@ -214,18 +221,8 @@ class LuaCode extends Code
             @prepend "local #{concat to_declare, ", "};\n"
         return to_declare
 
-    as_statements: (prefix="", suffix=";")=>
-        if @text!\matches(";$") or @text! == ""
-            return self
-        statements = LuaCode(@source)
-        if prefix != ""
-            statements\append prefix
-        statements\append self
-        if suffix != ""
-            statements\append suffix
-        return statements
-
     make_offset_table: =>
+        assert @source, "This code doesn't have a source"
         -- Return a mapping from output (lua) character number to input (nomsu) character number
         lua_to_nomsu, nomsu_to_lua = {}, {}
         walk = (lua, pos)->

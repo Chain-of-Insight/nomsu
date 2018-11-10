@@ -9,17 +9,17 @@ use "core/metaprogramming.nom"
 (say %message) compiles to:
     lua> "\
         ..if \%message.type == "Text" then
-            return LuaCode(tree.source, "print(", \(%message as lua expr), ");");
+            return LuaCode("print(", \(%message as lua expr), ");");
         else
-            return LuaCode(tree.source, "print(tostring(", \(%message as lua expr), "));");
+            return LuaCode("print(tostring(", \(%message as lua expr), "));");
         end"
 
 (ask %prompt) compiles to:
     lua> "\
         ..if \%prompt.type == "Text" then
-            return LuaCode(tree.source, "(io.write(", \(%prompt as lua expr), ") and io.read())");
+            return LuaCode("(io.write(", \(%prompt as lua expr), ") and io.read())");
         else
-            return LuaCode(tree.source, "(io.write(tostring(", \(..)
+            return LuaCode("(io.write(tostring(", \(..)
             %prompt as lua expr
         .., ")) and io.read())");
         end"

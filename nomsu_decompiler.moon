@@ -31,7 +31,7 @@ escape = (s)->
 tree_to_inline_nomsu = (tree)->
     switch tree.type
         when "Action"
-            nomsu = NomsuCode(tree.source)
+            nomsu = NomsuCode\from(tree.source)
             if tree.target
                 inline_target = tree_to_inline_nomsu(tree.target)
                 if tree.target.type == "Action"
@@ -61,10 +61,10 @@ tree_to_inline_nomsu = (tree)->
             inner_nomsu = tree_to_inline_nomsu(tree[1])
             unless tree[1].type == "List" or tree[1].type == "Dict" or tree[1].type == "Var"
                 inner_nomsu\parenthesize!
-            return NomsuCode(tree.source, "\\", inner_nomsu)
+            return NomsuCode\from(tree.source, "\\", inner_nomsu)
 
         when "Block"
-            nomsu = NomsuCode(tree.source, ":")
+            nomsu = NomsuCode\from(tree.source, ":")
             for i,line in ipairs tree
                 nomsu\append(i == 1 and " " or "; ")
                 nomsu\append tree_to_inline_nomsu(line)
@@ -86,12 +86,12 @@ tree_to_inline_nomsu = (tree)->
                         elseif bit.type == "Var" and type(tree[i+1]) == 'string' and not match(tree[i+1], "^[ \n\t,.:;#(){}[%]]")
                             interp_nomsu\parenthesize!
                         nomsu\append "\\", interp_nomsu
-            nomsu = NomsuCode(tree.source)
+            nomsu = NomsuCode\from(tree.source)
             add_text(nomsu, tree)
-            return NomsuCode(tree.source, '"', nomsu, '"')
+            return NomsuCode\from(tree.source, '"', nomsu, '"')
 
         when "List", "Dict"
-            nomsu = NomsuCode(tree.source, (tree.type == "List" and "[" or "{"))
+            nomsu = NomsuCode\from(tree.source, (tree.type == "List" and "[" or "{"))
             for i, item in ipairs tree
                 nomsu\append ", " if i > 1
                 nomsu\append tree_to_inline_nomsu(item)
@@ -101,7 +101,7 @@ tree_to_inline_nomsu = (tree)->
         when "DictEntry"
             key, value = tree[1], tree[2]
             nomsu = if key.type == "Text" and #key == 1 and is_identifier(key[1])
-                NomsuCode(key.source, key[1])
+                NomsuCode\from(key.source, key[1])
             else tree_to_inline_nomsu(key)
             nomsu\parenthesize! if key.type == "Action" or key.type == "Block"
             assert(value.type != "Block", "Didn't expect to find a Block as a value in a dict")
@@ -113,7 +113,7 @@ tree_to_inline_nomsu = (tree)->
             return nomsu
         
         when "IndexChain"
-            nomsu = NomsuCode(tree.source)
+            nomsu = NomsuCode\from(tree.source)
             for i, bit in ipairs tree
                 nomsu\append "." if i > 1
                 local bit_nomsu
@@ -127,10 +127,10 @@ tree_to_inline_nomsu = (tree)->
             return nomsu
         
         when "Number"
-            return NomsuCode(tree.source, tostring(tree[1]))
+            return NomsuCode\from(tree.source, tostring(tree[1]))
 
         when "Var"
-            return NomsuCode(tree.source, "%", tree[1])
+            return NomsuCode\from(tree.source, "%", tree[1])
 
         when "FileChunks"
             error("Can't inline a FileChunks")
@@ -146,7 +146,7 @@ tree_to_inline_nomsu = (tree)->
             error("Unknown type: #{tree.type}")
 
 tree_to_nomsu = (tree)->
-    nomsu = NomsuCode(tree.source)
+    nomsu = NomsuCode\from(tree.source)
 
     -- For concision:
     recurse = (t)->
@@ -166,7 +166,7 @@ tree_to_nomsu = (tree)->
         indented = tree_to_nomsu(t)
         if t.type == "Action"
             if indented\is_multiline!
-                return NomsuCode(t.source, "(..)\n    ", indented)
+                return NomsuCode\from(t.source, "(..)\n    ", indented)
             else indented\parenthesize!
         return indented
 
@@ -234,7 +234,7 @@ tree_to_nomsu = (tree)->
                 if i < #tree
                     -- number of lines > 2 (TODO: improve this)
                     nomsu\append(line_nomsu\match('\n[^\n]*\n') and "\n\n" or "\n")
-            return NomsuCode(tree.source, ":\n    ", nomsu)
+            return NomsuCode\from(tree.source, ":\n    ", nomsu)
 
         when "Text"
             -- Multi-line text has more generous wrap margins
@@ -274,7 +274,7 @@ tree_to_nomsu = (tree)->
                         if interp_nomsu\is_multiline!
                             nomsu\append "\n.."
             add_text(tree)
-            return NomsuCode(tree.source, '"\\\n    ..', nomsu, '"')
+            return NomsuCode\from(tree.source, '"\\\n    ..', nomsu, '"')
 
         when "List", "Dict"
             if #tree == 0
@@ -290,14 +290,14 @@ tree_to_nomsu = (tree)->
                 if i < #tree
                     nomsu\append((item_nomsu\is_multiline! or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE) and '\n' or ', ')
             return if tree.type == "List" then
-                NomsuCode(tree.source, "[..]\n    ", nomsu)
+                NomsuCode\from(tree.source, "[..]\n    ", nomsu)
             else
-                NomsuCode(tree.source, "{..}\n    ", nomsu)
+                NomsuCode\from(tree.source, "{..}\n    ", nomsu)
         
         when "DictEntry"
             key, value = tree[1], tree[2]
             nomsu = if key.type == "Text" and #key == 1 and is_identifier(key[1])
-                NomsuCode(key.source, key[1])
+                NomsuCode\from(key.source, key[1])
             else tree_to_inline_nomsu(key)
             nomsu\parenthesize! if key.type == "Block"
             value_nomsu = tree_to_nomsu(value)

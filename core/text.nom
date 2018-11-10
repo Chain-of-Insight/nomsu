@@ -4,6 +4,8 @@
     color codes.
 
 use "core/metaprogramming.nom"
+use "core/operators.nom"
+use "core/control_flow.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -47,17 +49,9 @@ test:
     assume "\n" == (newline)
 
 # Text literals
-lua> "\
-    ..do
-        local escapes = {
-            nl="\\\\n", newline="\\\\n", tab="\\\\t", bell="\\\\a", cr="\\\\r",
-            ["carriage return"]="\\\\r", backspace="\\\\b", ["form feed"]="\\\\f",
-            formfeed="\\\\f", ["vertical tab"]="\\\\v",
-        };
-        for name, e in pairs(escapes) do
-            local lua = "'"..e.."'"
-            compile.action[name] = function(compile, tree)
-                return LuaCode(tree.source, lua)
-            end
-        end
-    end"
+%escapes = {..}
+    nl:"\n", newline:"\n", tab:"\t", bell:"\a", cr:"\r", "carriage return":"\r",
+    backspace:"\b", "form feed":"\f", formfeed:"\f", "vertical tab":"\v"
+for %name = %str in %escapes:
+    with {%lua: Lua (quote %str)}:
+        %compile.action.%name = ([]-> %lua)

@@ -40,23 +40,12 @@ compile_error = (tree, err_msg, hint=nil)->
 -- math expressions like 2*x + 3^2 without having to define a single
 -- action for every possibility.
 math_expression = re.compile [[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]]
-compile_math_expression = (compile, tree, ...)->
-    lua = LuaCode(tree.source)
-    for i,tok in ipairs tree
-        if type(tok) == 'string'
-            lua\append tok
-        else
-            tok_lua = compile(tok)
-            tok_lua\parenthesize! if tok.type == "Action"
-            lua\append tok_lua
-        lua\append " " if i < #tree
-    return lua
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 compile = setmetatable({
     action: Importer{
-        [""]: (compile, tree, fn, ...)->
-            lua = LuaCode(tree.source)
+        [""]: (compile, fn, ...)->
+            lua = LuaCode!
             fn_lua = compile(fn)
             lua\append fn_lua
             unless fn_lua\text!\match("^%(.*%)$") or fn_lua\text!\match("^[_a-zA-Z][_a-zA-Z0-9.]*$")
@@ -68,15 +57,15 @@ compile = setmetatable({
             lua\append ")"
             return lua
 
-        ["Lua"]: (compile, tree, code)->
+        ["Lua"]: (compile, code)->
             if code.type != "Text"
-                return LuaCode(code.source, "LuaCode(", tostring(code.source)\as_lua!, ", ", compile(code), ")")
+                return LuaCode("LuaCode:from(", tostring(code.source)\as_lua!, ", ", compile(code), ")")
             add_bit_lua = (lua, bit_lua)->
                 bit_leading_len = #(bit_lua\match("^[^\n]*"))
                 lua\append(lua\trailing_line_len! + bit_leading_len > MAX_LINE and ",\n    " or ", ")
                 lua\append(bit_lua)
             operate_on_text = (text)->
-                lua = LuaCode(text.source, "LuaCode(", tostring(text.source)\as_lua!)
+                lua = LuaCode\from(text.source, "LuaCode:from(", tostring(text.source)\as_lua!)
                 for bit in *text
                     if type(bit) == "string"
                         add_bit_lua(lua, bit\as_lua!)
@@ -88,11 +77,11 @@ compile = setmetatable({
                 return lua
             return operate_on_text code
 
-        ["lua >"]: (compile, tree, code)->
+        ["lua >"]: (compile, code)->
             if code.type != "Text"
-                return tree
+                return code
             operate_on_text = (text)->
-                lua = LuaCode(text.source)
+                lua = LuaCode\from(text.source)
                 for bit in *text
                     if type(bit) == "string"
                         lua\append bit
@@ -103,47 +92,53 @@ compile = setmetatable({
                 return lua
             return operate_on_text code
 
-        ["= lua"]: (compile, tree, code)-> compile.action["lua >"](compile, tree, code)
+        ["= lua"]: (compile, code)-> compile.action["lua >"](compile, code)
 
-        ["use"]: (compile, tree, path)->
+        ["use"]: (compile, path)->
             --if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
             --    unless import_to_1_from(compile, path[1])
             --        compile_error tree, "Could not find anything to import for #{path}"
-            return LuaCode(tree.source, "run_file_1_in(#{compile(path)}, _ENV)")
+            return LuaCode("run_file_1_in(#{compile(path)}, _ENV)")
 
-        ["tests"]: (compile, tree)-> LuaCode(tree.source, "TESTS")
-        ["test"]: (compile, tree, body)->
+        ["tests"]: (compile)-> LuaCode("TESTS")
+        ["test"]: (compile, body)->
             unless body.type == 'Block'
-                compile_error(tree, "This should be a Block")
+                compile_error(body, "This should be a Block")
             test_nomsu = body\get_source_code!\match(":[ ]*(.*)")
             if indent = test_nomsu\match("\n([ ]*)")
                 test_nomsu = test_nomsu\gsub("\n"..indent, "\n")
-            LuaCode tree.source, "TESTS[#{tostring(tree.source)\as_lua!}] = ", test_nomsu\as_lua!
+            return LuaCode "TESTS[#{tostring(body.source)\as_lua!}] = ", test_nomsu\as_lua!
 
-        ["is jit"]: (compile, tree, code)-> LuaCode(tree.source, "jit")
-        ["Lua version"]: (compile, tree, code)-> LuaCode(tree.source, "_VERSION")
-        ["nomsu environment"]: (compile, tree)-> LuaCode(tree.source, "_ENV")
+        ["is jit"]: (compile, code)-> LuaCode("jit")
+        ["Lua version"]: (compile, code)-> LuaCode("_VERSION")
+        ["nomsu environment"]: (compile)-> LuaCode("_ENV")
     }
 }, {
     __import: (other)=>
         import_to_1_from(@action, other.action)
         return
     __call: (compile, tree, force_value=false)->
-        if tree.version
-            if get_version = compile.action[("Nomsu version")\as_lua_id!]
-                if upgrade = compile.action[("1 upgraded from 2 to")\as_lua_id!]
-                    tree = upgrade(tree, tree.version, get_version!)
         switch tree.type
             when "Action"
                 stub = tree.stub
                 compile_action = compile.action[stub]
                 if not compile_action and math_expression\match(stub)
-                    compile_action = compile_math_expression
+                    lua = LuaCode\from(tree.source)
+                    for i,tok in ipairs tree
+                        if type(tok) == 'string'
+                            lua\append tok
+                        else
+                            tok_lua = compile(tok)
+                            tok_lua\parenthesize! if tok.type == "Action"
+                            lua\append tok_lua
+                        lua\append " " if i < #tree
+                    return lua
+
                 if compile_action and not tree.target
                     args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force Lua to avoid tail call optimization for debugging purposes
                     -- TODO: use tail call?
-                    ret = compile_action(compile, tree, unpack(args))
+                    ret = compile_action(compile, unpack(args))
                     if ret == nil
                         info = debug.getinfo(compile_action, "S")
                         filename = Source\from_string(info.source).filename
@@ -151,11 +146,12 @@ compile = setmetatable({
                             "The compile-time action here (#{stub}) failed to return any value.",
                             "Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's returning something."
                     unless SyntaxTree\is_instance(ret)
+                        ret.source or= tree.source
                         return ret
                     if ret != tree
                         return compile(ret)
 
-                lua = LuaCode(tree.source)
+                lua = LuaCode\from(tree.source)
                 if tree.target -- Method call
                     target_lua = compile tree.target
                     target_text = target_lua\text!
@@ -174,7 +170,7 @@ compile = setmetatable({
                 return lua
 
             when "EscapedNomsu"
-                lua = LuaCode tree.source, "SyntaxTree{"
+                lua = LuaCode\from tree.source, "SyntaxTree{"
                 needs_comma, i = false, 1
                 as_lua = (x)->
                     if type(x) == 'number'
@@ -201,11 +197,11 @@ compile = setmetatable({
             
             when "Block"
                 if not force_value
-                    lua = LuaCode(tree.source)
+                    lua = LuaCode\from(tree.source)
                     lua\concat_append([compile(line) for line in *tree], "\n")
                     return lua
                 else
-                    lua = LuaCode(tree.source)
+                    lua = LuaCode\from(tree.source)
                     lua\append("((function()")
                     for i, line in ipairs(tree)
                         lua\append "\n    ", compile(line)
@@ -213,7 +209,7 @@ compile = setmetatable({
                     return lua
 
             when "Text"
-                lua = LuaCode(tree.source)
+                lua = LuaCode\from(tree.source)
                 string_buffer = ""
                 for i, bit in ipairs tree
                     if type(bit) == "string"
@@ -226,7 +222,7 @@ compile = setmetatable({
                     bit_lua = compile(bit)
                     if #lua.bits > 0 then lua\append ".."
                     if bit.type != "Text"
-                        bit_lua = LuaCode(bit.source, "tostring(",bit_lua,")")
+                        bit_lua = LuaCode\from(bit.source, "tostring(",bit_lua,")")
                     lua\append bit_lua
 
                 if string_buffer ~= "" or #lua.bits == 0
@@ -238,7 +234,7 @@ compile = setmetatable({
                 return lua
 
             when "List", "Dict"
-                lua = LuaCode tree.source, "#{tree.type}{"
+                lua = LuaCode\from tree.source, "#{tree.type}{"
                 i = 1
                 sep = ''
                 while i <= #tree
@@ -255,20 +251,26 @@ compile = setmetatable({
                         sep = ', '
                     i += 1
                 lua\append "}"
+                -- List/dict comprehenstion
                 if i <= #tree
-                    lua = LuaCode tree.source, "(function()\n    local it = ", lua
+                    lua = LuaCode\from tree.source, "(function()\n    local comprehension = ", lua
+                    if tree.type == "List"
+                        lua\append "\n    local function add(x) comprehension[#comprehension+1] = x end"
+                    else
+                        lua\append "\n    local function #{("add 1 =")\as_lua_id!}(k, v) comprehension[k] = v end"
                     while i <= #tree
                         lua\append "\n    "
                         if tree[i].type == 'Block' or tree[i].type == 'Comment'
                             lua\append compile(tree[i])
                         elseif tree[i].type == "DictEntry"
-                            lua\append "it[ ", compile(tree[i][1]), "] = ", (tree[i][2] and compile(tree[i][2]) or "true")
+                            entry_lua = compile(tree[i])
+                            lua\append (entry_lua\text!\sub(1,1) == '[' and "comprehension" or "comprehension."), entry_lua
                         else
-                            lua\append "it:add(", compile(tree[i]), ")"
+                            lua\append "comprehension[#comprehension+1] = ", compile(tree[i])
                         i += 1
-                    lua\append "\n    return it\nend)()"
+                    lua\append "\n    return comprehension\nend)()"
                 return lua
-                --lua = LuaCode tree.source, "#{tree.type}{"
+                --lua = LuaCode\from tree.source, "#{tree.type}{"
                 --lua\concat_append([compile(e) for e in *tree when e.type != 'Comment'], ", ", ",\n  ")
                 --lua\append "}"
                 --return lua
@@ -276,17 +278,17 @@ compile = setmetatable({
             when "DictEntry"
                 key, value = tree[1], tree[2]
                 key_lua = compile(key)
-                value_lua = value and compile(value) or LuaCode(key.source, "true")
+                value_lua = value and compile(value) or LuaCode\from(key.source, "true")
                 key_str = match(key_lua\text!, [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
                 return if key_str and key_str\is_lua_id!
-                    LuaCode tree.source, key_str,"=",value_lua
+                    LuaCode\from tree.source, key_str,"=",value_lua
                 elseif sub(key_lua\text!,1,1) == "["
                     -- NOTE: this *must* use a space after the [ to avoid freaking out
                     -- Lua's parser if the inner expression is a long string. Lua
                     -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                    LuaCode tree.source, "[ ",key_lua,"]=",value_lua
+                    LuaCode\from tree.source, "[ ",key_lua,"]=",value_lua
                 else
-                    LuaCode tree.source, "[",key_lua,"]=",value_lua
+                    LuaCode\from tree.source, "[",key_lua,"]=",value_lua
             
             when "IndexChain"
                 lua = compile(tree[1])
@@ -311,10 +313,10 @@ compile = setmetatable({
                 return lua
 
             when "Number"
-                return LuaCode(tree.source, tostring(tree[1]))
+                return LuaCode\from(tree.source, tostring(tree[1]))
 
             when "Var"
-                return LuaCode(tree.source, (tree[1])\as_lua_id!)
+                return LuaCode\from(tree.source, (tree[1])\as_lua_id!)
 
             when "FileChunks"
                 error("Can't convert FileChunks to a single block of lua, since each chunk's "..
@@ -322,7 +324,7 @@ compile = setmetatable({
             
             when "Comment"
                 -- TODO: implement?
-                return LuaCode(tree.source, "")
+                return LuaCode\from(tree.source, "")
             
             when "Error"
                 error("Can't compile errors")

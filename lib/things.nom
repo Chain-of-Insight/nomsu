@@ -60,7 +60,7 @@ test:
     lua> "\
         ..local fn_name = \%actions[1].stub:as_lua_id()
         local \%args = List{\(\%its), unpack(\%actions[1]:get_args())}
-        local lua = LuaCode(tree.source, "class.", fn_name, " = ", \(..)
+        local lua = LuaCode("class.", fn_name, " = ", \(..)
             what (%args -> %body) compiles to
         ..)
         for i=2,#\%actions do

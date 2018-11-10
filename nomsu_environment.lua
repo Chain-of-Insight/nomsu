@@ -52,6 +52,7 @@ do
   tree_to_nomsu, tree_to_inline_nomsu = _obj_0.tree_to_nomsu, _obj_0.tree_to_inline_nomsu
 end
 local compile = require('nomsu_compiler')
+local _currently_running_files = List({ })
 local nomsu_environment = Importer({
   NOMSU_COMPILER_VERSION = 12,
   NOMSU_SYNTAX_VERSION = max_parser_version,
@@ -113,7 +114,7 @@ local nomsu_environment = Importer({
   _1_parsed = function(nomsu_code)
     if type(nomsu_code) == 'string' then
       local filename = Files.spoof(nomsu_code)
-      nomsu_code = NomsuCode(Source(filename, 1, #nomsu_code), nomsu_code)
+      nomsu_code = NomsuCode:from(Source(filename, 1, #nomsu_code), nomsu_code)
     end
     local source = nomsu_code.source
     nomsu_code = tostring(nomsu_code)
@@ -186,7 +187,7 @@ local nomsu_environment = Importer({
   run_1_in = function(to_run, environment)
     if type(to_run) == 'string' then
       local filename = Files.spoof(to_run)
-      to_run = NomsuCode(Source(filename, 1, #to_run), to_run)
+      to_run = NomsuCode:from(Source(filename, 1, #to_run), to_run)
       local ret = environment.run_1_in(to_run, environment)
       return ret
     elseif NomsuCode:is_instance(to_run) then
@@ -277,6 +278,14 @@ local nomsu_environment = Importer({
       import_to_1_from(environment, environment.FILE_CACHE[path])
       return 
     end
+    if _currently_running_files:has(path) then
+      local i = _currently_running_files:index_of(path)
+      _currently_running_files:add(path)
+      local circle = _currently_running_files:from_1_to(i, -1)
+      print(_currently_running_files, path)
+      error("Circular import detected:\n           " .. circle:joined_with("\n..imports  "))
+    end
+    _currently_running_files:add(path)
     local mod = _1_forked(environment)
     assert(mod._1_parsed)
     mod._ENV = mod
@@ -291,10 +300,10 @@ local nomsu_environment = Importer({
         local code
         if optimization ~= 0 and Files.read(lua_filename) then
           local file = Files.read(lua_filename)
-          code = LuaCode(Source(filename, 1, #file), file)
+          code = LuaCode:from(Source(filename, 1, #file), file)
         else
           local file = Files.read(filename)
-          code = NomsuCode(Source(filename, 1, #file), file)
+          code = NomsuCode:from(Source(filename, 1, #file), file)
         end
         environment.run_1_in(code, mod)
         _continue_0 = true
@@ -305,6 +314,7 @@ local nomsu_environment = Importer({
     end
     import_to_1_from(environment, mod)
     environment.FILE_CACHE[path] = mod
+    return _currently_running_files:remove()
   end,
   compile_error_at = function(tree, err_msg, hint)
     if hint == nil then

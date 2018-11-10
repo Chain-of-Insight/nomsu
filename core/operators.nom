@@ -31,7 +31,7 @@ test:
     lua> "\
         ..local \%var_lua = \(%var as lua expr)
         local \%value_lua = \(%value as lua expr)
-        local lua = LuaCode(tree.source, \%var_lua, ' = ', \%value_lua, ';')
+        local lua = LuaCode(\%var_lua, ' = ', \%value_lua, ';')
         if \%var.type == 'Var' then
             lua:add_free_vars({compile(\%var):text()})
         end
@@ -49,7 +49,7 @@ test:
     assume (%assignments.type is "Dict") or barf "\
         ..Expected a Dict for the assignments part of '<- %' statement, not \%assignments"
     lua> "\
-        ..local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
+        ..local lhs, rhs = LuaCode(), LuaCode()
         for i, item in ipairs(\%assignments) do
             local \%target, \%value = item[1], item[2]
             \%value = \%value:map(function(t)
@@ -69,7 +69,7 @@ test:
             lhs:append(target_lua)
             rhs:append(value_lua)
         end
-        return LuaCode(tree.source, lhs, " = ", rhs, ";")"
+        return LuaCode(lhs, " = ", rhs, ";")"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -111,7 +111,7 @@ test:
 (with %assignments %body) compiles to:
     %lua = (%body as lua)
     lua> "\
-        ..local lhs, rhs = LuaCode(tree.source), LuaCode(tree.source)
+        ..local lhs, rhs = LuaCode(), LuaCode()
         local vars = {}
         for i, item in ipairs(\%assignments) do
             local \%target, \%value = item[1], item[2]
@@ -233,8 +233,7 @@ test:
 
 test:
     assume ((size of [1, 2, 3]) == 3)
-[size of %list, size of %list, size of %list, size of %list] all compile to (..)
-    "(#\(%list as lua expr))"
+(size of %list) compiles to "(#\(%list as lua expr))"
 
 (%list is empty) compiles to "(#\(%list as lua expr) == 0)"
 

@@ -63,30 +63,11 @@ do
   tree_to_nomsu, tree_to_inline_nomsu = _obj_0.tree_to_nomsu, _obj_0.tree_to_inline_nomsu
 end
 local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
-local compile_math_expression
-compile_math_expression = function(compile, tree, ...)
-  local lua = LuaCode(tree.source)
-  for i, tok in ipairs(tree) do
-    if type(tok) == 'string' then
-      lua:append(tok)
-    else
-      local tok_lua = compile(tok)
-      if tok.type == "Action" then
-        tok_lua:parenthesize()
-      end
-      lua:append(tok_lua)
-    end
-    if i < #tree then
-      lua:append(" ")
-    end
-  end
-  return lua
-end
 local MAX_LINE = 80
 local compile = setmetatable({
   action = Importer({
-    [""] = function(compile, tree, fn, ...)
-      local lua = LuaCode(tree.source)
+    [""] = function(compile, fn, ...)
+      local lua = LuaCode()
       local fn_lua = compile(fn)
       lua:append(fn_lua)
       if not (fn_lua:text():match("^%(.*%)$") or fn_lua:text():match("^[_a-zA-Z][_a-zA-Z0-9.]*$")) then
@@ -102,9 +83,9 @@ local compile = setmetatable({
       lua:append(")")
       return lua
     end,
-    ["Lua"] = function(compile, tree, code)
+    ["Lua"] = function(compile, code)
       if code.type ~= "Text" then
-        return LuaCode(code.source, "LuaCode(", tostring(code.source):as_lua(), ", ", compile(code), ")")
+        return LuaCode("LuaCode:from(", tostring(code.source):as_lua(), ", ", compile(code), ")")
       end
       local add_bit_lua
       add_bit_lua = function(lua, bit_lua)
@@ -114,7 +95,7 @@ local compile = setmetatable({
       end
       local operate_on_text
       operate_on_text = function(text)
-        local lua = LuaCode(text.source, "LuaCode(", tostring(text.source):as_lua())
+        local lua = LuaCode:from(text.source, "LuaCode:from(", tostring(text.source):as_lua())
         for _index_0 = 1, #text do
           local bit = text[_index_0]
           if type(bit) == "string" then
@@ -130,13 +111,13 @@ local compile = setmetatable({
       end
       return operate_on_text(code)
     end,
-    ["lua >"] = function(compile, tree, code)
+    ["lua >"] = function(compile, code)
       if code.type ~= "Text" then
-        return tree
+        return code
       end
       local operate_on_text
       operate_on_text = function(text)
-        local lua = LuaCode(text.source)
+        local lua = LuaCode:from(text.source)
         for _index_0 = 1, #text do
           local bit = text[_index_0]
           if type(bit) == "string" then
@@ -151,18 +132,18 @@ local compile = setmetatable({
       end
       return operate_on_text(code)
     end,
-    ["= lua"] = function(compile, tree, code)
-      return compile.action["lua >"](compile, tree, code)
+    ["= lua"] = function(compile, code)
+      return compile.action["lua >"](compile, code)
     end,
-    ["use"] = function(compile, tree, path)
-      return LuaCode(tree.source, "run_file_1_in(" .. tostring(compile(path)) .. ", _ENV)")
+    ["use"] = function(compile, path)
+      return LuaCode("run_file_1_in(" .. tostring(compile(path)) .. ", _ENV)")
     end,
-    ["tests"] = function(compile, tree)
-      return LuaCode(tree.source, "TESTS")
+    ["tests"] = function(compile)
+      return LuaCode("TESTS")
     end,
-    ["test"] = function(compile, tree, body)
+    ["test"] = function(compile, body)
       if not (body.type == 'Block') then
-        compile_error(tree, "This should be a Block")
+        compile_error(body, "This should be a Block")
       end
       local test_nomsu = body:get_source_code():match(":[ ]*(.*)")
       do
@@ -171,16 +152,16 @@ local compile = setmetatable({
           test_nomsu = test_nomsu:gsub("\n" .. indent, "\n")
         end
       end
-      return LuaCode(tree.source, "TESTS[" .. tostring(tostring(tree.source):as_lua()) .. "] = ", test_nomsu:as_lua())
+      return LuaCode("TESTS[" .. tostring(tostring(body.source):as_lua()) .. "] = ", test_nomsu:as_lua())
     end,
-    ["is jit"] = function(compile, tree, code)
-      return LuaCode(tree.source, "jit")
+    ["is jit"] = function(compile, code)
+      return LuaCode("jit")
     end,
-    ["Lua version"] = function(compile, tree, code)
-      return LuaCode(tree.source, "_VERSION")
+    ["Lua version"] = function(compile, code)
+      return LuaCode("_VERSION")
     end,
-    ["nomsu environment"] = function(compile, tree)
-      return LuaCode(tree.source, "_ENV")
+    ["nomsu environment"] = function(compile)
+      return LuaCode("_ENV")
     end
   })
 }, {
@@ -191,25 +172,27 @@ local compile = setmetatable({
     if force_value == nil then
       force_value = false
     end
-    if tree.version then
-      do
-        local get_version = compile.action[("Nomsu version"):as_lua_id()]
-        if get_version then
-          do
-            local upgrade = compile.action[("1 upgraded from 2 to"):as_lua_id()]
-            if upgrade then
-              tree = upgrade(tree, tree.version, get_version())
-            end
-          end
-        end
-      end
-    end
     local _exp_0 = tree.type
     if "Action" == _exp_0 then
       local stub = tree.stub
       local compile_action = compile.action[stub]
       if not compile_action and math_expression:match(stub) then
-        compile_action = compile_math_expression
+        local lua = LuaCode:from(tree.source)
+        for i, tok in ipairs(tree) do
+          if type(tok) == 'string' then
+            lua:append(tok)
+          else
+            local tok_lua = compile(tok)
+            if tok.type == "Action" then
+              tok_lua:parenthesize()
+            end
+            lua:append(tok_lua)
+          end
+          if i < #tree then
+            lua:append(" ")
+          end
+        end
+        return lua
       end
       if compile_action and not tree.target then
         local args
@@ -225,20 +208,21 @@ local compile = setmetatable({
           end
           args = _accum_0
         end
-        local ret = compile_action(compile, tree, unpack(args))
+        local ret = compile_action(compile, unpack(args))
         if ret == nil then
           local info = debug.getinfo(compile_action, "S")
           local filename = Source:from_string(info.source).filename
           compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
         end
         if not (SyntaxTree:is_instance(ret)) then
+          ret.source = ret.source or tree.source
           return ret
         end
         if ret ~= tree then
           return compile(ret)
         end
       end
-      local lua = LuaCode(tree.source)
+      local lua = LuaCode:from(tree.source)
       if tree.target then
         local target_lua = compile(tree.target)
         local target_text = target_lua:text()
@@ -269,7 +253,7 @@ local compile = setmetatable({
       lua:append(")")
       return lua
     elseif "EscapedNomsu" == _exp_0 then
-      local lua = LuaCode(tree.source, "SyntaxTree{")
+      local lua = LuaCode:from(tree.source, "SyntaxTree{")
       local needs_comma, i = false, 1
       local as_lua
       as_lua = function(x)
@@ -304,7 +288,7 @@ local compile = setmetatable({
       return lua
     elseif "Block" == _exp_0 then
       if not force_value then
-        local lua = LuaCode(tree.source)
+        local lua = LuaCode:from(tree.source)
         lua:concat_append((function()
           local _accum_0 = { }
           local _len_0 = 1
@@ -317,7 +301,7 @@ local compile = setmetatable({
         end)(), "\n")
         return lua
       else
-        local lua = LuaCode(tree.source)
+        local lua = LuaCode:from(tree.source)
         lua:append("((function()")
         for i, line in ipairs(tree) do
           lua:append("\n    ", compile(line))
@@ -326,7 +310,7 @@ local compile = setmetatable({
         return lua
       end
     elseif "Text" == _exp_0 then
-      local lua = LuaCode(tree.source)
+      local lua = LuaCode:from(tree.source)
       local string_buffer = ""
       for i, bit in ipairs(tree) do
         local _continue_0 = false
@@ -348,7 +332,7 @@ local compile = setmetatable({
             lua:append("..")
           end
           if bit.type ~= "Text" then
-            bit_lua = LuaCode(bit.source, "tostring(", bit_lua, ")")
+            bit_lua = LuaCode:from(bit.source, "tostring(", bit_lua, ")")
           end
           lua:append(bit_lua)
           _continue_0 = true
@@ -368,7 +352,7 @@ local compile = setmetatable({
       end
       return lua
     elseif "List" == _exp_0 or "Dict" == _exp_0 then
-      local lua = LuaCode(tree.source, tostring(tree.type) .. "{")
+      local lua = LuaCode:from(tree.source, tostring(tree.type) .. "{")
       local i = 1
       local sep = ''
       while i <= #tree do
@@ -389,32 +373,38 @@ local compile = setmetatable({
       end
       lua:append("}")
       if i <= #tree then
-        lua = LuaCode(tree.source, "(function()\n    local it = ", lua)
+        lua = LuaCode:from(tree.source, "(function()\n    local comprehension = ", lua)
+        if tree.type == "List" then
+          lua:append("\n    local function add(x) comprehension[#comprehension+1] = x end")
+        else
+          lua:append("\n    local function " .. tostring(("add 1 ="):as_lua_id()) .. "(k, v) comprehension[k] = v end")
+        end
         while i <= #tree do
           lua:append("\n    ")
           if tree[i].type == 'Block' or tree[i].type == 'Comment' then
             lua:append(compile(tree[i]))
           elseif tree[i].type == "DictEntry" then
-            lua:append("it[ ", compile(tree[i][1]), "] = ", (tree[i][2] and compile(tree[i][2]) or "true"))
+            local entry_lua = compile(tree[i])
+            lua:append((entry_lua:text():sub(1, 1) == '[' and "comprehension" or "comprehension."), entry_lua)
           else
-            lua:append("it:add(", compile(tree[i]), ")")
+            lua:append("comprehension[#comprehension+1] = ", compile(tree[i]))
           end
           i = i + 1
         end
-        lua:append("\n    return it\nend)()")
+        lua:append("\n    return comprehension\nend)()")
       end
       return lua
     elseif "DictEntry" == _exp_0 then
       local key, value = tree[1], tree[2]
       local key_lua = compile(key)
-      local value_lua = value and compile(value) or LuaCode(key.source, "true")
+      local value_lua = value and compile(value) or LuaCode:from(key.source, "true")
       local key_str = match(key_lua:text(), [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
       if key_str and key_str:is_lua_id() then
-        return LuaCode(tree.source, key_str, "=", value_lua)
+        return LuaCode:from(tree.source, key_str, "=", value_lua)
       elseif sub(key_lua:text(), 1, 1) == "[" then
-        return LuaCode(tree.source, "[ ", key_lua, "]=", value_lua)
+        return LuaCode:from(tree.source, "[ ", key_lua, "]=", value_lua)
       else
-        return LuaCode(tree.source, "[", key_lua, "]=", value_lua)
+        return LuaCode:from(tree.source, "[", key_lua, "]=", value_lua)
       end
     elseif "IndexChain" == _exp_0 then
       local lua = compile(tree[1])
@@ -437,13 +427,13 @@ local compile = setmetatable({
       end
       return lua
     elseif "Number" == _exp_0 then
-      return LuaCode(tree.source, tostring(tree[1]))
+      return LuaCode:from(tree.source, tostring(tree[1]))
     elseif "Var" == _exp_0 then
-      return LuaCode(tree.source, (tree[1]):as_lua_id())
+      return LuaCode:from(tree.source, (tree[1]):as_lua_id())
     elseif "FileChunks" == _exp_0 then
       return error("Can't convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     elseif "Comment" == _exp_0 then
-      return LuaCode(tree.source, "")
+      return LuaCode:from(tree.source, "")
     elseif "Error" == _exp_0 then
       return error("Can't compile errors")
     else
