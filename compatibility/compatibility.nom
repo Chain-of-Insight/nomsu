@@ -93,6 +93,7 @@ externally [..]
             set %with_upgraded_args 's metatable to (%tree 's metatable)
             %tree = (call %UPGRADES.%ver with [%with_upgraded_args, %end_version])
     
+    %tree.shebang = "#!/usr/bin/env nomsu -V\%end_version"
     return %tree
 
 externally (%tree upgraded from %start_version) means (..)

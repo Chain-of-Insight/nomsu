@@ -172,6 +172,8 @@ tree_to_nomsu = (tree)->
 
     switch tree.type
         when "FileChunks"
+            if tree.shebang
+                nomsu\append tree.shebang, "\n"
             should_clump = (prev_line, line)->
                 if prev_line.type == "Action" and line.type == "Action"
                     if prev_line.stub == "use" then return line.stub == "use"

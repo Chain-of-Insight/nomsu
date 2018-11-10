@@ -223,6 +223,9 @@ tree_to_nomsu = function(tree)
   end
   local _exp_0 = tree.type
   if "FileChunks" == _exp_0 then
+    if tree.shebang then
+      nomsu:append(tree.shebang, "\n")
+    end
     local should_clump
     should_clump = function(prev_line, line)
       if prev_line.type == "Action" and line.type == "Action" then

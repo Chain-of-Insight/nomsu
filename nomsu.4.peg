@@ -6,13 +6,13 @@ file:
     {:curr_indent: %nil :}
     !.
 
-shebang: "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* {:version: [0-9.]+ :} [^%nl]*
+shebang: "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* {:version: [0-9.]+ :} [^%nl]* (%nl / !.)
 
 eof: !.
 
 file_chunks (FileChunks):
     {:curr_indent: ' '* :}
-    shebang? comment? blank_lines?
+    {:shebang: shebang :}?
     (top_block (nl_nodent section_division top_block)*)
     blank_lines?
     ws* unexpected_chunk?

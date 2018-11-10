@@ -45,9 +45,7 @@ for %path in %args:
         %tree = (%code parsed)
         %uptree = (..)
             %tree upgraded from (%start_version or (%tree.version or (Nomsu version))) to %version
-        %text = "\
-            ..#!/usr/bin/env nomsu -V\%version
-            \(%uptree as nomsu)"
+        %text = (%uptree as nomsu)
         
         when:
             %inplace:
