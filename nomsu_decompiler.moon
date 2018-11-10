@@ -198,7 +198,7 @@ tree_to_nomsu = (tree)->
             next_space = ""
             if tree.target
                 target_nomsu = recurse(tree.target)
-                if (tree.target.type == "Block" or tree.target.type == "EscapedNomsu") and not target_nomsu\is_multiline!
+                if tree.target.type == "Block" and not target_nomsu\is_multiline!
                     target_nomsu\parenthesize!
                 nomsu\append target_nomsu
                 nomsu\append(target_nomsu\is_multiline! and "\n..::" or "::")
@@ -211,7 +211,7 @@ tree_to_nomsu = (tree)->
                     next_space = nomsu\trailing_line_len! > MAX_LINE and " \\\n.." or " "
                 else
                     bit_nomsu = recurse(bit)
-                    if i < #tree and (bit.type == "Block" or bit.type == "EscapedNomsu") and not bit_nomsu\is_multiline!
+                    if i < #tree and bit.type == "Block" and not bit_nomsu\is_multiline!
                         bit_nomsu\parenthesize!
 
                     if next_space == " " and not bit_nomsu\is_multiline! and nomsu\trailing_line_len! + #bit_nomsu\text! > MAX_LINE
@@ -225,7 +225,10 @@ tree_to_nomsu = (tree)->
             return nomsu
 
         when "EscapedNomsu"
-            return NomsuCode tree.source, "\\", recurse(tree[1])
+            nomsu = recurse(tree[1])
+            if tree[1].type == 'Block' and not nomsu\is_multiline!
+                nomsu\parenthesize!
+            return NomsuCode tree.source, "\\", nomsu
 
         when "Block"
             for i, line in ipairs tree
@@ -284,8 +287,6 @@ tree_to_nomsu = (tree)->
                 item_nomsu = tree_to_inline_nomsu(item)
                 if #item_nomsu\text! > MAX_LINE
                     item_nomsu = recurse(item)
-                elseif item.type == "Block" or item.type == "EscapedNomsu"
-                    item_nomsu\parenthesize!
                 nomsu\append item_nomsu
                 if i < #tree
                     nomsu\append((item_nomsu\is_multiline! or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE) and '\n' or ', ')

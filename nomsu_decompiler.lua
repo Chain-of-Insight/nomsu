@@ -265,7 +265,7 @@ tree_to_nomsu = function(tree)
     local next_space = ""
     if tree.target then
       local target_nomsu = recurse(tree.target)
-      if (tree.target.type == "Block" or tree.target.type == "EscapedNomsu") and not target_nomsu:is_multiline() then
+      if tree.target.type == "Block" and not target_nomsu:is_multiline() then
         target_nomsu:parenthesize()
       end
       nomsu:append(target_nomsu)
@@ -280,7 +280,7 @@ tree_to_nomsu = function(tree)
         next_space = nomsu:trailing_line_len() > MAX_LINE and " \\\n.." or " "
       else
         local bit_nomsu = recurse(bit)
-        if i < #tree and (bit.type == "Block" or bit.type == "EscapedNomsu") and not bit_nomsu:is_multiline() then
+        if i < #tree and bit.type == "Block" and not bit_nomsu:is_multiline() then
           bit_nomsu:parenthesize()
         end
         if next_space == " " and not bit_nomsu:is_multiline() and nomsu:trailing_line_len() + #bit_nomsu:text() > MAX_LINE then
@@ -295,7 +295,11 @@ tree_to_nomsu = function(tree)
     end
     return nomsu
   elseif "EscapedNomsu" == _exp_0 then
-    return NomsuCode(tree.source, "\\", recurse(tree[1]))
+    nomsu = recurse(tree[1])
+    if tree[1].type == 'Block' and not nomsu:is_multiline() then
+      nomsu:parenthesize()
+    end
+    return NomsuCode(tree.source, "\\", nomsu)
   elseif "Block" == _exp_0 then
     for i, line in ipairs(tree) do
       local line_nomsu = tree_to_nomsu(line)
@@ -367,8 +371,6 @@ tree_to_nomsu = function(tree)
       local item_nomsu = tree_to_inline_nomsu(item)
       if #item_nomsu:text() > MAX_LINE then
         item_nomsu = recurse(item)
-      elseif item.type == "Block" or item.type == "EscapedNomsu" then
-        item_nomsu:parenthesize()
       end
       nomsu:append(item_nomsu)
       if i < #tree then
