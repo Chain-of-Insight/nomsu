@@ -236,7 +236,7 @@ tree_to_nomsu = function(tree)
         nomsu:append("\n\n" .. tostring(("~"):rep(80)) .. "\n\n")
       end
       if chunk.type == "Block" then
-        nomsu:append(NomsuCode:from(chunk.source, unpack(tree_to_nomsu(chunk).bits, 2)))
+        nomsu:append(NomsuCode:from(chunk.source, table.unpack(tree_to_nomsu(chunk).bits, 2)))
       else
         nomsu:append(tree_to_nomsu(chunk))
       end
