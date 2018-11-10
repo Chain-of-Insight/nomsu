@@ -217,7 +217,10 @@ tree_to_nomsu = (tree)->
                         bit_nomsu\parenthesize!
 
                     if next_space == " " and not bit_nomsu\is_multiline! and nomsu\trailing_line_len! + #bit_nomsu\text! > MAX_LINE
-                        next_space = " \\\n.."
+                        if bit.type == 'Action'
+                            bit_nomsu = NomsuCode\from bit.source, "(..)\n    ", tree_to_nomsu(bit)
+                        else
+                            next_space = " \\\n.."
                     unless next_space == " " and bit.type == "Block"
                         nomsu\append next_space
 
@@ -230,7 +233,7 @@ tree_to_nomsu = (tree)->
             nomsu = recurse(tree[1])
             if tree[1].type == 'Block' and not nomsu\is_multiline!
                 nomsu\parenthesize!
-            return NomsuCode tree.source, "\\", nomsu
+            return NomsuCode\from tree.source, "\\", nomsu
 
         when "Block"
             for i, line in ipairs tree

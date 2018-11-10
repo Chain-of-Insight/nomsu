@@ -287,7 +287,11 @@ tree_to_nomsu = function(tree)
           bit_nomsu:parenthesize()
         end
         if next_space == " " and not bit_nomsu:is_multiline() and nomsu:trailing_line_len() + #bit_nomsu:text() > MAX_LINE then
-          next_space = " \\\n.."
+          if bit.type == 'Action' then
+            bit_nomsu = NomsuCode:from(bit.source, "(..)\n    ", tree_to_nomsu(bit))
+          else
+            next_space = " \\\n.."
+          end
         end
         if not (next_space == " " and bit.type == "Block") then
           nomsu:append(next_space)
@@ -302,7 +306,7 @@ tree_to_nomsu = function(tree)
     if tree[1].type == 'Block' and not nomsu:is_multiline() then
       nomsu:parenthesize()
     end
-    return NomsuCode(tree.source, "\\", nomsu)
+    return NomsuCode:from(tree.source, "\\", nomsu)
   elseif "Block" == _exp_0 then
     for i, line in ipairs(tree) do
       local line_nomsu = tree_to_nomsu(line)
