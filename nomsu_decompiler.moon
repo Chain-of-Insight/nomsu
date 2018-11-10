@@ -209,11 +209,12 @@ tree_to_nomsu = (tree)->
 
             for i,bit in ipairs tree
                 if type(bit) == "string"
-                    clump_words = if type(tree[i-1]) == 'string'
-                        is_operator(bit) != is_operator(tree[i-1])
-                    else bit == "'"
-                    nomsu\append " " if i > 1 and not clump_words
-                    nomsu\append bit
+                    if next_space == " "
+                        clump_words = if type(tree[i-1]) == 'string'
+                            is_operator(bit) != is_operator(tree[i-1])
+                        else bit == "'"
+                        next_space = "" if clump_words
+                    nomsu\append next_space, bit
                     next_space = nomsu\trailing_line_len! > MAX_LINE and " \\\n.." or " "
                 else
                     bit_nomsu = recurse(bit)

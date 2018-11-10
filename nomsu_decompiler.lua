@@ -281,16 +281,18 @@ tree_to_nomsu = function(tree)
     end
     for i, bit in ipairs(tree) do
       if type(bit) == "string" then
-        local clump_words
-        if type(tree[i - 1]) == 'string' then
-          clump_words = is_operator(bit) ~= is_operator(tree[i - 1])
-        else
-          clump_words = bit == "'"
+        if next_space == " " then
+          local clump_words
+          if type(tree[i - 1]) == 'string' then
+            clump_words = is_operator(bit) ~= is_operator(tree[i - 1])
+          else
+            clump_words = bit == "'"
+          end
+          if clump_words then
+            next_space = ""
+          end
         end
-        if i > 1 and not clump_words then
-          nomsu:append(" ")
-        end
-        nomsu:append(bit)
+        nomsu:append(next_space, bit)
         next_space = nomsu:trailing_line_len() > MAX_LINE and " \\\n.." or " "
       else
         local bit_nomsu = recurse(bit)
