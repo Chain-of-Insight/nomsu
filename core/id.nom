@@ -22,9 +22,9 @@ set %id_by_obj 's metatable to {..}
                 return %self.%nil_surrogate
             if (%key != %key):
                 return %self.%NaN_surrogate
-            --- %retry ---
+            --- (retry) ---
             %id = (uuid)
-            if (%obj_by_id.%id != (nil)): go to %retry
+            if (%obj_by_id.%id != (nil)): go to (retry)
             %self.%key = %id
             %obj_by_id.%id = %key
             return %id
