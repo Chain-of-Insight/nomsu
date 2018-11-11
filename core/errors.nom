@@ -7,10 +7,6 @@ use "core/metaprogramming.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (barf %msg) compiles to "error(\(=lua "\%msg and \(%msg as lua expr) or 'nil'"), 0);"
-(compile error at %tree %msg) compiles to "\
-    ..nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr))"
-(compile error at %tree %msg hint %hint) compiles to "\
-    ..nomsu:compile_error(\(%tree as lua expr), \(%msg as lua expr), \(%hint as lua expr))"
 
 (assume %condition) compiles to:
     lua> "\
