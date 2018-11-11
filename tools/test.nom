@@ -1,8 +1,8 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     Tool to run all tests in a file (i.e. the code block inside a call to 'test %'). Usage:
     nomsu tools/test.nom file1 file2 directory1 ...
-
+    
 use "lib/os.nom"
 use "lib/consolecolor.nom"
 
@@ -17,16 +17,15 @@ if (%args.1 == "-v"):
 for %path in (command line args):
     for file %filename in %path:
         if (%filename::matches "%.nom$"): use %filename
-
 for %path in (command line args): use %path
-%tests = ((=lua "Source:from_string(\%s)") = %t for %s = %t in (tests))
+%tests = {: for %s = %t in (tests): add (=lua "Source:from_string(\%s)") = %t}
 for %path in (command line args):
     for file %filename in %path:
         unless (%filename::matches "%.nom$"): do next %filename
         %file_tests = []
         for %src = %test in %tests:
             if (%src.filename == %filename):
-                %file_tests::add {test:%test, source:%src}
+                %file_tests::add {test: %test, source: %src}
         
         unless (%file_tests is empty):
             sort %file_tests by % -> %.source
@@ -37,6 +36,7 @@ for %path in (command line args):
                     say "    \(yellow (%.test::with "\n" -> "\n    "))"
                 run %.test
             
-            if %verbose: say (green "PASS")
+            if %verbose:
+                say (green "PASS")
             ..else:
                 say "\r[\(green "PASS")"

@@ -1,28 +1,26 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     A library for simple object oriented programming.
-
+    
 %globals.METAMETHOD_MAP = {..}
-    "as text": "__tostring", "clean up": "__gc",
-    "+": "__add", "-": "__sub", "*": "__mul", "/": "__div",
-    "negative": "__unm", "//": "__idiv", "mod": "__mod", "^": "__pow",
-    "&": "__band", "|": "__bor", "~": "__bxor", "~": "__bnot",
-    "<<": "__bshl", ">>": "__bshr", "==": "__eq", "<": "__lt",
-    "<=": "__le", "set 1 =": "__newindex", "size": "__len",
-    "iterate": "__ipairs", "iterate all": "__pairs",
+    "as text": "__tostring", "clean up": "__gc", "+": "__add", "-": "__sub"
+    "*": "__mul", "/": "__div", negative: "__unm", "//": "__idiv", mod: "__mod"
+    "^": "__pow", "&": "__band", "|": "__bor", "~": "__bxor", "~": "__bnot"
+    "<<": "__bshl", ">>": "__bshr", "==": "__eq", "<": "__lt", "<=": "__le"
+    "set 1 =": "__newindex", size: "__len", iterate: "__ipairs", "iterate all": "__pairs"
 
 test:
     a (Dog) is a thing:
         that can (set up) by:
             %its.barks or= 0
+        
         whose [bark, woof] all mean:
-            %barks = ("Bark!" for % in 1 to %its.barks)
+            %barks = [: for % in 1 to %its.barks: add "Bark!"]
             return (%barks::joined with " ")
-        that can (get pissed off) by:
-            %its.barks += 1
+        
+        that can (get pissed off) by: %its.barks += 1
     (Dog).genus = "Canus"
-    
-    %d = (a Dog with {barks:2})
+    %d = (a Dog with {barks: 2})
     assume (type of %d) == "Dog"
     assume (%d is a "Dog")
     assume %d.barks == 2
@@ -37,36 +35,37 @@ test:
     assume (%d.barks == 3)
     %d2 = (a Dog)
     assume (%d2.barks == 0) or barf "Default initializer failed"
-    with {%d:a Dog with {barks:1}}:
+    with {%d: a Dog with {barks: 1}}:
         assume ((%d::bark) == "Bark!")
+    
     a (Corgi) is a thing:
         that can [set up, get pissed off] like a (Dog)
         whose (sploot) means "splooted"
         whose [bark, woof] all mean:
-            %barks = ("Yip!" for % in 1 to %its.barks)
+            %barks = [: for % in 1 to %its.barks: add "Yip!"]
             return (%barks::joined with " ")
     
     %corg = (a Corgi)
     assume (%corg.barks == 0)
-    with {%d:a Corgi with {barks:1}}:
+    with {%d: a Corgi with {barks: 1}}:
         assume ((%d::sploot) == "splooted") or barf "subclass method failed"
         assume ((%d::bark) == "Yip!") or barf "inheritance failed"
         assume ((%d::woof) == "Yip!")
     
-    with {%d:a Dog with {barks:2}}:
+    with {%d: a Dog with {barks: 2}}:
         assume ((%d::bark) == "Bark! Bark!")
 
 [..]
-    that can %actions by %body,
-    whose %actions means %body, whose %actions all mean %body,
+    that can %actions by %body, whose %actions means %body
+    whose %actions all mean %body
 ..all compile to:
-    unless (%actions.type == "List"): %actions = [%actions]
+    unless (%actions.type == "List"):
+        %actions = [%actions]
+    
     lua> "\
         ..local fn_name = \%actions[1].stub:as_lua_id()
         local \%args = List{\(\%its), unpack(\%actions[1]:get_args())}
-        local lua = LuaCode("class.", fn_name, " = ", \(..)
-            what (%args -> %body) compiles to
-        ..)
+        local lua = LuaCode("class.", fn_name, " = ", \(what (%args -> %body) compiles to))
         for i=2,#\%actions do
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
@@ -85,8 +84,8 @@ test:
         return lua"
 
 [..]
-    that can %actions like a %class, that can %actions like an %class,
-    that has %actions like a %class, that has %actions like an %class,
+    that can %actions like a %class, that can %actions like an %class
+    that has %actions like a %class, that has %actions like an %class
 ..all compile to:
     %lua = (Lua "")
     %class_expr = (%class as lua expr)
@@ -96,13 +95,15 @@ test:
     %lua::add %lines joined with "\n"
     return %lua
 
-
 (a %classname is a thing with %members %class_body) compiles to:
     unless (%classname.type == "Action"):
-        compile error at %classname "Expected this to be an action, not a \(%classname.type)"
+        compile error at %classname "\
+            ..Expected this to be an action, not a \%classname.type"
+    
     for % in %classname:
         unless (% is text):
             compile error at % "Class names should not have arguments."
+    
     return (..)
         Lua "\
             ..do
@@ -142,4 +143,5 @@ test:
                 end
             end"
 
-(a %classname is a thing %class_body) parses as (a %classname is a thing with (nil) %class_body)
+(a %classname is a thing %class_body) parses as (..)
+    a %classname is a thing with (nil) %class_body

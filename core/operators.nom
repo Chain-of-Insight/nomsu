@@ -1,7 +1,7 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file contains definitions of operators like "+" and "and".
-
+    
 use "core/metaprogramming.nom"
 use "core/errors.nom"
 
@@ -16,7 +16,6 @@ test:
 (%x <= %y) compiles to "(\(%x as lua expr) <= \(%y as lua expr))"
 (%x >= %y) compiles to "(\(%x as lua expr) >= \(%y as lua expr))"
 [%a is %b, %a == %b] all compile to "(\(%a as lua expr) == \(%b as lua expr))"
-
 [%a isn't %b, %a is not %b, %a not= %b, %a != %b] all compile to "\
     ..(\(%a as lua expr) ~= \(%b as lua expr))"
 
@@ -38,9 +37,9 @@ test:
         return lua"
 
 test:
-    set {%x:10, %y:20}
+    set {%x: 10, %y: 20}
     assume ((%x == 10) and (%y == 20)) or barf "mutli-assignment failed."
-    set {%x:%y, %y:%x}
+    set {%x: %y, %y: %x}
     assume ((%y == 10) and (%x == 20)) or barf "swapping vars failed."
 
 # Simultaneous mutli-assignments like: x,y,z = 1,x,3;
@@ -48,6 +47,7 @@ test:
 (set %assignments) compiles to:
     assume (%assignments.type is "Dict") or barf "\
         ..Expected a Dict for the assignments part of '<- %' statement, not \%assignments"
+    
     lua> "\
         ..local lhs, rhs = LuaCode(), LuaCode()
         for i, item in ipairs(\%assignments) do
@@ -74,40 +74,37 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    set {%foozle:"outer", %y:"outer"}
+    set {%foozle: "outer", %y: "outer"}
     externally (set global x local y) means:
         external %foozle = "inner"
         %y = "inner"
-    
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
 (external %var = %value) compiles to "\(%var as lua) = \(%value as lua)"
-
 test:
-    set {%foozle:"outer", %y:"outer"}
+    set {%foozle: "outer", %y: "outer"}
     externally (set global x local y) means:
         with external [%foozle]:
             %foozle = "inner"
             %y = "inner"
-    
     set global x local y
     assume ((%foozle == "inner") and (%y == "outer")) or barf "\
         ..'with external' failed."
+
 (with external %externs %body) compiles to:
     %body_lua = (%body as lua)
-    lua> "\
-        ..\%body_lua:remove_free_vars(table.map(\%externs, function(v) return compile(v):text() end))"
+    lua> "\%body_lua:remove_free_vars(table.map(\%externs, function(v) return compile(v):text() end))"
     return %body_lua
 
 test:
-    set {%x:1, %y:2}
-    with {%z:nil, %x:999}:
+    set {%x: 1, %y: 2}
+    with {%z: nil, %x: 999}:
         %z = 999
         assume (%z == 999) or barf "'with' failed."
         assume (%x == 999) or barf "'with' assignment failed."
-    
     assume (%x == 1) or barf "'with' scoping failed"
     assume (%z == (nil)) or barf "'with' scoping failed"
+
 (with %assignments %body) compiles to:
     %lua = (%body as lua)
     lua> "\
@@ -132,18 +129,14 @@ test:
         end
         \%lua:remove_free_vars(vars)
         \%lua:prepend("local ", lhs, " = ", rhs, ";\\n")"
-    
-    return (..)
-        Lua "\
-            ..do
-                \%lua
-            end -- 'with' block"
+    return (Lua "do\n    \%lua\nend -- 'with' block")
 
 # Math Operators
 test:
     assume ((5 wrapped around 2) == 1) or barf "mod not working"
-[%x wrapped around %y, %x mod %y] all compile to (..)
-    "((\(%x as lua expr)) % (\(%y as lua expr)))"
+
+[%x wrapped around %y, %x mod %y] all compile to "\
+    ..((\(%x as lua expr)) % (\(%y as lua expr)))"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
@@ -152,10 +145,10 @@ test:
     (one) means:
         external %calls = (%calls + 1)
         return 1
-    
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
     assume (%calls == 1) or barf "\
         ..Three-way comparison evaluated middle value multiple times"
+
 (%x < %y < %z) parses as (..)
     call ([%a, %b, %c] -> ((%a < %b) and (%b < %c))) with [%x, %y, %z]
 
@@ -206,13 +199,21 @@ test:
     fall back to bit.bor(), bit.band(), etc.
 lua> "if \((is jit) or ((Lua version) == "Lua 5.2")) then"
 [NOT %, ~ %] all compile to "bit.bnot(\(% as lua expr))"
-[%x OR %y, %x | %y] all compile to "bit.bor(\(%x as lua expr), \(%y as lua expr))"
-[%x XOR %y, %x ~ %y] all compile to "bit.bxor(\(%x as lua expr), \(%y as lua expr))"
-[%x AND %y, %x & %y] all compile to "bit.band(\(%x as lua expr), \(%y as lua expr))"
+[%x OR %y, %x | %y] all compile to "\
+    ..bit.bor(\(%x as lua expr), \(%y as lua expr))"
+
+[%x XOR %y, %x ~ %y] all compile to "\
+    ..bit.bxor(\(%x as lua expr), \(%y as lua expr))"
+
+[%x AND %y, %x & %y] all compile to "\
+    ..bit.band(\(%x as lua expr), \(%y as lua expr))"
+
 [%x LSHIFT %shift, %x << %shift] all compile to "\
     ..bit.lshift(\(%x as lua expr), \(%shift as lua expr))"
+
 [%x RSHIFT %shift, %x >> %shift] all compile to "\
     ..bit.rshift(\(%x as lua expr), \(%shift as lua expr))"
+
 lua> "else"
 [NOT %, ~ %] all compile to "~(\(% as lua expr))"
 [%x OR %y, %x | %y] all compile to "(\(%x as lua expr) | \(%y as lua expr))"
@@ -220,8 +221,10 @@ lua> "else"
 [%x AND %y, %x & %y] all compile to "(\(%x as lua expr) & \(%y as lua expr))"
 [%x LSHIFT %shift, %x << %shift] all compile to "\
     ..(\(%x as lua expr) << \(%shift as lua expr))"
+
 [%x RSHIFT %shift, %x >> %shift] all compile to "\
     ..(\(%x as lua expr) >> \(%shift as lua expr))"
+
 lua> "end"
 
 # Unary operators
@@ -230,11 +233,9 @@ test:
     assume ((not (yes)) == (no))
 (- %) compiles to "(- \(% as lua expr))"
 (not %) compiles to "(not \(% as lua expr))"
-
 test:
     assume ((size of [1, 2, 3]) == 3)
 (size of %list) compiles to "(#\(%list as lua expr))"
-
 (%list is empty) compiles to "(#\(%list as lua expr) == 0)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

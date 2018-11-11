@@ -1,7 +1,7 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file contains definitions pertaining to variable scoping
-
+    
 use "core/metaprogramming.nom"
 use "core/operators.nom"
 use "core/collections.nom"
@@ -14,34 +14,26 @@ test:
     with local %x:
         %x = "inner"
         assume (%x == "inner")
-    
     assume (%x == "outer")
     externally (foo) means "outer foo"
     with local [(foo)'s meaning]:
         externally (foo) means "inner foo"
         assume ((foo) == "inner foo")
-    
     assume ((foo) == "outer foo")
+
 [with local %locals %body, with local %locals do %body] all compile to:
     %body_lua = (%body as lua)
     if %locals.type is:
         "Dict":
-            %body_lua = (..)
-                Lua "\
-                    ..\(what (<- %locals) compiles to)
-                    \%body_lua"
-            
-            %body_lua::declare locals ("\(%.1 as lua)" for % in %locals)
+            %body_lua = (Lua "\(what (<- %locals) compiles to)\n\%body_lua")
+            %body_lua::declare locals [: for % in %locals: add "\(%.1 as lua)"]
         
         "List":
-            %body_lua::declare locals ("\(% as lua)" for % in %locals)
+            %body_lua::declare locals [: for % in %locals: add "\(% as lua)"]
+        
         "Var" "Action":
             %body_lua::declare locals ["\(%locals as lua)"]
+        
         else:
             compile error at %locals "Unexpected local value"
-    
-    return (..)
-        Lua "\
-            ..do
-                \%body_lua
-            end"
+    return (Lua "do\n    \%body_lua\nend")

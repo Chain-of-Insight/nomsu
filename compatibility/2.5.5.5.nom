@@ -1,16 +1,14 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file defines upgrades from Nomsu <2.5.5.5 to Nomsu 2.5.5.5
-
+    
 use "compatibility/compatibility.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 upgrade action [hash %, sha1 %] to "2.5.5.5" as (..)
-    =lua "\
-        ..\(base64 decode (hash %)):gsub('.', function(c) return ('%x02'):format(c) end)"
+    =lua "\(base64 decode (hash %)):gsub('.', function(c) return ('%x02'):format(c) end)"
 
 upgrade action [file with hash %] to "2.5.5.5" as (..)
     file with hash (..)
-        base64 (..)
-            =lua "\%:gsub('..', function(xx) return string.char(tonumber(xx, 16)) end)"
+        base64 (=lua "\%:gsub('..', function(xx) return string.char(tonumber(xx, 16)) end)")

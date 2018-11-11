@@ -3,7 +3,7 @@
     Find an action by its stub. Usage:
     nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
     Will print all the code locations and code that uses the stub.
-
+    
 use "lib/os.nom"
 use "lib/consolecolor.nom"
 
@@ -22,19 +22,20 @@ for %path in %files:
         ..and if it barfs %msg:
             say (red "\%filename failed to parse:\n\%msg")
             %tree = (nil)
-        unless %tree: do next %filename
+        
+        unless %tree:
+            do next %filename
+        
         %results = []
         for %t in recursive %tree:
             if ((%t is "Action" syntax tree) and (%t.stub is %stub)):
                 %line_num = (line number of %t.source.start in %file)
                 %results::add {..}
-                    line: %line_num
-                    text: "\
-                        ..\(blue "\%filename:\%line_num:")
-                        \(yellow (source lines of %t))"
+                    line: %line_num, text: "\(blue "\%filename:\%line_num:")\n\(yellow (source lines of %t))"
             
             if (%t is syntax tree):
-                for %sub in %t: recurse %t on %sub
-        
+                for %sub in %t:
+                    recurse %t on %sub
         sort %results by % -> %.line
-        for % in %results: say %.text
+        for % in %results:
+            say %.text

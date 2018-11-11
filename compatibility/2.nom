@@ -1,7 +1,7 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file defines upgrades from Nomsu 1 to Nomsu 2
-
+    
 use "compatibility/compatibility.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -15,21 +15,22 @@ upgrade %tree to "2" as:
         %false_body = (%tree.5 upgraded)
         unless (%false_body is "Block" syntax tree):
             %false_body = (=lua "Block(\%false_body.source, \%false_body)")
+        
         return (..)
             \(if %cond %true_body else %false_body) with vars {..}
-                cond:%tree.2 upgraded, true_body:%true_body, false_body:%false_body
+                cond: %tree.2 upgraded, true_body: %true_body, false_body: %false_body
     
     %need_blocks = [..]
-        "if", "unless", "for 1 in", "for 1 = 2 in", "repeat while 1"
-        "repeat 1 times", "repeat", "repeat until 1", "for 1 in 2 to 3 by"
-        "for 1 in 2 to 3 via", "for 1 in 2 to", "for 1 2 in"
-        "do", "for 1 in recursive", "test", "with", "result of", "when"
+        "if", "unless", "for 1 in", "for 1 = 2 in", "repeat while 1", "repeat 1 times"
+        "repeat", "repeat until 1", "for 1 in 2 to 3 by", "for 1 in 2 to 3 via"
+        "for 1 in 2 to", "for 1 2 in", "do", "for 1 in recursive", "test", "with", "result of"
+        "when"
     
     for %n in %need_blocks:
         if (%tree.stub is %n):
-            %bits = (((% upgraded) if (% is syntax tree) else %) for % in %tree)
+            %bits = [: for % in %tree: add ((% upgraded) if (% is syntax tree) else %)]
             unless ((%bits::last) is "Block" syntax tree):
                 %body = (%bits::last)
-                %bits.(size of %bits) = (=lua "SyntaxTree{type='Block', source=\%body.source, \%body}")
-            
+                %bits.(size of %bits) = (..)
+                    =lua "SyntaxTree{type='Block', source=\%body.source, \%body}"
             return (=lua "SyntaxTree{type='Action', source=\%tree.source, unpack(\%bits)}")

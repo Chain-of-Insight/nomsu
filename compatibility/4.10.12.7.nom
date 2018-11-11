@@ -9,22 +9,33 @@ upgrade action (% as lua statements) to "4.10.12.7" as (% as lua)
 upgrade action (% as lua return) to "4.10.12.7" as (..)
     =lua "\%.type == 'Block' and \(% as lua) or 'return '..\(% as lua expr)"
 upgrade action (Lua value %) to "4.10.12.7" as (Lua %)
+upgrade action (%e for % in %items) to "4.10.12.7" as [: for % in %items: add %e]
+upgrade action (%e for %k = %v in %items) to "4.10.12.7" as [..]
+    : for %k = %v in %items: add %e
 
-upgrade action (%e for % in %items) to "4.10.12.7" as [:for % in %items: add %e]
-upgrade action (%e for %k = %v in %items) to "4.10.12.7" as [:for %k = %v in %items: add %e]
-upgrade action (%e for %i in %start to %stop) to "4.10.12.7" as [:for %i in %start to %stop: add %e]
-upgrade action (%e for %i in %start to %stop by %step) to "4.10.12.7" as (..)
-    [:for %i in %start to %stop by %step: add %e]
-upgrade action (%e for %i in %start to %stop via %step) to "4.10.12.7" as (..)
-    [:for %i in %start to %stop by %step: add %e]
+upgrade action (%e for %i in %start to %stop) to "4.10.12.7" as [..]
+    : for %i in %start to %stop: add %e
 
-upgrade action (%k = %v for % in %items) to "4.10.12.7" as {:for % in %items: add %k = %v}
-upgrade action (%k = %v for %k0 = %v0 in %items) to "4.10.12.7" as {:for %k0 = %v0 in %items: add %k = %v}
-upgrade action (%k = %v for %i in %start to %stop) to "4.10.12.7" as {:for %i in %start to %stop: add %k = %v}
-upgrade action (%k = %v for %i in %start to %stop by %step) to "4.10.12.7" as (..)
-    {:for %i in %start to %stop by %step: add %k = %v}
-upgrade action (%k = %v for %i in %start to %stop via %step) to "4.10.12.7" as (..)
-    {:for %i in %start to %stop by %step: add %k = %v}
+upgrade action (%e for %i in %start to %stop by %step) to "4.10.12.7" as [..]
+    : for %i in %start to %stop by %step: add %e
+
+upgrade action (%e for %i in %start to %stop via %step) to "4.10.12.7" as [..]
+    : for %i in %start to %stop by %step: add %e
+
+upgrade action (%k = %v for % in %items) to "4.10.12.7" as {..}
+    : for % in %items: add %k = %v
+
+upgrade action (%k = %v for %k0 = %v0 in %items) to "4.10.12.7" as {..}
+    : for %k0 = %v0 in %items: add %k = %v
+
+upgrade action (%k = %v for %i in %start to %stop) to "4.10.12.7" as {..}
+    : for %i in %start to %stop: add %k = %v
+
+upgrade action (%k = %v for %i in %start to %stop by %step) to "4.10.12.7" as {..}
+    : for %i in %start to %stop by %step: add %k = %v
+
+upgrade action (%k = %v for %i in %start to %stop via %step) to "4.10.12.7" as {..}
+    : for %i in %start to %stop by %step: add %k = %v
 
 upgrade action (% as lua statements) to "4.10.12.7" as (% as lua)
 upgrade action (compile error at %pos %err hint %hint) to "4.10.12.7" as (..)
@@ -38,11 +49,13 @@ upgrade %tree to "4.10.12.7" as:
         repeat while (%i < (size of %first_chunk)):
             if %first_has_use:
                 if ((%first_chunk.%i.type != "Action") or (%first_chunk.%i.stub != "use")):
-                    %chunk2 = (%SyntaxTree {type:"Block"})
+                    %chunk2 = (%SyntaxTree {type: "Block"})
                     for %j in %i to (size of %first_chunk.%i):
                         %chunk2.((size of %chunk2) + 1) = %first_chunk.%i.%j
+                    
                     for %j in %i to (size of %first_chunk.%i):
                         %first_chunk.%i.%j = (nil)
+                    
                     %table.insert %tree 2 %chunk2
                     return %tree
             ..else:

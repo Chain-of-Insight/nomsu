@@ -1,10 +1,10 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     Tool to automatically update code from old versions of Nomsu. Usage:
     nomsu tools/upgrade.nom [-i] file1 file2 directory1 ...
     If "-i" is the first argument, upgrades will be performed in-place. Otherwise, the
     upgraded code will be printed.
-
+    
 use "compatibility"
 use "lib/os.nom"
 
@@ -44,9 +44,9 @@ for %path in %args:
         %code = (%NomsuCode::from (%Source %filename 1 (size of %file)) %file)
         %tree = (%code parsed)
         %uptree = (..)
-            %tree upgraded from (%start_version or (%tree.version or (Nomsu version))) to %version
+            %tree upgraded from (%start_version or (%tree.version or (Nomsu version))) to \
+            ..%version
         %text = ((%uptree as nomsu)::text)
-        
         when:
             %inplace:
                 say "Upgraded \%filename"
@@ -58,4 +58,5 @@ for %path in %args:
                 ..else:
                     say (bright "\%filename will be changed")
             
-            else: say %text
+            else:
+                say %text

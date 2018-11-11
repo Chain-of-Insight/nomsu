@@ -1,7 +1,7 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file defines some common math literals and functions
-
+    
 use "core/metaprogramming.nom"
 use "core/text.nom"
 use "core/operators.nom"
@@ -28,7 +28,6 @@ test:
     assume (("5" as a number) == 5)
 ((% as a number)'s meaning) = ((tonumber %)'s meaning)
 ((% as number)'s meaning) = ((tonumber %)'s meaning)
-
 test:
     assume (..)
         all of [..]
@@ -36,101 +35,108 @@ test:
             arc tangent 5, arc tangent 5 / 10, hyperbolic sine 5, hyperbolic cosine 5
             hyperbolic tangent 5, e^ 5, ln 5, log base 2 of 5, floor 5, ceiling 5, round 5
     ..or barf "math functions failed"
-[absolute value %, | % |, abs %] all compile to (..)
-    "math.abs(\(% as lua expr))"
-
-[square root %, square root of %, √ %, sqrt %] all compile to (..)
-    "math.sqrt(\(% as lua expr))"
-
+[absolute value %, | % |, abs %] all compile to "math.abs(\(% as lua expr))"
+[square root %, square root of %, √ %, sqrt %] all compile to "\
+    ..math.sqrt(\(% as lua expr))"
 [sine %, sin %] all compile to "math.sin(\(% as lua expr))"
 [cosine %, cos %] all compile to "math.cos(\(% as lua expr))"
 [tangent %, tan %] all compile to "math.tan(\(% as lua expr))"
 [arc sine %, asin %] all compile to "math.asin(\(% as lua expr))"
 [arc cosine %, acos %] all compile to "math.acos(\(% as lua expr))"
 [arc tangent %, atan %] all compile to "math.atan(\(% as lua expr))"
-[arc tangent %y / %x, atan2 %y %x] all compile to (..)
-    "math.atan2(\(%y as lua expr), \(%x as lua expr))"
-
-[hyperbolic sine %, sinh %] all compile to (..)
-    "math.sinh(\(% as lua expr))"
-
-[hyperbolic cosine %, cosh %] all compile to (..)
-    "math.cosh(\(% as lua expr))"
-
-[hyperbolic tangent %, tanh %] all compile to (..)
-    "math.tanh(\(% as lua expr))"
-
+[arc tangent %y / %x, atan2 %y %x] all compile to "\
+    ..math.atan2(\(%y as lua expr), \(%x as lua expr))"
+[hyperbolic sine %, sinh %] all compile to "math.sinh(\(% as lua expr))"
+[hyperbolic cosine %, cosh %] all compile to "math.cosh(\(% as lua expr))"
+[hyperbolic tangent %, tanh %] all compile to "math.tanh(\(% as lua expr))"
 [e^ %, exp %] all compile to "math.exp(\(% as lua expr))"
-[natural log %, ln %, log %] all compile to (..)
-    "math.log(\(% as lua expr))"
-
-[log % base %base, log base %base of %] all compile to (..)
-    "math.log(\(% as lua expr), \(%base as lua expr))"
-
+[natural log %, ln %, log %] all compile to "math.log(\(% as lua expr))"
+[log % base %base, log base %base of %] all compile to "\
+    ..math.log(\(% as lua expr), \(%base as lua expr))"
 (floor %) compiles to "math.floor(\(% as lua expr))"
 [ceiling %, ceil %] all compile to "math.ceil(\(% as lua expr))"
-[round %, % rounded] all compile to (..)
-    "math.floor(\(% as lua expr) + .5)"
-
+[round %, % rounded] all compile to "math.floor(\(% as lua expr) + .5)"
 test:
     assume ((463 to the nearest 100) == 500) or barf "rounding failed"
     assume ((2.6 to the nearest 0.25) == 2.5) or barf "rounding failed"
+
 externally (%n to the nearest %rounder) means (..)
     =lua "(\%rounder)*math.floor((\%n / \%rounder) + .5)"
 
 # Any/all
 externally [all of %items, all %items] all mean:
     for % in %items:
-        unless %: return (no)
+        unless %:
+            return (no)
     return (yes)
+
 [all of %items, all %items] all compile to:
     unless (%items.type is "List"):
         return \(all of %items)
-    if ((size of %items) == 0): return (Lua "true")
+    
+    if ((size of %items) == 0):
+        return (Lua "true")
+    
     %lua = (Lua "(")
-    %lua::add ((% as lua expr) for % in %items) joined with " and "
+    %lua::add [: for % in %items: add (% as lua expr)] joined with " and "
     %lua::append ")"
     return %lua
-[not all of %items, not all %items] all parse as (not (all of %items))
 
+[not all of %items, not all %items] all parse as (not (all of %items))
 externally [any of %items, any %items] all mean:
     for % in %items:
-        if %: return (yes)
+        if %:
+            return (yes)
     return (no)
+
 [any of %items, any %items] all compile to:
     unless (%items.type is "List"):
         return \(any of %items)
-    if ((size of %items) == 0): return (Lua "false")
+    
+    if ((size of %items) == 0):
+        return (Lua "false")
+    
     %lua = (Lua "(")
-    %lua::add ((% as lua expr) for % in %items) joined with " or "
+    %lua::add [: for % in %items: add (% as lua expr)] joined with " or "
     %lua::append ")"
     return %lua
+
 [none of %items, none %items] all parse as (not (any of %items))
 
 # Sum/product
 externally [sum of %items, sum %items] all mean:
     %total = 0
-    for % in %items: %total += %
+    for % in %items:
+        %total += %
     return %total
+
 [sum of %items, sum %items] all compile to:
     unless (%items.type is "List"):
         return \(sum of %items)
-    if ((size of %items) == 0): return (Lua "0")
+    
+    if ((size of %items) == 0):
+        return (Lua "0")
+    
     %lua = (Lua "(")
-    %lua::add ((% as lua expr) for % in %items) joined with " + "
+    %lua::add [: for % in %items: add (% as lua expr)] joined with " + "
     %lua::append ")"
     return %lua
 
 externally [product of %items, product %items] all mean:
     %prod = 1
-    for % in %items: %prod *= %
+    for % in %items:
+        %prod *= %
     return %prod
+
 [product of %items, product %items] all compile to:
     unless (%items.type is "List"):
         return \(product of %items)
-    if ((size of %items) == 0): return (Lua "1")
+    
+    if ((size of %items) == 0):
+        return (Lua "1")
+    
     %lua = (Lua "(")
-    %lua::add ((% as lua expr) for % in %items) joined with " * "
+    %lua::add [: for % in %items: add (% as lua expr)] joined with " * "
     %lua::append ")"
     return %lua
 
@@ -156,45 +162,43 @@ externally [avg of %items, average of %items] all mean (..)
 [unless none of %items %body, unless none of %items then %body] all parse as (..)
     if (any of %items) %body
 
-[if all of %items %body else %else, if all of %items then %body else %else] all parse \
-..as (if (all of %items) %body else %else)
+[if all of %items %body else %else, if all of %items then %body else %else] \
+..all parse as (if (all of %items) %body else %else)
 
-[..]
-    unless all of %items %body else %else, unless all of %items then %body else %else
+[unless all of %items %body else %else, unless all of %items then %body else %else] \
 ..all parse as (if (not (all of %items)) %body else %else)
 
-[if any of %items %body else %else, if any of %items then %body else %else] all parse \
-..as (if (any of %items) %body else %else)
+[if any of %items %body else %else, if any of %items then %body else %else] \
+..all parse as (if (any of %items) %body else %else)
 
-[..]
-    unless any of %items %body else %else, unless any of %items then %body else %else
+[unless any of %items %body else %else, unless any of %items then %body else %else] \
 ..all parse as (if (not (any of %items)) %body else %else)
 
-[if none of %items %body else %else, if none of %items then %body else %else] all \
-..parse as (if (not (any of %items)) %body else %else)
+[if none of %items %body else %else, if none of %items then %body else %else] \
+..all parse as (if (not (any of %items)) %body else %else)
 
-[..]
-    unless none of %items %body else %else, unless none of %items then %body else %else
+[unless none of %items %body else %else, unless none of %items then %body else %else] \
 ..all parse as (if (any of %items) %body else %else)
 
 # Min/max
 externally [min of %items, smallest of %items, lowest of %items] all mean:
     %best = (nil)
     for % in %items:
-        if ((%best == (nil)) or (% < %best)):
-            %best = %
+        if ((%best == (nil)) or (% < %best)): %best = %
     return %best
 
-externally [max of %items, biggest of %items, largest of %items, highest of %items] all mean:
+externally [..]
+    max of %items, biggest of %items, largest of %items, highest of %items
+..all mean:
     %best = (nil)
     for % in %items:
-        if ((%best == (nil)) or (% > %best)):
-            %best = %
+        if ((%best == (nil)) or (% > %best)): %best = %
     return %best
 
 test:
     assume ((min of [3, -4, 1, 2] by % = (% * %)) == 1)
     assume ((max of [3, -4, 1, 2] by % = (% * %)) == -4)
+
 (min of %items by %item = %value_expr) parses as (..)
     result of:
         %best = (nil)
@@ -219,17 +223,14 @@ test:
 
 # Random functions
 externally (seed random with %) means:
-    lua> "\
-        ..math.randomseed(\%);
-        for i=1,20 do math.random(); end"
-
+    lua> "math.randomseed(\%);\nfor i=1,20 do math.random(); end"
 (seed random) parses as (seed random with (=lua "os.time()"))
 [random number, random, rand] all compile to "math.random()"
-[random int %n, random integer %n, randint %n] all compile to (..)
-    "math.random(\(%n as lua expr))"
+[random int %n, random integer %n, randint %n] all compile to "\
+    ..math.random(\(%n as lua expr))"
 
-[random from %low to %high, random number from %low to %high, rand %low %high] all \
-..compile to "math.random(\(%low as lua expr), \(%high as lua expr))"
+[random from %low to %high, random number from %low to %high, rand %low %high] \
+..all compile to "math.random(\(%low as lua expr), \(%high as lua expr))"
 
 externally [..]
     random choice from %elements, random choice %elements, random %elements

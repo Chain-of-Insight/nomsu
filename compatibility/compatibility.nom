@@ -1,8 +1,8 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
-
+    
 use "lib/os.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10,7 +10,6 @@ use "lib/os.nom"
 %UPGRADES = {}
 externally (upgrade to %version via %upgrade_fn) means:
     %UPGRADES.%version = %upgrade_fn
-
 %ACTION_UPGRADES = ({} with fallback % -> {})
 externally (upgrade action %stub to %version via %upgrade_fn) means:
     %ACTION_UPGRADES.%version.%stub = %upgrade_fn
@@ -27,7 +26,6 @@ externally (upgrade action %stub to %version via %upgrade_fn) means:
         for %i in 1 to (size of %action):
             if (%action.%i.type is "Var"):
                 %replacements.(%action.%i.1) = "\(\%tree as lua id)[\%i]"
-        
         define mangler
         (make tree %t) means:
             when:
@@ -45,21 +43,20 @@ externally (upgrade action %stub to %version via %upgrade_fn) means:
                             %args::add (make tree %v)
                         ..else:
                             %args::add "\(%k)=\(make tree %v)"
-                    
                     return "SyntaxTree{\(%args::joined with ", ")}"
                 
-                else: return (quote %t)
+                else:
+                    return (quote %t)
         
-        unless ("\%lua" == ""): %lua::append "\n"
+        unless ("\%lua" == ""):
+            %lua::append "\n"
+        
         %retval = (make tree %body)
         %lua::append (..)
             Lua "\
-                ..upgrade_action_1_to_2_via(\(quote %action.stub), \(%version as lua expr), function(\(..)
-                    \%tree as lua id
-                ..)
+                ..upgrade_action_1_to_2_via(\(quote %action.stub), \(%version as lua expr), function(\(\%tree as lua id))
                     return \%retval
                 end)"
-    
     return %lua
 
 externally [..]
@@ -71,8 +68,10 @@ externally [..]
     %versions = {}
     for %v = % in %UPGRADES:
         %versions.%v = (yes)
+    
     for %v = % in %ACTION_UPGRADES:
         %versions.%v = (yes)
+    
     %versions = ((keys in %versions) sorted by % -> (% as list))
     for %ver in %versions:
         if ((%ver as list) <= (%start_version as list)): do next %ver
@@ -81,18 +80,18 @@ externally [..]
             %tree = (..)
                 %tree with % ->:
                     if ((% is "Action" syntax tree) and %ACTION_UPGRADES.%ver.(%.stub)):
-                        %with_upgraded_args = (..)
-                            %k = (%v upgraded from %start_version to %end_version) for %k = %v in %
-                        set %with_upgraded_args 's metatable to (% 's metatable)
-                        return (..)
-                            %ACTION_UPGRADES.%ver.(%.stub) %with_upgraded_args %end_version
+                        %with_upgraded_args = {..}
+                            : for %k = %v in %: add %k = (%v upgraded from %start_version to %end_version)
+                        set %with_upgraded_args's metatable to (%'s metatable)
+                        return (%ACTION_UPGRADES.%ver.(%.stub) %with_upgraded_args %end_version)
         
         if %UPGRADES.%ver:
-            %with_upgraded_args = (..)
-                %k = (%v upgraded from %start_version to %end_version) for %k = %v in %tree
-            set %with_upgraded_args 's metatable to (%tree 's metatable)
+            %with_upgraded_args = {..}
+                :
+                    for %k = %v in %tree:
+                        add %k = (%v upgraded from %start_version to %end_version)
+            set %with_upgraded_args's metatable to (%tree's metatable)
             %tree = (call %UPGRADES.%ver with [%with_upgraded_args, %end_version])
-    
     %tree.shebang = "#!/usr/bin/env nomsu -V\%end_version"
     return %tree
 
@@ -107,7 +106,8 @@ externally (%tree upgraded) means (..)
 
 externally (use %path from version %version) means:
     for file %filename in %path:
-        if (=lua "LOADED[\%filename]"): do next %filename
+        if (=lua "LOADED[\%filename]"):
+            do next %filename
         %file = (read file %filename)
         %tree = (parse %file from %filename)
         %tree = (upgrade %tree from %version)

@@ -1,14 +1,13 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file defines some actions for hashing files and looking up files by hash.
-
+    
 use "lib/os.nom"
 use "lib/base64.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 lua> "local \%use_sha1, \%hashlib = pcall(require, 'openssl.digest')"
-
 test:
     assume (hash "hello world") == (hash "hello world")
     assume ((hash "hello world") != (hash "goodbye")) or barf "\
@@ -25,16 +24,17 @@ test:
     
     assume ((hash "\000") != (hash "\000\000\000\000\000")) or barf "\
         ..Incorrect hashing of null strings"
+    
     if %use_sha1:
         assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
+
 if %use_sha1:
     externally (hash %) means:
         %hash = (=lua "\%hashlib.new('sha1'):final(\%)")
         return (base64 %hash)
 ..else:
     # TODO: remove warning?
-    say "\
-        ..\027[31;1mWARNING: OpenSSL module not found. Defaulting to a non-cryptographically secure hash function.\027[0m"
+    say "\027[31;1mWARNING: OpenSSL module not found. Defaulting to a non-cryptographically secure hash function.\027[0m"
     externally (hash %) means:
         %bytes = (%::bytes)
         %hash = (%bytes.1 << 7)
@@ -47,6 +47,7 @@ externally (file with hash %hash) means:
     for file %filename in ".":
         %contents = (read file %filename)
         %file_hash = (hash %contents)
-        if (%file_hash == %hash): return %filename
+        if (%file_hash == %hash):
+            return %filename
 
 (hash of file %filename) parses as (hash (read file %filename))

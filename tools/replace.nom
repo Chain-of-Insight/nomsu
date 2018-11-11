@@ -1,10 +1,10 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     Tool to find and replace one tree with another.
     nomsu tools/replace.nom [-i] tree_to_replace replacement file1 file2 directory1 ...
     If "-i" is the first argument, replacements will be performed in-place. Otherwise, the
     upgraded code will be printed.
-
+    
 use "lib/os.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -35,9 +35,10 @@ for %path in %args:
             ..#!/usr/bin/env nomsu -V\(%tree.version or (Nomsu version))
             \(%tree2 as nomsu)"
         
-        if:
+        when:
             %inplace:
                 say "Replaced in \%filename"
                 write %text to file %filename
             
-            else: say %text
+            else:
+                say %text

@@ -1,8 +1,8 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.
-
+    
 use "core/metaprogramming.nom"
 use "core/control_flow.nom"
 use "core/operators.nom"
@@ -15,11 +15,11 @@ test:
     %visited = {}
     for %i = %x in %list:
         %visited.%i = (yes)
-    assume (%visited == {1:yes, 2:yes, 3:yes, 4:yes, 5:yes})
+    assume (%visited == {1: yes, 2: yes, 3: yes, 4: yes, 5: yes})
     %visited = {}
     for %x in %list:
         %visited.%x = (yes)
-    assume (%visited == {1:yes, 2:yes, 3:yes, 4:yes, 5:yes})
+    assume (%visited == {1: yes, 2: yes, 3: yes, 4: yes, 5: yes})
     assume ((%list::2 nd to last) == 4)
     assume ((%list::first) == 1)
     assume (%list::has 3)
@@ -35,130 +35,53 @@ test:
 
 # Dict functionality
 test:
-    %dict = {x:1, y:2, z:3}
-    assume ((size of %dict) == 3)
-    assume ((% for % in {x:1}) == [{key:"x", value:1}])
-    assume (({key:%k, value:%v} for %k = %v in {x:1}) == [{key:"x", value:1}])
-    assume (({x:1, y:1} + {y:10, z:10}) == {x:1, y:11, z:10})
-    assume (({x:1, y:1} | {y:10, z:10}) == {x:1, y:1, z:10})
-    assume (({x:1, y:1} & {y:10, z:10}) == {y:1})
-    assume (({x:1, y:1} ~ {y:10, z:10}) == {x:1, z:10})
-
-# List Comprehension
-test:
-    assume (((% * %) for % in [1, 2, 3]) == [1, 4, 9])
-(%expression for %item in %iterable) parses as (..)
-    result of:
-        %comprehension = []
-        for %item in %iterable:
-            %comprehension::add %expression
-        return %comprehension
-
-[..]
-    %expression for %index in %start to %stop via %step
-    %expression for %index in %start to %stop by %step
-..all parse as (..)
-    result of:
-        %comprehension = []
-        for %index in %start to %stop via %step:
-            %comprehension::add %expression
-        return %comprehension
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-test:
-    assume (((% * %) for % in 1 to 3) == [1, 4, 9])
-(%expression for %var in %start to %stop) parses as (..)
-    %expression for %var in %start to %stop via 1
-
-test:
-    assume (("\%k,\%v" for %k = %v in {x:1}) == ["x,1"])
-[..]
-    %expression for %key = %value in %iterable
-    %expression for %key %value in %iterable
-..all parse as (..)
-    result of:
-        %comprehension = []
-        for %key = %value in %iterable:
-            %comprehension::add %expression
-        return %comprehension
-
-# Dict comprehensions
-test:
-    assume (((% * %) = % for % in [1, 2, 3]) == {1:1, 4:2, 9:3})
-[..]
-    %key = %value for %item in %iterable, %key %value for %item in %iterable
-..all parse as (..)
-    result of:
-        %comprehension = {}
-        for %item in %iterable:
-            %comprehension.%key = %value
-        return %comprehension
-
-test:
-    assume ((%k = (%v * %v) for %k = %v in {x:1, y:2, z:3}) == {x:1, y:4, z:9})
-[..]
-    %key = %value for %src_key = %src_value in %iterable
-    %key %value for %src_key %src_value in %iterable
-..all parse as (..)
-    result of:
-        %comprehension = {}
-        for %src_key = %src_value in %iterable:
-            %comprehension.%key = %value
-        return %comprehension
-
-[..]
-    %key = %value for %item in %start to %stop via %step
-    %key %value for %item in %start to %stop via %step
-..all parse as (..)
-    result of:
-        %comprehension = {}
-        for %item in %start to %stop via %step:
-            %comprehension.%key = %value
-        return %comprehension
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-test:
-    assume (((% * %) = % for % in 1 to 3) == {1:1, 4:2, 9:3})
-[..]
-    %key = %value for %item in %start to %stop
-    %key %value for %item in %start to %stop
-..all parse as (%key = %value for %item in %start to %stop via 1)
+    %dict = {x: 1, y: 2, z: 3}
+    assume (size of %dict) == 3
+    assume [: for % in {x: 1}: add %] == [{key: "x", value: 1}]
+    assume [: for %k = %v in {x: 1}: add {key: %k, value: %v}] == [..]
+        {key: "x", value: 1}
+    assume ({x: 1, y: 1} + {y: 10, z: 10}) == {x: 1, y: 11, z: 10}
+    assume ({x: 1, y: 1} | {y: 10, z: 10}) == {x: 1, y: 1, z: 10}
+    assume ({x: 1, y: 1} & {y: 10, z: 10}) == {y: 1}
+    assume ({x: 1, y: 1} ~ {y: 10, z: 10}) == {x: 1, z: 10}
 
 test:
     assume (([[1, 2], [3, 4]] flattened) == [1, 2, 3, 4])
+
 externally (%lists flattened) means:
     %flat = []
-    for %list in %lists:
-        for %item in %list: %flat::add %item
+    for %item in recursive %lists:
+        if (%item is a "List"):
+            for % in %item:
+                recurse %item on %
+        ..else:
+            %flat::add %item
     return %flat
 
 test:
-    assume ((entries in {x:1}) == [{key:"x", value:1}])
-(entries in %dict) parses as ({key:%k, value:%v} for %k = %v in %dict)
+    assume ((entries in {x: 1}) == [{key: "x", value: 1}])
 
+(entries in %dict) parses as [: for %k = %v in %dict: add {key: %k, value: %v}]
 test:
-    assume ((keys in {x:1}) == ["x"])
-[keys in %dict, keys of %dict] all parse as (%k for %k = %v in %dict)
-
+    assume ((keys in {x: 1}) == ["x"])
+[keys in %dict, keys of %dict] all parse as [: for %k = %v in %dict: add %k]
 test:
-    assume ((values in {x:1}) == [1])
-[values in %dict, values of %dict] all parse as (%v for %k = %v in %dict)
+    assume ((values in {x: 1}) == [1])
+[values in %dict, values of %dict] all parse as [: for %k = %v in %dict: add %v]
 
 # Metatable stuff
 test:
     %t = {}
-    set %t 's metatable to {__tostring:[%] -> "XXX"}
+    set %t's metatable to {__tostring: [%] -> "XXX"}
     assume ("\%t" == "XXX")
-(set %dict 's metatable to %metatable) compiles to "\
+
+(set %dict's metatable to %metatable) compiles to "\
     ..setmetatable(\(%dict as lua expr), \(%metatable as lua expr));"
 
-[% 's metatable, % 'metatable] all compile to "\
-    ..getmetatable(\(% as lua expr))"
-
+[%'s metatable, %'metatable] all compile to "getmetatable(\(% as lua expr))"
 test:
     assume (({} with fallback % -> (% + 1)).10 == 11)
+
 (%dict with fallback %key -> %value) compiles to "\
     ..(function(d)
         local mt = {}
@@ -178,12 +101,11 @@ test:
     assume (%x == [1, 2, 3])
     sort %x by % = (- %)
     assume (%x == [3, 2, 1])
-    %keys = {1:999, 2:0, 3:50}
+    %keys = {1: 999, 2: 0, 3: 50}
     sort %x by % = %keys.%
     assume (%x == [2, 3, 1])
 (sort %items) compiles to "table.sort(\(%items as lua expr));"
-[..]
-    sort %items by %item = %key_expr, sort %items by %item -> %key_expr
+[sort %items by %item = %key_expr, sort %items by %item -> %key_expr] \
 ..all parse as (..)
     do:
         %keys = ({} with fallback %item -> %key_expr)
@@ -193,19 +115,21 @@ test:
 
 test:
     assume ((sorted [3, 1, 2]) == [1, 2, 3])
+
 externally [%items sorted, sorted %items] all mean:
-    %copy = (% for % in %items)
+    %copy = [: for % in %items: add %]
     sort %copy
     return %copy
 
 [%items sorted by %item = %key, %items sorted by %item -> %key] all parse as (..)
     result of:
-        %copy = (% for % in %items)
+        %copy = [: for % in %items: add %]
         sort %copy by %item = %key
         return %copy
 
 test:
     assume ((unique [1, 2, 1, 3, 2, 3]) == [1, 2, 3])
+
 externally (unique %items) means:
     %unique = []
     %seen = {}
@@ -213,5 +137,4 @@ externally (unique %items) means:
         unless %seen.%:
             %unique::add %
             %seen.% = (yes)
-    
     return %unique

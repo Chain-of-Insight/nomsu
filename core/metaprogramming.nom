@@ -1,11 +1,9 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
-
-lua> "\
-    ..NOMSU_CORE_VERSION = 10
-    NOMSU_LIB_VERSION = 7"
+    
+lua> "NOMSU_CORE_VERSION = 10\nNOMSU_LIB_VERSION = 7"
 lua> "\
     ..do
         local mangle_index = 0
@@ -25,7 +23,8 @@ lua> "\
     ..compile.action["1 ->"] = function(compile, \%args, \%body)
         local lua = LuaCode("(function(")
         if SyntaxTree:is_instance(\%args) and \%args.type == "Action" then \%args = \%args:get_args() end
-        local lua_args = table.map(\%args, function(a) return SyntaxTree:is_instance(a) and compile(a):text() or a end)
+        local lua_args = table.map(\%args, function(a) return SyntaxTree:is_instance(a) and compile(a):text(\
+    ..) or a end)
         lua:concat_append(lua_args, ", ")
         local body_lua = SyntaxTree:is_instance(\%body) and compile(\%body) or \%body
         if SyntaxTree:is_instance(\%body) and \%body.type ~= "Block" then body_lua:prepend("return ") end
@@ -49,9 +48,11 @@ lua> "\
 
 test:
     (five) compiles to "5"
+
 test:
     assume ((five) == 5) or barf "Compile to expression failed."
     (loc x) compiles to "local x = 99;"
+
 test:
     lua> "do"
     loc x
@@ -61,9 +62,11 @@ test:
     (asdf) compiles to:
         %tmp = ""
         return (Lua %tmp)
+
 test:
     asdf
     assume (%tmp is (nil)) or barf "compile to is leaking variables"
+
 lua> "\
     ..compile.action["1 compiles to"] = function(compile, \%action, \%body)
         local \%args = List{\(\%compile), unpack(\%action:get_args())}
@@ -114,11 +117,9 @@ test:
         (foo %x) means:
             %y = (%x + 1)
             return %y
-        
         assume ((foo 10) == 11) or barf "Action didn't work."
         assume (%y is (nil)) or barf "Action leaked a local into globals."
         (baz %) parses as (foo %)
-    
     assume ((foo 1) == "outer")
 
 (%action means %body) compiles to:
@@ -128,6 +129,7 @@ test:
         local lua = LuaCode(fn_name, " = ", \(what (%args -> %body) compiles to))
         lua:add_free_vars({fn_name})
         return lua"
+
 (%actions all mean %body) compiles to:
     lua> "\
         ..local fn_name = \%actions[1].stub:as_lua_id()
@@ -148,16 +150,20 @@ test:
         return lua"
 
 test:
-    externally (baz1) means: return "baz1"
+    externally (baz1) means:
+        return "baz1"
     externally (baz2) means "baz2"
+
 test:
     assume ((baz1) == "baz1")
     assume ((baz2) == "baz2")
+
 (externally %action means %body) compiles to:
     lua> "\
         ..local lua = \(what (%action means %body) compiles to)
         lua:remove_free_vars({\%action.stub:as_lua_id()})
         return lua"
+
 (externally %actions all mean %body) compiles to:
     lua> "\
         ..local lua = \(what (%actions all mean %body) compiles to)
@@ -166,23 +172,25 @@ test:
 
 test:
     assume (((say %)'s meaning) == (=lua "say"))
-(%action's meaning) compiles to (Lua (%action.stub as lua id))
 
+(%action's meaning) compiles to (Lua (%action.stub as lua id))
 test:
     (swap %x and %y) parses as (..)
         do:
             %tmp = %x
             %x = %y
             %y = %tmp
+
 test:
-    set {%1:1, %2:2}
+    set {%1: 1, %2: 2}
     swap %1 and %2
     assume ((%1 == 2) and (%2 == 1)) or barf "\
         ..'parse % as %' failed on 'swap % and %'"
-    set {%tmp:1, %tmp2:2}
+    set {%tmp: 1, %tmp2: 2}
     swap %tmp and %tmp2
     assume ((%tmp == 2) and (%tmp2 == 1)) or barf "\
         ..'parse % as %' variable mangling failed."
+
 (%actions all parse as %body) compiles to:
     lua> "\
         ..local replacements = {}
@@ -197,7 +205,8 @@ test:
                 if replacements[t[1]] then
                     return replacements[t[1]]
                 else
-                    return "SyntaxTree{mangle("..t[1]:as_lua().."), type="..t.type:as_lua()..", source="..tostring(t.source):as_lua().."}"
+                    return "SyntaxTree{mangle("..t[1]:as_lua().."), type="..t.type:as_lua()..", source="..tostring(\
+        ..t.source):as_lua().."}"
                 end
             elseif SyntaxTree:is_instance(t) then
                 local ret = {}
@@ -227,12 +236,10 @@ test:
         local ret = \(what (%actions all compile to %new_body) compiles to)
         return ret"
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [%action parses as %body] all parse as ([%action] all parse as %body)
-
-(%tree as lua expr) compiles to "\
-    ..compile(\(=lua "compile(\%tree, true)"), true)"
+(%tree as lua expr) compiles to "compile(\(=lua "compile(\%tree, true)"), true)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -257,7 +264,10 @@ externally (% is %kind syntax tree) means (..)
 
 (%tree with %t -> %replacement) compiles to "\
     ..\(%tree as lua expr):map(function(\(%t as lua expr))
-        \((%replacement as lua) if (%replacement.type == "Block") else ("return \(%replacement as lua expr)"))
+        \(..)
+        (%replacement as lua) if (%replacement.type == "Block") else "\
+            ..return \(%replacement as lua expr)"
+    ..
     end)"
 
 externally (%tree with vars %replacements) means (..)
@@ -317,14 +327,9 @@ externally (%tree with %patt ~> %replacement) means:
         end)"
 
 test:
-    assume (..)
-        (..)
-            quote "\
-                ..one
-                "two""
-        ..== "\"one\\n\\\"two\\\"\""
-(quote %s) compiles to "tostring(\(%s as lua expr)):as_lua()"
+    assume ((quote "one\n\"two\"") == "\"one\\n\\\"two\\\"\"")
 
+(quote %s) compiles to "tostring(\(%s as lua expr)):as_lua()"
 test:
     assume (lua type of {}) == "table"
     assume (type of {}) == "Dict"
@@ -346,8 +351,8 @@ externally (type of %) means:
         return lua_type"
 
 [% is a %type, % is an %type] all parse as ((type of %) == %type)
-[% isn't a %type, % isn't an %type, % is not a %type, % is not an %type] all parse as (..)
-    (type of %) != %type
+[% isn't a %type, % isn't an %type, % is not a %type, % is not an %type] \
+..all parse as ((type of %) != %type)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -357,18 +362,14 @@ test:
     run "external %passed = (yes)"
     assume %passed
     assume (run \(return \(\(5) + \(5)))) == 10
-(run %nomsu_code) compiles to "\
-    ..run_1_in(\(%nomsu_code as lua expr), _ENV)"
-
+(run %nomsu_code) compiles to "run_1_in(\(%nomsu_code as lua expr), _ENV)"
 [compile %block, compiled %block, %block compiled] all compile to "\
     ..compile(\(%block as lua))"
 
 # Return statement is wrapped in a do..end block because Lua is unhappy if you
     put code after a return statement, unless you wrap it in a block.
 (return %return_value) compiles to "\
-    ..do return \(..)
-        =lua "\%return_value and \(%return_value as lua expr) or ''"
-    .. end"
+    ..do return \(=lua "\%return_value and \(%return_value as lua expr) or ''") end"
 
 # Literals
 (yes) compiles to "true"
@@ -392,5 +393,4 @@ test:
     end"
 
 externally (Nomsu version) means:
-    return "\
-        ..\(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)"
+    return "\(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)"

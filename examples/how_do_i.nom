@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -65,7 +65,7 @@ say "\
     Similarly, you can put a long interpolated indented value like: \(..)
         1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9
     .. between a backslash and two periods."
-
+    
 say "Single-line text can contain escape sequences like \", \\, \000, and \n"
 
 # How do I define a list?
@@ -91,7 +91,7 @@ say %my_list.1
 # How do I define a dictionary/hash map?
     One-word text keys don't need quotes, otherwise the key is an expression.
     If the expression is more complex than a literal, it needs parentheses:
-%my_dict = {x:101, y:2, "how many bottles":99, 653:292, (5 + 6):11}
+%my_dict = {x: 101, y: 2, "how many bottles": 99, 653: 292, (5 + 6): 11}
 
 # How do I use a dict?
 # Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
@@ -113,10 +113,13 @@ if (1 > 10):
 when:
     (3 > 3):
         say "this won't print"
+    
     (3 > 6) (3 > 5) (3 > 4):
         say "this won't print because none of the conditions on the line above are true"
+    
     (3 > 2):
         say "this will print"
+    
     else:
         say "this is the default case"
 
@@ -124,8 +127,10 @@ when:
 if (1 + 2) is:
     0 1:
         say "this won't print"
+    
     2 3:
         say "this will print"
+    
     else:
         say "this won't print"
 
@@ -140,7 +145,9 @@ for %i in 1 to 3:
     say "For %i in 1 to 3 loop #\%i"
 
 # This will print 0,2, and 4
-for %even in 0 to 5 by 2: say "Even #\%even"
+for %even in 0 to 5 by 2:
+    say "Even #\%even"
+
 for %backwards in 3 to 1 by -1:
     say "Backwards #\%backwards"
 
@@ -149,7 +156,6 @@ for %backwards in 3 to 1 by -1:
 repeat while (%x <= 3):
     say "repeat while loop #\%x"
     %x += 1
-
 %x = 1
 repeat until (%x > 3):
     say "repeat until loop #\%x"
@@ -160,7 +166,8 @@ repeat until (%x > 3):
 repeat:
     say "repeat loop #\%x"
     %x += 1
-    if (%x > 3): stop repeating
+    if (%x > 3):
+        stop repeating
 
 # How do I do a 'goto'?
 do:
@@ -168,7 +175,8 @@ do:
     === (my loop) ===
     say "GOTO loop #\%x"
     %x += 1
-    if (%x <= 3): go to (my loop)
+    if (%x <= 3):
+        go to (my loop)
     say "finished going to"
 
 # How do I define a function/method/procedure?
@@ -189,8 +197,8 @@ say both "Hello" and also "world!"
         %tmp = (%f1 + %f2)
         %f1 = %f2
         %f2 = %tmp
-        if (%f2 > %n): return %f2
-
+        if (%f2 > %n):
+            return %f2
 say (first fibonacci above 10)
 
 # Actions can have aliases, which may or may not have the arguments in different order
@@ -200,7 +208,6 @@ say (first fibonacci above 10)
     I like %better_things more than %worse_things
 ..all mean:
     say "\(%better_things::capitalized) rule and \%worse_things drool!"
-
 I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"
 
@@ -208,7 +215,6 @@ I think "chihuahuas" are worse than "corgis"
 (%what_she_said is what she said) means:
     say %what_she_said
     say "-- she said"
-
 "Howdy pardner" is what she said
 
 # The language only reserves []{}().,:;%#\ as special characters, so actions
@@ -217,7 +223,6 @@ I think "chihuahuas" are worse than "corgis"
     say %foo_bar
     say %
     say %1
-
 >> "wow" $@&' --> "so flexible!" @&_~-^-~_~-^ "even numbers can be variables!" !
 
 # There's also full unicode support
@@ -243,7 +248,6 @@ say (2 + 3)
 # If you need to keep going after an indented region, you can start the next line with ".."
 say both "Very long first argument that needs its own line" and also "\
     ..short second arg"
-
 (my favorite number) means (21 + 2)
 
 # This can be nested:
@@ -253,7 +257,6 @@ say both (my favorite number) and also "foo"
 # The "lua> %" and "=lua %" macros can be used to write raw lua code: 
 (say the time) means:
     lua> "io.write(\"The OS time is: \", os.time(), \"\\n\");"
-
 say the time
 say "Math expression result is: \(=lua "(1 + 2*3 + 3*4)^2 % 5")"
 
@@ -270,7 +273,6 @@ say "The square root of 2 is \(square root of 2)"
         return (Lua "-- Debug code:\n\(%body as lua)")
     ..else:
         return (Lua "-- (debug code removed for production)")
-
 %DEBUG_ENABLED = (yes)
 
 # Constants can be defined as macros
@@ -301,7 +303,6 @@ debug only:
         if ((%best is (nil)) or (%key > %best_key)):
             %best = %item
             %best_key = %key
-    
     return %best
 
 # Function literals look like: [%x] -> (%x * %x)
@@ -323,7 +324,6 @@ say (best of [2, -3, 4, -8] according to ((% squared)'s meaning))
             if ((%best is (nil)) or (%key > %best_key)):
                 %best = %item
                 %best_key = %key
-        
         return %best
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

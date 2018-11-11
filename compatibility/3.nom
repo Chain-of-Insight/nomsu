@@ -1,7 +1,7 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file defines upgrades from Nomsu <=2 to Nomsu 3
-
+    
 use "compatibility/compatibility.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10,6 +10,4 @@ upgrade action (method %spec %body) to "3" as (my action %spec %body)
 upgrade action (me) to "3" as %me
 upgrade action (@) to "3" as %me
 upgrade action "as" to "3" via (..)
-    [] -> (..)
-        barf "\
-            ..Object API has changed. Use (%obj::action ...) instead of (as %obj: action ...)"
+    [] -> (barf "Object API has changed. Use (%obj::action ...) instead of (as %obj: action ...)")

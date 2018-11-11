@@ -1,16 +1,16 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file contains basic error reporting code
-
+    
 use "core/metaprogramming.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(barf %msg) compiles to "error(\(=lua "\%msg and \(%msg as lua expr) or 'nil'"), 0);"
+(barf %msg) compiles to "\
+    ..error(\(=lua "\%msg and \(%msg as lua expr) or 'nil'"), 0);"
 
 (assume %condition) compiles to:
-    lua> "\
-        ..local \%assumption = 'Assumption failed: '..tostring((\%condition):get_source_code())"
+    lua> "local \%assumption = 'Assumption failed: '..tostring((\%condition):get_source_code())"
     return (..)
         Lua "\
             ..if not \(%condition as lua expr) then
@@ -18,17 +18,14 @@ use "core/metaprogramming.nom"
             end"
 
 (assume %a == %b) compiles to:
-    lua> "\
-        ..local \%assumption = 'Assumption failed: '..tostring(\(\(%a == %b) as nomsu))"
+    lua> "local \%assumption = 'Assumption failed: '..tostring(\(\(%a == %b) as nomsu))"
     define mangler
     return (..)
         Lua "\
             ..do
                 local \(mangle "a"), \(mangle "b") = \(%a as lua expr), \(%b as lua expr)
                 if \(mangle "a") ~= \(mangle "b") then
-                    error(\(quote "\%assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\(..)
-                mangle "b"
-            ..), 0)
+                    error(\(quote "\%assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\(mangle "b")), 0)
                 end
             end"
 
@@ -38,16 +35,18 @@ use "core/metaprogramming.nom"
     end"
 
 test:
-    try (barf) and if it succeeds: barf "try failed."
+    try (barf) and if it succeeds:
+        barf "try failed."
     %worked = (no)
-    try (barf) and if it barfs: %worked = (yes)
+    try (barf) and if it barfs:
+        %worked = (yes)
     assume %worked or barf "try/catch failed"
     %x = 1
     try:
         %x = 2
         do (barf) then always: %x = 3
-    ..and if it barfs: do nothing
-    
+    ..and if it barfs:
+        do nothing
     assume (%x == 3) or barf "do/then always failed"
 
 # Try/except
@@ -81,19 +80,19 @@ test:
 
 #
     [..]
-        try %action and if it succeeds %success or if it barfs %fallback
-        try %action and if it barfs %fallback or if it succeeds %success
+    try %action and if it succeeds %success or if it barfs %fallback
+    try %action and if it barfs %fallback or if it succeeds %success
     ..all parse as (..)
-        try %action and if it succeeds %success or if it barfs (=lua "") %fallback
-
+    try %action and if it succeeds %success or if it barfs (=lua "") %fallback
+    
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+    
 (try %action) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs (do nothing)
 
 #(try %action and if it barfs %fallback) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs %fallback
-
+    
 (try %action and if it barfs %msg %fallback) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs %msg %fallback
 

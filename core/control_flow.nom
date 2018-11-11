@@ -1,8 +1,8 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
-
+    
 use "core/metaprogramming.nom"
 use "core/operators.nom"
 use "core/errors.nom"
@@ -10,13 +10,15 @@ use "core/errors.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # No-Op
-test: do nothing
+test:
+    do nothing
 (do nothing) compiles to ""
 
 # Conditionals
 test:
     if (no):
         barf "conditional fail"
+
 (if %condition %if_body) compiles to "\
     ..if \(%condition as lua expr) then
         \(%if_body as lua)
@@ -25,9 +27,9 @@ test:
 test:
     unless (yes):
         barf "conditional fail"
+
 (unless %condition %unless_body) parses as (if (not %condition) %unless_body)
-[..]
-    if %condition %if_body else %else_body, unless %condition %else_body else %if_body
+[if %condition %if_body else %else_body, unless %condition %else_body else %if_body] \
 ..all compile to "\
     ..if \(%condition as lua expr) then
         \(%if_body as lua)
@@ -43,6 +45,7 @@ test:
 test:
     assume ((1 if (yes) else 2) == 1)
     assume ((1 if (no) else 2) == 2)
+
 [..]
     %when_true_expr if %condition else %when_false_expr
     %when_true_expr if %condition otherwise %when_false_expr
@@ -51,12 +54,8 @@ test:
 ..all compile to:
     #   If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
         equivalent of a conditional expression: (cond and if_true or if_false)
-    if {Text:yes, List:yes, Dict:yes, Number:yes}.(%when_true_expr.type):
-        return (..)
-            Lua "\
-                ..(\(%condition as lua expr) and \(%when_true_expr as lua expr) or \(..)
-                    %when_false_expr as lua expr
-                ..)"
+    if {Text: yes, List: yes, Dict: yes, Number: yes}.(%when_true_expr.type):
+        return (Lua "(\(%condition as lua expr) and \(%when_true_expr as lua expr) or \(%when_false_expr as lua expr))")
     ..else:
         #   Otherwise, need to do an anonymous inline function (yuck, too bad lua 
             doesn't have a proper ternary operator!)
@@ -78,35 +77,37 @@ test:
     %i = 0
     === %loop ===
     %i += 1
-    unless (%i == 10): go to %loop
+    unless (%i == 10):
+        go to %loop
     assume (%i == 10)
     === (Loop) ===
     %i -= 1
-    unless (%i == 0): go to (Loop)
+    unless (%i == 0):
+        go to (Loop)
     assume (%i == 0)
+
 [=== %label ===, --- %label ---, *** %label ***] all compile to "\
-    ..::label_\(..)
-        (%label.stub if (%label.type == "Action") else %label) as lua identifier
-    ..::"
+    ..::label_\((%label.stub if (%label.type == "Action") else %label) as lua identifier)::"
 
 (go to %label) compiles to "\
-    ..goto label_\(..)
-        (%label.stub if (%label.type == "Action") else %label) as lua identifier
-    .."
+    ..goto label_\((%label.stub if (%label.type == "Action") else %label) as lua identifier)"
 
 # Basic loop control
 (stop %var) compiles to:
     if %var:
-        return (..)
-            Lua "goto stop_\((%var.stub if (%var.type == "action") else %var) as lua identifier)"
-    ..else: return (Lua "break")
+        return (Lua "goto stop_\((%var.stub if (%var.type == "action") else %var) as lua identifier)")
+    ..else:
+        return (Lua "break")
+
 (do next %var) compiles to:
     if %var:
-        return (..)
-            Lua "goto continue_\((%var.stub if (%var.type == "action") else %var) as lua identifier)"
-    ..else: return (Lua "goto continue")
+        return (Lua "goto continue_\((%var.stub if (%var.type == "action") else %var) as lua identifier)")
+    ..else:
+        return (Lua "goto continue")
+
 [===stop %var ===, ---stop %var ---, ***stop %var ***] all compile to "\
     ..::stop_\((%var.stub if (%var.type == "action") else %var) as lua identifier)::"
+
 [===next %var ===, ---next %var ---, ***next %var ***] all compile to "\
     ..::continue_\((%var.stub if (%var.type == "action") else %var) as lua identifier)::"
 
@@ -116,32 +117,31 @@ test:
     repeat while (%x < 10): %x += 1
     assume (%x == 10)
     repeat while (%x < 20): stop
-    repeat while (%x < 20): stop repeating
+    repeat while (%x < 20):
+        stop repeating
     assume (%x == 10)
     repeat while (%x < 20):
         %x += 1
-        if (yes): do next
+        if (yes):
+            do next
         barf "Failed to 'do next'"
-    
     assume (%x == 20)
     repeat while (%x < 30):
         %x += 1
-        if (yes): do next repeat
+        if (yes):
+            do next repeat
         barf "Failed to 'do next repeat'"
-    
     assume (%x == 30)
 (do next repeat) compiles to "goto continue_repeat"
 (stop repeating) compiles to "goto stop_repeat"
 (repeat while %condition %body) compiles to:
-    %lua = (..)
-        Lua "\
-            ..while \(%condition as lua expr) do
-                \(%body as lua)"
-    
+    %lua = (Lua "while \(%condition as lua expr) do\n    \(%body as lua)")
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
+    
     if (%body has subtree \(do next repeat)):
         %lua::append "\n    ::continue_repeat::"
+    
     %lua::append "\nend --while-loop"
     if (%body has subtree \(stop repeating)):
         %inner_lua = %lua
@@ -150,25 +150,24 @@ test:
             ..
                 ::stop_repeat::
             end -- end of 'stop repeating' label scope"
-    
     return %lua
-
 (repeat %body) parses as (repeat while (yes) %body)
 (repeat until %condition %body) parses as (repeat while (not %condition) %body)
-
 test:
     %x = 0
     repeat 10 times: %x += 1
     assume (%x == 10)
+
 (repeat %n times %body) compiles to:
     define mangler
-    %lua = (..)
-        Lua "for \(mangle "i")=1,\(%n as lua expr) do\n    "
+    %lua = (Lua "for \(mangle "i")=1,\(%n as lua expr) do\n    ")
     %lua::append (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
+    
     if (%body has subtree \(do next repeat)):
         %lua::append "\n    ::continue_repeat::"
+    
     %lua::append "\nend --numeric for-loop"
     if (%body has subtree \(stop repeating)):
         %inner_lua = %lua
@@ -177,17 +176,18 @@ test:
             ..
                 ::stop_repeat::
             end -- end of 'stop repeating' label scope"
-    
     return %lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
     %nums = []
-    for %x in 1 to 5: %nums::add %x
+    for %x in 1 to 5:
+        %nums::add %x
     assume (%nums == [1, 2, 3, 4, 5])
     %nums = []
-    for %x in 1 to 5 via 2: %nums::add %x
+    for %x in 1 to 5 via 2:
+        %nums::add %x
     assume (%nums == [1, 3, 5])
     %nums = []
     for %outer in 1 to 100:
@@ -195,10 +195,9 @@ test:
             if (%inner == 2):
                 %nums::add -2
                 do next %inner
-            
             %nums::add %inner
-            if (%inner == 5): stop %outer
-    
+            if (%inner == 5):
+                stop %outer
     assume (%nums == [1, -2, 3, -2, 3, 4, 3, 4, 5])
 
 # Numeric range for loops
@@ -209,15 +208,11 @@ test:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%var.type is "Var"):
         compile error at %var "Expected a variable here, not a \(%var.type)"
-    %lua = (..)
-        Lua "\
-            ..for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(..)
-                %step as lua expr
-            .. do"
-    
+    %lua = (Lua "for \(%var as lua expr)=\(%start as lua expr),\(%stop as lua expr),\(%step as lua expr) do")
     %lua::append "\n    " (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
+    
     if (%body has subtree \(do next %var)):
         %lua::append "\n    " (what (===next %var ===) compiles to)
     
@@ -228,7 +223,6 @@ test:
         %lua::append %inner_lua "\n    "
         %lua::append (what (===stop %var ===) compiles to)
         %lua::append "\nend -- end of scope for stopping for-loop"
-    
     return %lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -239,25 +233,33 @@ test:
 test:
     %a = [10, 20, 30, 40, 50]
     %b = []
-    for %x in %a: %b::add %x
+    for %x in %a:
+        %b::add %x
     assume (%a == %b)
     %b = []
     for %x in %a:
-        if (%x == 10): do next %x
-        if (%x == 50): stop %x
+        if (%x == 10):
+            do next %x
+        
+        if (%x == 50):
+            stop %x
+        
         %b::add %x
-    
     assume (%b == [20, 30, 40])
 
 # For-each loop (lua's "ipairs()")
 (for %var in %iterable %body) compiles to:
     define mangler
+    
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     %lua = (..)
-        Lua "for \(mangle "i"),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do\n    "
+        Lua "\
+            ..for \(mangle "i"),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
+                "
     %lua::append (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
+    
     if (%body has subtree \(do next %var)):
         %lua::append "\n    " (what (===next %var ===) compiles to)
     
@@ -268,17 +270,19 @@ test:
         %lua::append %inner_lua "\n    "
         %lua::append (what (===stop %var ===) compiles to)
         %lua::append "\nend -- end of scope for stopping for-loop"
-    
     return %lua
 
 # TODO: reduce code duplication
 (for %var in %iterable at %i %body) compiles to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     %lua = (..)
-        Lua "for \(%i as lua identifier),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do\n    "
+        Lua "\
+            ..for \(%i as lua identifier),\(%var as lua identifier) in ipairs(\(%iterable as lua expr)) do
+                "
     %lua::append (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
+    
     if (%body has subtree \(do next %var)):
         %lua::append "\n    " (what (===next %var ===) compiles to)
     
@@ -289,37 +293,36 @@ test:
         %lua::append %inner_lua "\n    "
         %lua::append (what (===stop %var ===) compiles to)
         %lua::append "\nend -- end of scope for stopping for-loop"
-    
     return %lua
 
 test:
-    %d = {a:10, b:20, c:30, d:40, e:50}
+    %d = {a: 10, b: 20, c: 30, d: 40, e: 50}
     %result = []
     for %k = %v in %d:
-        if (%k == "a"): do next %k
-        if (%v == 20): do next %v
+        if (%k == "a"):
+            do next %k
+        
+        if (%v == 20):
+            do next %v
+        
         %result::add "\%k = \%v"
-    
     assume ((%result sorted) == ["c = 30", "d = 40", "e = 50"])
 
 # Dict iteration (lua's "pairs()")
-[..]
-    for %key = %value in %iterable %body, for %key %value in %iterable %body
+[for %key = %value in %iterable %body, for %key %value in %iterable %body] \
 ..all compile to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     unless (%key.type is "Var"):
         compile error at %key "Expected a variable here, not a \(%key.type)"
+    
     unless (%value.type is "Var"):
         compile error at %value "Expected a variable here, not a \(%value.type)"
-    %lua = (..)
-        Lua "\
-            ..for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(..)
-                %iterable as lua expr
-            ..) do"
     
+    %lua = (Lua "for \(%key as lua identifier),\(%value as lua identifier) in pairs(\(%iterable as lua expr)) do")
     %lua::append "\n    " (%body as lua)
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
+    
     if (%body has subtree \(do next %key)):
         %lua::append "\n    " (what (===next %key ===) compiles to)
     
@@ -350,8 +353,10 @@ test:
         (1 == 0) (1 == 1) %not_a_variable.x: do nothing
         (1 == 1):
             barf "bad conditional"
+        
         (1 == 2):
             barf "bad conditional"
+        
         else:
             barf "bad conditional"
 
@@ -361,30 +366,29 @@ test:
     %clause = "if"
     %else_allowed = (yes)
     unless (%body.type is "Block"):
-        compile error at %body "'if' expected a Block, but got a \(%body.type)."
-        ..hint "Perhaps you forgot to put a ':' after 'if'?"
+        compile error at %body "'if' expected a Block, but got a \(%body.type)." "\
+            ..Perhaps you forgot to put a ':' after 'if'?"
     
     for %line in %body:
         unless (..)
             ((%line.type is "Action") and ((size of %line) >= 2)) and (..)
                 %line.(size of %line) is "Block" syntax tree
         ..:
-            compile error at %line "Invalid line for the body of an 'if' block."
-            ..hint "Each line should contain one or more conditional expressions \
-                ..followed by a block, or "else" followed by a block."
-        
+            compile error at %line "Invalid line for the body of an 'if' block." "\
+                ..Each line should contain one or more conditional expressions followed by a block, or "else" followed \
+                ..by a block."
         %action = %line.(size of %line)
         if ((%line.1 is "else") and ((size of %line) == 2)):
             unless %else_allowed:
-                compile error at %line "You can't have two 'else' blocks."
-                ..hint "Merge all of the 'else' blocks together."
+                compile error at %line "You can't have two 'else' blocks." "\
+                    ..Merge all of the 'else' blocks together."
             
             unless ((size of "\%code") > 0):
                 compile error at %line "\
                     ..You can't have an 'else' block without a preceeding condition"
-                ..hint "If you want the code in this block to always execute, you don't \
-                    ..need a conditional block around it. Otherwise, make sure the 'else' \
-                    ..block comes last."
+                .."\
+                    ..If you want the code in this block to always execute, you don't need a conditional block around it. \
+                    ..Otherwise, make sure the 'else' block comes last."
             
             %code::append "\nelse\n    " (%action as lua)
             %else_allowed = (no)
@@ -394,13 +398,13 @@ test:
                 if (%i > 1):
                     %code::append " or "
                 %code::append (%line.%i as lua expr)
-            
             %code::append " then\n    " (%action as lua)
             %clause = "\nelseif"
     
     if ((size of "\%code") == 0):
-        compile error at %body "'if' block has an empty body."
-        ..hint "This means nothing would happen, so the 'if' block should be deleted."
+        compile error at %body "'if' block has an empty body." "\
+            ..This means nothing would happen, so the 'if' block should be deleted."
+    
     %code::append "\nend --when"
     return %code
 
@@ -408,9 +412,13 @@ test:
     if 5 is:
         1 2 3:
             barf "bad switch statement"
-        4 5: do nothing
+        
+        4 5:
+            do nothing
+        
         5 6:
             barf "bad switch statement"
+        
         else:
             barf "bad switch statement"
 
@@ -421,28 +429,28 @@ test:
     %else_allowed = (yes)
     define mangler
     unless (%body.type is "Block"):
-        compile error at %body "'if' expected a Block, but got a \(%body.type)"
-        ..hint "Perhaps you forgot to put a ':' after the 'is'?"
+        compile error at %body "'if' expected a Block, but got a \(%body.type)" "\
+            ..Perhaps you forgot to put a ':' after the 'is'?"
+    
     for %line in %body:
         unless (..)
             ((%line.type is "Action") and ((size of %line) >= 2)) and (..)
                 %line.(size of %line) is "Block" syntax tree
         ..:
-            compile error at %line "Invalid line for 'if' block."
-            ..hint "Each line should contain expressions \
-                ..followed by a block, or "else" followed by a block"
-        
+            compile error at %line "Invalid line for 'if' block." "\
+                ..Each line should contain expressions followed by a block, or "else" followed by a block"
         %action = %line.(size of %line)
         if ((%line.1 is "else") and ((size of %line) == 2)):
             unless %else_allowed:
-                compile error at %line "You can't have two 'else' blocks."
-                ..hint "Merge all of the 'else' blocks together."
+                compile error at %line "You can't have two 'else' blocks." "\
+                    ..Merge all of the 'else' blocks together."
+            
             unless ((size of "\%code") > 0):
                 compile error at %line "\
                     ..You can't have an 'else' block without a preceeding condition"
-                ..hint "If you want the code in this block to always execute, you don't \
-                    ..need a conditional block around it. Otherwise, make sure the 'else' \
-                    ..block comes last."
+                .."\
+                    ..If you want the code in this block to always execute, you don't need a conditional block around it. \
+                    ..Otherwise, make sure the 'else' block comes last."
             
             %code::append "\nelse\n    " (%action as lua)
             %else_allowed = (no)
@@ -452,13 +460,13 @@ test:
                 if (%i > 1):
                     %code::append " or "
                 %code::append "\(mangle "branch value") == " (%line.%i as lua expr)
-            
             %code::append " then\n    " (%action as lua)
             %clause = "\nelseif"
     
     if ((size of "\%code") == 0):
-        compile error at %body "'if' block has an empty body."
-        ..hint "This means nothing would happen, so the 'if' block should be deleted."
+        compile error at %body "'if' block has an empty body." "\
+            ..This means nothing would happen, so the 'if' block should be deleted."
+    
     %code::append "\nend --when"
     return (..)
         Lua "\
@@ -468,19 +476,17 @@ test:
             end -- if % is..."
 
 # Do/finally
-(do %action) compiles to "\
-    ..do
-        \(%action as lua)
-    end -- do"
-
+(do %action) compiles to "do\n    \(%action as lua)\nend -- do"
 test:
     %d = {}
     try:
         do:
             %d.x = "bad"
             barf
-        ..then always: %d.x = "good"
+        ..then always:
+            %d.x = "good"
     assume (%d.x == "good")
+
 (do %action then always %final_action) compiles to:
     define mangler
     return (..)
@@ -497,19 +503,19 @@ test:
             end"
 
 test:
-    assume ((result of (: return 99)) == 99)
+    assume ((result of: return 99) == 99)
 
 # Inline thunk:
 (result of %body) compiles to "\(what ([] -> %body) compiles to)()"
-
 test:
     %t = [1, [2, [[3], 4], 5, [[[6]]]]]
     %flat = []
     for % in recursive %t:
         if ((lua type of %) is "table"):
-            for %2 in %: recurse % on %2
-        ..else: %flat::add %
-    
+            for %2 in %:
+                recurse % on %2
+        ..else:
+            %flat::add %
     assume (sorted %flat) == [1, 2, 3, 4, 5, 6]
 
 # Recurion control flow
@@ -518,6 +524,7 @@ test:
         define mangler
         (recurse %v on %x) compiles to (..)
             Lua "table.insert(\(mangle "stack \(%v.1)"), \(%x as lua expr))"
+        
         %lua = (..)
             Lua "\
                 ..do
@@ -525,10 +532,13 @@ test:
                     while #\(mangle "stack \(%var.1)") > 0 do
                         \(%var as lua expr) = table.remove(\(mangle "stack \(%var.1)"), 1)
                         \(%body as lua)"
+        
         if (%body has subtree \(do next)):
             %lua::append "\n        ::continue::"
+        
         if (%body has subtree \(do next %var)):
             %lua::append "\n        \(what (===next %var ===) compiles to)"
+        
         %lua::append "\n    end -- Recursive loop"
         if (%body has subtree \(stop %var)):
             %lua::append "\n        \(what (===stop %var ===) compiles to)"

@@ -1,8 +1,8 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
-
+    
 use "core/metaprogramming.nom"
 use "core/operators.nom"
 use "core/control_flow.nom"
@@ -27,19 +27,19 @@ test:
     assume ("asdf"::with "s" -> "X") == "aXdf"
     assume ("one\ntwo\n"::lines) == ["one", "two", ""]
     (%spec とは %body) parses as (%spec means %body)
+
 test:
     %こんにちは = "こんにちは"
     (% と言う) とは "\(%)世界"
     assume (%こんにちは と言う) == "こんにちは世界"
+
 (%expr for %match in %text matching %patt) compiles to:
     define mangler
     return (..)
         Lua "\
             ..(function()
                 local \(mangle "comprehension") = List{}
-                for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(..)
-                %patt as lua expr
-            ..) do
+                for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(%patt as lua expr)) do
                     \(mangle "comprehension")[#\(mangle "comprehension")+1] = \(%expr as lua)
                 end
                 return \(mangle "comprehension")
@@ -50,8 +50,9 @@ test:
 
 # Text literals
 %escapes = {..}
-    nl:"\n", newline:"\n", tab:"\t", bell:"\a", cr:"\r", "carriage return":"\r",
-    backspace:"\b", "form feed":"\f", formfeed:"\f", "vertical tab":"\v"
+    nl: "\n", newline: "\n", tab: "\t", bell: "\a", cr: "\r", "carriage return": "\r"
+    backspace: "\b", "form feed": "\f", formfeed: "\f", "vertical tab": "\v"
+
 for %name = %str in %escapes:
     with {%lua: Lua (quote %str)}:
-        %compile.action.%name = ([]-> %lua)
+        %compile.action.%name = ([] -> %lua)

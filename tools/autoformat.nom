@@ -1,10 +1,10 @@
-#!/usr/bin/env nomsu -V4.8.10
+#!/usr/bin/env nomsu -V4.10.12.7
 #
     Auto-format Nomsu code. Usage:
     nomsu tools/autoformat.nom [-i] file1 file2 directory1 ...
     If the first argument is "-i", modifications will be performed in-place. Otherwise,
     the formatted code will be printed.
-
+    
 use "lib/os.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -24,4 +24,5 @@ for %path in %args:
         
         if %inplace:
             write %formatted to file %filename
-        ..else: say %formatted
+        ..else:
+            say %formatted
