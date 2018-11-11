@@ -6,7 +6,7 @@ file:
     {:curr_indent: %nil :}
     !.
 
-shebang: "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* {:version: [0-9.]+ :} [^%nl]* (%nl / !.)
+shebang: "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* [0-9.]+ [^%nl]* (%nl / !.)
 
 eof: !.
 
@@ -37,7 +37,7 @@ nl_nodent: blank_lines nodent
 nl_indent: blank_lines tab_error? {:curr_indent: indent :} (comment nl_nodent)*
 
 comment (Comment):
-    "#" {~ [^%nl]* (%nl+ (indent -> '') [^%nl]*)* ~}
+    "#" {~ [^%nl]* (%nl+ (indent -> '') [^%nl]*)* (%nl &%nl)* ~}
 eol_comment (Comment):
     "#" {[^%nl]*}
 

@@ -3,61 +3,9 @@
     This file defines upgrades from Nomsu <4.9 to 4.9
 use "compatibility/compatibility.nom"
 
-upgrade action "local action" to "4.9" via (..)
-    [%tree, %end_version] ->:
-        %spec = %tree.3
-        %body = %tree.4
-        if %spec.type is:
-            "List":
-                if ((size of %spec) == 1):
-                    return \(%spec.1 means %body)
-                ..else:
-                    return \(%spec all mean %body)
-            else:
-                return \(%spec means %body)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-upgrade action "action" to "4.9" via (..)
+upgrade action "if" to "4.9" via (..)
     [%tree, %end_version] ->:
-        %spec = %tree.2
-        %body = %tree.3
-        if %body:
-            if %spec.type is:
-                "List":
-                    if ((size of %spec) == 1):
-                        return \(externally %spec.1 means %body)
-                    ..else:
-                        return \(externally %spec all mean %body)
-                else:
-                    return \(externally %spec means %body)
-        ..else:
-            return \(%spec's meaning)
-
-upgrade action "compile 1 to" to "4.9" via (..)
-    [%tree, %end_version] ->:
-        %spec = %tree.2
-        %body = %tree.4
-        if %spec.type is:
-            "List":
-                if ((size of %spec) == 1):
-                    return \(%spec.1 compiles to %body)
-                ..else:
-                    return \(%spec all compile to %body)
-            else:
-                return \(%spec compiles to %body)
-
-upgrade action "parse 1 as" to "4.9" via (..)
-    [%tree, %end_version] ->:
-        %spec = %tree.2
-        %body = %tree.4
-        if %spec.type is:
-            "List":
-                if ((size of %spec) == 1):
-                    return \(%spec.1 parses as %body)
-                ..else:
-                    return \(%spec all parse as %body)
-            else:
-                return \(%spec parse as %body)
-
-upgrade action (compile as %) to "4.9" as (what % compiles to)
-upgrade action (remove action %) to "4.9" as ((%'s meaning) = (nil))
-upgrade action (if %) to "4.9" as (when %)
+        if ((size of %tree) > 2): return %tree
+        return \(when %tree.2)

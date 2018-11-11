@@ -122,6 +122,9 @@ local nomsu_environment = Importer({
     local syntax_version = version and tonumber(version:match("^[0-9]+")) or max_parser_version
     local parse = Parsers[syntax_version] or Parsers[max_parser_version]
     local tree = parse(nomsu_code, source.filename)
+    if tree.shebang then
+      tree.version = tree.shebang:match("nomsu %-V[ ]*([%d.]*)")
+    end
     local find_errors
     find_errors = function(t)
       if t.type == "Error" then

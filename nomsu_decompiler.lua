@@ -11,7 +11,8 @@ do
   R, P, S = _obj_0.R, _obj_0.P, _obj_0.S
 end
 local re = require('re')
-local MAX_LINE = 90
+local MAX_LINE = 80
+local GOLDEN_RATIO = ((1 + math.sqrt(5)) / 2)
 local utf8_char_patt = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
 local operator_patt = S("'`~!@$^&*+=|<>?/-") ^ 1 * -1
 local identifier_patt = (R("az", "AZ", "09") + P("_") + utf8_char_patt) ^ 1 * -1
@@ -149,7 +150,7 @@ tree_to_inline_nomsu = function(tree)
       nomsu:parenthesize()
     end
     assert(value.type ~= "Block", "Didn't expect to find a Block as a value in a dict")
-    nomsu:append(":")
+    nomsu:append(": ")
     if value then
       local value_nomsu = tree_to_inline_nomsu(value)
       if value.type == "Block" then
@@ -197,19 +198,20 @@ tree_to_nomsu = function(tree)
   local recurse
   recurse = function(t)
     local space = MAX_LINE - nomsu:trailing_line_len()
-    local inline = true
+    local try_inline = true
     for subtree in coroutine.wrap(function()
       return (t:map(coroutine.yield) and nil)
     end) do
       if subtree.type == "Block" then
         if #subtree > 1 then
-          inline = false
+          try_inline = false
         end
       end
     end
-    if inline then
-      local inline_nomsu = tree_to_inline_nomsu(t)
-      if #inline_nomsu:text() <= space then
+    local inline_nomsu
+    if try_inline then
+      inline_nomsu = tree_to_inline_nomsu(t)
+      if #inline_nomsu:text() <= space or #inline_nomsu:text() <= 8 then
         if t.type == "Action" then
           inline_nomsu:parenthesize()
         end
@@ -223,6 +225,9 @@ tree_to_nomsu = function(tree)
       else
         indented:parenthesize()
       end
+    end
+    if inline_nomsu and indented:text():match("^[^\n]*\n[^\n]*$") and nomsu:trailing_line_len() <= 8 then
+      return inline_nomsu
     end
     return indented
   end
@@ -270,7 +275,7 @@ tree_to_nomsu = function(tree)
         if #word_buffer > 0 then
           local words = table.concat(word_buffer)
           if next_space == " " then
-            if nomsu:trailing_line_len() + #words > MAX_LINE then
+            if nomsu:trailing_line_len() + #words > MAX_LINE and nomsu:trailing_line_len() > 8 then
               next_space = " \\\n.."
             elseif word_buffer[1] == "'" then
               next_space = ""
@@ -282,11 +287,11 @@ tree_to_nomsu = function(tree)
         end
         local bit_nomsu = recurse(bit)
         if bit.type == "Block" and not bit_nomsu:is_multiline() then
-          if #bit_nomsu:text() > nomsu:trailing_line_len() then
+          if #bit_nomsu:text() > nomsu:trailing_line_len() * GOLDEN_RATIO and #bit_nomsu:text() > 8 then
             bit_nomsu = tree_to_nomsu(bit)
           end
         end
-        if next_space == " " and not bit_nomsu:is_multiline() and nomsu:trailing_line_len() + #bit_nomsu:text() > MAX_LINE then
+        if (next_space == " " and not bit_nomsu:is_multiline() and nomsu:trailing_line_len() + #bit_nomsu:text() > MAX_LINE and nomsu:trailing_line_len() > 8) then
           if bit.type == 'Action' then
             bit_nomsu = NomsuCode:from(bit.source, "(..)\n    ", tree_to_nomsu(bit))
           else
@@ -307,7 +312,7 @@ tree_to_nomsu = function(tree)
     if #word_buffer > 0 then
       local words = table.concat(word_buffer)
       if next_space == " " then
-        if nomsu:trailing_line_len() + #words > MAX_LINE then
+        if nomsu:trailing_line_len() + #words > MAX_LINE and nomsu:trailing_line_len() > 8 then
           next_space = " \\\n.."
         elseif word_buffer[1] == "'" then
           next_space = ""
@@ -397,14 +402,21 @@ tree_to_nomsu = function(tree)
       nomsu:append(tree.type == "List" and "[]" or "{}")
       return nomsu
     end
+    local sep = ''
     for i, item in ipairs(tree) do
       local item_nomsu = tree_to_inline_nomsu(item)
       if #item_nomsu:text() > MAX_LINE then
         item_nomsu = recurse(item)
       end
+      if item.type == 'Comment' then
+        item_nomsu = tree_to_nomsu(item)
+      end
+      nomsu:append(sep)
       nomsu:append(item_nomsu)
-      if i < #tree then
-        nomsu:append((item_nomsu:is_multiline() or nomsu:trailing_line_len() + #tostring(item_nomsu) >= MAX_LINE) and '\n' or ', ')
+      if item_nomsu:is_multiline() or item.type == 'Comment' or nomsu:trailing_line_len() + #tostring(item_nomsu) >= MAX_LINE then
+        sep = '\n'
+      else
+        sep = ', '
       end
     end
     if tree.type == "List" then

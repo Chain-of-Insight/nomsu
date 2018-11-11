@@ -3,7 +3,8 @@
 {:R,:P,:S} = require 'lpeg'
 re = require 're'
 
-MAX_LINE = 90
+MAX_LINE = 80
+GOLDEN_RATIO = ((1+math.sqrt(5))/2)
 
 -- Parsing helper functions
 utf8_char_patt = (
@@ -107,7 +108,7 @@ tree_to_inline_nomsu = (tree)->
             else tree_to_inline_nomsu(key)
             nomsu\parenthesize! if key.type == "Action" or key.type == "Block"
             assert(value.type != "Block", "Didn't expect to find a Block as a value in a dict")
-            nomsu\append ":"
+            nomsu\append ": "
             if value
                 value_nomsu = tree_to_inline_nomsu(value)
                 value_nomsu\parenthesize! if value.type == "Block"
@@ -153,15 +154,16 @@ tree_to_nomsu = (tree)->
     -- For concision:
     recurse = (t)->
         space = MAX_LINE - nomsu\trailing_line_len!
-        inline = true
+        try_inline = true
         for subtree in coroutine.wrap(-> (t\map(coroutine.yield) and nil))
             if subtree.type == "Block"
                 if #subtree > 1
-                    inline = false
+                    try_inline = false
         
-        if inline
+        local inline_nomsu
+        if try_inline
             inline_nomsu = tree_to_inline_nomsu(t)
-            if #inline_nomsu\text! <= space
+            if #inline_nomsu\text! <= space or #inline_nomsu\text! <= 8
                 if t.type == "Action"
                     inline_nomsu\parenthesize!
                 return inline_nomsu
@@ -170,6 +172,8 @@ tree_to_nomsu = (tree)->
             if indented\is_multiline!
                 return NomsuCode\from(t.source, "(..)\n    ", indented)
             else indented\parenthesize!
+        if inline_nomsu and indented\text!\match("^[^\n]*\n[^\n]*$") and nomsu\trailing_line_len! <= 8
+            return inline_nomsu
         return indented
 
     switch tree.type
@@ -207,7 +211,7 @@ tree_to_nomsu = (tree)->
                 if #word_buffer > 0
                     words = table.concat(word_buffer)
                     if next_space == " "
-                        if nomsu\trailing_line_len! + #words > MAX_LINE
+                        if nomsu\trailing_line_len! + #words > MAX_LINE and nomsu\trailing_line_len! > 8
                             next_space = " \\\n.."
                         elseif word_buffer[1] == "'"
                             next_space = ""
@@ -217,14 +221,14 @@ tree_to_nomsu = (tree)->
 
                 bit_nomsu = recurse(bit)
                 if bit.type == "Block" and not bit_nomsu\is_multiline!
-                    -- Rule of thumb: one-liner block arguments should be shorter
-                    -- than the proceeding part of the line
-                    if #bit_nomsu\text! > nomsu\trailing_line_len!
+                    -- Rule of thumb: nontrivial one-liner block arguments should be no more
+                    -- than golden ratio * the length of the proceeding part of the line
+                    if #bit_nomsu\text! > nomsu\trailing_line_len! * GOLDEN_RATIO and #bit_nomsu\text! > 8
                         bit_nomsu = tree_to_nomsu(bit)
-                    --else
-                    --    bit_nomsu\parenthesize!
 
-                if next_space == " " and not bit_nomsu\is_multiline! and nomsu\trailing_line_len! + #bit_nomsu\text! > MAX_LINE
+                if (next_space == " " and not bit_nomsu\is_multiline! and
+                    nomsu\trailing_line_len! + #bit_nomsu\text! > MAX_LINE and
+                    nomsu\trailing_line_len! > 8)
                     if bit.type == 'Action'
                         bit_nomsu = NomsuCode\from bit.source, "(..)\n    ", tree_to_nomsu(bit)
                     else
@@ -238,7 +242,7 @@ tree_to_nomsu = (tree)->
             if #word_buffer > 0
                 words = table.concat(word_buffer)
                 if next_space == " "
-                    if nomsu\trailing_line_len! + #words > MAX_LINE
+                    if nomsu\trailing_line_len! + #words > MAX_LINE and nomsu\trailing_line_len! > 8
                         next_space = " \\\n.."
                     elseif word_buffer[1] == "'"
                         next_space = ""
@@ -312,13 +316,19 @@ tree_to_nomsu = (tree)->
             if #tree == 0
                 nomsu\append(tree.type == "List" and "[]" or "{}")
                 return nomsu
+            sep = ''
             for i, item in ipairs tree
                 item_nomsu = tree_to_inline_nomsu(item)
                 if #item_nomsu\text! > MAX_LINE
                     item_nomsu = recurse(item)
+                if item.type == 'Comment'
+                    item_nomsu = tree_to_nomsu(item)
+                nomsu\append sep
                 nomsu\append item_nomsu
-                if i < #tree
-                    nomsu\append((item_nomsu\is_multiline! or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE) and '\n' or ', ')
+                if item_nomsu\is_multiline! or item.type == 'Comment' or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE
+                    sep = '\n'
+                else
+                    sep = ', '
             return if tree.type == "List" then
                 NomsuCode\from(tree.source, "[..]\n    ", nomsu)
             else

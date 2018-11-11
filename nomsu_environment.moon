@@ -65,6 +65,8 @@ nomsu_environment = Importer{
         syntax_version = version and tonumber(version\match("^[0-9]+")) or max_parser_version
         parse = Parsers[syntax_version] or Parsers[max_parser_version]
         tree = parse(nomsu_code, source.filename)
+        if tree.shebang
+            tree.version = tree.shebang\match("nomsu %-V[ ]*([%d.]*)")
         find_errors = (t)->
             if t.type == "Error"
                 coroutine.yield t
