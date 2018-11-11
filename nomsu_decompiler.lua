@@ -12,7 +12,7 @@ do
 end
 local re = require('re')
 local MAX_LINE = 80
-local GOLDEN_RATIO = ((1 + math.sqrt(5)) / 2)
+local GOLDEN_RATIO = ((math.sqrt(5) - 1) / 2)
 local utf8_char_patt = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
 local operator_patt = S("'`~!@$^&*+=|<>?/-") ^ 1 * -1
 local identifier_patt = (R("az", "AZ", "09") + P("_") + utf8_char_patt) ^ 1 * -1
@@ -179,7 +179,15 @@ tree_to_inline_nomsu = function(tree)
     end
     return nomsu
   elseif "Number" == _exp_0 then
-    return NomsuCode:from(tree.source, tostring(tree[1]))
+    local s
+    if tree.hex and tree[1] < 0 then
+      s = ("-0x%X"):format(-tree[1])
+    elseif tree.hex then
+      s = ("0x%X"):format(tree[1])
+    else
+      s = tostring(tree[1])
+    end
+    return NomsuCode:from(tree.source, s)
   elseif "Var" == _exp_0 then
     return NomsuCode:from(tree.source, "%", tree[1])
   elseif "FileChunks" == _exp_0 then

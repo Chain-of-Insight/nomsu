@@ -4,7 +4,7 @@
 re = require 're'
 
 MAX_LINE = 80
-GOLDEN_RATIO = ((1+math.sqrt(5))/2)
+GOLDEN_RATIO = ((math.sqrt(5)-1)/2)
 
 -- Parsing helper functions
 utf8_char_patt = (
@@ -130,7 +130,12 @@ tree_to_inline_nomsu = (tree)->
             return nomsu
         
         when "Number"
-            return NomsuCode\from(tree.source, tostring(tree[1]))
+            s = if tree.hex and tree[1] < 0
+                ("-0x%X")\format(-tree[1])
+            elseif tree.hex
+                ("0x%X")\format(tree[1])
+            else tostring(tree[1])
+            return NomsuCode\from(tree.source, s)
 
         when "Var"
             return NomsuCode\from(tree.source, "%", tree[1])
