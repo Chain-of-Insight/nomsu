@@ -48,6 +48,14 @@ test:
 test:
     assume "\n" == (newline)
 
+test:
+    assume (0xDEADBEEF as hex) == "0xDEADBEEF"
+externally (%num as hex) means:
+    if (%num < 0):
+        return ("-0x%X"::formatted with (- %num))
+    ..else:
+        return ("0x%X"::formatted with %num)
+
 # Text literals
 %escapes = {..}
     nl: "\n", newline: "\n", tab: "\t", bell: "\a", cr: "\r", "carriage return": "\r"

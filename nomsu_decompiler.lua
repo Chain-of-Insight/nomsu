@@ -392,7 +392,7 @@ tree_to_nomsu = function(tree)
               if type(tree[i + 1]) == 'string' and not match(tree[i + 1], "^[ \n\t,.:;#(){}[%]]") then
                 interp_nomsu:parenthesize()
               end
-            elseif bit.type == "EscapedNomsu" or bit.type == "Block" then
+            elseif bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain" then
               interp_nomsu:parenthesize()
             end
           end

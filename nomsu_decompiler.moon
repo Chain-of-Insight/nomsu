@@ -309,7 +309,7 @@ tree_to_nomsu = (tree)->
                             if bit.type == "Var"
                                 if type(tree[i+1]) == 'string' and not match(tree[i+1], "^[ \n\t,.:;#(){}[%]]")
                                     interp_nomsu\parenthesize!
-                            elseif bit.type == "EscapedNomsu" or bit.type == "Block"
+                            elseif bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain"
                                 interp_nomsu\parenthesize!
                         nomsu\append interp_nomsu
                         if interp_nomsu\is_multiline!
