@@ -1,0 +1,50 @@
+#!/usr/bin/env nomsu -V4.11
+#
+    This file defines upgrades from Nomsu <4.11 to Nomsu 4.11
+    (deleting (if all of ...), etc. shorthand)
+    
+use "compatibility/compatibility.nom"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+upgrade action [if all of %items %body, if all of %items then %body] to "4.11" as (..)
+    if (all of %items) %body
+
+upgrade action [unless all of %items %body, unless all of %items then %body] to \
+.."4.11" as (if (not (all of %items)) %body)
+
+upgrade action [if any of %items %body, if any of %items then %body] to "4.11" as (..)
+    if (any of %items) %body
+
+upgrade action [unless any of %items %body, unless any of %items then %body] to \
+.."4.11" as (if (not (any of %items)) %body)
+
+upgrade action [if none of %items %body, if none of %items then %body] to "4.11" \
+..as (if (not (any of %items)) %body)
+
+upgrade action [unless none of %items %body, unless none of %items then %body] to \
+.."4.11" as (if (any of %items) %body)
+
+upgrade action [..]
+    if all of %items %body else %else, if all of %items then %body else %else
+..to "4.11" as (if (all of %items) %body else %else)
+
+upgrade action [..]
+    unless all of %items %body else %else, unless all of %items then %body else %else
+..to "4.11" as (if (not (all of %items)) %body else %else)
+
+upgrade action [..]
+    if any of %items %body else %else, if any of %items then %body else %else
+..to "4.11" as (if (any of %items) %body else %else)
+
+upgrade action [..]
+    unless any of %items %body else %else, unless any of %items then %body else %else
+..to "4.11" as (if (not (any of %items)) %body else %else)
+
+upgrade action [..]
+    if none of %items %body else %else, if none of %items then %body else %else
+..to "4.11" as (if (not (any of %items)) %body else %else)
+
+upgrade action [..]
+    unless none of %items %body else %else, unless none of %items then %body else %else
+..to "4.11" as (if (any of %items) %body else %else)
