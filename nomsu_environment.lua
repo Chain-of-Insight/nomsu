@@ -104,6 +104,12 @@ local nomsu_environment = Importer({
   LuaCode = LuaCode,
   NomsuCode = NomsuCode,
   Source = Source,
+  LuaCode_from = (function(src, ...)
+    return LuaCode:from(src, ...)
+  end),
+  NomsuCode_from = (function(src, ...)
+    return NomsuCode:from(src, ...)
+  end),
   SOURCE_MAP = Importer({ }),
   _1_as_nomsu = tree_to_nomsu,
   _1_as_inline_nomsu = tree_to_inline_nomsu,

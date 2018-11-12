@@ -19,7 +19,7 @@ for %path in %args:
     for file %filename in %path:
         unless (%filename::matches "%.nom$"): do next %filename
         %contents = (read file %filename)
-        %code = (%NomsuCode::from (Source %filename 1 (size of %contents)) %contents)
+        %code = (NomsuCode from (Source %filename 1 (size of %contents)) %contents)
         %tree = (%code parsed)
         %formatted = ((%tree as nomsu)::text)
         if %inplace:

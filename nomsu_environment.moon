@@ -48,6 +48,8 @@ nomsu_environment = Importer{
     lpeg:lpeg, re:re, Files:Files,
     :SyntaxTree, TESTS: Dict({}), globals: Dict({}),
     :LuaCode, :NomsuCode, :Source
+    LuaCode_from: ((src, ...)-> LuaCode\from(src, ...)),
+    NomsuCode_from: ((src, ...)-> NomsuCode\from(src, ...)),
     SOURCE_MAP: Importer({})
 
     -- Nomsu functions:

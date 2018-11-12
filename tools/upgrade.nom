@@ -41,7 +41,7 @@ for %path in %args:
     for file %filename in %path:
         unless (%filename::matches "%.nom$"): do next %filename
         %file = (read file %filename)
-        %code = (%NomsuCode::from (%Source %filename 1 (size of %file)) %file)
+        %code = (NomsuCode from (%Source %filename 1 (size of %file)) %file)
         %tree = (%code parsed)
         %uptree = (..)
             %tree upgraded from (%start_version or (%tree.version or (Nomsu version))) to \

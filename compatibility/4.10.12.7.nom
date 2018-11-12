@@ -38,7 +38,7 @@ upgrade action (%k = %v for %i in %start to %stop via %step) to "4.10.12.7" as {
     : for %i in %start to %stop by %step: add %k = %v
 
 upgrade action (parse %text from %filename) to "4.10.12.7" as (..)
-    (%NomsuCode (%Source %filename 1 (size of %text))) parsed
+    (NomsuCode from (Source %filename 1 (size of %text)) %text) parsed
 
 upgrade action (% as lua statements) to "4.10.12.7" as (% as lua)
 upgrade action (compile error at %pos %err hint %hint) to "4.10.12.7" as (..)

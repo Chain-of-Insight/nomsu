@@ -16,7 +16,7 @@ for %path in %files:
     for file %filename in %path:
         unless (%filename::matches "%.nom$"): do next %filename
         %file = (read file %filename)
-        %code = (%NomsuCode (%Source %filename 1 (size of %file)) %file)
+        %code = (NomsuCode from (%Source %filename 1 (size of %file)) %file)
         try:
             %tree = (%code parsed)
         ..and if it barfs %msg:
