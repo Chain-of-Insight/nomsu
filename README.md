@@ -45,14 +45,20 @@ If you enjoy Nomsu so much that you'd like to tinker with it or have it in your 
 All `.moon` files have been precompiled into corresponding `.lua` files, so you don't need to have [Moonscript](http://moonscript.org/) installed to run the Nomsu compiler.
 
 * [nomsu](nomsu) - A shell script that selects between different installed versions of Nomsu (using the `-V` flag). You can use this script to, for example, run `nomsu -V 1.2 your_script.nom` to run with the latest version of Nomsu that matches `1.2.?.?`. All flags and arguments are passed along to whichever Nomsu compiler is chosen.
-* [nomsu.moon](nomsu.moon) - The source code for the Nomsu command line runner. This handles launching the compiler and running the REPL.
+* [nomsu.moon](nomsu.moon) - The source code for the Nomsu command line runner. This handles loading the nomsu environment and compiler and running the REPL.
 * `nomsu.*.peg` - The [Parsing Expression Grammar](https://en.wikipedia.org/wiki/Parsing_expression_grammar) used to define each version of Nomsu's syntax. The format of this file is a slightly modified version of the format accepted by LPEG's `re` module.
-* [nomsu\_compiler.moon](nomsu_compiler.moon) - **The actual Nomsu compiler**. This file can be imported and used without going through the regular command line interface (e.g. for applications that want to embed the compiler).
 * [parser.moon](parser.moon) - The Nomsu parser. This file can also be imported and used directly for applications that only need to *parse* Nomsu, not compile it.
-* [syntax\_tree.moon](syntax_tree.moon) - Datastructures used for Nomsu Abstract Syntax Trees.
-* [code\_obj.moon](code_obj.moon) - Datastructures used for incrementally building generated code, while preserving code origins.
+* [nomsu\_compiler.moon](nomsu_compiler.moon) - **The actual Nomsu compiler**. This file defines a function that transforms a Nomsu syntax tree into runnable Lua code.
+* [nomsu\_decompiler.moon](nomsu_compiler.moon) - This file defines functions that transform Nomsu syntax trees back into Nomsu code. This can be used for auto-formatting.
+* [nomsu\_environment.moon](nomsu_environment.moon) - This file defines the environment in which Nomsu code runs, including some basic built-in functions.
+* [bitops.moon](bitops.moon) - This is a shim for Lua 5.2 and LuaJIT that defines bitwise operations that respect metamethods.
+* [code\_obj.moon](code_obj.moon) - Datastructures used for incrementally building generated code, while preserving code source information.
+* [containers.moon](containers.moon) - A library that defines some custom containers (List and Dict) used by nomsu.
 * [error\_handling.moon](error_handling.moon) - The logic for producing good error messages within Lua that reference the Nomsu source code that led to them.
-* [consolecolors.lua](consolecolors.lua) - Lua module that defines ANSI color codes for colored console output (used internally in nomsu.moon).
+* [files.moon](files.moon) - A library for interacting with the filesystem.
+* [pretty_errors.moon](pretty_errors.moon) - A simple library for displaying errors in a more visually pleasing/readable way.
+* [string2.moon](string2.moon) - A library defining some extra functionality for strings.
+* [syntax\_tree.moon](syntax_tree.moon) - Datastructures used for Nomsu Abstract Syntax Trees.
 * [examples/how\_do\_i.nom](examples/how_do_i.nom) - A simple walkthrough of some of the features of Nomsu, written in Nomsu code. **This is a good place to start.**
 * [core/\*.nom](core) - Core language definitions of stuff like control flow, operators, and metaprogramming, broken down into different files.
 * [lib/\*.nom](lib) - Optional language libraries for stuff you might want, like interfacing with the OS, or doing Object Oriented Programming.
