@@ -10,6 +10,7 @@
     "set 1 =": "__newindex", size: "__len", iterate: "__ipairs", "iterate all": "__pairs"
 
 test:
+    an (Empty) is a thing
     a (Dog) is a thing:
         that can (set up) by:
             %its.barks or= 0
@@ -95,7 +96,10 @@ test:
     %lua::add %lines joined with "\n"
     return %lua
 
-(a %classname is a thing with %members %class_body) compiles to:
+[..]
+    a %classname is a thing with %members %class_body
+    an %classname is a thing with %members %class_body
+..all compile to:
     unless (%classname.type == "Action"):
         compile error at %classname "\
             ..Expected this to be an action, not a \%classname.type"
@@ -129,7 +133,7 @@ test:
                 class.__tostring = function(inst)
                     return inst.name..dict_tostring(inst)
                 end
-                \(%class_body as lua)
+                \((%class_body as lua) if %class_body else "")
                 for stub,metamethod in pairs(globals.METAMETHOD_MAP) do
                     class[metamethod] = class[stub:as_lua_id()]
                 end
@@ -143,5 +147,5 @@ test:
                 end
             end"
 
-(a %classname is a thing %class_body) parses as (..)
+[a %classname is a thing %class_body, an %classname is a thing] all parse as (..)
     a %classname is a thing with (nil) %class_body
