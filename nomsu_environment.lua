@@ -274,8 +274,8 @@ local nomsu_environment = Importer({
   end,
   FILE_CACHE = { },
   run_file_1_in = function(path, environment, optimization)
-    if optimization == nil then
-      optimization = 1
+    if not optimization then
+      optimization = environment.OPTIMIZATION
     end
     if environment.FILE_CACHE[path] then
       import_to_1_from(environment, environment.FILE_CACHE[path])
@@ -285,7 +285,6 @@ local nomsu_environment = Importer({
       local i = _currently_running_files:index_of(path)
       _currently_running_files:add(path)
       local circle = _currently_running_files:from_1_to(i, -1)
-      print(_currently_running_files, path)
       error("Circular import detected:\n           " .. circle:joined_with("\n..imports  "))
     end
     _currently_running_files:add(path)

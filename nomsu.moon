@@ -89,10 +89,10 @@ if not args or args.help
     print usage
     os.exit(EXIT_FAILURE)
 nomsu_environment.command_line_args = List(args.nomsu_args)
-nomsu_environment.optimization = args.optimization or 1
+nomsu_environment.OPTIMIZATION = tonumber(args.optimization or 1)
 
 if args.version
-    nomsu_environment.run_file_1_in 'core', nomsu_environment
+    nomsu_environment.run_file_1_in 'core', nomsu_environment, nomsu_environment.OPTIMIZATION
     nomsu_environment.run_1_in([[say (Nomsu version)]], nomsu_environment)
     os.exit(EXIT_SUCCESS)
 
@@ -108,7 +108,7 @@ run = ->
             input_files[filename] = true
 
     unless args.no_core
-        nomsu_environment.run_file_1_in 'core', nomsu_environment
+        nomsu_environment.run_file_1_in 'core', nomsu_environment, nomsu_environment.OPTIMIZATION
     
     for f in *file_queue
         for _,filename in Files.walk(f)
@@ -152,7 +152,7 @@ run = ->
                 nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
 
     unless args.primary_file or args.exec_strings
-        nomsu_environment.run_file_1_in("tools/repl.nom", nomsu_environment)
+        nomsu_environment.run_file_1_in("tools/repl.nom", nomsu_environment, nomsu_environment.OPTIMIZATION)
 
 debugger = if args.debugger == "nil" then {}
 else require(args.debugger or 'error_handling')

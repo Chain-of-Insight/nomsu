@@ -136,9 +136,9 @@ if not args or args.help then
   os.exit(EXIT_FAILURE)
 end
 nomsu_environment.command_line_args = List(args.nomsu_args)
-nomsu_environment.optimization = args.optimization or 1
+nomsu_environment.OPTIMIZATION = tonumber(args.optimization or 1)
 if args.version then
-  nomsu_environment.run_file_1_in('core', nomsu_environment)
+  nomsu_environment.run_file_1_in('core', nomsu_environment, nomsu_environment.OPTIMIZATION)
   nomsu_environment.run_1_in([[say (Nomsu version)]], nomsu_environment)
   os.exit(EXIT_SUCCESS)
 end
@@ -167,7 +167,7 @@ run = function()
     end
   end
   if not (args.no_core) then
-    nomsu_environment.run_file_1_in('core', nomsu_environment)
+    nomsu_environment.run_file_1_in('core', nomsu_environment, nomsu_environment.OPTIMIZATION)
   end
   for _index_0 = 1, #file_queue do
     local f = file_queue[_index_0]
@@ -239,7 +239,7 @@ run = function()
     end
   end
   if not (args.primary_file or args.exec_strings) then
-    return nomsu_environment.run_file_1_in("tools/repl.nom", nomsu_environment)
+    return nomsu_environment.run_file_1_in("tools/repl.nom", nomsu_environment, nomsu_environment.OPTIMIZATION)
   end
 end
 local debugger

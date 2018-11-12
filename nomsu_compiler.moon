@@ -98,7 +98,7 @@ compile = setmetatable({
             --if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
             --    unless import_to_1_from(compile, path[1])
             --        compile_error tree, "Could not find anything to import for #{path}"
-            return LuaCode("run_file_1_in(#{compile(path)}, _ENV)")
+            return LuaCode("run_file_1_in(#{compile(path)}, _ENV, OPTIMIZATION)")
 
         ["tests"]: (compile)-> LuaCode("TESTS")
         ["test"]: (compile, body)->

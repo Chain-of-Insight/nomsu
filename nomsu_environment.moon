@@ -150,7 +150,9 @@ nomsu_environment = Importer{
             error("Attempt to run unknown thing: "..tostring(to_run))
     
     FILE_CACHE: {}
-    run_file_1_in: (path, environment, optimization=1)->
+    run_file_1_in: (path, environment, optimization)->
+        if not optimization
+            optimization = environment.OPTIMIZATION
         if environment.FILE_CACHE[path]
             import_to_1_from(environment, environment.FILE_CACHE[path])
             return
@@ -158,7 +160,6 @@ nomsu_environment = Importer{
             i = _currently_running_files\index_of(path)
             _currently_running_files\add path
             circle = _currently_running_files\from_1_to(i, -1)
-            print(_currently_running_files, path)
             error("Circular import detected:\n           "..circle\joined_with("\n..imports  "))
         _currently_running_files\add path
         mod = _1_forked(environment)

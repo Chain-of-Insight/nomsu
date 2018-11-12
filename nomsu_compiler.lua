@@ -136,7 +136,7 @@ local compile = setmetatable({
       return compile.action["lua >"](compile, code)
     end,
     ["use"] = function(compile, path)
-      return LuaCode("run_file_1_in(" .. tostring(compile(path)) .. ", _ENV)")
+      return LuaCode("run_file_1_in(" .. tostring(compile(path)) .. ", _ENV, OPTIMIZATION)")
     end,
     ["tests"] = function(compile)
       return LuaCode("TESTS")
