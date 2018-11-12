@@ -21,18 +21,19 @@ say "\
     "
 
 repeat:
-    %io.write (bright (yellow ">> "))
+    say (bright (yellow ">> ")) inline
     %buff = []
     repeat:
-        %io.write (bright)
+        say (bright) inline
         %line = (%io.read "*L")
-        %io.write (reset color)
+        say (reset color) inline
         if ((%line == "\n") or (not %line)):
             if ((size of %buff) > 0):
-                %io.write "\027[1A\027[2K"
+                # clear the line
+                say "\027[1A\027[2K" inline
             go to (run buffer)
         %buff::add (%line::with "\t" -> "    ")
-        %io.write (dim (yellow ".. "))
+        say (dim (yellow ".. ")) inline
     === (run buffer) ===
     if ((size of %buff) == 0): stop
     %buff = (%buff::joined)

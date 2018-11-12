@@ -38,7 +38,7 @@ nomsu_environment = Importer{
     -- Lua stuff:
     :next, unpack: unpack or table.unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
     :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
-    :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
+    say:print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
     :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
     :pairs, :ipairs, :jit, :_VERSION
     bit: (jit or _VERSION == "Lua 5.2") and require('bitops') or nil
