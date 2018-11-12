@@ -184,7 +184,7 @@ tree_to_nomsu = (tree)->
     switch tree.type
         when "FileChunks"
             if tree.shebang
-                nomsu\append tree.shebang, "\n"
+                nomsu\append tree.shebang
 
             for chunk_no, chunk in ipairs tree
                 nomsu\append "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1

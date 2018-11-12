@@ -242,7 +242,7 @@ tree_to_nomsu = function(tree)
   local _exp_0 = tree.type
   if "FileChunks" == _exp_0 then
     if tree.shebang then
-      nomsu:append(tree.shebang, "\n")
+      nomsu:append(tree.shebang)
     end
     for chunk_no, chunk in ipairs(tree) do
       if chunk_no > 1 then
