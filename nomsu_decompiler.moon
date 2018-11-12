@@ -107,9 +107,8 @@ tree_to_inline_nomsu = (tree)->
                 NomsuCode\from(key.source, key[1])
             else tree_to_inline_nomsu(key)
             nomsu\parenthesize! if key.type == "Action" or key.type == "Block"
-            assert(value.type != "Block", "Didn't expect to find a Block as a value in a dict")
-            nomsu\append ": "
             if value
+                nomsu\append ": "
                 value_nomsu = tree_to_inline_nomsu(value)
                 value_nomsu\parenthesize! if value.type == "Block"
                 nomsu\append value_nomsu
@@ -345,10 +344,11 @@ tree_to_nomsu = (tree)->
                 NomsuCode\from(key.source, key[1])
             else tree_to_inline_nomsu(key)
             nomsu\parenthesize! if key.type == "Block"
-            value_nomsu = tree_to_nomsu(value)
-            if (value.type == "Block" or value.type == "EscapedNomsu") and not value_nomsu\is_multiline!
-                value_nomsu\parenthesize!
-            nomsu\append ": ", value_nomsu
+            if value
+                value_nomsu = tree_to_nomsu(value)
+                if (value.type == "Block" or value.type == "EscapedNomsu") and not value_nomsu\is_multiline!
+                    value_nomsu\parenthesize!
+                nomsu\append ": ", value_nomsu
             return nomsu
 
         when "Comment"

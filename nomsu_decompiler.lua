@@ -149,9 +149,8 @@ tree_to_inline_nomsu = function(tree)
     if key.type == "Action" or key.type == "Block" then
       nomsu:parenthesize()
     end
-    assert(value.type ~= "Block", "Didn't expect to find a Block as a value in a dict")
-    nomsu:append(": ")
     if value then
+      nomsu:append(": ")
       local value_nomsu = tree_to_inline_nomsu(value)
       if value.type == "Block" then
         value_nomsu:parenthesize()
@@ -442,11 +441,13 @@ tree_to_nomsu = function(tree)
     if key.type == "Block" then
       nomsu:parenthesize()
     end
-    local value_nomsu = tree_to_nomsu(value)
-    if (value.type == "Block" or value.type == "EscapedNomsu") and not value_nomsu:is_multiline() then
-      value_nomsu:parenthesize()
+    if value then
+      local value_nomsu = tree_to_nomsu(value)
+      if (value.type == "Block" or value.type == "EscapedNomsu") and not value_nomsu:is_multiline() then
+        value_nomsu:parenthesize()
+      end
+      nomsu:append(": ", value_nomsu)
     end
-    nomsu:append(": ", value_nomsu)
     return nomsu
   elseif "Comment" == _exp_0 then
     nomsu:append("#", (tree[1]:gsub("\n", "\n    ")))
