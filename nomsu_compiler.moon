@@ -270,10 +270,6 @@ compile = setmetatable({
                         i += 1
                     lua\append "\n    return comprehension\nend)()"
                 return lua
-                --lua = LuaCode\from tree.source, "#{tree.type}{"
-                --lua\concat_append([compile(e) for e in *tree when e.type != 'Comment'], ", ", ",\n  ")
-                --lua\append "}"
-                --return lua
 
             when "DictEntry"
                 key, value = tree[1], tree[2]
@@ -323,8 +319,7 @@ compile = setmetatable({
                     "compilation depends on the earlier chunks")
             
             when "Comment"
-                -- TODO: implement?
-                return LuaCode\from(tree.source, "")
+                return LuaCode\from(tree.source, "-- ", (tree[1]\gsub('\n', '\n-- ')))
             
             when "Error"
                 error("Can't compile errors")

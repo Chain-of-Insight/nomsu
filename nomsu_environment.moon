@@ -107,10 +107,10 @@ nomsu_environment = Importer{
             -- (typically), so each chunk needs to compile and run before the next one
             -- compiles.
             ret = nil
-            for chunk in *to_run
+            for chunk_no, chunk in ipairs to_run
                 lua = environment.compile(chunk)
                 lua\declare_locals!
-                lua\prepend "-- File: #{filename}\n"
+                lua\prepend "-- File: #{filename} chunk ##{chunk_no}\n"
                 ret = environment.run_1_in(lua, environment)
             return ret
         elseif LuaCode\is_instance(to_run)

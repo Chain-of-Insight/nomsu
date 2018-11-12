@@ -433,7 +433,7 @@ local compile = setmetatable({
     elseif "FileChunks" == _exp_0 then
       return error("Can't convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     elseif "Comment" == _exp_0 then
-      return LuaCode:from(tree.source, "")
+      return LuaCode:from(tree.source, "-- ", (tree[1]:gsub('\n', '\n-- ')))
     elseif "Error" == _exp_0 then
       return error("Can't compile errors")
     else

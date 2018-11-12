@@ -208,11 +208,10 @@ local nomsu_environment = Importer({
         }
       end
       local ret = nil
-      for _index_0 = 1, #to_run do
-        local chunk = to_run[_index_0]
+      for chunk_no, chunk in ipairs(to_run) do
         local lua = environment.compile(chunk)
         lua:declare_locals()
-        lua:prepend("-- File: " .. tostring(filename) .. "\n")
+        lua:prepend("-- File: " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
         ret = environment.run_1_in(lua, environment)
       end
       return ret

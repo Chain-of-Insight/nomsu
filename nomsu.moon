@@ -128,10 +128,11 @@ run = ->
                 code = NomsuCode\from(source, code)
                 tree = nomsu_environment._1_parsed(code)
                 tree = {tree} unless tree.type == 'FileChunks'
-                for chunk in *tree
+                for chunk_no, chunk in ipairs tree
                     lua = nomsu_environment.compile(chunk)
                     lua\declare_locals!
                     nomsu_environment.run_1_in(chunk, nomsu_environment)
+                    output\write((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
                     output\write(tostring(lua), "\n")
                     if args.verbose then print(tostring(lua))
                 print ("Compiled %-25s -> %s")\format(filename, filename\gsub("%.nom$", ".lua"))
