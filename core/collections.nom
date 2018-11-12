@@ -15,11 +15,11 @@ test:
     %visited = {}
     for %i = %x in %list:
         %visited.%i = (yes)
-    assume (%visited == {1: yes, 2: yes, 3: yes, 4: yes, 5: yes})
+    assume (%visited == {1, 2, 3, 4, 5})
     %visited = {}
     for %x in %list:
         %visited.%x = (yes)
-    assume (%visited == {1: yes, 2: yes, 3: yes, 4: yes, 5: yes})
+    assume (%visited == {1, 2, 3, 4, 5})
     assume ((%list::2 nd to last) == 4)
     assume ((%list::first) == 1)
     assume (%list::has 3)
