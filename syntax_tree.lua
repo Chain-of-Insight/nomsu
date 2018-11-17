@@ -147,16 +147,16 @@ do
     end,
     get_args = function(self)
       assert(self.type == "Action", "Only actions have arguments")
-      local _accum_0 = { }
-      local _len_0 = 1
+      local args = {
+        self.target
+      }
       for _index_0 = 1, #self do
         local tok = self[_index_0]
         if type(tok) ~= 'string' then
-          _accum_0[_len_0] = tok
-          _len_0 = _len_0 + 1
+          args[#args + 1] = tok
         end
       end
-      return _accum_0
+      return args
     end,
     get_stub = function(self)
       local stub_bits = { }
@@ -198,7 +198,8 @@ do
       local Files = require('files')
       local f = Files.read(s.filename)
       return f
-    end
+    end,
+    __mode = "k"
   })
   self.is_instance = function(self, t)
     return type(t) == 'table' and getmetatable(t) == self.__base

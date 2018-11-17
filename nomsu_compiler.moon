@@ -19,19 +19,26 @@ unpack or= table.unpack
 {:LuaCode, :Source} = require "code_obj"
 SyntaxTree = require "syntax_tree"
 {:Importer, :import_to_1_from, :_1_forked} = require 'importer'
+Files = require "files"
 
 table.map = (t, fn)-> setmetatable([fn(v) for _,v in ipairs(t)], getmetatable(t))
 
--- TODO:
--- Re-implement nomsu-to-lua comment translation?
-
 -- TODO: de-duplicate this
 pretty_error = require("pretty_errors")
-compile_error = (tree, err_msg, hint=nil)->
+compile_error = (source, err_msg, hint=nil)->
+    local file
+    if SyntaxTree\is_instance(source)
+        file = source\get_source_file!
+        source = source.source
+    elseif type(source) == 'string'
+        source = Source\from_string(source)
+    if source and not file
+        file = Files.read(source.filename)
+
     err_str = pretty_error{
         title: "Compile error"
-        error:err_msg, hint:hint, source:tree\get_source_file!
-        start:tree.source.start, stop:tree.source.stop, filename:tree.source.filename
+        error:err_msg, hint:hint, source:file
+        start:source.start, stop:source.stop, filename:source.filename
     }
     error(err_str, 0)
 {:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
@@ -53,7 +60,7 @@ compile = setmetatable({
             lua\append "("
             for i=1,select('#',...)
                 lua\append(", ") if i > 1
-                lua\append compile(select(i, ...))
+                lua\append compile((select(i, ...)))
             lua\append ")"
             return lua
 
@@ -94,11 +101,10 @@ compile = setmetatable({
 
         ["= lua"]: (compile, code)-> compile.action["lua >"](compile, code)
 
-        ["use"]: (compile, path)->
-            --if path.type == 'Text' and #path == 1 and type(path[1]) == 'string'
-            --    unless import_to_1_from(compile, path[1])
-            --        compile_error tree, "Could not find anything to import for #{path}"
-            return LuaCode("run_file_1_in(#{compile(path)}, _ENV, OPTIMIZATION)")
+        ["use"]: (compile, path)-> LuaCode("run_file_1_in(#{compile(path)}, _ENV, OPTIMIZATION)")
+
+        ["use 1 with prefix"]: (compile, path, prefix)->
+            LuaCode("run_file_1_in(#{compile(path)}, _ENV, OPTIMIZATION, ", compile(prefix), ")")
 
         ["tests"]: (compile)-> LuaCode("TESTS")
         ["test"]: (compile, body)->
@@ -114,15 +120,13 @@ compile = setmetatable({
         ["nomsu environment"]: (compile)-> LuaCode("_ENV")
     }
 }, {
-    __import: (other)=>
-        import_to_1_from(@action, other.action)
-        return
-    __call: (compile, tree, force_value=false)->
+    __import: import_to_1_from
+    __call: (compile, tree)->
         switch tree.type
             when "Action"
                 stub = tree.stub
                 compile_action = compile.action[stub]
-                if not compile_action and math_expression\match(stub)
+                if not compile_action and not tree.target and math_expression\match(stub)
                     lua = LuaCode\from(tree.source)
                     for i,tok in ipairs tree
                         if type(tok) == 'string'
@@ -155,7 +159,9 @@ compile = setmetatable({
                 if tree.target -- Method call
                     target_lua = compile tree.target
                     target_text = target_lua\text!
-                    if target_text\match("^%(.*%)$") or target_text\match("^[_a-zA-Z][_a-zA-Z0-9.]*$")
+                    -- TODO: this parenthesizing is maybe overly conservative
+                    if target_text\match("^%(.*%)$") or target_text\match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or
+                        tree.target.type == "IndexChain"
                         lua\append target_lua, ":"
                     else
                         lua\append "(", target_lua, "):"
@@ -163,7 +169,9 @@ compile = setmetatable({
                 args = {}
                 for i, tok in ipairs tree
                     if type(tok) == "string" then continue
-                    arg_lua = compile(tok, true)
+                    arg_lua = compile(tok)
+                    if tok.type == "Block"
+                        arg_lua = LuaCode\from(tok.source, "(function()\n    ", arg_lua, "\nend)()")
                     insert args, arg_lua
                 lua\concat_append args, ", "
                 lua\append ")"
@@ -196,17 +204,11 @@ compile = setmetatable({
                 return lua
             
             when "Block"
-                if not force_value
-                    lua = LuaCode\from(tree.source)
-                    lua\concat_append([compile(line) for line in *tree], "\n")
-                    return lua
-                else
-                    lua = LuaCode\from(tree.source)
-                    lua\append("((function()")
-                    for i, line in ipairs(tree)
-                        lua\append "\n    ", compile(line)
-                    lua\append("\nend)())")
-                    return lua
+                lua = LuaCode\from(tree.source)
+                for i, line in ipairs tree
+                    if i > 1 then lua\append "\n"
+                    lua\append compile(line)
+                return lua
 
             when "Text"
                 lua = LuaCode\from(tree.source)
@@ -234,7 +236,7 @@ compile = setmetatable({
                 return lua
 
             when "List", "Dict"
-                lua = LuaCode\from tree.source, "#{tree.type}{"
+                lua = LuaCode\from tree.source
                 i = 1
                 sep = ''
                 while i <= #tree
@@ -250,7 +252,12 @@ compile = setmetatable({
                         lua\append item_lua
                         sep = ', '
                     i += 1
-                lua\append "}"
+
+                if lua\is_multiline!
+                    lua = LuaCode\from tree.source, "#{tree.type}{\n    ", lua, "\n}"
+                else
+                    lua = LuaCode\from tree.source, "#{tree.type}{", lua, "}"
+
                 -- List/dict comprehenstion
                 if i <= #tree
                     lua = LuaCode\from tree.source, "(function()\n    local comprehension = ", lua
@@ -269,6 +276,7 @@ compile = setmetatable({
                             lua\append "comprehension[#comprehension+1] = ", compile(tree[i])
                         i += 1
                     lua\append "\n    return comprehension\nend)()"
+                
                 return lua
 
             when "DictEntry"
@@ -329,4 +337,4 @@ compile = setmetatable({
 
 })
 
-return compile
+return {:compile, :compile_error}

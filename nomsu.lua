@@ -202,12 +202,12 @@ run = function()
           for chunk_no, chunk in ipairs(tree) do
             local lua = nomsu_environment.compile(chunk)
             lua:declare_locals()
-            nomsu_environment.run_1_in(chunk, nomsu_environment)
-            output:write((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
-            output:write(tostring(lua), "\n")
+            lua:prepend((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
             if args.verbose then
-              print(tostring(lua))
+              print(lua:text())
             end
+            nomsu_environment.run_1_in(chunk, nomsu_environment)
+            output:write(lua:text(), "\n")
           end
           print(("Compiled %-25s -> %s"):format(filename, filename:gsub("%.nom$", ".lua")))
           output:close()
@@ -221,12 +221,12 @@ run = function()
               tree
             }
           end
-          for _index_1 = 1, #tree do
-            local chunk = tree[_index_1]
+          for chunk_no, chunk in ipairs(tree) do
             local lua = nomsu_environment.compile(chunk)
             lua:declare_locals()
-            nomsu_environment.run_1_in(chunk, nomsu_environment)
-            print(tostring(lua))
+            lua:prepend((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
+            print(lua:text())
+            nomsu_environment.run_1_in(lua, nomsu_environment)
           end
         else
           nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)

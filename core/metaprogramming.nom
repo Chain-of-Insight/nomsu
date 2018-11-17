@@ -3,7 +3,8 @@
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
     
-lua> "NOMSU_CORE_VERSION = 10\nNOMSU_LIB_VERSION = 7"
+lua> "NOMSU_CORE_VERSION = 11"
+lua> "NOMSU_LIB_VERSION = 8"
 lua> "\
     ..do
         local mangle_index = 0
@@ -21,23 +22,38 @@ lua> "\
 
 lua> "\
     ..compile.action["1 ->"] = function(compile, \%args, \%body)
-        local lua = LuaCode("(function(")
-        if SyntaxTree:is_instance(\%args) and \%args.type == "Action" then \%args = \%args:get_args() end
-        local lua_args = table.map(\%args, function(a) return SyntaxTree:is_instance(a) and compile(a):text(\
-    ..) or a end)
-        lua:concat_append(lua_args, ", ")
+        if \%args and not \%body then \%args, \%body = {}, \%args end
         local body_lua = SyntaxTree:is_instance(\%body) and compile(\%body) or \%body
         if SyntaxTree:is_instance(\%body) and \%body.type ~= "Block" then body_lua:prepend("return ") end
-        body_lua:remove_free_vars(lua_args)
+        local lua = LuaCode("(function(")
+        if SyntaxTree:is_instance(\%args) and \%args.type == "Action" then \%args = \%args:get_args()
+        elseif SyntaxTree:is_instance(\%args) and \%args.type == "Var" then \%args = {\%args} end
+        for i, arg in ipairs(\%args) do
+            local arg_lua = SyntaxTree:is_instance(arg) and compile(arg):text() or arg
+            if arg_lua == "..." then
+                if i < #\%args then
+                    compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
+                        "Extra arguments must come last.", "Try removing any arguments after (*extra arguments*)")
+                end
+            elseif not arg_lua:is_lua_id() then
+                compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
+                    "This does not compile to a Lua identifier, so it can't be used as a function argument.",
+                    "This should probably be a Nomsu variable instead (like %x).")
+            end
+            lua:append(i > 1 and ", " or "", arg_lua)
+            body_lua:remove_free_vars({arg_lua})
+        end
         body_lua:declare_locals()
         lua:append(")\\n    ", body_lua, "\\nend)")
         return lua
-    end"
+    end
+    compile.action["->"] = compile.action["1 ->"]
+    compile.action["for"] = compile.action["1 ->"]"
 
 lua> "\
     ..compile.action["what 1 compiles to"] = function(compile, \%action)
         local lua = LuaCode("compile.action[", \%action.stub:as_lua(), "](")
-        local lua_args = table.map(\%action:get_args(), function(a) return compile(a) end)
+        local lua_args = table.map(\%action:get_args(), compile)
         table.insert(lua_args, 1, "compile")
         lua:concat_append(lua_args, ", ")
         lua:append(")")
@@ -100,17 +116,6 @@ lua> "\
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(call %fn with %args) compiles to:
-    lua> "\
-        ..local lua = LuaCode(compile(\%fn), "(")
-        if \%args.type == 'List' then
-            lua:concat_append(table.map(\%args, function(a) return compile(a) end), ", ")
-        else
-            lua:append('unpack(', compile(\%args), ')')
-        end
-        lua:append(")")
-        return lua"
-
 test:
     (foo %x) means "outer"
     with local [(foo %)'s meaning]:
@@ -124,27 +129,36 @@ test:
 
 (%action means %body) compiles to:
     lua> "\
-        ..local fn_name = \%action.stub:as_lua_id()
-        local \%args = \%action:get_args()
-        local lua = LuaCode(fn_name, " = ", \(what (%args -> %body) compiles to))
-        lua:add_free_vars({fn_name})
+        ..
+        local lua = LuaCode()
+        local fn_name = \%action.stub:as_lua_id()
+        if \%action.target then lua:append(compile(\%action.target), ".")
+        else lua:add_free_vars({fn_name}) end
+        lua:append(fn_name, " = ", \(what (%action -> %body) compiles to), ";")
         return lua"
 
 (%actions all mean %body) compiles to:
     lua> "\
         ..local fn_name = \%actions[1].stub:as_lua_id()
+        local target = \%actions[1].target and compile(\%actions[1].target) or nil
         local \%args = List(\%actions[1]:get_args())
         local lua = \(what (%actions.1 means %body) compiles to)
         for i=2,#\%actions do
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
-            lua:add_free_vars({alias_name})
             local \%alias_args = List(alias:get_args())
-            lua:append("\\n", alias_name, " = ")
-            if \%args == \%alias_args then
-                lua:append(fn_name)
+            lua:append("\\n")
+            if alias.target then
+                lua:append(compile(alias.target), ".")
             else
-                lua:append(\(what (%alias_args -> %actions.1) compiles to))
+                lua:add_free_vars({alias_name})
+            end
+            lua:append(alias_name, " = ")
+            if \%args == \%alias_args then
+                if target then lua:append(target, ".") end
+                lua:append(fn_name, ";")
+            else
+                lua:append(\(what (%alias_args -> %actions.1) compiles to), ";")
             end
         end
         return lua"
@@ -182,11 +196,11 @@ test:
             %y = %tmp
 
 test:
-    set {%1: 1, %2: 2}
+    [%1, %2] = [1, 2]
     swap %1 and %2
     assume ((%1 == 2) and (%2 == 1)) or barf "\
         ..'parse % as %' failed on 'swap % and %'"
-    set {%tmp: 1, %tmp2: 2}
+    [%tmp, %tmp2] = [1, 2]
     swap %tmp and %tmp2
     assume ((%tmp == 2) and (%tmp2 == 1)) or barf "\
         ..'parse % as %' variable mangling failed."
@@ -239,9 +253,15 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [%action parses as %body] all parse as ([%action] all parse as %body)
-(%tree as lua expr) compiles to "compile(\(=lua "compile(\%tree, true)"), true)"
+#(%tree as lua expr) compiles to "compile(\(=lua "compile(\%tree, true)"), true)"
+externally (%tree as lua expr) means:
+    lua> "\
+        ..local tree_lua = compile(\%tree)
+        if \%tree.type == 'Block' then
+            tree_lua = LuaCode:from(\%tree.source, '(function()\n    ', tree_lua, '\nend)()')
+        end
+        return tree_lua"
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 externally [%var as lua identifier, %var as lua id] all mean:
     lua> "\
@@ -256,7 +276,14 @@ externally [%var as lua identifier, %var as lua id] all mean:
         else error("Unknown type: "..tostring(\%var))
         end"
 
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test:
+    (num args (*extra arguments*)) means (select "#" (*extra arguments*))
+    assume (num args 1 2 3) == 3
+    (extra args (*extra arguments*)) means [*extra arguments*]
+    assume (extra args 1 2 3) == [1, 2, 3]
+    (third arg (*extra arguments*)) means (select 3 (*extra arguments*))
+    assume (third arg 5 6 7 8) == 7
+(*extra arguments*) compiles to "..."
 
 (% is syntax tree) compiles to "SyntaxTree:is_instance(\(% as lua expr))"
 externally (% is %kind syntax tree) means (..)
@@ -288,7 +315,7 @@ externally (%tree with vars %replacements) means (..)
 (%tree has subtree %match_tree) compiles to "\
     ..(function()
         local match_tree = \(%match_tree as lua expr)
-        for subtree in coroutine.wrap(function() \(%tree as lua expr):map(coroutine.yield) end) do
+        for subtree in coroutine_wrap(function() \(%tree as lua expr):map(yield) end) do
             if subtree == match_tree then return true end
         end
     end)()"
@@ -366,10 +393,20 @@ test:
 [compile %block, compiled %block, %block compiled] all compile to "\
     ..compile(\(%block as lua))"
 
+test:
+    (foo) means: return 100 200 300
+    assume (select 2 (foo)) == 200
 # Return statement is wrapped in a do..end block because Lua is unhappy if you
     put code after a return statement, unless you wrap it in a block.
-(return %return_value) compiles to "\
-    ..do return \(=lua "\%return_value and \(%return_value as lua expr) or ''") end"
+(return (*extra arguments*)) compiles to:
+    lua> "\
+        ..local lua = \(Lua "do return ")
+        for i=1,select('#',...) do
+            if i > 1 then lua:append(", ") end
+            lua:append(_1_as_lua((select(i, ...))))
+        end
+        lua:append(" end")
+        return lua"
 
 # Literals
 (yes) compiles to "true"

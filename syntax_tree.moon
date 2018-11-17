@@ -39,11 +39,13 @@ class SyntaxTree
                 table.insert(bits, "[ #{as_lua(k)}]=#{as_lua(v)}")
         return "SyntaxTree{#{table.concat(bits, ", ")}}"
 
-    @source_code_for_tree: setmetatable({}, {__index:(t)=>
-        s = t.source
-        Files = require 'files'
-        f = Files.read(s.filename)
-        return f
+    @source_code_for_tree: setmetatable({}, {
+        __index:(t)=>
+            s = t.source
+            Files = require 'files'
+            f = Files.read(s.filename)
+            return f
+        __mode: "k"
     })
     get_source_file: => @@source_code_for_tree[@]
     get_source_code: => @@source_code_for_tree[@]\sub(@source.start, @source.stop)
@@ -73,7 +75,10 @@ class SyntaxTree
 
     get_args: =>
         assert(@type == "Action", "Only actions have arguments")
-        return [tok for tok in *@ when type(tok) != 'string']
+        args = {@target}
+        for tok in *@
+            if type(tok) != 'string' then args[#args+1] = tok
+        return args
 
     get_stub: =>
         stub_bits = {}

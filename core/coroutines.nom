@@ -3,29 +3,40 @@
     This file defines the code that creates and manipulates coroutines
     
 use "core/metaprogramming.nom"
+use "core/operators.nom"
+use "core/control_flow.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    %nums = []
     %co = (..)
-        coroutine:
-            -> 4
-            -> 5
-            repeat 3 times: -> 6
+        ->:
+            yield 4
+            yield 5
+            repeat 3 times: yield 6
     
+    %nums = []
     for % in coroutine %co:
         %nums::add %
     
     assume (%nums == [4, 5, 6, 6, 6]) or barf "Coroutine iteration failed"
 
-[coroutine %body, generator %body] all compile to "\
-    ..(function()
-        \(%body as lua)
-    end)"
 
-(-> %) compiles to "coroutine.yield(true, \((% as lua expr) if % else "nil"))"
+    %d = {x:0}
+    %co2 = (..)
+        coroutine:
+            %d.x += 1
+            yield 1
+            %d.x += 1
+            yield
+            %d.x += 1
+    repeat while ((coroutine status of %co2) != "dead"):
+        resume %co2
+    assume %d.x == 3
+    
+(coroutine %body) parses as (coroutine from (-> %body))
+
 (for % in coroutine %co %body) compiles to "\
-    ..for _junk,\(% as lua expr) in coroutine.wrap(\(%co as lua expr)) do
+    ..for \(% as lua expr) in coroutine_wrap(\(%co as lua expr)) do
         \(%body as lua)
     end"

@@ -491,21 +491,21 @@ do
         result[#result + 1] = tmp
       end
       return List(result)
+    end,
+    from_1_to = sub,
+    from = sub,
+    character = function(self, i)
+      return sub(self, i, i)
     end
   }
   setmetatable(text_methods, {
     __index = string2
   })
+  setmetatable(string2, {
+    __index = error
+  })
   getmetatable("").__methods = text_methods
-  getmetatable("").__index = function(self, i)
-    if type(i) == 'number' then
-      return sub(self, i, i)
-    elseif type(i) == 'table' then
-      return sub(self, i[1], i[2])
-    else
-      return text_methods[i]
-    end
-  end
+  getmetatable("").__index = text_methods
   getmetatable("").__add = function(self, x)
     return tostring(self) .. tostring(x)
   end

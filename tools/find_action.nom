@@ -11,7 +11,7 @@ use "lib/consolecolor.nom"
 
 %stub = (command line args).1
 say "Looking for stub: \%stub..."
-%files = ((command line args).% for % in 2 to (size of (command line args)))
+%files = [: for % in 2 to (size of (command line args)): add (command line args).%]
 for %path in %files:
     for file %filename in %path:
         unless (%filename::matches "%.nom$"): do next %filename

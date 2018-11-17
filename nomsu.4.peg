@@ -118,14 +118,14 @@ inline_action (Action):
     (   (inline_arg (ws* (inline_arg / word))+)
       / (word       (ws* (inline_arg / word))*))
     (ws* inline_block)?
-inline_arg: inline_expression / inline_block
+inline_arg: inline_expression / inline_block / "(" ws* ")"
 action (Action):
     !section_division
     ({:target: (expression / "(" inline_block ")" / indented_block) :}
         ((ws* "\")? eol nl_nodent "..")? ws* "::" ((ws* "\")? eol nl_nodent "..")? ws*)?
     (  (arg  (((ws* "\")? eol nl_nodent "..")? ws* (arg / word))+)
      / (word (((ws* "\")? eol nl_nodent "..")? ws* (arg / word))*))
-arg: expression / inline_block / indented_block
+arg: expression / inline_block / indented_block / "(" ws* ")"
 
 word: !number { operator_char+ / ident_char+ }
 

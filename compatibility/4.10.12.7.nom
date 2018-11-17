@@ -44,24 +44,32 @@ upgrade action (% as lua statements) to "4.10.12.7" as (% as lua)
 upgrade action (compile error at %pos %err hint %hint) to "4.10.12.7" as (..)
     compile error at %pos %err %hint
 
+# In old code, it was okay to have imports at the top of the file in the same chunk,
+    but changes to the API now require imports to be in their own file chunk in order
+    for compilation to work properly.
 upgrade %tree to "4.10.12.7" as:
     if (%tree.type == "FileChunks"):
         %first_chunk = %tree.1
-        %first_has_use = (no)
         %i = 1
-        repeat while (%i < (size of %first_chunk)):
-            if %first_has_use:
-                if ((%first_chunk.%i.type != "Action") or (%first_chunk.%i.stub != "use")):
-                    %chunk2 = (%SyntaxTree {type: "Block"})
-                    for %j in %i to (size of %first_chunk.%i):
-                        %chunk2.((size of %chunk2) + 1) = %first_chunk.%i.%j
-                    
-                    for %j in %i to (size of %first_chunk.%i):
-                        %first_chunk.%i.%j = (nil)
-                    
-                    %table.insert %tree 2 %chunk2
-                    return %tree
+        %has_use = (no)
+        repeat while (%i <= (size of %first_chunk)):
+            if ((%first_chunk.%i.type == "Action") and (%first_chunk.%i.stub == "use")):
+                %has_use = (yes)
             ..else:
-                if ((%first_chunk.type == "Action") and (%first_chunk.stub == "use")):
-                    %first_has_use = (yes)
+                if %has_use: go to (insert chunk)
             %i += 1
+        return
+
+        === (insert chunk) ===
+        [%chunk1, %chunk2] = [..]
+            SyntaxTree {type: "Block", source: %first_chunk.source}
+            SyntaxTree {type: "Block", source: %first_chunk.source}
+        for %j in 1 to (%i - 1):
+            %chunk1.%j = %first_chunk.%j
+        for %j in %i to (size of %first_chunk):
+            %chunk2.(%j - %i + 1) = %first_chunk.%j
+
+        %new_tree = (SyntaxTree {source: %tree.source, type: "FileChunks", 1: %chunk1, 2: %chunk2})
+        for %i in 2 to (size of %tree):
+            %new_tree.(%i + 1) = %tree.%i
+        return %new_tree

@@ -219,11 +219,11 @@ I think "chihuahuas" are worse than "corgis"
 
 # The language only reserves []{}().,:;%#\ as special characters, so actions
     can have really funky names!
-(>> %foo_bar $@&' --> % @&_~-^-~_~-^ %1 !) means:
+(>> %foo_bar $@&' -->< % @&_~-^-~_~-^ %1 !) means:
     say %foo_bar
     say %
     say %1
->> "wow" $@&' --> "so flexible!" @&_~-^-~_~-^ "even numbers can be variables!" !
+>> "wow" $@&' -->< "so flexible!" @&_~-^-~_~-^ "even numbers can be variables!" !
 
 # There's also full unicode support
 %こんにちは = "こんにちは"
@@ -305,8 +305,8 @@ debug only:
             %best_key = %key
     return %best
 
-# Function literals look like: [%x] -> (%x * %x)
-say (best of [2, -3, 4, -8] according to ([%x] -> (%x * %x)))
+# Function literals look like: %x -> (%x * %x)
+say (best of [2, -3, 4, -8] according to (%x -> (%x * %x)))
 
 # Or, you can use ((foo %)'s meaning) to access the function that gets called by (foo %)
 (%x squared) means (%x * %x)

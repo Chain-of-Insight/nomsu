@@ -63,4 +63,4 @@ externally (%num as hex) means:
 
 for %name = %str in %escapes:
     with {%lua: Lua (quote %str)}:
-        %compile.action.%name = ([] -> %lua)
+        %compile.action.%name = (-> %lua)

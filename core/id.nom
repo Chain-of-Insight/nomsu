@@ -16,7 +16,7 @@ use "core/control_flow.nom"
 set %obj_by_id's metatable to {__mode: "v"}
 %id_by_obj = {}
 set %id_by_obj's metatable to {..}
-    __mode: "k", __index: [%self, %key] ->:
+    __mode: "k", __index: for (%self %key):
         if (%key == (nil)):
             return %self.%nil_surrogate
         

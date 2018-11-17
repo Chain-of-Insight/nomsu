@@ -72,7 +72,7 @@ test:
 # Metatable stuff
 test:
     %t = {}
-    set %t's metatable to {__tostring: [%] -> "XXX"}
+    set %t's metatable to {__tostring: % -> "XXX"}
     assume ("\%t" == "XXX")
 
 (set %dict's metatable to %metatable) compiles to "\

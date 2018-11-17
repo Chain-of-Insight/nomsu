@@ -42,7 +42,6 @@ class Source
         return Source(@filename, @start+offset, @stop)
 
 class Code
-    is_code: true
     new: (...)=>
         @bits = {}
         @append(...)
@@ -101,9 +100,7 @@ class Code
             assert(b, "code bit is nil")
             assert(not Source\is_instance(b), "code bit is a Source")
             if b == '' then continue
-            b.dirty = error if b.is_code
-            --if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
-            --    b = b\as_lua!
+            b.dirty = error if type(b) != 'string'
             bits[#bits+1] = b
         @dirty!
     
@@ -140,7 +137,7 @@ class Code
                 else
                     bits[#bits+1] = joiner
             bits[#bits+1] = b
-            b.dirty = error if b.is_code
+            b.dirty = error if type(b) != 'string'
             unless type(b) == 'string'
                 b = b\text!
             line = match(b, "\n([^\n]*)$")
@@ -157,9 +154,7 @@ class Code
             bits[i] = bits[i-n]
         for i=1,n
             b = select(i, ...)
-            b.dirty = error if b.is_code
-            --if type(b) != 'string' and not (type(b) == 'table' and b.is_code)
-            --    b = b\as_lua!
+            b.dirty = error if type(b) != 'string'
             bits[i] = b
         @dirty!
 

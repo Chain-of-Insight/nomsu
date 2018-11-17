@@ -31,12 +31,14 @@ for version=1,999
     Parsers[version] = make_parser(peg_contents, make_tree)
 
 {:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
-compile = require('nomsu_compiler')
+{:compile, :compile_error} = require('nomsu_compiler')
 _currently_running_files = List{} -- Used to check for circular imports in run_file_1_in
 nomsu_environment = Importer{
     NOMSU_COMPILER_VERSION: 12, NOMSU_SYNTAX_VERSION: max_parser_version
     -- Lua stuff:
-    :next, unpack: unpack or table.unpack, :setmetatable, :coroutine, :rawequal, :getmetatable, :pcall,
+    :next, unpack: unpack or table.unpack, :setmetatable, :rawequal, :getmetatable, :pcall,
+    yield:coroutine.yield, resume:coroutine.resume, coroutine_status_of:coroutine.status,
+    coroutine_wrap:coroutine.wrap, coroutine_from: coroutine.create,
     :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
     say:print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
     :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
@@ -53,9 +55,9 @@ nomsu_environment = Importer{
     SOURCE_MAP: Importer({})
 
     -- Nomsu functions:
-    _1_as_nomsu:tree_to_nomsu, _1_as_inline_nomsu:tree_to_inline_nomsu
-    compile: compile, _1_as_lua: compile,
-    :_1_forked, :import_to_1_from
+    _1_as_nomsu:tree_to_nomsu, _1_as_inline_nomsu:tree_to_inline_nomsu,
+    compile: compile, _1_as_lua: compile, compile_error_at:compile_error,
+    :_1_forked, :import_to_1_from,
 
     _1_parsed: (nomsu_code)->
         if type(nomsu_code) == 'string'
@@ -69,14 +71,15 @@ nomsu_environment = Importer{
         tree = parse(nomsu_code, source.filename)
         if tree.shebang
             tree.version = tree.shebang\match("nomsu %-V[ ]*([%d.]*)")
+        errs = {}
         find_errors = (t)->
             if t.type == "Error"
-                coroutine.yield t
+                errs[#errs+1] = t
             else
                 for k,v in pairs(t)
                     continue unless SyntaxTree\is_instance(v)
                     find_errors(v)
-        errs = [err for err in coroutine.wrap(-> find_errors(tree))]
+        find_errors(tree)
         num_errs = #errs
         if num_errs > 0
             err_strings = [pretty_error{
@@ -152,11 +155,11 @@ nomsu_environment = Importer{
             error("Attempt to run unknown thing: "..tostring(to_run))
     
     FILE_CACHE: {}
-    run_file_1_in: (path, environment, optimization)->
+    run_file_1_in: (path, environment, optimization, prefix=nil)->
         if not optimization
             optimization = environment.OPTIMIZATION
         if environment.FILE_CACHE[path]
-            import_to_1_from(environment, environment.FILE_CACHE[path])
+            import_to_1_from(environment, environment.FILE_CACHE[path], prefix)
             return
         if _currently_running_files\has(path)
             i = _currently_running_files\index_of(path)
@@ -165,7 +168,6 @@ nomsu_environment = Importer{
             error("Circular import detected:\n           "..circle\joined_with("\n..imports  "))
         _currently_running_files\add path
         mod = _1_forked(environment)
-        mod._ENV = mod
         for _,filename in Files.walk(path)
             continue unless filename == "stdin" or filename\match("%.nom$")
             lua_filename = filename\gsub("%.nom$", ".lua")
@@ -177,17 +179,9 @@ nomsu_environment = Importer{
                 file = Files.read(filename)
                 NomsuCode\from(Source(filename, 1, #file), file)
             environment.run_1_in(code, mod)
-        import_to_1_from(environment, mod)
+        import_to_1_from(environment, mod, prefix)
         environment.FILE_CACHE[path] = mod
         _currently_running_files\remove!
-
-    compile_error_at: (tree, err_msg, hint=nil)->
-        err_str = pretty_error{
-            title: "Compile error"
-            error:err_msg, hint:hint, source:tree\get_source_file!
-            start:tree.source.start, stop:tree.source.stop, filename:tree.source.filename
-        }
-        error(err_str, 0)
 }
 nomsu_environment._ENV = nomsu_environment
 

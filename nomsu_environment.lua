@@ -51,7 +51,11 @@ do
   local _obj_0 = require("nomsu_decompiler")
   tree_to_nomsu, tree_to_inline_nomsu = _obj_0.tree_to_nomsu, _obj_0.tree_to_inline_nomsu
 end
-local compile = require('nomsu_compiler')
+local compile, compile_error
+do
+  local _obj_0 = require('nomsu_compiler')
+  compile, compile_error = _obj_0.compile, _obj_0.compile_error
+end
 local _currently_running_files = List({ })
 local nomsu_environment = Importer({
   NOMSU_COMPILER_VERSION = 12,
@@ -59,10 +63,14 @@ local nomsu_environment = Importer({
   next = next,
   unpack = unpack or table.unpack,
   setmetatable = setmetatable,
-  coroutine = coroutine,
   rawequal = rawequal,
   getmetatable = getmetatable,
   pcall = pcall,
+  yield = coroutine.yield,
+  resume = coroutine.resume,
+  coroutine_status_of = coroutine.status,
+  coroutine_wrap = coroutine.wrap,
+  coroutine_from = coroutine.create,
   error = error,
   package = package,
   os = os,
@@ -115,6 +123,7 @@ local nomsu_environment = Importer({
   _1_as_inline_nomsu = tree_to_inline_nomsu,
   compile = compile,
   _1_as_lua = compile,
+  compile_error_at = compile_error,
   _1_forked = _1_forked,
   import_to_1_from = import_to_1_from,
   _1_parsed = function(nomsu_code)
@@ -131,10 +140,11 @@ local nomsu_environment = Importer({
     if tree.shebang then
       tree.version = tree.shebang:match("nomsu %-V[ ]*([%d.]*)")
     end
+    local errs = { }
     local find_errors
     find_errors = function(t)
       if t.type == "Error" then
-        return coroutine.yield(t)
+        errs[#errs + 1] = t
       else
         for k, v in pairs(t) do
           local _continue_0 = false
@@ -152,18 +162,7 @@ local nomsu_environment = Importer({
         end
       end
     end
-    local errs
-    do
-      local _accum_0 = { }
-      local _len_0 = 1
-      for err in coroutine.wrap(function()
-        return find_errors(tree)
-      end) do
-        _accum_0[_len_0] = err
-        _len_0 = _len_0 + 1
-      end
-      errs = _accum_0
-    end
+    find_errors(tree)
     local num_errs = #errs
     if num_errs > 0 then
       local err_strings
@@ -278,12 +277,15 @@ local nomsu_environment = Importer({
     end
   end,
   FILE_CACHE = { },
-  run_file_1_in = function(path, environment, optimization)
+  run_file_1_in = function(path, environment, optimization, prefix)
+    if prefix == nil then
+      prefix = nil
+    end
     if not optimization then
       optimization = environment.OPTIMIZATION
     end
     if environment.FILE_CACHE[path] then
-      import_to_1_from(environment, environment.FILE_CACHE[path])
+      import_to_1_from(environment, environment.FILE_CACHE[path], prefix)
       return 
     end
     if _currently_running_files:has(path) then
@@ -294,7 +296,6 @@ local nomsu_environment = Importer({
     end
     _currently_running_files:add(path)
     local mod = _1_forked(environment)
-    mod._ENV = mod
     for _, filename in Files.walk(path) do
       local _continue_0 = false
       repeat
@@ -318,24 +319,9 @@ local nomsu_environment = Importer({
         break
       end
     end
-    import_to_1_from(environment, mod)
+    import_to_1_from(environment, mod, prefix)
     environment.FILE_CACHE[path] = mod
     return _currently_running_files:remove()
-  end,
-  compile_error_at = function(tree, err_msg, hint)
-    if hint == nil then
-      hint = nil
-    end
-    local err_str = pretty_error({
-      title = "Compile error",
-      error = err_msg,
-      hint = hint,
-      source = tree:get_source_file(),
-      start = tree.source.start,
-      stop = tree.source.stop,
-      filename = tree.source.filename
-    })
-    return error(err_str, 0)
   end
 })
 nomsu_environment._ENV = nomsu_environment

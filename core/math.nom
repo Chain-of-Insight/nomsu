@@ -70,7 +70,7 @@ externally [all of %items, all %items] all mean:
             return (no)
     return (yes)
 
-[all of %items, all %items] all compile to:
+#[all of %items, all %items] all compile to:
     unless (%items.type is "List"):
         return \(all of %items)
     
@@ -89,7 +89,7 @@ externally [any of %items, any %items] all mean:
             return (yes)
     return (no)
 
-[any of %items, any %items] all compile to:
+#[any of %items, any %items] all compile to:
     unless (%items.type is "List"):
         return \(any of %items)
     
@@ -110,7 +110,7 @@ externally [sum of %items, sum %items] all mean:
         %total += %
     return %total
 
-[sum of %items, sum %items] all compile to:
+#[sum of %items, sum %items] all compile to:
     unless (%items.type is "List"):
         return \(sum of %items)
     
@@ -128,7 +128,7 @@ externally [product of %items, product %items] all mean:
         %prod *= %
     return %prod
 
-[product of %items, product %items] all compile to:
+#[product of %items, product %items] all compile to:
     unless (%items.type is "List"):
         return \(product of %items)
     

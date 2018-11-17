@@ -196,16 +196,13 @@ do
                 i = tmp[1]
                 result[#result+1] = tmp
             return List(result)
+        from_1_to: sub, from: sub,
+        character: (i)=> sub(@, i, i)
     
     setmetatable(text_methods, {__index:string2})
-
+    setmetatable(string2, {__index:error})
     getmetatable("").__methods = text_methods
-    getmetatable("").__index = (i)=>
-        -- Use [] for accessing text characters, or s[{3,4}] for s:sub(3,4)
-        if type(i) == 'number' then return sub(@, i, i)
-        elseif type(i) == 'table' then return sub(@, i[1], i[2])
-        else return text_methods[i]
-
+    getmetatable("").__index = text_methods
     getmetatable("").__add = (x)=> tostring(@)..tostring(x)
 
 return {:List, :Dict}

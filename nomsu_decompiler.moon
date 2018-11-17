@@ -58,6 +58,8 @@ tree_to_inline_nomsu = (tree)->
                         if bit.type == "Action"
                             arg_nomsu\parenthesize!
                     nomsu\append arg_nomsu
+            if #tree == 1 and type(tree[1]) != "string"
+                nomsu\append "()"
             return nomsu
 
         when "EscapedNomsu"
@@ -251,6 +253,11 @@ tree_to_nomsu = (tree)->
                     elseif word_buffer[1] == "'"
                         next_space = ""
                 nomsu\append next_space, words
+                next_space = " "
+
+            if #tree == 1 and type(tree[1]) != "string"
+                if next_space == " " then next_space = ""
+                nomsu\append next_space, "()"
 
             return nomsu
 

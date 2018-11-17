@@ -15,7 +15,7 @@ externally (upgrade action %stub to %version via %upgrade_fn) means:
     %ACTION_UPGRADES.%version.%stub = %upgrade_fn
 
 (upgrade %tree to %version as %body) parses as (..)
-    upgrade to %version via ([%, %end_version] -> (% with %tree -> %body))
+    upgrade to %version via ((% %end_version) -> (% with %tree -> %body))
 
 (upgrade action %actions to %version as %body) compiles to:
     if (%actions is "Action" syntax tree):
@@ -91,7 +91,7 @@ externally [..]
                     for %k = %v in %tree:
                         add %k = (%v upgraded from %start_version to %end_version)
             set %with_upgraded_args's metatable to (%tree's metatable)
-            %tree = (call %UPGRADES.%ver with [%with_upgraded_args, %end_version])
+            %tree = (%UPGRADES.%ver %with_upgraded_args %end_version)
     %tree.shebang = "#!/usr/bin/env nomsu -V\%end_version\n"
     return %tree
 

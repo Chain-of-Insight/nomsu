@@ -2,32 +2,28 @@
 #
     A library for simple object oriented programming.
     
-%globals.METAMETHOD_MAP = {..}
-    "as text": "__tostring", "clean up": "__gc", "+": "__add", "-": "__sub"
-    "*": "__mul", "/": "__div", negative: "__unm", "//": "__idiv", mod: "__mod"
-    "^": "__pow", "&": "__band", "|": "__bor", "~": "__bxor", "~": "__bnot"
-    "<<": "__bshl", ">>": "__bshr", "==": "__eq", "<": "__lt", "<=": "__le"
-    "set 1 =": "__newindex", size: "__len", iterate: "__ipairs", "iterate all": "__pairs"
-
 test:
     an (Empty) is a thing
     a (Dog) is a thing:
-        that can (set up) by:
+        [%it, %its] = [Dog, Dog]
+        (%its::set up) means:
             %its.barks or= 0
         
-        whose [bark, woof] all mean:
+        [%its::bark, %its::woof] all mean:
             %barks = [: for % in 1 to %its.barks: add "Bark!"]
             return (%barks::joined with " ")
         
-        that can (get pissed off) by: %its.barks += 1
+        (%it::gets pissed off) means:
+            %it.barks += 1
     (Dog).genus = "Canus"
     %d = (a Dog with {barks: 2})
+    assume "\%d" == "Dog {barks: 2}"
     assume (type of %d) == "Dog"
     assume (%d is a "Dog")
     assume %d.barks == 2
     assume ((%d::bark) == "Bark! Bark!")
     assume ((%d::woof) == "Bark! Bark!")
-    %d::get pissed off
+    %d::gets pissed off
     assume (%d.barks == 3)
     assume ((%d::bark) == "Bark! Bark! Bark!")
     assume (%d.genus == "Canus")
@@ -40,112 +36,101 @@ test:
         assume ((%d::bark) == "Bark!")
     
     a (Corgi) is a thing:
-        that can [set up, get pissed off] like a (Dog)
-        whose (sploot) means "splooted"
-        whose [bark, woof] all mean:
+        [%it, %its] = [Corgi, Corgi]
+        %it [set up, gets pissed off] like a (Dog)
+        (%it::as text) means "Dogloaf \({: for %k = %v in %it: add %k = %v })"
+        (%its::sploot) means "sploooot"
+        [%its::bark, %its::woof] all mean:
             %barks = [: for % in 1 to %its.barks: add "Yip!"]
             return (%barks::joined with " ")
     
     %corg = (a Corgi)
     assume (%corg.barks == 0)
+    assume "\%corg" == "Dogloaf {barks: 0}"
     with {%d: a Corgi with {barks: 1}}:
-        assume ((%d::sploot) == "splooted") or barf "subclass method failed"
+        assume ((%d::sploot) == "sploooot") or barf "subclass method failed"
         assume ((%d::bark) == "Yip!") or barf "inheritance failed"
         assume ((%d::woof) == "Yip!")
     
     with {%d: a Dog with {barks: 2}}:
         assume ((%d::bark) == "Bark! Bark!")
 
-[..]
-    that can %actions by %body, whose %actions means %body
-    whose %actions all mean %body
-..all compile to:
-    unless (%actions.type == "List"):
-        %actions = [%actions]
+    a (Vec) is a thing with {x, y}:
+        %its = (Vec)
+        (%its::+ %other) means (Vec {x: %its.x + %other.x, y: %its.y + %other.y})
     
-    lua> "\
-        ..local fn_name = \%actions[1].stub:as_lua_id()
-        local \%args = List{\(\%its), unpack(\%actions[1]:get_args())}
-        local lua = LuaCode("class.", fn_name, " = ", \(what (%args -> %body) compiles to))
-        for i=2,#\%actions do
-            local alias = \%actions[i]
-            local alias_name = alias.stub:as_lua_id()
-            local \%alias_args = List{\(\%its), unpack(alias:get_args())}
-            lua:append("\\nclass.", alias_name, " = ")
-            if \%alias_args == \%args then
-                lua:append("class.", fn_name)
-            else
-                lua:append("function(")
-                lua:concat_append(table.map(\%alias_args, function(a) return compile(a) end), ", ")
-                lua:append(")\\n    return class.", fn_name, "(")
-                lua:concat_append(table.map(\%args, function(a) return compile(a) end), ", ")
-                lua:append(")\\nend")
-            end
-        end
-        return lua"
-
+    assume ((Vec {x: 1, y:2 }) + (Vec {x: 10, y: 10})) == (Vec {x: 11, y: 12})
+    assume (((Vec {x: 1, y:2 }) + (Vec {x: 10, y: 10})) != (Vec {x: 0, y: 0}))
 [..]
-    that can %actions like a %class, that can %actions like an %class
-    that has %actions like a %class, that has %actions like an %class
+    %it can %actions like a %class, %it can %actions like an %class
+    %it has %actions like a %class, %it has %actions like an %class
+    %it %actions like a %class, %it %actions like an %class
 ..all compile to:
     %lua = (Lua "")
     %class_expr = (%class as lua expr)
     %lines = []
     for %a in %actions:
-        %lines::add "class.\(%a.stub::as lua id) = \%class_expr.\(%a.stub::as lua id)"
+        %lines::add "\(%it as lua expr).\(%a.stub::as lua id) = \%class_expr.\(%a.stub::as lua id)"
     %lua::add %lines joined with "\n"
     return %lua
+
+%METAMETHOD_MAP = {..}
+    "as text": "__tostring", "clean up": "__gc", "+": "__add", "-": "__sub"
+    "*": "__mul", "/": "__div", negative: "__unm", "//": "__idiv", mod: "__mod"
+    "^": "__pow", "&": "__band", "|": "__bor", "~": "__bxor", "~": "__bnot"
+    "<<": "__bshl", ">>": "__bshr", "==": "__eq", "<": "__lt", "<=": "__le"
+    "set 1 =": "__newindex", size: "__len", iterate: "__ipairs", "iterate all": "__pairs"
+
+((% as text like a dict)'s meaning) = ({}'s metatable).__tostring
+
+externally (..)
+    a class named %classname with %members ((initialize %it)'s meaning)
+..means:
+    %class = {__type: %classname}
+    %class.__index = %class
+    %class.class = %class
+    %class.__tostring = (% -> "\(%.__type) \(% as text like a dict)")
+    %class.__eq = ({}'s metatable).__eq
+    %class.__len = ({}'s metatable).__len
+    if %members:
+        %class.__members = %members
+        %class.__newindex = (..)
+            for (%its %key = %value):
+                if %members.%key:
+                    rawset %its %key %value
+                ..else:
+                    barf "Cannot set \%key, it's not one of the allowed member fields."
+    set %class's metatable to {..}
+        __tostring: (%class) -> %class.__type
+        __call: for (%class with %initial_values):
+            if (%initial_values == (nil)): return %class
+            set %initial_values's metatable to %class
+            if %initial_values.set_up: %initial_values::set up
+            return %initial_values
+    if ((initialize)'s meaning):
+        initialize %class
+        for %stub = %metamethod in %METAMETHOD_MAP:
+            if %class.(%stub::as lua id):
+                %class.%metamethod = %class.(%stub::as lua id)
+    return %class
 
 [..]
     a %classname is a thing with %members %class_body
     an %classname is a thing with %members %class_body
 ..all compile to:
-    unless (%classname.type == "Action"):
-        compile error at %classname "\
-            ..Expected this to be an action, not a \%classname.type"
-    
-    for % in %classname:
-        unless (% is text):
-            compile error at % "Class names should not have arguments."
-    
+    %class_id = (%classname.stub::as lua id)
+    if %class_body:
+        %body_lua = (%class_body as lua)
+        %body_lua::remove free vars [%class_id]
+        %body_lua::declare locals
     return (..)
         Lua "\
-            ..do
-                local class = {name=\(quote %classname.stub)}
-                class.__type = class.name
-                setmetatable(class, {
-                    __tostring=function(cls) return cls.name end,
-                    __call=function(cls, inst)
-                        inst = setmetatable(inst or {}, cls)
-                        if inst.set_up then inst:set_up() end
-                        return inst
-                    end,
-                })
-                class.__members = \(%members as lua expr)
-                _ENV[("a "..class.name):as_lua_id()] = class
-                _ENV[("an "..class.name):as_lua_id()] = class
-                _ENV[("a "..class.name.." with"):as_lua_id()] = class
-                _ENV[("an "..class.name.." with"):as_lua_id()] = class
-                _ENV[class.name:as_lua_id()] = function() return class end
-                class.__index = class
-                class.class = class
-                local dict_tostring = getmetatable(Dict{}).__tostring
-                class.__tostring = function(inst)
-                    return inst.name..dict_tostring(inst)
-                end
-                \((%class_body as lua) if %class_body else "")
-                for stub,metamethod in pairs(globals.METAMETHOD_MAP) do
-                    class[metamethod] = class[stub:as_lua_id()]
-                end
-                if class.__members then
-                    assert(select(2, next(class.__members)) == true)
-                    getmetatable(class).__newindex = function(its, key, value)
-                        if class.__members[key] then
-                            rawset(its, key, value)
-                        else error("Not a valid member: "..tostring(key)) end
-                    end
-                end
-            end"
+            ..\%class_id = a_class_named_1_with(\(quote %classname.stub), \(%members as lua)\(..)
+                (Lua ", function(\%class_id)\n    \%body_lua\nend") if %class_body else ""
+            ..)
+            a_\%class_id = function(initial_values) return \(%classname.stub::as lua id)(initial_values or {}) end
+            an_\%class_id, a_\(%class_id)_with, an_\(%class_id)_with = \
+            ..a_\%class_id, a_\%class_id, a_\%class_id"
 
 [a %classname is a thing %class_body, an %classname is a thing] all parse as (..)
     a %classname is a thing with (nil) %class_body

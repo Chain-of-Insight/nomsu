@@ -77,7 +77,6 @@ local Code
 do
   local _class_0
   local _base_0 = {
-    is_code = true,
     text = function(self)
       if self.__str == nil then
         local buff, indent = { }, 0
@@ -169,7 +168,7 @@ do
             _continue_0 = true
             break
           end
-          if b.is_code then
+          if type(b) ~= 'string' then
             b.dirty = error
           end
           bits[#bits + 1] = b
@@ -223,7 +222,7 @@ do
           end
         end
         bits[#bits + 1] = b
-        if b.is_code then
+        if type(b) ~= 'string' then
           b.dirty = error
         end
         if not (type(b) == 'string') then
@@ -246,7 +245,7 @@ do
       end
       for i = 1, n do
         local b = select(i, ...)
-        if b.is_code then
+        if type(b) ~= 'string' then
           b.dirty = error
         end
         bits[i] = b

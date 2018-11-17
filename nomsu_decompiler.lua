@@ -88,6 +88,9 @@ tree_to_inline_nomsu = function(tree)
         nomsu:append(arg_nomsu)
       end
     end
+    if #tree == 1 and type(tree[1]) ~= "string" then
+      nomsu:append("()")
+    end
     return nomsu
   elseif "EscapedNomsu" == _exp_0 then
     local inner_nomsu = tree_to_inline_nomsu(tree[1])
@@ -326,6 +329,13 @@ tree_to_nomsu = function(tree)
         end
       end
       nomsu:append(next_space, words)
+      next_space = " "
+    end
+    if #tree == 1 and type(tree[1]) ~= "string" then
+      if next_space == " " then
+        next_space = ""
+      end
+      nomsu:append(next_space, "()")
     end
     return nomsu
   elseif "EscapedNomsu" == _exp_0 then

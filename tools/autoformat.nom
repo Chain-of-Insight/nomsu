@@ -16,8 +16,9 @@ if (%args.1 is "-i"):
     %args::remove index 1
 
 for %path in %args:
+    if (%path == "-"): %path = "stdin"
     for file %filename in %path:
-        unless (%filename::matches "%.nom$"): do next %filename
+        unless ((%filename::matches "%.nom$") or (%filename == "stdin")): do next %filename
         %contents = (read file %filename)
         %code = (NomsuCode from (Source %filename 1 (size of %contents)) %contents)
         %tree = (%code parsed)
@@ -25,4 +26,4 @@ for %path in %args:
         if %inplace:
             write %formatted to file %filename
         ..else:
-            say %formatted
+            say %formatted inline
