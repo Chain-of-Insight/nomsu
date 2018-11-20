@@ -65,6 +65,8 @@ compile = setmetatable({
             return lua
 
         ["Lua"]: (compile, code)->
+            if not code
+                return LuaCode("LuaCode()")
             if code.type != "Text"
                 return LuaCode("LuaCode:from(", tostring(code.source)\as_lua!, ", ", compile(code), ")")
             add_bit_lua = (lua, bit_lua)->

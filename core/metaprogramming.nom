@@ -118,7 +118,7 @@ lua> "\
 
 test:
     (foo %x) means "outer"
-    with local [(foo %)'s meaning]:
+    with {((foo %)'s meaning)}:
         (foo %x) means:
             %y = (%x + 1)
             return %y

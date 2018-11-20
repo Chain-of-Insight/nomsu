@@ -194,7 +194,7 @@ do
                 tmp = List{stepper(x,i)}
                 break if #tmp == 0
                 i = tmp[1]
-                result[#result+1] = tmp
+                result[#result+1] = (#tmp == 1) and tmp[1] or tmp
             return List(result)
         from_1_to: sub, from: sub,
         character: (i)=> sub(@, i, i)

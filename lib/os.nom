@@ -3,11 +3,17 @@
     This file defines some actions that interact with the operating system and filesystem.
     
 test:
-    path of Nomsu file "lib/os.nom"
+    assume (nomsu files for "core")
 
-externally (path of Nomsu file %filename) means:
-    lua> "for i,f in Files.walk(\%filename) do return f end"
-    barf "Could not find file: \%filename"
+externally (files for %path) means:
+    %files = (=lua "Files.list(\%path)")
+    if %files: %files = (List %files)
+    return %files
+
+externally (nomsu files for %path) means:
+    for %nomsupath in (%package.nomsupath::all matches of "[^;]+"):
+        %files = (files for "\%nomsupath/\%path")
+        if %files: return %files
 
 externally (sh> %cmd) means:
     lua> "\
@@ -23,14 +29,10 @@ externally (read file %filename) means (=lua "Files.read(\%filename)")
 test:
     for file %f in "core": do nothing
 
-(for file %f in %path %body) compiles to "\
-    ..for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
-        \(%body as lua)
-        \(what (===next %f ===) compiles to)
-    end
-    \(what (===stop %f ===) compiles to)"
+(for file %f in %path %body) parses as (for %f in (nomsu files for %path) %body)
 
-(%expr for file %f in %path) compiles to "\
+# TODO: deprecate
+#(%expr for file %f in %path) compiles to "\
     ..(function()
         local ret = List{}
         for i,\(%f as lua expr) in Files.walk(\(%path as lua expr)) do
@@ -48,21 +50,6 @@ externally [..]
         ..local file = io.open(\%filename, 'w')
         file:write(\%text)
         file:close()"
-
-test:
-    assume (line number of 3 in "x\ny") == 2
-
-externally (line number of %pos in %str) means (..)
-    =lua "Files.get_line_number(\%str, \%pos)"
-
-test:
-    assume (line 2 in "one\ntwo\nthree") == "two"
-
-externally (line %line_num in %str) means (..)
-    =lua "Files.get_line(\%str, \%line_num)"
-
-test:
-    assume (source lines of \(this))
 
 externally (source lines of %tree) means:
     %source = (%tree.source if (%tree is syntax tree) else %tree)

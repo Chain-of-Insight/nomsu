@@ -157,7 +157,9 @@ run = function()
       if not (Files.exists(f)) then
         error("Could not find: '" .. tostring(f) .. "'")
       end
-      for _, filename in Files.walk(f) do
+      local _list_0 = Files.list(f)
+      for _index_1 = 1, #_list_0 do
+        local filename = _list_0[_index_1]
         input_files[filename] = true
       end
       _continue_0 = true
@@ -170,72 +172,70 @@ run = function()
     nomsu_environment.run_file_1_in('core', nomsu_environment, nomsu_environment.OPTIMIZATION)
   end
   for _index_0 = 1, #file_queue do
-    local f = file_queue[_index_0]
-    for _, filename in Files.walk(f) do
-      local _continue_0 = false
-      repeat
-        if not (filename == "stdin" or filename:match("%.nom$")) then
-          _continue_0 = true
-          break
-        end
-        if args.check_syntax then
-          local code = Files.read(filename)
-          local source = Source(filename, 1, #code)
-          nomsu_environment._1_parsed(NomsuCode:from(source, code))
-          print("Parse succeeded: " .. tostring(filename))
-        elseif args.compile then
-          local output
-          if filename == 'stdin' then
-            output = io.output()
-          else
-            output = io.open(filename:gsub("%.nom$", ".lua"), "w")
-          end
-          local code = Files.read(filename)
-          local source = Source(filename, 1, #code)
-          code = NomsuCode:from(source, code)
-          local tree = nomsu_environment._1_parsed(code)
-          if not (tree.type == 'FileChunks') then
-            tree = {
-              tree
-            }
-          end
-          for chunk_no, chunk in ipairs(tree) do
-            local lua = nomsu_environment.compile(chunk)
-            lua:declare_locals()
-            lua:prepend((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
-            if args.verbose then
-              print(lua:text())
-            end
-            nomsu_environment.run_1_in(chunk, nomsu_environment)
-            output:write(lua:text(), "\n")
-          end
-          print(("Compiled %-25s -> %s"):format(filename, filename:gsub("%.nom$", ".lua")))
-          output:close()
-        elseif args.verbose then
-          local code = Files.read(filename)
-          local source = Source(filename, 1, #code)
-          code = NomsuCode:from(source, code)
-          local tree = nomsu_environment._1_parsed(code)
-          if not (tree.type == 'FileChunks') then
-            tree = {
-              tree
-            }
-          end
-          for chunk_no, chunk in ipairs(tree) do
-            local lua = nomsu_environment.compile(chunk)
-            lua:declare_locals()
-            lua:prepend((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
-            print(lua:text())
-            nomsu_environment.run_1_in(lua, nomsu_environment)
-          end
-        else
-          nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
-        end
+    local _continue_0 = false
+    repeat
+      local filename = file_queue[_index_0]
+      if not (filename == "stdin" or filename:match("%.nom$")) then
         _continue_0 = true
-      until true
-      if not _continue_0 then
         break
       end
+      if args.check_syntax then
+        local code = Files.read(filename)
+        local source = Source(filename, 1, #code)
+        nomsu_environment._1_parsed(NomsuCode:from(source, code))
+        print("Parse succeeded: " .. tostring(filename))
+      elseif args.compile then
+        local output
+        if filename == 'stdin' then
+          output = io.output()
+        else
+          output = io.open(filename:gsub("%.nom$", ".lua"), "w")
+        end
+        local code = Files.read(filename)
+        local source = Source(filename, 1, #code)
+        code = NomsuCode:from(source, code)
+        local tree = nomsu_environment._1_parsed(code)
+        if not (tree.type == 'FileChunks') then
+          tree = {
+            tree
+          }
+        end
+        for chunk_no, chunk in ipairs(tree) do
+          local lua = nomsu_environment.compile(chunk)
+          lua:declare_locals()
+          lua:prepend((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
+          if args.verbose then
+            print(lua:text())
+          end
+          nomsu_environment.run_1_in(chunk, nomsu_environment)
+          output:write(lua:text(), "\n")
+        end
+        print(("Compiled %-25s -> %s"):format(filename, filename:gsub("%.nom$", ".lua")))
+        output:close()
+      elseif args.verbose then
+        local code = Files.read(filename)
+        local source = Source(filename, 1, #code)
+        code = NomsuCode:from(source, code)
+        local tree = nomsu_environment._1_parsed(code)
+        if not (tree.type == 'FileChunks') then
+          tree = {
+            tree
+          }
+        end
+        for chunk_no, chunk in ipairs(tree) do
+          local lua = nomsu_environment.compile(chunk)
+          lua:declare_locals()
+          lua:prepend((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
+          print(lua:text())
+          nomsu_environment.run_1_in(lua, nomsu_environment)
+        end
+      else
+        nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
+      end
+      _continue_0 = true
+    until true
+    if not _continue_0 then
+      break
     end
   end
   if not (args.primary_file or args.exec_strings) then

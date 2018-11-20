@@ -168,17 +168,22 @@ nomsu_environment = Importer{
             error("Circular import detected:\n           "..circle\joined_with("\n..imports  "))
         _currently_running_files\add path
         mod = _1_forked(environment)
-        for _,filename in Files.walk(path)
-            continue unless filename == "stdin" or filename\match("%.nom$")
-            lua_filename = filename\gsub("%.nom$", ".lua")
-            -- TODO: don't automatically use precompiled version?
-            code = if optimization != 0 and Files.read(lua_filename)
-                file = Files.read(lua_filename)
-                LuaCode\from(Source(filename, 1, #file), file)
-            else
-                file = Files.read(filename)
-                NomsuCode\from(Source(filename, 1, #file), file)
-            environment.run_1_in(code, mod)
+
+        for nomsupath in package.nomsupath\gmatch("[^;]+")
+            files = Files.list(nomsupath.."/"..path)
+            continue unless files
+            for filename in *files
+                continue unless filename == "stdin" or filename\match("%.nom$")
+                lua_filename = filename\gsub("%.nom$", ".lua")
+                -- TODO: don't automatically use precompiled version?
+                code = if optimization != 0 and Files.read(lua_filename)
+                    file = Files.read(lua_filename)
+                    LuaCode\from(Source(filename, 1, #file), file)
+                else
+                    file = Files.read(filename)
+                    NomsuCode\from(Source(filename, 1, #file), file)
+                environment.run_1_in(code, mod)
+            break
         import_to_1_from(environment, mod, prefix)
         environment.FILE_CACHE[path] = mod
         _currently_running_files\remove!

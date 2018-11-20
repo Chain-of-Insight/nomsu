@@ -11,10 +11,11 @@ use "lib/consolecolor.nom"
 
 %stub = (command line args).1
 say "Looking for stub: \%stub..."
-%files = [: for % in 2 to (size of (command line args)): add (command line args).%]
-for %path in %files:
-    for file %filename in %path:
-        unless (%filename::matches "%.nom$"): do next %filename
+for % in 2 to (size of (command line args)):
+    for %filename in (files for (command line args).%):
+        if (%filename == "-"): %filename = "stdin"
+        unless ((%filename == "stdin") or (%filename::matches "%.nom$")):
+            do next %filename
         %file = (read file %filename)
         %code = (NomsuCode from (%Source %filename 1 (size of %file)) %file)
         try:

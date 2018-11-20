@@ -488,7 +488,7 @@ do
           break
         end
         i = tmp[1]
-        result[#result + 1] = tmp
+        result[#result + 1] = (#tmp == 1) and tmp[1] or tmp
       end
       return List(result)
     end,

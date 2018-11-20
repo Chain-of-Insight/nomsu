@@ -104,54 +104,53 @@ run = ->
             continue
         unless Files.exists(f)
             error("Could not find: '#{f}'")
-        for _,filename in Files.walk(f)
+        for filename in *Files.list(f)
             input_files[filename] = true
 
     unless args.no_core
         nomsu_environment.run_file_1_in 'core', nomsu_environment, nomsu_environment.OPTIMIZATION
     
-    for f in *file_queue
-        for _,filename in Files.walk(f)
-            continue unless filename == "stdin" or filename\match("%.nom$")
-            if args.check_syntax
-                -- Check syntax
-                code = Files.read(filename)
-                source = Source(filename, 1, #code)
-                nomsu_environment._1_parsed(NomsuCode\from(source, code))
-                print("Parse succeeded: #{filename}")
-            elseif args.compile
-                -- Compile .nom files into .lua
-                output = if filename == 'stdin' then io.output()
-                else io.open(filename\gsub("%.nom$", ".lua"), "w")
-                code = Files.read(filename)
-                source = Source(filename, 1, #code)
-                code = NomsuCode\from(source, code)
-                tree = nomsu_environment._1_parsed(code)
-                tree = {tree} unless tree.type == 'FileChunks'
-                for chunk_no, chunk in ipairs tree
-                    lua = nomsu_environment.compile(chunk)
-                    lua\declare_locals!
-                    lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
-                    if args.verbose then print(lua\text!)
-                    nomsu_environment.run_1_in(chunk, nomsu_environment)
-                    output\write(lua\text!, "\n")
-                print ("Compiled %-25s -> %s")\format(filename, filename\gsub("%.nom$", ".lua"))
-                output\close!
-            elseif args.verbose
-                code = Files.read(filename)
-                source = Source(filename, 1, #code)
-                code = NomsuCode\from(source, code)
-                tree = nomsu_environment._1_parsed(code)
-                tree = {tree} unless tree.type == 'FileChunks'
-                for chunk_no, chunk in ipairs tree
-                    lua = nomsu_environment.compile(chunk)
-                    lua\declare_locals!
-                    lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
-                    print(lua\text!)
-                    nomsu_environment.run_1_in(lua, nomsu_environment)
-            else
-                -- Just run the file
-                nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
+    for filename in *file_queue
+        continue unless filename == "stdin" or filename\match("%.nom$")
+        if args.check_syntax
+            -- Check syntax
+            code = Files.read(filename)
+            source = Source(filename, 1, #code)
+            nomsu_environment._1_parsed(NomsuCode\from(source, code))
+            print("Parse succeeded: #{filename}")
+        elseif args.compile
+            -- Compile .nom files into .lua
+            output = if filename == 'stdin' then io.output()
+            else io.open(filename\gsub("%.nom$", ".lua"), "w")
+            code = Files.read(filename)
+            source = Source(filename, 1, #code)
+            code = NomsuCode\from(source, code)
+            tree = nomsu_environment._1_parsed(code)
+            tree = {tree} unless tree.type == 'FileChunks'
+            for chunk_no, chunk in ipairs tree
+                lua = nomsu_environment.compile(chunk)
+                lua\declare_locals!
+                lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
+                if args.verbose then print(lua\text!)
+                nomsu_environment.run_1_in(chunk, nomsu_environment)
+                output\write(lua\text!, "\n")
+            print ("Compiled %-25s -> %s")\format(filename, filename\gsub("%.nom$", ".lua"))
+            output\close!
+        elseif args.verbose
+            code = Files.read(filename)
+            source = Source(filename, 1, #code)
+            code = NomsuCode\from(source, code)
+            tree = nomsu_environment._1_parsed(code)
+            tree = {tree} unless tree.type == 'FileChunks'
+            for chunk_no, chunk in ipairs tree
+                lua = nomsu_environment.compile(chunk)
+                lua\declare_locals!
+                lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
+                print(lua\text!)
+                nomsu_environment.run_1_in(lua, nomsu_environment)
+        else
+            -- Just run the file
+            nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
 
     unless args.primary_file or args.exec_strings
         nomsu_environment.run_file_1_in("tools/repl.nom", nomsu_environment, nomsu_environment.OPTIMIZATION)

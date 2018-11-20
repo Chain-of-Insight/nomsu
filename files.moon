@@ -2,7 +2,6 @@
 lpeg = require 'lpeg'
 re = require 're'
 Files = {}
-assert package.nomsupath, "No package.nomsupath was found"
 
 run_cmd = (cmd)->
     f = io.popen(cmd)
@@ -10,7 +9,6 @@ run_cmd = (cmd)->
     return nil unless f\close!
     return lines
         
-
 _SPOOFED_FILES = {}
 _FILE_CACHE = setmetatable {}, __index:_SPOOFED_FILES
 _BROWSE_CACHE = {}
@@ -24,7 +22,7 @@ Files.spoof = (filename, contents)->
     _SPOOFED_FILES[filename] = contents
     return filename
 
--- Read a file's contents (searching first locally, then in the nomsupath)
+-- Read a file's contents
 Files.read = (filename)->
     if file_contents = _FILE_CACHE[filename]
         return file_contents
@@ -53,14 +51,12 @@ Files.exists = (path)->
     return true if _SPOOFED_FILES[path]
     return true if path == 'stdin'
     return true if run_cmd("ls #{sanitize(path)}")
-    for nomsupath in package.nomsupath\gmatch("[^;]+")
-        return true if run_cmd("ls #{nomsupath}/#{sanitize(path)}")
     return false
 
-browse = (path)->
+Files.list = (path)->
     unless _BROWSE_CACHE[path]
         local files
-        _BROWSE_CACHE[path] = if _SPOOFED_FILES[path]
+        _BROWSE_CACHE[path] = if _SPOOFED_FILES[path] or path == 'stdin'
             {path}
         else run_cmd('find -L "'..path..'" -not -path "*/\\.*" -type f') or false
     return _BROWSE_CACHE[path]
@@ -73,51 +69,36 @@ if ok
     Files.exists = (path)->
         return true if _SPOOFED_FILES[path]
         return true if path == 'stdin' or raw_file_exists(path)
-        for nomsupath in package.nomsupath\gmatch("[^;]+")
-            return true if raw_file_exists(nomsupath.."/"..path)
         return false
 
-    export browse
-    browse = (filename)->
-        unless _BROWSE_CACHE[filename]
-            _BROWSE_CACHE[filename] = if _SPOOFED_FILES[filename] or filename == 'stdin'
-                {filename}
+    Files.list = (path)->
+        unless _BROWSE_CACHE[path]
+            _BROWSE_CACHE[path] = if _SPOOFED_FILES[path] or path == 'stdin'
+                {path}
             else
-                file_type, err = lfs.attributes(filename, 'mode')
+                file_type, err = lfs.attributes(path, 'mode')
                 switch file_type
                     when "file", "char device"
-                        {filename}
+                        {path}
                     when "directory", "link"
                         files = {}
-                        for subfile in lfs.dir(filename)
+                        for subfile in lfs.dir(path)
                             continue if subfile == "." or subfile == ".."
-                            for f in *(browse(filename.."/"..subfile) or {})
+                            for f in *(Files.list(path.."/"..subfile) or {})
                                 files[#files+1] = f
                         files
                     else false
-        return _BROWSE_CACHE[filename]
+            -- Filter out any "./" prefix to standardize
+            if _BROWSE_CACHE[path]
+                for i,f in ipairs(_BROWSE_CACHE[path])
+                    if f\match("^%./") then _BROWSE_CACHE[path][i] = f\sub(3)
+        return _BROWSE_CACHE[path]
 else
     unless run_cmd('find . -maxdepth 0')
         url = if jit
             'https://github.com/spacewander/luafilesystem'
         else 'https://github.com/keplerproject/luafilesystem'
         error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: #{url} or `luarocks install luafilesystem`)", 0
-
-Files.walk = (path, flush_cache=false)->
-    if flush_cache
-        export _BROWSE_CACHE
-        _BROWSE_CACHE = {}
-    local files
-    if path == 'stdin' or _SPOOFED_FILES[path]
-        files = {path}
-    elseif path\match("^[~/]") or path\match("^%./") or path\match("^%.%./")
-        files = browse(path)
-    else
-        for nomsupath in package.nomsupath\gmatch("[^;]+")
-            if files = browse(nomsupath.."/"..path) then break
-    files or= {}
-    files = [gsub(f, "^%./", "") for f in *files]
-    return ipairs(files)
 
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}

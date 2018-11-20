@@ -13,30 +13,32 @@ if (%args.1 == "-v"):
     %args::remove index 1
     %verbose = (yes)
 
+%to_run = [..]
+    :
+        for %path in (command line args):
+            for %filename in (files for %path):
+                if (%filename == "-"): %filename = "stdin"
+                if ((%filename::matches "%.nom$") or (%filename == "stdin")):
+                    add %filename
 # Make sure all the files get run
-for %path in (command line args):
-    for file %filename in %path:
-        if (%filename::matches "%.nom$"): use %filename
-for %path in (command line args): use %path
+for %filename in %to_run: use %filename
 %tests = {: for %s = %t in (tests): add (=lua "Source:from_string(\%s)") = %t}
-for %path in (command line args):
-    for file %filename in %path:
-        unless (%filename::matches "%.nom$"): do next %filename
-        %file_tests = []
-        for %src = %test in %tests:
-            if (%src.filename == %filename):
-                %file_tests::add {test: %test, source: %src}
-        
-        unless (%file_tests is empty):
-            sort %file_tests by % -> %.source
-            lua> "io.write('[ .. ] ', \%filename); io.flush()"
-            if %verbose: say ""
-            for % in %file_tests:
-                if %verbose:
-                    say "    \(yellow (%.test::with "\n" -> "\n    "))"
-                run %.test
-            
+for %filename in %to_run:
+    %file_tests = []
+    for %src = %test in %tests:
+        if (%src.filename == %filename):
+            %file_tests::add {test: %test, source: %src}
+    
+    unless (%file_tests is empty):
+        sort %file_tests by % -> %.source
+        lua> "io.write('[ .. ] ', \%filename); io.flush()"
+        if %verbose: say ""
+        for % in %file_tests:
             if %verbose:
-                say (green "PASS")
-            ..else:
-                say "\r[\(green "PASS")"
+                say "    \(yellow (%.test::with "\n" -> "\n    "))"
+            run %.test
+        
+        if %verbose:
+            say (green "PASS")
+        ..else:
+            say "\r[\(green "PASS")"

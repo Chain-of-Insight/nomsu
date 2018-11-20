@@ -35,7 +35,12 @@ externally (print tree %t at indent %indent) means:
                     else:
                         say "\%indent  \(quote %arg)"
 
-for %path in (=lua "arg"):
-    for file %filename in %path:
-        unless (%filename::matches "%.nom$"): do next %filename
-        print tree (parse (read file %filename) from %filename) at indent ""
+for %path in (command line args):
+    for %filename in (files for %path):
+        if (%filename == "-"): %filename = "stdin"
+        unless ((%filename == "stdin") or (%filename::matches "%.nom$")):
+            do next %filename
+        %text = (read file %filename)
+        %nomsu = (NomsuCode from (Source %filename 1 (size of %text)) %text)
+        %tree = (%nomsu parsed)
+        print tree %tree at indent ""

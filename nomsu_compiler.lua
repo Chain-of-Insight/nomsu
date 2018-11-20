@@ -95,6 +95,9 @@ local compile = setmetatable({
       return lua
     end,
     ["Lua"] = function(compile, code)
+      if not code then
+        return LuaCode("LuaCode()")
+      end
       if code.type ~= "Text" then
         return LuaCode("LuaCode:from(", tostring(code.source):as_lua(), ", ", compile(code), ")")
       end

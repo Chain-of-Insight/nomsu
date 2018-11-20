@@ -99,7 +99,8 @@ test:
 
 test:
     [%x, %y] = [1, 2]
-    with {%z: nil, %x: 999}:
+    with {%z, %x: 999}:
+        assume %z == (nil)
         %z = 999
         assume (%z == 999) or barf "'with' failed."
         assume (%x == 999) or barf "'with' assignment failed."
@@ -113,20 +114,19 @@ test:
         local vars = {}
         for i, item in ipairs(\%assignments) do
             local \%target, \%value = item[1], item[2]
-            if not \%target.type == "Var" then
-                error("Invalid target for 'with' assignment: "..tostring(\%target))
-            end
             local target_lua = \(%target as lua)
-            local value_lua = \(%value as lua)
+            if not target_lua:text():is_lua_id() then
+                compile_error_at(\%target, "Invalid target for 'with' scope assignment.",
+                    "This should be either a variable or an action's meaning.")
+            end
+            local value_lua = \%value and \(%value as lua) or "nil"
             if i > 1 then
                 lhs:append(", ")
                 rhs:append(", ")
             end
             lhs:append(target_lua)
             rhs:append(value_lua)
-            if \%target.type == "Var" then
-                vars[i] = target_lua:text()
-            end
+            vars[i] = target_lua:text()
         end
         \%lua:remove_free_vars(vars)
         \%lua:prepend("local ", lhs, " = ", rhs, ";\\n")"
