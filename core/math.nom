@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This file defines some common math literals and functions
     
@@ -72,16 +72,16 @@ externally [all of %items, all %items] all mean:
 
 #[all of %items, all %items] all compile to:
     unless (%items.type is "List"):
-        return \(all of %items)
+    return \(all of %items)
     
     if ((size of %items) == 0):
-        return (Lua "true")
+    return (Lua "true")
     
     %lua = (Lua "(")
     %lua::add [: for % in %items: add (% as lua expr)] joined with " and "
     %lua::append ")"
     return %lua
-
+    
 [not all of %items, not all %items] all parse as (not (all of %items))
 externally [any of %items, any %items] all mean:
     for % in %items:
@@ -91,16 +91,16 @@ externally [any of %items, any %items] all mean:
 
 #[any of %items, any %items] all compile to:
     unless (%items.type is "List"):
-        return \(any of %items)
+    return \(any of %items)
     
     if ((size of %items) == 0):
-        return (Lua "false")
+    return (Lua "false")
     
     %lua = (Lua "(")
     %lua::add [: for % in %items: add (% as lua expr)] joined with " or "
     %lua::append ")"
     return %lua
-
+    
 [none of %items, none %items] all parse as (not (any of %items))
 
 # Sum/product
@@ -112,16 +112,16 @@ externally [sum of %items, sum %items] all mean:
 
 #[sum of %items, sum %items] all compile to:
     unless (%items.type is "List"):
-        return \(sum of %items)
+    return \(sum of %items)
     
     if ((size of %items) == 0):
-        return (Lua "0")
+    return (Lua "0")
     
     %lua = (Lua "(")
     %lua::add [: for % in %items: add (% as lua expr)] joined with " + "
     %lua::append ")"
     return %lua
-
+    
 externally [product of %items, product %items] all mean:
     %prod = 1
     for % in %items:
@@ -130,16 +130,16 @@ externally [product of %items, product %items] all mean:
 
 #[product of %items, product %items] all compile to:
     unless (%items.type is "List"):
-        return \(product of %items)
+    return \(product of %items)
     
     if ((size of %items) == 0):
-        return (Lua "1")
+    return (Lua "1")
     
     %lua = (Lua "(")
     %lua::add [: for % in %items: add (% as lua expr)] joined with " * "
     %lua::append ")"
     return %lua
-
+    
 externally [avg of %items, average of %items] all mean (..)
     (sum of %items) / (size of %items)
 

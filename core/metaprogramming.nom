@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
@@ -253,15 +253,15 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [%action parses as %body] all parse as ([%action] all parse as %body)
+
 #(%tree as lua expr) compiles to "compile(\(=lua "compile(\%tree, true)"), true)"
 externally (%tree as lua expr) means:
     lua> "\
         ..local tree_lua = compile(\%tree)
         if \%tree.type == 'Block' then
-            tree_lua = LuaCode:from(\%tree.source, '(function()\n    ', tree_lua, '\nend)()')
+            tree_lua = LuaCode:from(\%tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
         end
         return tree_lua"
-
 
 externally [%var as lua identifier, %var as lua id] all mean:
     lua> "\
@@ -283,8 +283,8 @@ test:
     assume (extra args 1 2 3) == [1, 2, 3]
     (third arg (*extra arguments*)) means (select 3 (*extra arguments*))
     assume (third arg 5 6 7 8) == 7
-(*extra arguments*) compiles to "..."
 
+(*extra arguments*) compiles to "..."
 (% is syntax tree) compiles to "SyntaxTree:is_instance(\(% as lua expr))"
 externally (% is %kind syntax tree) means (..)
     =lua "SyntaxTree:is_instance(\%) and \%.type == \%kind"
@@ -394,8 +394,10 @@ test:
     ..compile(\(%block as lua))"
 
 test:
-    (foo) means: return 100 200 300
+    (foo) means:
+        return 100 200 300
     assume (select 2 (foo)) == 200
+
 # Return statement is wrapped in a do..end block because Lua is unhappy if you
     put code after a return statement, unless you wrap it in a block.
 (return (*extra arguments*)) compiles to:

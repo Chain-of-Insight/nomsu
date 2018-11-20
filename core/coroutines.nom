@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This file defines the code that creates and manipulates coroutines
     
@@ -13,16 +13,13 @@ test:
         ->:
             yield 4
             yield 5
-            repeat 3 times: yield 6
-    
+            repeat 3 times:
+                yield 6
     %nums = []
     for % in coroutine %co:
         %nums::add %
-    
     assume (%nums == [4, 5, 6, 6, 6]) or barf "Coroutine iteration failed"
-
-
-    %d = {x:0}
+    %d = {x: 0}
     %co2 = (..)
         coroutine:
             %d.x += 1
@@ -30,12 +27,9 @@ test:
             %d.x += 1
             yield
             %d.x += 1
-    repeat while ((coroutine status of %co2) != "dead"):
-        resume %co2
+    repeat while ((coroutine status of %co2) != "dead"): resume %co2
     assume %d.x == 3
-    
 (coroutine %body) parses as (coroutine from (-> %body))
-
 (for % in coroutine %co %body) compiles to "\
     ..for \(% as lua expr) in coroutine_wrap(\(%co as lua expr)) do
         \(%body as lua)

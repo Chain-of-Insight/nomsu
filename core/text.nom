@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -50,6 +50,7 @@ test:
 
 test:
     assume (0xDEADBEEF as hex) == "0xDEADBEEF"
+
 externally (%num as hex) means:
     if (%num < 0):
         return ("-0x%X"::formatted with (- %num))

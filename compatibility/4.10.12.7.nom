@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This file defines upgrades from Nomsu <4.10.12.7 to 4.10.12.7
 use "compatibility/compatibility.nom"
@@ -56,20 +56,25 @@ upgrade %tree to "4.10.12.7" as:
             if ((%first_chunk.%i.type == "Action") and (%first_chunk.%i.stub == "use")):
                 %has_use = (yes)
             ..else:
-                if %has_use: go to (insert chunk)
+                if %has_use:
+                    go to (insert chunk)
             %i += 1
         return
-
         === (insert chunk) ===
         [%chunk1, %chunk2] = [..]
             SyntaxTree {type: "Block", source: %first_chunk.source}
             SyntaxTree {type: "Block", source: %first_chunk.source}
+        
         for %j in 1 to (%i - 1):
             %chunk1.%j = %first_chunk.%j
+        
         for %j in %i to (size of %first_chunk):
             %chunk2.(%j - %i + 1) = %first_chunk.%j
-
-        %new_tree = (SyntaxTree {source: %tree.source, type: "FileChunks", 1: %chunk1, 2: %chunk2})
+        
+        %new_tree = (..)
+            SyntaxTree {source: %tree.source, type: "FileChunks", 1: %chunk1, 2: %chunk2}
+        
         for %i in 2 to (size of %tree):
             %new_tree.(%i + 1) = %tree.%i
+        
         return %new_tree

@@ -1,7 +1,7 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     Auto-format Nomsu code. Usage:
-        nomsu tools/autoformat.nom [-i] file1 file2 directory1 ...
+    nomsu tools/autoformat.nom [-i] file1 file2 directory1 ...
     If the first argument is "-i", modifications will be performed in-place. Otherwise,
     the formatted code will be printed.
     
@@ -16,9 +16,12 @@ if (%args.1 is "-i"):
     %args::remove index 1
 
 for %path in %args:
-    if (%path == "-"): %path = "stdin"
-    for file %filename in %path:
-        unless ((%filename::matches "%.nom$") or (%filename == "stdin")): do next %filename
+    if (%path == "-"):
+        %path = "stdin"
+    
+    for %filename in (files for %path):
+        unless ((%filename::matches "%.nom$") or (%filename == "stdin")):
+            do next %filename
         %contents = (read file %filename)
         %code = (NomsuCode from (Source %filename 1 (size of %contents)) %contents)
         %tree = (%code parsed)

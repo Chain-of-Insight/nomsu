@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     Tool to print out a parse tree of files in an easy-to-read format. Usage:
     nomsu tools/parse.nom file1 file2 directory1 ...        
@@ -37,9 +37,12 @@ externally (print tree %t at indent %indent) means:
 
 for %path in (command line args):
     for %filename in (files for %path):
-        if (%filename == "-"): %filename = "stdin"
+        if (%filename == "-"):
+            %filename = "stdin"
+        
         unless ((%filename == "stdin") or (%filename::matches "%.nom$")):
             do next %filename
+        
         %text = (read file %filename)
         %nomsu = (NomsuCode from (Source %filename 1 (size of %text)) %text)
         %tree = (%nomsu parsed)

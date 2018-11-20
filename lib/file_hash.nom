@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This file defines some actions for hashing files and looking up files by hash.
     
@@ -44,7 +44,7 @@ if %use_sha1:
         return "\%hash"
 
 externally (file with hash %hash) means:
-    for file %filename in ".":
+    for %filename in (files for "."):
         %contents = (read file %filename)
         %file_hash = (hash %contents)
         if (%file_hash == %hash):

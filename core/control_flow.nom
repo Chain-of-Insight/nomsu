@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -54,7 +54,7 @@ test:
 ..all compile to:
     #   If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
         equivalent of a conditional expression: (cond and if_true or if_false)
-    if {"Text", "List", "Dict", "Number"}.(%when_true_expr.type):
+    if {Text, List, Dict, Number}.(%when_true_expr.type):
         return (Lua "(\(%condition as lua expr) and \(%when_true_expr as lua expr) or \(%when_false_expr as lua expr))")
     ..else:
         #   Otherwise, need to do an anonymous inline function (yuck, too bad lua 

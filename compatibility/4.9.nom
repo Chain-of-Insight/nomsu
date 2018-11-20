@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This file defines upgrades from Nomsu <4.9 to 4.9
 use "compatibility/compatibility.nom"

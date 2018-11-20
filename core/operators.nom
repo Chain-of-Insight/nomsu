@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     This file contains definitions of operators like "+" and "and".
     
@@ -51,7 +51,8 @@ test:
                 if #\%value ~= #\%var then
                     compile_error_at(\%value,
                         "This assignment has too "..(#\%value > #\%var and "many" or "few").." values.",
-                        "Make sure it has the same number of values on the left and right hand side of the '=' operator.")
+                        "Make sure it has the same number of values on the left and right hand side of the '\
+        ..=' operator.")
                 end
                 for i, \%val in ipairs(\%value) do
                     if i > 1 then lua:append(", ") end
@@ -149,7 +150,6 @@ test:
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
     assume (%calls == 1) or barf "\
         ..Three-way comparison evaluated middle value multiple times"
-
 (%x < %y < %z) parses as (((%a %b %c) -> ((%a < %b) and (%b < %c))) %x %y %z)
 (%x <= %y < %z) parses as (((%a %b %c) -> ((%a <= %b) and (%b < %c))) %x %y %z)
 (%x < %y <= %z) parses as (((%a %b %c) -> ((%a < %b) and (%b <= %c))) %x %y %z)

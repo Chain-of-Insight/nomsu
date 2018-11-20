@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     Find an action by its stub. Usage:
     nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
@@ -13,9 +13,12 @@ use "lib/consolecolor.nom"
 say "Looking for stub: \%stub..."
 for % in 2 to (size of (command line args)):
     for %filename in (files for (command line args).%):
-        if (%filename == "-"): %filename = "stdin"
+        if (%filename == "-"):
+            %filename = "stdin"
+        
         unless ((%filename == "stdin") or (%filename::matches "%.nom$")):
             do next %filename
+        
         %file = (read file %filename)
         %code = (NomsuCode from (%Source %filename 1 (size of %file)) %file)
         try:
@@ -30,7 +33,7 @@ for % in 2 to (size of (command line args)):
         %results = []
         for %t in recursive %tree:
             if ((%t is "Action" syntax tree) and (%t.stub is %stub)):
-                %line_num = (line number of %t.source.start in %file)
+                %line_num = (%file::line number at %t.source.start)
                 %results::add {..}
                     line: %line_num, text: "\(blue "\%filename:\%line_num:")\n\(yellow (source lines of %t))"
             

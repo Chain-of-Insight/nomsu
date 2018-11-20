@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.10.12.7
+#!/usr/bin/env nomsu -V4.11.12.8
 #
     A library for simple object oriented programming.
     
@@ -13,8 +13,7 @@ test:
             %barks = [: for % in 1 to %its.barks: add "Bark!"]
             return (%barks::joined with " ")
         
-        (%it::gets pissed off) means:
-            %it.barks += 1
+        (%it::gets pissed off) means: %it.barks += 1
     (Dog).genus = "Canus"
     %d = (a Dog with {barks: 2})
     assume "\%d" == "Dog {barks: 2}"
@@ -38,7 +37,7 @@ test:
     a (Corgi) is a thing:
         [%it, %its] = [Corgi, Corgi]
         %it [set up, gets pissed off] like a (Dog)
-        (%it::as text) means "Dogloaf \({: for %k = %v in %it: add %k = %v })"
+        (%it::as text) means "Dogloaf \{: for %k = %v in %it: add %k = %v}"
         (%its::sploot) means "sploooot"
         [%its::bark, %its::woof] all mean:
             %barks = [: for % in 1 to %its.barks: add "Yip!"]
@@ -54,13 +53,14 @@ test:
     
     with {%d: a Dog with {barks: 2}}:
         assume ((%d::bark) == "Bark! Bark!")
-
+    
     a (Vec) is a thing with {x, y}:
         %its = (Vec)
         (%its::+ %other) means (Vec {x: %its.x + %other.x, y: %its.y + %other.y})
     
-    assume ((Vec {x: 1, y:2 }) + (Vec {x: 10, y: 10})) == (Vec {x: 11, y: 12})
-    assume (((Vec {x: 1, y:2 }) + (Vec {x: 10, y: 10})) != (Vec {x: 0, y: 0}))
+    assume ((Vec {x: 1, y: 2}) + (Vec {x: 10, y: 10})) == (Vec {x: 11, y: 12})
+    assume (((Vec {x: 1, y: 2}) + (Vec {x: 10, y: 10})) != (Vec {x: 0, y: 0}))
+
 [..]
     %it can %actions like a %class, %it can %actions like an %class
     %it has %actions like a %class, %it has %actions like an %class
@@ -70,7 +70,8 @@ test:
     %class_expr = (%class as lua expr)
     %lines = []
     for %a in %actions:
-        %lines::add "\(%it as lua expr).\(%a.stub::as lua id) = \%class_expr.\(%a.stub::as lua id)"
+        %lines::add "\
+            ..\(%it as lua expr).\(%a.stub::as lua id) = \%class_expr.\(%a.stub::as lua id)"
     %lua::add %lines joined with "\n"
     return %lua
 
@@ -82,9 +83,7 @@ test:
     "set 1 =": "__newindex", size: "__len", iterate: "__ipairs", "iterate all": "__pairs"
 
 ((% as text like a dict)'s meaning) = ({}'s metatable).__tostring
-
-externally (..)
-    a class named %classname with %members ((initialize %it)'s meaning)
+externally (a class named %classname with %members ((initialize %it)'s meaning)) \
 ..means:
     %class = {__type: %classname}
     %class.__index = %class
@@ -100,18 +99,22 @@ externally (..)
                     rawset %its %key %value
                 ..else:
                     barf "Cannot set \%key, it's not one of the allowed member fields."
+    
     set %class's metatable to {..}
-        __tostring: (%class) -> %class.__type
+        __tostring: %class -> %class.__type
         __call: for (%class with %initial_values):
             if (%initial_values == (nil)): return %class
             set %initial_values's metatable to %class
-            if %initial_values.set_up: %initial_values::set up
+            if %initial_values.set_up:
+                %initial_values::set up
             return %initial_values
+    
     if ((initialize)'s meaning):
         initialize %class
         for %stub = %metamethod in %METAMETHOD_MAP:
             if %class.(%stub::as lua id):
                 %class.%metamethod = %class.(%stub::as lua id)
+    
     return %class
 
 [..]
@@ -123,6 +126,7 @@ externally (..)
         %body_lua = (%class_body as lua)
         %body_lua::remove free vars [%class_id]
         %body_lua::declare locals
+    
     return (..)
         Lua "\
             ..\%class_id = a_class_named_1_with(\(quote %classname.stub), \(%members as lua)\(..)
