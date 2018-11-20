@@ -24,7 +24,7 @@ externally (upgrade action %stub to %version via %upgrade_fn) means:
     for %action in %actions:
         %replacements = {}
         for %i in 1 to (size of %action):
-            if (%action.%i.type is "Var"):
+            if (%action.%i is "Var" syntax tree):
                 %replacements.(%action.%i.1) = "\(\%tree as lua id)[\%i]"
         define mangler
         (make tree %t) means:

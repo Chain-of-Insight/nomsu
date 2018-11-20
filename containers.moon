@@ -200,7 +200,6 @@ do
         character: (i)=> sub(@, i, i)
     
     setmetatable(text_methods, {__index:string2})
-    setmetatable(string2, {__index:error})
     getmetatable("").__methods = text_methods
     getmetatable("").__index = text_methods
     getmetatable("").__add = (x)=> tostring(@)..tostring(x)
