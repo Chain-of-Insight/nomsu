@@ -7,7 +7,5 @@ use "compatibility/compatibility.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 upgrade action "traceback" to "3.5.5.6" via (..)
-    -> (barf "'traceback' has been deprecated")
-
-upgrade action "traceback 1" to "3.5.5.6" via (..)
-    -> (barf "'traceback 1' has been deprecated")
+    for %tree:
+        compile error at %tree "'traceback' has been deprecated."

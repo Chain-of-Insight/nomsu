@@ -338,21 +338,6 @@ externally (match %tree with %patt) means:
         end
         return matches"
 
-externally (%tree with %patt ~> %replacement) means:
-    lua> "\
-        ..return \%tree:map(function(\%t)
-            local \%vars = \(match %t with %patt)
-            if not \%vars then return nil end
-            for \%k,\%v in pairs(\%vars) do
-                \%vars[\%k] = \(%v with %patt ~> %replacement)
-            end
-            return \%replacement:map(function(\%t)
-                if \%t.type == "Var" then
-                    return \%vars[\%t[1]]
-                end
-            end)
-        end)"
-
 test:
     assume ((quote "one\n\"two\"") == "\"one\\n\\\"two\\\"\"")
 

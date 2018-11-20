@@ -25,17 +25,18 @@ Files.spoof = (filename, contents)->
 -- Read a file's contents
 Files.read = (filename)->
     if file_contents = _FILE_CACHE[filename]
-        return file_contents
-    if filename == 'stdin'
+        return file_contents or nil
+    if filename == 'stdin' or filename == '-'
         contents = io.read('*a')
         Files.spoof('stdin', contents)
+        Files.spoof('-', contents)
         return contents
     file = io.open(filename)
     return nil unless file
     contents = file\read("*a")
     file\close!
     _FILE_CACHE[filename] = contents
-    return contents
+    return contents or nil
 
 {:match, :gsub} = string
 
@@ -49,14 +50,14 @@ sanitize = (path)->
 
 Files.exists = (path)->
     return true if _SPOOFED_FILES[path]
-    return true if path == 'stdin'
+    return true if path == 'stdin' or path == '-'
     return true if run_cmd("ls #{sanitize(path)}")
     return false
 
 Files.list = (path)->
     unless _BROWSE_CACHE[path]
         local files
-        _BROWSE_CACHE[path] = if _SPOOFED_FILES[path] or path == 'stdin'
+        _BROWSE_CACHE[path] = if _SPOOFED_FILES[path] or path == 'stdin' or path == '-'
             {path}
         else run_cmd('find -L "'..path..'" -not -path "*/\\.*" -type f') or false
     return _BROWSE_CACHE[path]
@@ -68,12 +69,12 @@ if ok
         return if mode == 'file' or mode == 'directory' or mode == 'link' then true else false
     Files.exists = (path)->
         return true if _SPOOFED_FILES[path]
-        return true if path == 'stdin' or raw_file_exists(path)
+        return true if path == 'stdin' or path == '-' or raw_file_exists(path)
         return false
 
     Files.list = (path)->
         unless _BROWSE_CACHE[path]
-            _BROWSE_CACHE[path] = if _SPOOFED_FILES[path] or path == 'stdin'
+            _BROWSE_CACHE[path] = if _SPOOFED_FILES[path] or path == 'stdin' or path == '-'
                 {path}
             else
                 file_type, err = lfs.attributes(path, 'mode')

@@ -169,6 +169,7 @@ nomsu_environment = Importer{
         _currently_running_files\add path
         mod = _1_forked(environment)
 
+        did_anything = false
         for nomsupath in package.nomsupath\gmatch("[^;]+")
             files = Files.list(nomsupath.."/"..path)
             continue unless files
@@ -183,7 +184,10 @@ nomsu_environment = Importer{
                     file = Files.read(filename)
                     NomsuCode\from(Source(filename, 1, #file), file)
                 environment.run_1_in(code, mod)
+                did_anything = true
             break
+        unless did_anything
+            error("File not found: #{path}", 0)
         import_to_1_from(environment, mod, prefix)
         environment.FILE_CACHE[path] = mod
         _currently_running_files\remove!

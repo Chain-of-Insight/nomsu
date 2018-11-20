@@ -8,24 +8,10 @@ use "lib/consolecolor.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-%args = (command line args)
-if (%args.1 == "-v"):
-    %args::remove index 1
-    %verbose = (yes)
-
-%to_run = [..]
-    :
-        for %path in (command line args):
-            for %filename in (files for %path):
-                if (%filename == "-"):
-                    %filename = "stdin"
-                if ((%filename::matches "%.nom$") or (%filename == "stdin")): add %filename
-
 # Make sure all the files get run
-for %filename in %to_run:
-    use %filename
+for %filename in (command line args).extra_args: use %filename
 %tests = {: for %s = %t in (tests): add (=lua "Source:from_string(\%s)") = %t}
-for %filename in %to_run:
+for %filename in (command line args).extra_args:
     %file_tests = []
     for %src = %test in %tests:
         if (%src.filename == %filename):
@@ -34,13 +20,13 @@ for %filename in %to_run:
     unless (%file_tests is empty):
         sort %file_tests by % -> %.source
         lua> "io.write('[ .. ] ', \%filename); io.flush()"
-        if %verbose: say ""
+        if (command line args)."-v": say ""
         for % in %file_tests:
-            if %verbose:
+            if (command line args)."-v":
                 say "    \(yellow (%.test::with "\n" -> "\n    "))"
             run %.test
         
-        if %verbose:
+        if (command line args)."-v":
             say (green "PASS")
         ..else:
             say "\r[\(green "PASS")"

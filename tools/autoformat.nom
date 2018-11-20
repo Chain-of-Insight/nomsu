@@ -10,23 +10,17 @@ use "lib/os.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 %args = (command line args)
-%inplace = (no)
-if (%args.1 is "-i"):
-    %inplace = (yes)
-    %args::remove index 1
-
-for %path in %args:
-    if (%path == "-"):
-        %path = "stdin"
+for %filename in %args.extra_args:
+    %file = (read file %filename)
+    unless %file:
+        barf "File does not exist: \%filename"
+    %leading_indent = (%file::matching "[\n]*([ ]*)")
+    %code = (NomsuCode from (%Source %filename 1 (size of %file)) %file)
+    %tree = (%code parsed)
+    %formatted = "\
+        ..\%leading_indent\(((%tree as nomsu)::text)::with "\n" -> "\n\%leading_indent")"
     
-    for %filename in (files for %path):
-        unless ((%filename::matches "%.nom$") or (%filename == "stdin")):
-            do next %filename
-        %contents = (read file %filename)
-        %code = (NomsuCode from (Source %filename 1 (size of %contents)) %contents)
-        %tree = (%code parsed)
-        %formatted = ((%tree as nomsu)::text)
-        if %inplace:
-            write %formatted to file %filename
-        ..else:
-            say %formatted inline
+    if %args."-i":
+        write %formatted to file %filename
+    ..else:
+        say %formatted inline

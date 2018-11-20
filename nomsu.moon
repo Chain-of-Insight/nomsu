@@ -61,7 +61,7 @@ file_queue = List{}
 sep = "\3"
 parser = re.compile([[
     args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: %true :} %sep)?
-        {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
+        {:nomsu_args: {| (nomsu_flag %sep)* {:extra_args: {| ({[^%sep]+} %sep)* |} :} |} :} |} !.
     flag <-
         {:optimization: "-O" (%sep? %number)? :}
       / ("-I" %sep? ({~ file ~} -> add_file))
@@ -74,6 +74,7 @@ parser = re.compile([[
       / {:no_core: "--no-core" %true :}
       / {:debugger: ("-d" %sep? {(!%sep .)*}) :}
       / {:requested_version: "-V" (%sep? {([0-9.])+})? :}
+    nomsu_flag <- {| ({:key: ('-' [a-z]) :} {:value: %true :}) / ({:key: ('--' [^%sep=]+) :} {:value: ('=' {[^%sep]+}) / %true :}) |}
     file <- ("-" -> "stdin") / {(!%sep .)+}
 ]], {
     true:lpeg.Cc(true), number:lpeg.R("09")^1/tonumber, sep:lpeg.P(sep)
@@ -88,7 +89,11 @@ args = parser\match(arg_string)
 if not args or args.help
     print usage
     os.exit(EXIT_FAILURE)
-nomsu_environment.command_line_args = List(args.nomsu_args)
+nomsu_args = Dict{}
+for argpair in *args.nomsu_args
+    nomsu_args[argpair.key] = argpair.value
+nomsu_args.extra_args = List(args.nomsu_args.extra_args or {})
+nomsu_environment.command_line_args = nomsu_args
 nomsu_environment.OPTIMIZATION = tonumber(args.optimization or 1)
 
 if args.version
@@ -99,9 +104,6 @@ if args.version
 run = ->
     input_files = {}
     for f in *file_queue
-        if f == 'stdin'
-            input_files[f] = true
-            continue
         unless Files.exists(f)
             error("Could not find: '#{f}'")
         for filename in *Files.list(f)

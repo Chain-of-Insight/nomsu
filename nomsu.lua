@@ -102,7 +102,7 @@ end
 local file_queue = List({ })
 local sep = "\3"
 local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: %true :} %sep)?
-        {:nomsu_args: {| ({(!%sep .)*} %sep)* |} :} %sep? |} !.
+        {:nomsu_args: {| (nomsu_flag %sep)* {:extra_args: {| ({[^%sep]+} %sep)* |} :} |} :} |} !.
     flag <-
         {:optimization: "-O" (%sep? %number)? :}
       / ("-I" %sep? ({~ file ~} -> add_file))
@@ -115,6 +115,7 @@ local parser = re.compile([[    args <- {| (flag %sep)* (({~ file ~} -> add_file
       / {:no_core: "--no-core" %true :}
       / {:debugger: ("-d" %sep? {(!%sep .)*}) :}
       / {:requested_version: "-V" (%sep? {([0-9.])+})? :}
+    nomsu_flag <- {| ({:key: ('-' [a-z]) :} {:value: %true :}) / ({:key: ('--' [^%sep=]+) :} {:value: ('=' {[^%sep]+}) / %true :}) |}
     file <- ("-" -> "stdin") / {(!%sep .)+}
 ]], {
   ["true"] = lpeg.Cc(true),
@@ -135,7 +136,14 @@ if not args or args.help then
   print(usage)
   os.exit(EXIT_FAILURE)
 end
-nomsu_environment.command_line_args = List(args.nomsu_args)
+local nomsu_args = Dict({ })
+local _list_0 = args.nomsu_args
+for _index_0 = 1, #_list_0 do
+  local argpair = _list_0[_index_0]
+  nomsu_args[argpair.key] = argpair.value
+end
+nomsu_args.extra_args = List(args.nomsu_args.extra_args or { })
+nomsu_environment.command_line_args = nomsu_args
 nomsu_environment.OPTIMIZATION = tonumber(args.optimization or 1)
 if args.version then
   nomsu_environment.run_file_1_in('core', nomsu_environment, nomsu_environment.OPTIMIZATION)
@@ -146,26 +154,14 @@ local run
 run = function()
   local input_files = { }
   for _index_0 = 1, #file_queue do
-    local _continue_0 = false
-    repeat
-      local f = file_queue[_index_0]
-      if f == 'stdin' then
-        input_files[f] = true
-        _continue_0 = true
-        break
-      end
-      if not (Files.exists(f)) then
-        error("Could not find: '" .. tostring(f) .. "'")
-      end
-      local _list_0 = Files.list(f)
-      for _index_1 = 1, #_list_0 do
-        local filename = _list_0[_index_1]
-        input_files[filename] = true
-      end
-      _continue_0 = true
-    until true
-    if not _continue_0 then
-      break
+    local f = file_queue[_index_0]
+    if not (Files.exists(f)) then
+      error("Could not find: '" .. tostring(f) .. "'")
+    end
+    local _list_1 = Files.list(f)
+    for _index_1 = 1, #_list_1 do
+      local filename = _list_1[_index_1]
+      input_files[filename] = true
     end
   end
   if not (args.no_core) then

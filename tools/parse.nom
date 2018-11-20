@@ -35,15 +35,10 @@ externally (print tree %t at indent %indent) means:
                     else:
                         say "\%indent  \(quote %arg)"
 
-for %path in (command line args):
-    for %filename in (files for %path):
-        if (%filename == "-"):
-            %filename = "stdin"
-        
-        unless ((%filename == "stdin") or (%filename::matches "%.nom$")):
-            do next %filename
-        
-        %text = (read file %filename)
-        %nomsu = (NomsuCode from (Source %filename 1 (size of %text)) %text)
-        %tree = (%nomsu parsed)
-        print tree %tree at indent ""
+for %filename in (command line args).extra_args:
+    %file = (read file %filename)
+    unless %file:
+        barf "File does not exist: \%filename"
+    %nomsu = (NomsuCode from (Source %filename 1 (size of %file)) %file)
+    %tree = (%nomsu parsed)
+    print tree %tree at indent ""

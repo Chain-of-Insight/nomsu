@@ -37,12 +37,13 @@ Files.read = function(filename)
   do
     local file_contents = _FILE_CACHE[filename]
     if file_contents then
-      return file_contents
+      return file_contents or nil
     end
   end
-  if filename == 'stdin' then
+  if filename == 'stdin' or filename == '-' then
     local contents = io.read('*a')
     Files.spoof('stdin', contents)
+    Files.spoof('-', contents)
     return contents
   end
   local file = io.open(filename)
@@ -52,7 +53,7 @@ Files.read = function(filename)
   local contents = file:read("*a")
   file:close()
   _FILE_CACHE[filename] = contents
-  return contents
+  return contents or nil
 end
 local match, gsub
 do
@@ -71,7 +72,7 @@ Files.exists = function(path)
   if _SPOOFED_FILES[path] then
     return true
   end
-  if path == 'stdin' then
+  if path == 'stdin' or path == '-' then
     return true
   end
   if run_cmd("ls " .. tostring(sanitize(path))) then
@@ -82,7 +83,7 @@ end
 Files.list = function(path)
   if not (_BROWSE_CACHE[path]) then
     local files
-    if _SPOOFED_FILES[path] or path == 'stdin' then
+    if _SPOOFED_FILES[path] or path == 'stdin' or path == '-' then
       _BROWSE_CACHE[path] = {
         path
       }
@@ -107,14 +108,14 @@ if ok then
     if _SPOOFED_FILES[path] then
       return true
     end
-    if path == 'stdin' or raw_file_exists(path) then
+    if path == 'stdin' or path == '-' or raw_file_exists(path) then
       return true
     end
     return false
   end
   Files.list = function(path)
     if not (_BROWSE_CACHE[path]) then
-      if _SPOOFED_FILES[path] or path == 'stdin' then
+      if _SPOOFED_FILES[path] or path == 'stdin' or path == '-' then
         _BROWSE_CACHE[path] = {
           path
         }

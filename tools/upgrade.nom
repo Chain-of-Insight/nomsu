@@ -7,56 +7,36 @@
     
 use "compatibility"
 use "lib/os.nom"
+use "lib/consolecolor.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 %args = (command line args)
-%inplace = (no)
-%start_version = (nil)
-%version = (Nomsu version)
-repeat:
-    if %args.1 is:
-        "-i":
-            %inplace = (yes)
-            %args::remove index 1
+%inplace = (%args."-i" or %args."--inplace")
+%start_version = %args."--upgrade-from"
+%version = (%args."--upgrade-to" or (Nomsu version))
+%test = (%args."-t" or %args."--test")
+for %filename in %args.extra_args:
+    %file = (read file %filename)
+    unless %file:
+        barf "File does not exist: \%filename"
+    %leading_indent = (%file::matching "[\n]*([ ]*)")
+    %code = (NomsuCode from (Source %filename 1 (size of %file)) %file)
+    %tree = (%code parsed)
+    %uptree = (..)
+        %tree upgraded from (%start_version or (%tree.version or (Nomsu version))) to \
+        ..%version
+    %text = "\%leading_indent\(((%uptree as nomsu)::text)::with "\n" -> "\n\%leading_indent")"
+    when:
+        %inplace:
+            say "Upgraded \%filename"
+            write %text to file %filename
         
-        "-t":
-            use "lib/consolecolor.nom"
-            %test = (yes)
-            %args::remove index 1
+        %test:
+            if (%uptree == %tree):
+                say (dim "\%filename will not be changed")
+            ..else:
+                say (bright "\%filename will be changed")
         
-        "-V":
-            %version = %args.2
-            %args::remove index 1
-            %args::remove index 1
-        
-        "-S":
-            %start_version = %args.2
-            %args::remove index 1
-            %args::remove index 1
-        
-        else: stop
-
-for %path in %args:
-    for %filename in (files for %path):
-        unless (%filename::matches "%.nom$"): do next %filename
-        %file = (read file %filename)
-        %code = (NomsuCode from (%Source %filename 1 (size of %file)) %file)
-        %tree = (%code parsed)
-        %uptree = (..)
-            %tree upgraded from (%start_version or (%tree.version or (Nomsu version))) to \
-            ..%version
-        %text = ((%uptree as nomsu)::text)
-        when:
-            %inplace:
-                say "Upgraded \%filename"
-                write %text to file %filename
-            
-            %test:
-                if (%uptree == %tree):
-                    say (dim "\%filename will not be changed")
-                ..else:
-                    say (bright "\%filename will be changed")
-            
-            else:
-                say %text
+        else:
+            say %text inline

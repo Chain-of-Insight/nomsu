@@ -296,6 +296,7 @@ local nomsu_environment = Importer({
     end
     _currently_running_files:add(path)
     local mod = _1_forked(environment)
+    local did_anything = false
     for nomsupath in package.nomsupath:gmatch("[^;]+") do
       local _continue_0 = false
       repeat
@@ -323,6 +324,7 @@ local nomsu_environment = Importer({
                 code = NomsuCode:from(Source(filename, 1, #file), file)
               end
               environment.run_1_in(code, mod)
+              did_anything = true
               _continue_1 = true
             until true
             if not _continue_1 then
@@ -336,6 +338,9 @@ local nomsu_environment = Importer({
       if not _continue_0 then
         break
       end
+    end
+    if not (did_anything) then
+      error("File not found: " .. tostring(path), 0)
     end
     import_to_1_from(environment, mod, prefix)
     environment.FILE_CACHE[path] = mod
