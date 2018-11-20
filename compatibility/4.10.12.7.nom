@@ -60,7 +60,7 @@ upgrade %tree to "4.10.12.7" as:
                     go to (insert chunk)
             %i += 1
         return
-        === (insert chunk) ===
+        --- (insert chunk) ---
         [%chunk1, %chunk2] = [..]
             SyntaxTree {type: "Block", source: %first_chunk.source}
             SyntaxTree {type: "Block", source: %first_chunk.source}

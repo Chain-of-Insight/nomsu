@@ -34,7 +34,7 @@ repeat:
             go to (run buffer)
         %buff::add (%line::with "\t" -> "    ")
         say (dim (yellow ".. ")) inline
-    === (run buffer) ===
+    --- (run buffer) ---
     if ((size of %buff) == 0): stop
     %buff = (%buff::joined)
     

@@ -38,6 +38,11 @@ upgrade action (line %n in %text) to "4.11" as (%text::line %n)
 upgrade action (line number of %pos in %text) to "4.11" as (..)
     %text::line number at %pos
 
+# Deduplicating goto labels:
+upgrade action [=== %label ===, *** %label ***] to "4.11" as (--- %label ---)
+upgrade action [===stop %label ===, ***stop %label ***] to "4.11" as (---stop %label ---)
+upgrade action [===next %label ===, ***next %label ***] to "4.11" as (---next %label ---)
+
 # Deprecating shorthand functions:
 upgrade action [if all of %items %body, if all of %items then %body] to "4.11" as (..)
     if (all of %items) %body
