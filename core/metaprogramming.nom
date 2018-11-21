@@ -370,9 +370,10 @@ externally (type of %) means:
 
 test:
     assume ((run "return (2 + 99)") == 101)
-    external %passed = (no)
-    run "external %passed = (yes)"
-    assume %passed
+    %x = 0
+    externally (set to %) means: external %x = %
+    run "set to 1"
+    assume %x == 1
     assume (run \(return \(\(5) + \(5)))) == 10
 (run %nomsu_code) compiles to "run_1_in(\(%nomsu_code as lua expr), _ENV)"
 [compile %block, compiled %block, %block compiled] all compile to "\

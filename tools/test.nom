@@ -12,9 +12,15 @@ use "lib/consolecolor.nom"
 for %filename in (command line args).extra_args: use %filename
 %tests = {: for %s = %t in (tests): add (=lua "Source:from_string(\%s)") = %t}
 for %filename in (command line args).extra_args:
+    %file = (read file %filename)
+    %version = (%file::matching "#![^\n]* nomsu %-V[ ]*([^\n]*)")
     %file_tests = []
     for %src = %test in %tests:
         if (%src.filename == %filename):
+            if %version:
+                %test = "\
+                    ..#!/usr/bin/env nomsu -V\(%version)
+                    \%test"
             %file_tests::add {test: %test, source: %src}
     
     unless (%file_tests is empty):
