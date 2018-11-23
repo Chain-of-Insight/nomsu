@@ -385,7 +385,7 @@ test:
             
             unless ((size of "\%code") > 0):
                 compile error at %line "\
-                    ..You can't have an 'else' block without a preceeding condition"
+                    ..You can't have an 'else' block without a preceding condition"
                 .."\
                     ..If you want the code in this block to always execute, you don't need a conditional block around it. \
                     ..Otherwise, make sure the 'else' block comes last."
@@ -447,7 +447,7 @@ test:
             
             unless ((size of "\%code") > 0):
                 compile error at %line "\
-                    ..You can't have an 'else' block without a preceeding condition"
+                    ..You can't have an 'else' block without a preceding condition"
                 .."\
                     ..If you want the code in this block to always execute, you don't need a conditional block around it. \
                     ..Otherwise, make sure the 'else' block comes last."
