@@ -30,8 +30,19 @@ for version = 1, 999 do
   local peg_file
   if package.nomsupath then
     for path in package.nomsupath:gmatch("[^;]+") do
-      peg_file = io.open(path .. "/nomsu." .. tostring(version) .. ".peg")
-      if peg_file then
+      local _continue_0 = false
+      repeat
+        if path == "." and package.nomsupath ~= "." then
+          _continue_0 = true
+          break
+        end
+        peg_file = io.open(path .. "/nomsu." .. tostring(version) .. ".peg")
+        if peg_file then
+          break
+        end
+        _continue_0 = true
+      until true
+      if not _continue_0 then
         break
       end
     end

@@ -68,11 +68,6 @@ compile_error = function(source, err_msg, hint)
   })
   return error(err_str, 0)
 end
-local tree_to_nomsu, tree_to_inline_nomsu
-do
-  local _obj_0 = require("nomsu_decompiler")
-  tree_to_nomsu, tree_to_inline_nomsu = _obj_0.tree_to_nomsu, _obj_0.tree_to_inline_nomsu
-end
 local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
 local MAX_LINE = 80
 local compile = setmetatable({
@@ -434,7 +429,7 @@ local compile = setmetatable({
     elseif "Number" == _exp_0 then
       return LuaCode:from(tree.source, tostring(tree[1]))
     elseif "Var" == _exp_0 then
-      return LuaCode:from(tree.source, (tree[1]):as_lua_id())
+      return LuaCode:from(tree.source, (concat(tree, " ")):as_lua_id())
     elseif "FileChunks" == _exp_0 then
       return error("Can't convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     elseif "Comment" == _exp_0 then

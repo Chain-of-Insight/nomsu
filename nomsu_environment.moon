@@ -20,6 +20,7 @@ for version=1,999
     local peg_file
     if package.nomsupath
         for path in package.nomsupath\gmatch("[^;]+")
+            continue if path == "." and package.nomsupath != "."
             peg_file = io.open(path.."/nomsu.#{version}.peg")
             break if peg_file
     else

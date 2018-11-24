@@ -41,7 +41,6 @@ compile_error = (source, err_msg, hint=nil)->
         start:source.start, stop:source.stop, filename:source.filename
     }
     error(err_str, 0)
-{:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
 
 -- This is a bit of a hack, but this code handles arbitrarily complex
 -- math expressions like 2*x + 3^2 without having to define a single
@@ -322,7 +321,7 @@ compile = setmetatable({
                 return LuaCode\from(tree.source, tostring(tree[1]))
 
             when "Var"
-                return LuaCode\from(tree.source, (tree[1])\as_lua_id!)
+                return LuaCode\from(tree.source, (concat(tree, " "))\as_lua_id!)
 
             when "FileChunks"
                 error("Can't convert FileChunks to a single block of lua, since each chunk's "..
