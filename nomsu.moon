@@ -20,15 +20,16 @@ else
 usage = [=[
 Nomsu Compiler
 
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [-O optimization level] [-v] [-c] [-s] [-I file] [--help | -h] [--version] [--no-core] [file [nomsu args...]]
+Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [--help | -h] [--version] [-O optimization level] [-v] [-c] [-s] [-d debugger] [--no-core] [(file | -t tool | -e "nomsu code..." | -m files... [--]) [nomsu args...]]
 
 OPTIONS
+    -t <tool> Run a tool.
+    -e Execute the specified string.
+    -m Run multiple files (all extra arguments).
     -O <level> Run the compiler with the given optimization level (>0: use precompiled .lua versions of Nomsu files, when available).
     -v Verbose: print compiled lua code.
     -c Compile the input files into a .lua files.
-    -e Execute the specified string.
     -s Check the input files for syntax errors.
-    -I <file> Add an additional input file or directory.
     -d <debugger> Attempt to use the specified debugger to wrap the main body of execution.
     -h/--help Print this message.
     --version Print the version number and exit.
@@ -57,32 +58,30 @@ nomsu_environment = require('nomsu_environment')
 if not arg or debug.getinfo(2).func == require
     return nomsu_environment
 
-file_queue = List{}
 sep = "\3"
 parser = re.compile([[
-    args <- {| (flag %sep)* (({~ file ~} -> add_file) {:primary_file: %true :} %sep)?
-        {:nomsu_args: {| (nomsu_flag %sep)* {:extra_args: {| ({[^%sep]+} %sep)* |} :} |} :} |} !.
+    args <- {| (flag %sep)*
+        (("-e" %sep {:execute: {[^%sep]+} :} %sep)
+         / {:files: {|
+            ("-t" %sep {~ {[^%sep]+} -> "nomsu://tools/%1.nom" ~} %sep
+             / "-m" %sep (!("--" %sep) {[^%sep]+} %sep)* ("--" %sep)?
+             / {[^%sep]+} %sep
+             / {~ '' %sep? -> 'nomsu://tools/repl.nom' ~}) |} :})
+      {:nomsu_args: {| (nomsu_flag %sep)* {:extra_args: {| ({[^%sep]+} %sep)* |} :} |} :}
+      |} !.
     flag <-
         {:optimization: "-O" (%sep? %number)? :}
-      / ("-I" %sep? ({~ file ~} -> add_file))
-      / ("-e" %sep? (({} {~ file ~}) -> add_exec_string) {:exec_strings: %true :})
       / ({:check_syntax: "-s" %true:})
       / ({:compile: "-c" %true:})
       / {:verbose: "-v" %true :}
       / {:help: ("-h" / "--help") %true :}
       / {:version: "--version" %true :}
       / {:no_core: "--no-core" %true :}
-      / {:debugger: ("-d" %sep? {(!%sep .)*}) :}
+      / {:debugger: ("-d" %sep? {[^%sep]*}) :}
       / {:requested_version: "-V" (%sep? {([0-9.])+})? :}
     nomsu_flag <- {| ({:key: ('-' [a-z]) :} {:value: %true :}) / ({:key: ('--' [^%sep=]+) :} {:value: ('=' {[^%sep]+}) / %true :}) |}
-    file <- ("-" -> "stdin") / {(!%sep .)+}
 ]], {
     true:lpeg.Cc(true), number:lpeg.R("09")^1/tonumber, sep:lpeg.P(sep)
-    add_file: (f)-> file_queue\add(f)
-    add_exec_string: (pos, s)->
-        name = "command line arg @#{pos}.nom"
-        Files.spoof(name, s)
-        file_queue\add name
 })
 arg_string = table.concat(arg, sep)..sep
 args = parser\match(arg_string)
@@ -96,24 +95,37 @@ nomsu_args.extra_args = List(args.nomsu_args.extra_args or {})
 nomsu_environment.command_line_args = nomsu_args
 nomsu_environment.OPTIMIZATION = tonumber(args.optimization or 1)
 
-if args.version
-    nomsu_environment.run_file_1_in 'core', nomsu_environment, nomsu_environment.OPTIMIZATION
-    nomsu_environment.run_1_in([[say (Nomsu version)]], nomsu_environment)
-    os.exit(EXIT_SUCCESS)
-
 run = ->
-    input_files = {}
-    for f in *file_queue
-        unless Files.exists(f)
-            error("Could not find: '#{f}'")
-        for filename in *Files.list(f)
-            input_files[filename] = true
-
     unless args.no_core
-        nomsu_environment.run_file_1_in 'core', nomsu_environment, nomsu_environment.OPTIMIZATION
+        for nomsupath in package.nomsupath\gmatch("[^;]+")
+            files = Files.list(nomsupath.."/core")
+            continue unless files
+            for f in *files
+                continue unless f\match("%.nom$")
+                nomsu_environment.run_file_1_in f, nomsu_environment, nomsu_environment.OPTIMIZATION
+
+    if args.version
+        nomsu_environment.run_1_in("say (Nomsu version)", nomsu_environment)
+        os.exit(EXIT_SUCCESS)
+
+    input_files = {}
+    if args.execute
+        table.insert input_files, Files.spoof("<input command>", args.execute)
+    if args.files
+        for f in *args.files
+            local files
+            if nomsu_name = f\match("^nomsu://(.*)")
+                for nomsupath in package.nomsupath\gmatch("[^;]+")
+                    files = Files.list(nomsupath.."/"..nomsu_name)
+                    continue unless files
+            else
+                files = Files.list(f)
+            unless files and #files > 0
+                error("Could not find: '#{f}'")
+            for filename in *files
+                table.insert input_files, filename
     
-    for filename in *file_queue
-        continue unless filename == "stdin" or filename\match("%.nom$")
+    for filename in *input_files
         if args.check_syntax
             -- Check syntax
             code = Files.read(filename)
@@ -153,9 +165,6 @@ run = ->
         else
             -- Just run the file
             nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
-
-    unless args.primary_file or args.exec_strings
-        nomsu_environment.run_file_1_in("tools/repl.nom", nomsu_environment, nomsu_environment.OPTIMIZATION)
 
 debugger = if args.debugger == "nil" then {}
 else require(args.debugger or 'error_handling')

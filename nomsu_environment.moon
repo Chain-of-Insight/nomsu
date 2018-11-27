@@ -172,13 +172,14 @@ nomsu_environment = Importer{
 
         did_anything = false
         for nomsupath in package.nomsupath\gmatch("[^;]+")
-            files = Files.list(nomsupath.."/"..path)
+            full_path = nomsupath == "." and path or nomsupath.."/"..path
+            files = Files.list(full_path)
             continue unless files
             for filename in *files
-                continue unless filename == "stdin" or filename\match("%.nom$")
                 lua_filename = filename\gsub("%.nom$", ".lua")
                 -- TODO: don't automatically use precompiled version?
                 code = if optimization != 0 and Files.read(lua_filename)
+                    -- TODO: use a checksum?
                     file = Files.read(lua_filename)
                     LuaCode\from(Source(filename, 1, #file), file)
                 else

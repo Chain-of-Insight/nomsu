@@ -10,9 +10,16 @@ nomsu \- run a Nomsu program
 ]
 [
 .I nomsu_file
+|
+.I -t tool
+|
+.I -e nomsu_code
+|
+.I -m nomsu_files...
+[--]
+]
 [
 .I args
-]
 ]
 .SH DESCRIPTION
 \fBnomsu\fR is the compiler/interpreter for the Nomsu programming language.
@@ -20,12 +27,19 @@ nomsu \- run a Nomsu program
 .TP
 If an input file is provided, \fBnomsu\fR will run that file.
 .TP
-If an input directory is provided, \fBnomsu\fR will run every .nom file in the directory and its subdirectories.
-.TP
 If "-" is used, \fBnomsu\fR will read from standard input
 .TP
 If no input files are provided, \fBnomsu\fR will run in interactive mode.
 .SH OPTIONS
+.TP
+.BI \-t " tool"
+Run the specified Nomsu tool (one of the tools/*.nom files provided with the compiler).
+.TP
+.BI \-m " file1 file2... " [--]
+Run multiple files. If a "--" is supplied, any additional arguments will be treated as arguments for the files, rather than additional files.
+.TP
+.BI \-e " code"
+Execute the given nomsu code string.
 .TP
 .BI \-V " version"
 Specify the desired Nomsu version (defaults to the latest installed version). E.g. \fBnomsu -V 1.2\fR or \fBnomsu -V 1.2.5.9\fR
@@ -33,7 +47,7 @@ Specify the desired Nomsu version (defaults to the latest installed version). E.
 .BI \-L
 List the installed versions of Nomsu (if \fB-V\fR is supplied, only print versions that match the requested pattern).
 .TP
-.B \-O " level"
+.BI \-O " optimization"
 Run the compiler with the given optimization level (default: 1). If \fBlevel\fR is >0, use precompiled .lua versions of .nom files, when available.
 .TP
 .B \-v
@@ -42,23 +56,17 @@ Verbose: print compiled lua code as it's generated for the input files.
 .B \-c
 Compile the input files into .lua files.
 .TP
-.B \-s " file"
+.B \-s
 Check the input files for syntax errors without running them.
 .TP
-.B \-I " file"
-Include the specified file (or all .nom files in a directory and its subdirectories) in the input files.
-.TP
-.B \-e " code"
-Execute the given nomsu code string.
-.TP
-.B \-d " debugger"
+.BI \-d " debugger"
 If provided, \fBnomsu\fR will attempt to use the specified debugger to wrap the main body of execution.
 .TP
 .B \--version
 Print the version number and exit.
 .TP
 .B \--no-core
-Disable the default behavior of running the files in 'core' before running anything else.
+Run \fBnomsu\fR without running the files in the 'core' directory (this will disable most functionality).
 .TP
 .B \--help
 Print the command line usage.
@@ -75,12 +83,17 @@ Runs the Nomsu file 'my_file.nom'
 
 .TP
 .B
+nomsu -t autoformat -i my_file.nom
+Runs the tools/autoformat.nom script with arguments "-i my_file.nom", which will automatically format my_file.nom in-place.
+
+.TP
+.B
 nomsu -c my_file.nom
 Compiles the Nomsu file 'my_file.nom' into a Lua file called 'my_file.lua'
 
 .TP
 .B
-nomsu -I one.nom -I two.nom three.nom
+nomsu -m one.nom two.nom three.nom
 Runs 'one.nom', then 'two.nom', then 'three.nom'.
 
 .TP

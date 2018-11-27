@@ -312,35 +312,25 @@ local nomsu_environment = Importer({
       local _continue_0 = false
       repeat
         do
-          local files = Files.list(nomsupath .. "/" .. path)
+          local full_path = nomsupath == "." and path or nomsupath .. "/" .. path
+          local files = Files.list(full_path)
           if not (files) then
             _continue_0 = true
             break
           end
           for _index_0 = 1, #files do
-            local _continue_1 = false
-            repeat
-              local filename = files[_index_0]
-              if not (filename == "stdin" or filename:match("%.nom$")) then
-                _continue_1 = true
-                break
-              end
-              local lua_filename = filename:gsub("%.nom$", ".lua")
-              local code
-              if optimization ~= 0 and Files.read(lua_filename) then
-                local file = Files.read(lua_filename)
-                code = LuaCode:from(Source(filename, 1, #file), file)
-              else
-                local file = Files.read(filename)
-                code = NomsuCode:from(Source(filename, 1, #file), file)
-              end
-              environment.run_1_in(code, mod)
-              did_anything = true
-              _continue_1 = true
-            until true
-            if not _continue_1 then
-              break
+            local filename = files[_index_0]
+            local lua_filename = filename:gsub("%.nom$", ".lua")
+            local code
+            if optimization ~= 0 and Files.read(lua_filename) then
+              local file = Files.read(lua_filename)
+              code = LuaCode:from(Source(filename, 1, #file), file)
+            else
+              local file = Files.read(filename)
+              code = NomsuCode:from(Source(filename, 1, #file), file)
             end
+            environment.run_1_in(code, mod)
+            did_anything = true
           end
           break
         end
