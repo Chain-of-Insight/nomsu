@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.11.12.8
+#!/usr/bin/env nomsu -V4.12.12.8
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -166,8 +166,7 @@ repeat until (%x > 3):
 repeat:
     say "repeat loop #\%x"
     %x += 1
-    if (%x > 3):
-        stop repeating
+    if (%x > 3): stop
 
 # How do I do a 'goto'?
 do:

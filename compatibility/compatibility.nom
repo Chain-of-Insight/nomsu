@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.11.12.8
+#!/usr/bin/env nomsu -V4.12.12.8
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -92,11 +92,13 @@ externally [..]
                         add %k = (%v upgraded from %start_version to %end_version)
             set %with_upgraded_args's metatable to (%tree's metatable)
             %tree = (%UPGRADES.%ver %with_upgraded_args %end_version)
+    
     if (%tree.version != %end_version):
         %tree = (SyntaxTree {: for %k = %v in %tree: add %k = %v})
         %tree.version = %end_version
         if %tree.shebang:
             %tree.shebang = "#!/usr/bin/env nomsu -V\%end_version\n"
+    
     return %tree
 
 externally (%tree upgraded from %start_version) means (..)

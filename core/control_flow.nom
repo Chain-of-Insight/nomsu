@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.11.12.8
+#!/usr/bin/env nomsu -V4.12.12.8
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -87,10 +87,16 @@ test:
     assume (%i == 0)
 
 (--- %label ---) compiles to "\
-    ..::label_\((%label.stub::as lua id) if (%label.type == "Action") else (%label as lua identifier))::"
+    ..::label_\(..)
+        (%label.stub::as lua id) if (%label.type == "Action") else (..)
+            %label as lua identifier
+    ..::"
 
 (go to %label) compiles to "\
-    ..goto label_\((%label.stub::as lua id) if (%label.type == "Action") else (%label as lua identifier))"
+    ..goto label_\(..)
+        (%label.stub::as lua id) if (%label.type == "Action") else (..)
+            %label as lua identifier
+    .."
 
 # Basic loop control
 (stop %var) compiles to:
@@ -105,11 +111,8 @@ test:
     ..else:
         return (Lua "goto continue")
 
-(---stop %var ---) compiles to "\
-    ..::stop_\(%var as lua identifier)::"
-
-(---next %var ---) compiles to "\
-    ..::continue_\(%var as lua identifier)::"
+(---stop %var ---) compiles to "::stop_\(%var as lua identifier)::"
+(---next %var ---) compiles to "::continue_\(%var as lua identifier)::"
 
 # While loops
 test:
@@ -124,12 +127,14 @@ test:
             do next
         barf "Failed to 'do next'"
     assume (%x == 20)
+
 (repeat while %condition %body) compiles to:
     %lua = (Lua "while \(%condition as lua expr) do\n    \(%body as lua)")
     if (%body has subtree \(do next)):
         %lua::append "\n    ::continue::"
     %lua::append "\nend --while-loop"
     return %lua
+
 (repeat %body) parses as (repeat while (yes) %body)
 (repeat until %condition %body) parses as (repeat while (not %condition) %body)
 
@@ -185,10 +190,11 @@ test:
 
 test:
     %x = 0
-    repeat 5 times: %x += 1
+    repeat 5 times:
+        %x += 1
     assume %x == 5
-(repeat %n times %body) parses as (for (=lua "_XXX_") in 1 to %n %body)
 
+(repeat %n times %body) parses as (for (=lua "_XXX_") in 1 to %n %body)
 test:
     %a = [10, 20, 30, 40, 50]
     %b = []
@@ -229,7 +235,8 @@ test:
         %lua::append "\nend -- end of scope for stopping for-loop"
     return %lua
 
-(for %var in %iterable %body) parses as (for %var in %iterable at (=lua "__") %body)
+(for %var in %iterable %body) parses as (..)
+    for %var in %iterable at (=lua "__") %body
 
 test:
     %d = {a: 10, b: 20, c: 30, d: 40, e: 50}

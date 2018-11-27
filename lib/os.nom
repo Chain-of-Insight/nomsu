@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.11.12.8
+#!/usr/bin/env nomsu -V4.12.12.8
 #
     This file defines some actions that interact with the operating system and filesystem.
     
@@ -28,7 +28,6 @@ test:
     read file "lib/os.nom"
 
 externally (read file %filename) means (=lua "Files.read(\%filename)")
-
 externally [..]
     write to file %filename %text, to file %filename write %text
     write %text to file %filename

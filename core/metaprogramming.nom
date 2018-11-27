@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.11.12.8
+#!/usr/bin/env nomsu -V4.12.12.8
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
@@ -373,7 +373,8 @@ externally (type of %) means:
 test:
     assume ((run "return (2 + 99)") == 101)
     %x = 0
-    externally (set to %) means: external %x = %
+    externally (set to %) means:
+        external %x = %
     run "set to 1"
     assume %x == 1
     assume (run \(return \(\(5) + \(5)))) == 10

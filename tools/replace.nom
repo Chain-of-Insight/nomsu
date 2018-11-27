@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.11.12.8
+#!/usr/bin/env nomsu -V4.12.12.8
 #
     Tool to find and replace one tree with another.
     nomsu tools/replace.nom [-i] tree_to_replace replacement file1 file2 directory1 ...
@@ -10,29 +10,25 @@ use "lib/os.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 barf "Deprecated."
-
 if ((size of %args.extra_args) < 3):
     say "Usage: nomsu tools/replace.nom [-i] tree_to_replace replacement files..."
     lua> "os.exit(1)"
-
-%pattern = ((%args.extra_args.1) parsed)
-%replacement = ((%args.extra_args.2) parsed)
+%pattern = (%args.extra_args.1 parsed)
+%replacement = (%args.extra_args.2 parsed)
 for %filename in %args.extra_args at %i:
-    if (%i < 3): do next %i
+    if (%i < 3):
+        do next %i
     %file = (read file %filename)
-    unless %file: barf "File does not exist: \%filename"
+    unless %file:
+        barf "File does not exist: \%filename"
     %nomsu = (NomsuCode from (Source %filename 1 (size of %file)) %file)
     %tree = (%nomsu parsed)
+    
     # TODO: fix this to use variable substitution
-    %tree2 = (..)
-        %tree::map (..)
-            for %subtree:
-                if (%subtree == %pattern):
-                    return %replacement
+    %tree2 = (%tree::map (for %subtree: if (%subtree == %pattern): return %replacement))
     if (%tree2 == %tree):
         say "No changes in \%filename"
         do next %filename
-    
     %text = ((%tree2 as nomsu)::text)
     when:
         %args."-i":

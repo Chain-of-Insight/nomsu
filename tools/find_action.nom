@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.11.12.8
+#!/usr/bin/env nomsu -V4.12.12.8
 #
     Find an action by its stub. Usage:
     nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
