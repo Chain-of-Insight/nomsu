@@ -3,7 +3,7 @@
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
     
-lua> "NOMSU_CORE_VERSION = 11"
+lua> "NOMSU_CORE_VERSION = 12"
 lua> "NOMSU_LIB_VERSION = 8"
 lua> "\
     ..do
@@ -90,7 +90,7 @@ lua> "\
             \%body = SyntaxTree{source=\%body.source, type="Action", "Lua", \%body}
         end
         return LuaCode("compile.action[", \%action.stub:as_lua(),
-            "] = ", \(what (%args -> %body) compiles to))
+            "] = ", \(\(%args -> %body) as lua))
     end"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,8 +100,9 @@ lua> "\
         ..if \%actions.type ~= "List" then
             compile_error(\%actions, "This should be a list of actions.")
         end
-        local lua = \(what (%actions.1 compiles to %body) compiles to)
+        local lua = \(\(%actions.1 compiles to %body) as lua)
         local \%args = List{\(\%compile), unpack(\%actions[1]:get_args())}
+        local \%compiled_args = List(table.map(\%args, compile))
         for i=2,#\%actions do
             local alias = \%actions[i]
             local \%alias_args = List{\(\%compile), unpack(alias:get_args())}
@@ -109,7 +110,11 @@ lua> "\
             if \%alias_args == \%args then
                 lua:append("compile.action[", \%actions[1].stub:as_lua(), "]")
             else
-                lua:append(\(what (%alias_args -> \(what %actions.1 compiles to)) compiles to))
+                lua:append("function(")
+                lua:concat_append(table.map(\%alias_args, compile), ", ")
+                lua:append(") return compile.action[", \%actions[1].stub:as_lua(), "](")
+                lua:concat_append(\%compiled_args, ", ")
+                lua:append(") end")
             end
         end
         return lua"
@@ -134,7 +139,7 @@ test:
         local fn_name = \%action.stub:as_lua_id()
         if \%action.target then lua:append(compile(\%action.target), ".")
         else lua:add_free_vars({fn_name}) end
-        lua:append(fn_name, " = ", \(what (%action -> %body) compiles to), ";")
+        lua:append(fn_name, " = ", \(\(%action -> %body) as lua), ";")
         return lua"
 
 (%actions all mean %body) compiles to:
@@ -142,7 +147,7 @@ test:
         ..local fn_name = \%actions[1].stub:as_lua_id()
         local target = \%actions[1].target and compile(\%actions[1].target) or nil
         local \%args = List(\%actions[1]:get_args())
-        local lua = \(what (%actions.1 means %body) compiles to)
+        local lua = \(\(%actions.1 means %body) as lua)
         for i=2,#\%actions do
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
@@ -158,7 +163,7 @@ test:
                 if target then lua:append(target, ".") end
                 lua:append(fn_name, ";")
             else
-                lua:append(\(what (%alias_args -> %actions.1) compiles to), ";")
+                lua:append(\(\(%alias_args -> %actions.1) as lua), ";")
             end
         end
         return lua"
@@ -174,20 +179,20 @@ test:
 
 (externally %action means %body) compiles to:
     lua> "\
-        ..local lua = \(what (%action means %body) compiles to)
+        ..local lua = \(\(%action means %body) as lua)
         lua:remove_free_vars({\%action.stub:as_lua_id()})
         return lua"
 
 (externally %actions all mean %body) compiles to:
     lua> "\
-        ..local lua = \(what (%actions all mean %body) compiles to)
+        ..local lua = \(\(%actions all mean %body) as lua)
         lua:remove_free_vars(table.map(\%actions, function(a) return a.stub:as_lua_id() end))
         return lua"
 
 test:
     assume (((say %)'s meaning) == (=lua "say"))
 
-(%action's meaning) compiles to (Lua (%action.stub as lua id))
+(%action's meaning) compiles to (Lua (%action.stub::as lua id))
 test:
     (swap %x and %y) parses as (..)
         do:
@@ -231,7 +236,7 @@ test:
                         i = i + 1
                     elseif k == "source" then
                         ret[#ret+1] = k.."= "..tostring(v):as_lua()
-                    elseif lua_type_of(k) == 'string' and k:match("[_a-zA-Z][_a-zA-Z0-9]*") then
+                    elseif lua_type_of(k) == 'string' and k:is_a_lua_id() then
                         ret[#ret+1] = k.."= "..make_tree(v)
                     else
                         ret[#ret+1] = "["..make_tree(k).."]= "..make_tree(v)
@@ -247,7 +252,7 @@ test:
         local \%new_body = LuaCode:from(\%body.source,
             "local mangle = mangler()",
             "\\nreturn ", make_tree(\%body))
-        local ret = \(what (%actions all compile to %new_body) compiles to)
+        local ret = \(\(%actions all compile to %new_body) as lua)
         return ret"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -265,16 +270,13 @@ externally (%tree as lua expr) means:
 
 externally [%var as lua identifier, %var as lua id] all mean:
     lua> "\
-        ..if lua_type_of(\%var) == 'string' then return \%var:as_lua_id()
-        elseif SyntaxTree:is_instance(\%var, 'Var') then return \%var[1]:as_lua_id()
-        elseif SyntaxTree:is_instance(\%var) then
-            local lua = \(%var as lua expr)
-            if not lua:text():match("^[_a-zA-Z][_a-zA-Z0-9]*$") then
-                compile_error(\%var, "This is not a valid Lua identifier.")
-            end
-            return lua
-        else error("Unknown type: "..tostring(\%var))
-        end"
+        ..local lua = \(%var as lua)
+        if not lua:text():is_a_lua_id() then
+            compile_error(\%var,
+                "This is supposed to be something that compiles to a valid Lua identifier.",
+                "This should probably be a variable.")
+        end
+        return lua"
 
 test:
     (num args (*extra arguments*)) means (select "#" (*extra arguments*))

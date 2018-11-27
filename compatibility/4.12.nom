@@ -1,0 +1,18 @@
+#!/usr/bin/env nomsu -V4.12
+#
+    This file defines upgrades from Nomsu <4.11 to Nomsu 4.11
+    (overhaul of function literals, deleting (if all of ...), etc. shorthand)
+    
+use "compatibility/compatibility.nom"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+upgrade action "do next repeat" to "4.12" via (..)
+    for %tree:
+        compile error at %tree "This method has been deprecated." "\
+            ..Use either (do next) or (go to (label)) instead."
+
+upgrade action "stop repeating" to "4.12" via (..)
+    for %tree:
+        compile error at %tree "This method has been deprecated." "\
+            ..Use either (stop) or (go to (label)) instead."

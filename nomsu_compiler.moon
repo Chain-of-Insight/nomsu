@@ -213,24 +213,36 @@ compile = setmetatable({
 
             when "Text"
                 lua = LuaCode\from(tree.source)
+                added = 0
                 string_buffer = ""
                 for i, bit in ipairs tree
                     if type(bit) == "string"
                         string_buffer ..= bit
                         continue
                     if string_buffer != ""
-                        if #lua.bits > 0 then lua\append ".."
-                        lua\append string_buffer\as_lua!
+                        string_buffer = string_buffer\as_lua!
+                        if lua\trailing_line_len! + #string_buffer > MAX_LINE
+                            lua\append "\n  "
+                        if added > 0 then lua\append ".."
+                        lua\append string_buffer
+                        added += 1
                         string_buffer = ""
                     bit_lua = compile(bit)
-                    if #lua.bits > 0 then lua\append ".."
+                    if lua\trailing_line_len! + #bit_lua\text! > MAX_LINE
+                        lua\append "\n  "
+                    if added > 0 then lua\append ".."
                     if bit.type != "Text"
                         bit_lua = LuaCode\from(bit.source, "tostring(",bit_lua,")")
                     lua\append bit_lua
+                    added += 1
 
                 if string_buffer ~= "" or #lua.bits == 0
-                    if #lua.bits > 0 then lua\append ".."
-                    lua\append string_buffer\as_lua!
+                    string_buffer = string_buffer\as_lua!
+                    if lua\trailing_line_len! + #string_buffer > MAX_LINE
+                        lua\append "\n  "
+                    if added > 0 then lua\append ".."
+                    lua\append string_buffer
+                    added += 1
 
                 if #lua.bits > 1
                     lua\parenthesize!

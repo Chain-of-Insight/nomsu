@@ -165,7 +165,7 @@ indented_text (Text):
 indented_plain_text (Text):
     {~ 
         ((("\" blank_lines =curr_indent "..") -> "") / ('\\' -> '\')
-        / (!text_interpolation ((!("\n") escaped_char) / '\'))
+        / (!text_interpolation (escaped_char / '\'))
         / (nonterminal_quote / text_char)+)+
         (%nl+ (=curr_indent -> ""))*
     ~}

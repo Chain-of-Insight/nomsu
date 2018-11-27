@@ -307,6 +307,7 @@ local compile = setmetatable({
       return lua
     elseif "Text" == _exp_0 then
       local lua = LuaCode:from(tree.source)
+      local added = 0
       local string_buffer = ""
       for i, bit in ipairs(tree) do
         local _continue_0 = false
@@ -317,20 +318,29 @@ local compile = setmetatable({
             break
           end
           if string_buffer ~= "" then
-            if #lua.bits > 0 then
+            string_buffer = string_buffer:as_lua()
+            if lua:trailing_line_len() + #string_buffer > MAX_LINE then
+              lua:append("\n  ")
+            end
+            if added > 0 then
               lua:append("..")
             end
-            lua:append(string_buffer:as_lua())
+            lua:append(string_buffer)
+            added = added + 1
             string_buffer = ""
           end
           local bit_lua = compile(bit)
-          if #lua.bits > 0 then
+          if lua:trailing_line_len() + #bit_lua:text() > MAX_LINE then
+            lua:append("\n  ")
+          end
+          if added > 0 then
             lua:append("..")
           end
           if bit.type ~= "Text" then
             bit_lua = LuaCode:from(bit.source, "tostring(", bit_lua, ")")
           end
           lua:append(bit_lua)
+          added = added + 1
           _continue_0 = true
         until true
         if not _continue_0 then
@@ -338,10 +348,15 @@ local compile = setmetatable({
         end
       end
       if string_buffer ~= "" or #lua.bits == 0 then
-        if #lua.bits > 0 then
+        string_buffer = string_buffer:as_lua()
+        if lua:trailing_line_len() + #string_buffer > MAX_LINE then
+          lua:append("\n  ")
+        end
+        if added > 0 then
           lua:append("..")
         end
-        lua:append(string_buffer:as_lua())
+        lua:append(string_buffer)
+        added = added + 1
       end
       if #lua.bits > 1 then
         lua:parenthesize()
