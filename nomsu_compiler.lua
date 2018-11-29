@@ -96,24 +96,24 @@ local compile = setmetatable({
       if code.type ~= "Text" then
         return LuaCode("LuaCode:from(", tostring(code.source):as_lua(), ", ", compile(code), ")")
       end
-      local add_bit_lua
-      add_bit_lua = function(lua, bit_lua)
-        local bit_leading_len = #(bit_lua:match("^[^\n]*"))
-        lua:append(lua:trailing_line_len() + bit_leading_len > MAX_LINE and ",\n    " or ", ")
-        return lua:append(bit_lua)
-      end
       local operate_on_text
       operate_on_text = function(text)
         local lua = LuaCode:from(text.source, "LuaCode:from(", tostring(text.source):as_lua())
         for _index_0 = 1, #text do
           local bit = text[_index_0]
+          local bit_lua
           if type(bit) == "string" then
-            add_bit_lua(lua, bit:as_lua())
+            bit_lua = bit:as_lua()
           elseif bit.type == "Text" then
-            add_bit_lua(lua, operate_on_text(bit))
+            bit_lua = operate_on_text(bit)
+          elseif bit.type == "Block" then
+            bit_lua = LuaCode:from(bit.source, "(function()", "\n    local _lua = LuaCode:from(", tostring(bit.source):as_lua(), ")", "\n    local function add(bit) _lua:append(bit) end", "\n    local function join_with(glue)", "\n        local old_bits = _lua.bits", "\n        _lua = LuaCode:from(_lua.source)", "\n        _lua:concat_append(old_bits, glue)", "\n    end", "\n    ", compile(bit), "\n    return _lua", "\nend)()")
           else
-            add_bit_lua(lua, compile(bit))
+            bit_lua = compile(bit)
           end
+          local bit_leading_len = #(bit_lua:match("^[^\n]*"))
+          lua:append(lua:trailing_line_len() + bit_leading_len > MAX_LINE and ",\n    " or ", ")
+          lua:append(bit_lua)
         end
         lua:append(")")
         return lua
