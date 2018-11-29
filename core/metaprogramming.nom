@@ -40,11 +40,11 @@ lua> "\
                     "This does not compile to a Lua identifier, so it can't be used as a function argument.",
                     "This should probably be a Nomsu variable instead (like %x).")
             end
-            lua:append(i > 1 and ", " or "", arg_lua)
+            lua:add(i > 1 and ", " or "", arg_lua)
             body_lua:remove_free_vars({arg_lua})
         end
         body_lua:declare_locals()
-        lua:append(")\\n    ", body_lua, "\\nend)")
+        lua:add(")\\n    ", body_lua, "\\nend)")
         return lua
     end
     compile.action["->"] = compile.action["1 ->"]
@@ -55,8 +55,8 @@ lua> "\
         local lua = LuaCode("compile.action[", \%action.stub:as_lua(), "](")
         local lua_args = table.map(\%action:get_args(), compile)
         table.insert(lua_args, 1, "compile")
-        lua:concat_append(lua_args, ", ")
-        lua:append(")")
+        lua:concat_add(lua_args, ", ")
+        lua:add(")")
         return lua
     end"
 
@@ -106,15 +106,15 @@ lua> "\
         for i=2,#\%actions do
             local alias = \%actions[i]
             local \%alias_args = List{\(\%compile), unpack(alias:get_args())}
-            lua:append("\\ncompile.action[", alias.stub:as_lua(), "] = ")
+            lua:add("\\ncompile.action[", alias.stub:as_lua(), "] = ")
             if \%alias_args == \%args then
-                lua:append("compile.action[", \%actions[1].stub:as_lua(), "]")
+                lua:add("compile.action[", \%actions[1].stub:as_lua(), "]")
             else
-                lua:append("function(")
-                lua:concat_append(table.map(\%alias_args, compile), ", ")
-                lua:append(") return compile.action[", \%actions[1].stub:as_lua(), "](")
-                lua:concat_append(\%compiled_args, ", ")
-                lua:append(") end")
+                lua:add("function(")
+                lua:concat_add(table.map(\%alias_args, compile), ", ")
+                lua:add(") return compile.action[", \%actions[1].stub:as_lua(), "](")
+                lua:concat_add(\%compiled_args, ", ")
+                lua:add(") end")
             end
         end
         return lua"
@@ -137,9 +137,9 @@ test:
         ..
         local lua = LuaCode()
         local fn_name = \%action.stub:as_lua_id()
-        if \%action.target then lua:append(compile(\%action.target), ".")
+        if \%action.target then lua:add(compile(\%action.target), ".")
         else lua:add_free_vars({fn_name}) end
-        lua:append(fn_name, " = ", \(\(%action -> %body) as lua), ";")
+        lua:add(fn_name, " = ", \(\(%action -> %body) as lua), ";")
         return lua"
 
 (%actions all mean %body) compiles to:
@@ -152,18 +152,18 @@ test:
             local alias = \%actions[i]
             local alias_name = alias.stub:as_lua_id()
             local \%alias_args = List(alias:get_args())
-            lua:append("\\n")
+            lua:add("\\n")
             if alias.target then
-                lua:append(compile(alias.target), ".")
+                lua:add(compile(alias.target), ".")
             else
                 lua:add_free_vars({alias_name})
             end
-            lua:append(alias_name, " = ")
+            lua:add(alias_name, " = ")
             if \%args == \%alias_args then
-                if target then lua:append(target, ".") end
-                lua:append(fn_name, ";")
+                if target then lua:add(target, ".") end
+                lua:add(fn_name, ";")
             else
-                lua:append(\(\(%alias_args -> %actions.1) as lua), ";")
+                lua:add(\(\(%alias_args -> %actions.1) as lua), ";")
             end
         end
         return lua"
@@ -393,10 +393,10 @@ test:
     lua> "\
         ..local lua = \(Lua "do return ")
         for i=1,select('#',...) do
-            if i > 1 then lua:append(", ") end
-            lua:append(_1_as_lua((select(i, ...))))
+            if i > 1 then lua:add(", ") end
+            lua:add(_1_as_lua((select(i, ...))))
         end
-        lua:append(" end")
+        lua:add(" end")
         return lua"
 
 # Literals

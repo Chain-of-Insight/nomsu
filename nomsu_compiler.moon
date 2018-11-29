@@ -53,14 +53,14 @@ compile = setmetatable({
         [""]: (compile, fn, ...)->
             lua = LuaCode!
             fn_lua = compile(fn)
-            lua\append fn_lua
+            lua\add fn_lua
             unless fn_lua\text!\match("^%(.*%)$") or fn_lua\text!\match("^[_a-zA-Z][_a-zA-Z0-9.]*$")
                 lua\parenthesize!
-            lua\append "("
+            lua\add "("
             for i=1,select('#',...)
-                lua\append(", ") if i > 1
-                lua\append compile((select(i, ...)))
-            lua\append ")"
+                lua\add(", ") if i > 1
+                lua\add compile((select(i, ...)))
+            lua\add ")"
             return lua
 
         ["Lua"]: (compile, code)->
@@ -80,11 +80,11 @@ compile = setmetatable({
                     elseif bit.type == "Block"
                         bit_lua = LuaCode\from bit.source, "(function()",
                             "\n    local _lua = LuaCode:from(", tostring(bit.source)\as_lua!, ")",
-                            "\n    local function add(bit) _lua:append(bit) end",
+                            "\n    local function add(bit) _lua:add(bit) end",
                             "\n    local function join_with(glue)",
                             "\n        local old_bits = _lua.bits",
                             "\n        _lua = LuaCode:from(_lua.source)",
-                            "\n        _lua:concat_append(old_bits, glue)",
+                            "\n        _lua:concat_add(old_bits, glue)",
                             "\n    end",
                             "\n    ", compile(bit),
                             "\n    return _lua",
@@ -93,9 +93,9 @@ compile = setmetatable({
                         bit_lua = compile(bit)
 
                     bit_leading_len = #(bit_lua\match("^[^\n]*"))
-                    lua\append(lua\trailing_line_len! + bit_leading_len > MAX_LINE and ",\n    " or ", ")
-                    lua\append(bit_lua)
-                lua\append ")"
+                    lua\add(lua\trailing_line_len! + bit_leading_len > MAX_LINE and ",\n    " or ", ")
+                    lua\add(bit_lua)
+                lua\add ")"
                 return lua
 
             return operate_on_text code
@@ -107,11 +107,11 @@ compile = setmetatable({
                 lua = LuaCode\from(text.source)
                 for bit in *text
                     if type(bit) == "string"
-                        lua\append bit
+                        lua\add bit
                     elseif bit.type == "Text"
-                        lua\append(operate_on_text(bit))
+                        lua\add(operate_on_text(bit))
                     else
-                        lua\append compile(bit)
+                        lua\add compile(bit)
                 return lua
             return operate_on_text code
 
@@ -146,12 +146,12 @@ compile = setmetatable({
                     lua = LuaCode\from(tree.source)
                     for i,tok in ipairs tree
                         if type(tok) == 'string'
-                            lua\append tok
+                            lua\add tok
                         else
                             tok_lua = compile(tok)
                             tok_lua\parenthesize! if tok.type == "Action"
-                            lua\append tok_lua
-                        lua\append " " if i < #tree
+                            lua\add tok_lua
+                        lua\add " " if i < #tree
                     return lua
 
                 if compile_action and not tree.target
@@ -178,10 +178,10 @@ compile = setmetatable({
                     -- TODO: this parenthesizing is maybe overly conservative
                     if target_text\match("^%(.*%)$") or target_text\match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or
                         tree.target.type == "IndexChain"
-                        lua\append target_lua, ":"
+                        lua\add target_lua, ":"
                     else
-                        lua\append "(", target_lua, "):"
-                lua\append((stub)\as_lua_id!,"(")
+                        lua\add "(", target_lua, "):"
+                lua\add((stub)\as_lua_id!,"(")
                 args = {}
                 for i, tok in ipairs tree
                     if type(tok) == "string" then continue
@@ -189,8 +189,8 @@ compile = setmetatable({
                     if tok.type == "Block"
                         arg_lua = LuaCode\from(tok.source, "(function()\n    ", arg_lua, "\nend)()")
                     insert args, arg_lua
-                lua\concat_append args, ", "
-                lua\append ")"
+                lua\concat_add args, ", "
+                lua\add ")"
                 return lua
 
             when "EscapedNomsu"
@@ -204,26 +204,26 @@ compile = setmetatable({
                     else x\as_lua!
 
                 for k,v in pairs((SyntaxTree\is_instance(tree[1]) and tree[1].type == "EscapedNomsu" and tree) or tree[1])
-                    if needs_comma then lua\append ", "
+                    if needs_comma then lua\add ", "
                     else needs_comma = true
                     if k == i
                         i += 1
                     elseif type(k) == 'string' and match(k,"[_a-zA-Z][_a-zA-Z0-9]*")
-                        lua\append(k, "= ")
+                        lua\add(k, "= ")
                     else
-                        lua\append("[", as_lua(k), "]= ")
+                        lua\add("[", as_lua(k), "]= ")
                     if k == "source"
-                        lua\append tostring(v)\as_lua!
+                        lua\add tostring(v)\as_lua!
                     else
-                        lua\append as_lua(v)
-                lua\append "}"
+                        lua\add as_lua(v)
+                lua\add "}"
                 return lua
             
             when "Block"
                 lua = LuaCode\from(tree.source)
                 for i, line in ipairs tree
-                    if i > 1 then lua\append "\n"
-                    lua\append compile(line)
+                    if i > 1 then lua\add "\n"
+                    lua\add compile(line)
                 return lua
 
             when "Text"
@@ -237,9 +237,9 @@ compile = setmetatable({
                     if string_buffer != ""
                         string_buffer = string_buffer\as_lua!
                         if lua\trailing_line_len! + #string_buffer > MAX_LINE
-                            lua\append "\n  "
-                        if added > 0 then lua\append ".."
-                        lua\append string_buffer
+                            lua\add "\n  "
+                        if added > 0 then lua\add ".."
+                        lua\add string_buffer
                         added += 1
                         string_buffer = ""
 
@@ -254,19 +254,19 @@ compile = setmetatable({
                             "\n    return _buffer",
                             "\nend)()"
                     if lua\trailing_line_len! + #bit_lua\text! > MAX_LINE
-                        lua\append "\n  "
-                    if added > 0 then lua\append ".."
+                        lua\add "\n  "
+                    if added > 0 then lua\add ".."
                     if bit.type != "Text"
                         bit_lua = LuaCode\from(bit.source, "tostring(",bit_lua,")")
-                    lua\append bit_lua
+                    lua\add bit_lua
                     added += 1
 
                 if string_buffer ~= "" or #lua.bits == 0
                     string_buffer = string_buffer\as_lua!
                     if lua\trailing_line_len! + #string_buffer > MAX_LINE
-                        lua\append "\n  "
-                    if added > 0 then lua\append ".."
-                    lua\append string_buffer
+                        lua\add "\n  "
+                    if added > 0 then lua\add ".."
+                    lua\add string_buffer
                     added += 1
 
                 if #lua.bits > 1
@@ -281,13 +281,13 @@ compile = setmetatable({
                     item = tree[i]
                     if item.type == "Block"
                         break
-                    lua\append sep
+                    lua\add sep
                     if item.type == "Comment"
-                        lua\append compile(item), "\n"
+                        lua\add compile(item), "\n"
                         sep = ''
                     else
                         item_lua = compile(item)
-                        lua\append item_lua
+                        lua\add item_lua
                         sep = ', '
                     i += 1
 
@@ -300,20 +300,20 @@ compile = setmetatable({
                 if i <= #tree
                     lua = LuaCode\from tree.source, "(function()\n    local comprehension = ", lua
                     if tree.type == "List"
-                        lua\append "\n    local function add(x) comprehension[#comprehension+1] = x end"
+                        lua\add "\n    local function add(x) comprehension[#comprehension+1] = x end"
                     else
-                        lua\append "\n    local function #{("add 1 =")\as_lua_id!}(k, v) comprehension[k] = v end"
+                        lua\add "\n    local function #{("add 1 =")\as_lua_id!}(k, v) comprehension[k] = v end"
                     while i <= #tree
-                        lua\append "\n    "
+                        lua\add "\n    "
                         if tree[i].type == 'Block' or tree[i].type == 'Comment'
-                            lua\append compile(tree[i])
+                            lua\add compile(tree[i])
                         elseif tree[i].type == "DictEntry"
                             entry_lua = compile(tree[i])
-                            lua\append (entry_lua\text!\sub(1,1) == '[' and "comprehension" or "comprehension."), entry_lua
+                            lua\add (entry_lua\text!\sub(1,1) == '[' and "comprehension" or "comprehension."), entry_lua
                         else
-                            lua\append "comprehension[#comprehension+1] = ", compile(tree[i])
+                            lua\add "comprehension[#comprehension+1] = ", compile(tree[i])
                         i += 1
-                    lua\append "\n    return comprehension\nend)()"
+                    lua\add "\n    return comprehension\nend)()"
                 
                 return lua
 
@@ -344,14 +344,14 @@ compile = setmetatable({
                     key_lua_str = key_lua\text!
                     lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
                     if lua_id and lua_id\is_lua_id!
-                        lua\append ".#{lua_id}"
+                        lua\add ".#{lua_id}"
                     elseif sub(key_lua_str,1,1) == '['
                         -- NOTE: this *must* use a space after the [ to avoid freaking out
                         -- Lua's parser if the inner expression is a long string. Lua
                         -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                        lua\append "[ ",key_lua," ]"
+                        lua\add "[ ",key_lua," ]"
                     else
-                        lua\append "[",key_lua,"]"
+                        lua\add "[",key_lua,"]"
                 return lua
 
             when "Number"

@@ -66,11 +66,11 @@ test:
             local alias_name = alias.stub:as_lua_id()
             local \%alias_args = List(alias:get_args())
             table.insert(\%alias_args, 1, \(\%me))
-            lua:append("\\nclass.", alias_name, " = ")
+            lua:add("\\nclass.", alias_name, " = ")
             if \%args == \%alias_args then
-                lua:append("class.", fn_name)
+                lua:add("class.", fn_name)
             else
-                lua:append(\(what (%alias_args -> %actions.1) compiles to))
+                lua:add(\(what (%alias_args -> %actions.1) compiles to))
             end
         end
         return lua"

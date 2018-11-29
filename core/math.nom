@@ -79,7 +79,7 @@ externally [all of %items, all %items] all mean:
     
     %lua = (Lua "(")
     %lua::add [: for % in %items: add (% as lua expr)] joined with " and "
-    %lua::append ")"
+    %lua::add ")"
     return %lua
     
 [not all of %items, not all %items] all parse as (not (all of %items))
@@ -98,7 +98,7 @@ externally [any of %items, any %items] all mean:
     
     %lua = (Lua "(")
     %lua::add [: for % in %items: add (% as lua expr)] joined with " or "
-    %lua::append ")"
+    %lua::add ")"
     return %lua
     
 [none of %items, none %items] all parse as (not (any of %items))
@@ -119,7 +119,7 @@ externally [sum of %items, sum %items] all mean:
     
     %lua = (Lua "(")
     %lua::add [: for % in %items: add (% as lua expr)] joined with " + "
-    %lua::append ")"
+    %lua::add ")"
     return %lua
     
 externally [product of %items, product %items] all mean:
@@ -137,7 +137,7 @@ externally [product of %items, product %items] all mean:
     
     %lua = (Lua "(")
     %lua::add [: for % in %items: add (% as lua expr)] joined with " * "
-    %lua::append ")"
+    %lua::add ")"
     return %lua
     
 externally [avg of %items, average of %items] all mean (..)

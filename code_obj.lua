@@ -154,7 +154,7 @@ do
         self._is_multiline = nil
       end
     end,
-    append = function(self, ...)
+    add = function(self, ...)
       local n = select("#", ...)
       local match = string.match
       local bits = self.bits
@@ -206,7 +206,7 @@ do
       end
       return self._is_multiline
     end,
-    concat_append = function(self, values, joiner, wrapping_joiner)
+    concat_add = function(self, values, joiner, wrapping_joiner)
       wrapping_joiner = wrapping_joiner or joiner
       local match = string.match
       local bits = self.bits
@@ -254,14 +254,14 @@ do
     end,
     parenthesize = function(self)
       self:prepend("(")
-      return self:append(")")
+      return self:add(")")
     end
   }
   _base_0.__index = _base_0
   _class_0 = setmetatable({
     __init = function(self, ...)
       self.bits = { }
-      return self:append(...)
+      return self:add(...)
     end,
     __base = _base_0,
     __name = "Code"
@@ -418,7 +418,7 @@ do
     end,
     parenthesize = function(self)
       self:prepend("(")
-      return self:append(")")
+      return self:add(")")
     end
   }
   _base_0.__index = _base_0
@@ -496,8 +496,8 @@ do
   end
   NomsuCode = _class_0
 end
-Code.__base.add_1_joined_with = assert(Code.__base.concat_append)
-Code.__base.add = assert(Code.__base.append)
+Code.__base.add_1_joined_with = assert(Code.__base.concat_add)
+Code.__base.add = assert(Code.__base.add)
 return {
   Code = Code,
   NomsuCode = NomsuCode,

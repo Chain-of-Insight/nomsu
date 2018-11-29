@@ -49,10 +49,10 @@ externally (upgrade action %stub to %version via %upgrade_fn) means:
                     return (quote %t)
         
         unless ("\%lua" == ""):
-            %lua::append "\n"
+            %lua::add "\n"
         
         %retval = (make tree %body)
-        %lua::append (..)
+        %lua::add (..)
             Lua "\
                 ..upgrade_action_1_to_2_via(\(quote %action.stub), \(%version as lua expr), function(\(\%tree as lua id))
                     return \%retval

@@ -44,7 +44,7 @@ class Source
 class Code
     new: (...)=>
         @bits = {}
-        @append(...)
+        @add(...)
 
     @from: (source, ...)=>
         inst = self(...)
@@ -91,7 +91,7 @@ class Code
         -- Multi-line only goes from false->true, since there is no API for removing bits
         @_is_multiline = nil if @_is_multiline == false
             
-    append: (...)=>
+    add: (...)=>
         n = select("#",...)
         match = string.match
         bits = @bits
@@ -123,7 +123,7 @@ class Code
                     break
         return @_is_multiline
 
-    concat_append: (values, joiner, wrapping_joiner)=>
+    concat_add: (values, joiner, wrapping_joiner)=>
         wrapping_joiner or= joiner
         match = string.match
         bits = @bits
@@ -160,7 +160,7 @@ class Code
 
     parenthesize: =>
         @prepend "("
-        @append ")"
+        @add ")"
 
 class LuaCode extends Code
     __tostring: Code.__tostring
@@ -239,14 +239,14 @@ class LuaCode extends Code
 
     parenthesize: =>
         @prepend "("
-        @append ")"
+        @add ")"
 
 class NomsuCode extends Code
     __tostring: Code.__tostring
     as_lua: Code.as_lua
     __len: Code.__len
 
-Code.__base.add_1_joined_with = assert Code.__base.concat_append
-Code.__base.add = assert Code.__base.append
+Code.__base.add_1_joined_with = assert Code.__base.concat_add
+Code.__base.add = assert Code.__base.add
 
 return {:Code, :NomsuCode, :LuaCode, :Source}

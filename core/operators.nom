@@ -39,14 +39,14 @@ test:
         local lua = LuaCode()
         if \%var.type == "List" then
             for i, \%assignment in ipairs(\%var) do
-                if i > 1 then lua:append(", ") end
+                if i > 1 then lua:add(", ") end
                 local assignment_lua = \(%assignment as lua expr)
-                lua:append(assignment_lua)
+                lua:add(assignment_lua)
                 if \%assignment.type == 'Var' then
                     lua:add_free_vars({assignment_lua:text()})
                 end
             end
-            lua:append(' = ')
+            lua:add(' = ')
             if \%value.type == "List" then
                 if #\%value ~= #\%var then
                     compile_error_at(\%value,
@@ -55,21 +55,21 @@ test:
         ..=' operator.")
                 end
                 for i, \%val in ipairs(\%value) do
-                    if i > 1 then lua:append(", ") end
+                    if i > 1 then lua:add(", ") end
                     local val_lua = \(%val as lua expr)
-                    lua:append(val_lua)
+                    lua:add(val_lua)
                 end
-                lua:append(";")
+                lua:add(";")
             else
-                lua:append(\(%value as lua expr), ';')
+                lua:add(\(%value as lua expr), ';')
             end
         else
             local var_lua = \(%var as lua expr)
-            lua:append(var_lua)
+            lua:add(var_lua)
             if \%var.type == 'Var' then
                 lua:add_free_vars({var_lua:text()})
             end
-            lua:append(' = ', \(%value as lua expr), ';')
+            lua:add(' = ', \(%value as lua expr), ';')
         end
         return lua"
 
@@ -122,11 +122,11 @@ test:
             end
             local value_lua = \%value and \(%value as lua) or "nil"
             if i > 1 then
-                lhs:append(", ")
-                rhs:append(", ")
+                lhs:add(", ")
+                rhs:add(", ")
             end
-            lhs:append(target_lua)
-            rhs:append(value_lua)
+            lhs:add(target_lua)
+            rhs:add(value_lua)
             vars[i] = target_lua:text()
         end
         \%lua:remove_free_vars(vars)
