@@ -33,9 +33,9 @@ say %one_two
 # Or, as a shorthand, you can do this to increment a variable:
 %foobar += 1
 
-# How do I define a mutli-line string?
+# How do I define a multi-line string?
 # In Nomsu, the name "text" is used, rather than "string", and multi-line text looks like:
-%mutli_text = "\
+%multi_text = "\
     ..Start with a quote mark and a backslash and an indented "..", then put indented
     lines below it. The indented lines will not include the indentation, except when
     the lines are indented more than 4 spaces relative to the original quote mark.
