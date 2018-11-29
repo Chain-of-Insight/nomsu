@@ -330,6 +330,9 @@ local compile = setmetatable({
             string_buffer = ""
           end
           local bit_lua = compile(bit)
+          if bit.type == "Block" then
+            bit_lua = LuaCode:from(bit.source, "(function()", "\n    local _buffer = List{}", "\n    local function add(bit) _buffer:add(bit) end", "\n    local function join_with(glue) _buffer = _buffer:joined_with(glue) end", "\n    ", bit_lua, "\n    if lua_type_of(_buffer) == 'table' then _buffer = _buffer:joined() end", "\n    return _buffer", "\nend)()")
+          end
           if lua:trailing_line_len() + #bit_lua:text() > MAX_LINE then
             lua:append("\n  ")
           end

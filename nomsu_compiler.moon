@@ -227,7 +227,17 @@ compile = setmetatable({
                         lua\append string_buffer
                         added += 1
                         string_buffer = ""
+
                     bit_lua = compile(bit)
+                    if bit.type == "Block"
+                        bit_lua = LuaCode\from bit.source, "(function()",
+                            "\n    local _buffer = List{}",
+                            "\n    local function add(bit) _buffer:add(bit) end",
+                            "\n    local function join_with(glue) _buffer = _buffer:joined_with(glue) end",
+                            "\n    ", bit_lua,
+                            "\n    if lua_type_of(_buffer) == 'table' then _buffer = _buffer:joined() end",
+                            "\n    return _buffer",
+                            "\nend)()"
                     if lua\trailing_line_len! + #bit_lua\text! > MAX_LINE
                         lua\append "\n  "
                     if added > 0 then lua\append ".."

@@ -171,7 +171,7 @@ indented_plain_text (Text):
     ~}
 
 text_interpolation:
-    inline_text_interpolation / ("\" indented_expression (blank_lines =curr_indent "..")?)
+    inline_text_interpolation / ("\" (indented_expression / indented_block) (blank_lines =curr_indent "..")?)
 
 number (Number):
     (&("-"? "0x" [0-9a-fA-F]+) {:hex: '' -> 'yes' :})?
