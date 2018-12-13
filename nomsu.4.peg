@@ -158,7 +158,7 @@ indented_text (Text):
     _inline_text* 
     (('\' %nl+ {:curr_indent: indent :} ('..')?)
      / disallowed_interpolation? {%nl+} {:curr_indent: indent :})
-    (indented_plain_text / text_interpolation / illegal_char / {~ %nl+ (=curr_indent -> "") ~})*
+    (indented_plain_text / text_interpolation / illegal_char / {~ %nl+ (=curr_indent -> "") [ ]* ~})*
     ('"' eol / eof / missing_quote_err)
     {:curr_indent: %nil :}
 -- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
@@ -167,7 +167,6 @@ indented_plain_text (Text):
         ((("\" blank_lines =curr_indent "..") -> "") / ('\\' -> '\')
         / (!text_interpolation (escaped_char / '\'))
         / (nonterminal_quote / text_char)+)+
-        (%nl+ (=curr_indent -> ""))*
     ~}
 
 text_interpolation:

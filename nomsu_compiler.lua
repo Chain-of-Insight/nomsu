@@ -107,7 +107,7 @@ local compile = setmetatable({
           elseif bit.type == "Text" then
             bit_lua = operate_on_text(bit)
           elseif bit.type == "Block" then
-            bit_lua = LuaCode:from(bit.source, "(function()", "\n    local _lua = LuaCode:from(", tostring(bit.source):as_lua(), ")", "\n    local function add(bit) _lua:add(bit) end", "\n    local function join_with(glue)", "\n        local old_bits = _lua.bits", "\n        _lua = LuaCode:from(_lua.source)", "\n        _lua:concat_add(old_bits, glue)", "\n    end", "\n    ", compile(bit), "\n    return _lua", "\nend)()")
+            bit_lua = LuaCode:from(bit.source, "(function()", "\n    local _lua = LuaCode:from(", tostring(bit.source):as_lua(), ")", "\n    local function add(...) _lua:add(...) end", "\n    local function join_with(glue)", "\n        local old_bits = _lua.bits", "\n        _lua = LuaCode:from(_lua.source)", "\n        _lua:concat_add(old_bits, glue)", "\n    end", "\n    ", compile(bit), "\n    return _lua", "\nend)()")
           else
             bit_lua = compile(bit)
           end
@@ -164,7 +164,12 @@ local compile = setmetatable({
           test_nomsu = test_nomsu:gsub("\n" .. indent, "\n")
         end
       end
-      return LuaCode("TESTS[" .. tostring(tostring(body.source):as_lua()) .. "] = ", test_nomsu:as_lua())
+      local test_text = compile(SyntaxTree({
+        type = "Text",
+        source = body.source,
+        test_nomsu
+      }))
+      return LuaCode("TESTS[" .. tostring(tostring(body.source):as_lua()) .. "] = ", test_text)
     end,
     ["is jit"] = function(compile, code)
       return LuaCode("jit")
@@ -240,7 +245,7 @@ local compile = setmetatable({
         end
       end
       lua:add((stub):as_lua_id(), "(")
-      local args = { }
+      local arg_count = 0
       for i, tok in ipairs(tree) do
         local _continue_0 = false
         repeat
@@ -248,18 +253,22 @@ local compile = setmetatable({
             _continue_0 = true
             break
           end
+          arg_count = arg_count + 1
           local arg_lua = compile(tok)
           if tok.type == "Block" then
             arg_lua = LuaCode:from(tok.source, "(function()\n    ", arg_lua, "\nend)()")
           end
-          insert(args, arg_lua)
+          if arg_count > 1 then
+            lua:add(",")
+          end
+          lua:add(lua:trailing_line_len() + #arg_lua:text() > MAX_LINE and "\n   " or " ")
+          lua:add(arg_lua)
           _continue_0 = true
         until true
         if not _continue_0 then
           break
         end
       end
-      lua:concat_add(args, ", ")
       lua:add(")")
       return lua
     elseif "EscapedNomsu" == _exp_0 then
@@ -271,28 +280,32 @@ local compile = setmetatable({
           return tostring(x)
         elseif SyntaxTree:is_instance(x) then
           return compile(x)
+        elseif Source:is_instance(x) then
+          return tostring(x):as_lua()
         else
           return x:as_lua()
         end
       end
       for k, v in pairs((SyntaxTree:is_instance(tree[1]) and tree[1].type == "EscapedNomsu" and tree) or tree[1]) do
-        if needs_comma then
-          lua:add(", ")
-        else
-          needs_comma = true
-        end
+        local entry_lua = LuaCode()
         if k == i then
           i = i + 1
         elseif type(k) == 'string' and match(k, "[_a-zA-Z][_a-zA-Z0-9]*") then
-          lua:add(k, "= ")
+          entry_lua:add(k, "= ")
         else
-          lua:add("[", as_lua(k), "]= ")
+          entry_lua:add("[", as_lua(k), "]= ")
         end
-        if k == "source" then
-          lua:add(tostring(v):as_lua())
-        else
-          lua:add(as_lua(v))
+        entry_lua:add(as_lua(v))
+        if needs_comma then
+          lua:add(",")
         end
+        if lua:trailing_line_len() + #(entry_lua:text():match("^[\n]*")) > MAX_LINE then
+          lua:add("\n")
+        elseif needs_comma then
+          lua:add(" ")
+        end
+        lua:add(entry_lua)
+        needs_comma = true
       end
       lua:add("}")
       return lua
@@ -309,6 +322,17 @@ local compile = setmetatable({
       local lua = LuaCode:from(tree.source)
       local added = 0
       local string_buffer = ""
+      local add_bit
+      add_bit = function(bit)
+        if added > 0 then
+          if lua:trailing_line_len() + #bit > MAX_LINE then
+            lua:add("\n  ")
+          end
+          lua:add("..")
+        end
+        lua:add(bit)
+        added = added + 1
+      end
       for i, bit in ipairs(tree) do
         local _continue_0 = false
         repeat
@@ -318,50 +342,35 @@ local compile = setmetatable({
             break
           end
           if string_buffer ~= "" then
-            string_buffer = string_buffer:as_lua()
-            if lua:trailing_line_len() + #string_buffer > MAX_LINE then
-              lua:add("\n  ")
+            for i = 1, #string_buffer, MAX_LINE do
+              add_bit(string_buffer:sub(i, i + MAX_LINE - 1):as_lua())
             end
-            if added > 0 then
-              lua:add("..")
-            end
-            lua:add(string_buffer)
-            added = added + 1
             string_buffer = ""
           end
           local bit_lua = compile(bit)
           if bit.type == "Block" then
             bit_lua = LuaCode:from(bit.source, "(function()", "\n    local _buffer = List{}", "\n    local function add(bit) _buffer:add(bit) end", "\n    local function join_with(glue) _buffer = _buffer:joined_with(glue) end", "\n    ", bit_lua, "\n    if lua_type_of(_buffer) == 'table' then _buffer = _buffer:joined() end", "\n    return _buffer", "\nend)()")
           end
-          if lua:trailing_line_len() + #bit_lua:text() > MAX_LINE then
-            lua:add("\n  ")
-          end
-          if added > 0 then
-            lua:add("..")
-          end
           if bit.type ~= "Text" then
             bit_lua = LuaCode:from(bit.source, "tostring(", bit_lua, ")")
           end
-          lua:add(bit_lua)
-          added = added + 1
+          add_bit(bit_lua)
           _continue_0 = true
         until true
         if not _continue_0 then
           break
         end
       end
-      if string_buffer ~= "" or #lua.bits == 0 then
-        string_buffer = string_buffer:as_lua()
-        if lua:trailing_line_len() + #string_buffer > MAX_LINE then
-          lua:add("\n  ")
+      if string_buffer ~= "" then
+        for i = 1, #string_buffer, MAX_LINE do
+          add_bit(string_buffer:sub(i, i + MAX_LINE - 1):as_lua())
         end
-        if added > 0 then
-          lua:add("..")
-        end
-        lua:add(string_buffer)
-        added = added + 1
+        string_buffer = ""
       end
-      if #lua.bits > 1 then
+      if added == 0 then
+        add_bit('""')
+      end
+      if added > 1 then
         lua:parenthesize()
       end
       return lua

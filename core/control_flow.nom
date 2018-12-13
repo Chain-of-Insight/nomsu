@@ -174,13 +174,14 @@ test:
     if (%body has subtree \(do next %var)):
         %lua::add "\n    " (\(---next %var ---) as lua)
     
-    %lua::add "\nend --numeric for-loop"
+    %lua::add "\nend -- numeric for " (%var as lua identifier) " loop"
     if (%body has subtree \(stop %var)):
-        %inner_lua = %lua
-        %lua = (Lua "do -- scope for stopping for-loop\n    ")
-        %lua::add %inner_lua "\n    "
-        %lua::add (\(---stop %var ---) as lua)
-        %lua::add "\nend -- end of scope for stopping for-loop"
+        %lua = (..)
+            Lua "\
+                ..do -- scope for (stop \(%var as lua identifier))
+                    \%lua
+                    \(\(---stop %var ---) as lua)
+                end -- scope for (stop \(%var as lua identifier))"
     return %lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
