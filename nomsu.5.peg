@@ -122,7 +122,7 @@ inline_action (Action):
 inline_arg: inline_expression / inline_block
 inline_methodcall (MethodCall):
     (index_chain / noindex_inline_expression / "(" inline_block ")")
-    "|" inline_action
+    "|" inline_action (ws* ";" ws* inline_action)*
 
 action (Action):
     !section_division
@@ -132,7 +132,11 @@ linesplit: (ws* "\")? eol nl_nodent ".." ws*
 arg: expression / inline_block / indented_block
 methodcall (MethodCall):
     (index_chain / noindex_inline_expression / indented_expression / "(" inline_block ")" / indented_block)
-    linesplit? "|" linesplit? action
+    linesplit? "|"
+    ((ws* inline_action ws* ";")* ws* action
+     / eol nl_indent
+        (action eol) (nl_nodent action eol)* 
+        (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*)
 
 word: !number { operator_char+ / ident_char+ }
 

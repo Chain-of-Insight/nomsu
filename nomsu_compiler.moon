@@ -185,28 +185,28 @@ compile = setmetatable({
                 return lua
 
             when "MethodCall"
-                stub = tree[2].stub
                 lua = LuaCode\from tree.source
                 target_lua = compile tree[1]
                 target_text = target_lua\text!
                 -- TODO: this parenthesizing is maybe overly conservative
-                if target_text\match("^%(.*%)$") or target_text\match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or
-                    tree[1].type == "IndexChain"
-                    lua\add target_lua, ":"
-                else
-                    lua\add "(", target_lua, "):"
+                if not (target_text\match("^%(.*%)$") or target_text\match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or
+                    tree[1].type == "IndexChain")
+                    target_lua\parenthesize!
 
-                -- TODO: de-duplicate this code
-                assert tree[2].type == "Action"
-                lua\add((stub)\as_lua_id!,"(")
-                for i, arg in ipairs tree[2]\get_args!
-                    arg_lua = compile(arg)
-                    if arg.type == "Block"
-                        arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
-                    lua\add "," if i > 1
-                    lua\add(lua\trailing_line_len! + #arg_lua\text! > MAX_LINE and "\n   " or " ")
-                    lua\add arg_lua
-                lua\add ")"
+                for i=2,#tree
+                    lua\add "\n" if i > 2
+                    lua\add target_lua, ":"
+                    lua\add((tree[i].stub)\as_lua_id!,"(")
+                    for argnum, arg in ipairs tree[i]\get_args!
+                        arg_lua = compile(arg)
+                        if arg.type == "Block"
+                            arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
+                        if lua\trailing_line_len! + #arg_lua\text! > MAX_LINE
+                            lua\add(argnum > 1 and ",\n    " or "\n    ")
+                        elseif argnum > 1
+                            lua\add ", "
+                        lua\add arg_lua
+                    lua\add ")"
                 return lua
 
             when "EscapedNomsu"

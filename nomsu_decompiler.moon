@@ -57,7 +57,11 @@ tree_to_inline_nomsu = (tree)->
             return nomsu
 
         when "MethodCall"
-            return NomsuCode\from(tree.source, tree_to_inline_nomsu(tree[1]), "|", tree_to_inline_nomsu(tree[2]))
+            nomsu = NomsuCode\from(tree.source, tree_to_inline_nomsu(tree[1]), "|")
+            for i=2,#tree
+                nomsu\add "; " if i > 2
+                nomsu\add tree_to_inline_nomsu(tree[i])
+            return nomsu
 
         when "EscapedNomsu"
             inner_nomsu = tree_to_inline_nomsu(tree[1])
@@ -139,8 +143,7 @@ tree_to_inline_nomsu = (tree)->
             return NomsuCode\from(tree.source, s)
 
         when "Var"
-            -- TODO: remove this hack:
-            varname = tree[1]\gsub("_", " ")
+            varname = tree[1]
             if varname == "" or is_identifier(varname)
                 return NomsuCode\from(tree.source, "$", varname)
             else
@@ -265,7 +268,14 @@ tree_to_nomsu = (tree)->
                 target_nomsu\parenthesize!
             nomsu\add target_nomsu
             nomsu\add(target_nomsu\is_multiline! and "\n..|" or "|")
-            nomsu\add tree_to_nomsu(tree[2])
+            inner_nomsu = NomsuCode!
+            for i=2,#tree
+                inner_nomsu\add "\n" if i > 2
+                inner_nomsu\add tree_to_nomsu(tree[i])
+            if #tree == 2 and nomsu\trailing_line_len! + #inner_nomsu\text!\match("^[^\n]*") < MAX_LINE
+                nomsu\add inner_nomsu
+            else
+                nomsu\add "\n    ", inner_nomsu
             return nomsu
 
         when "EscapedNomsu"

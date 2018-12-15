@@ -270,6 +270,9 @@ externally (%tree as lua expr) means:
         ..local tree_lua = compile(\%tree)
         if \%tree.type == 'Block' then
             tree_lua = LuaCode:from(\%tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
+        elseif \%tree.type == 'MethodCall' and #\%tree > 2 then
+            compile_error_at(\%tree, "This must be a single value instead of "..(#\%tree - 1).." method calls.",
+                "Replace this with a single method call.")
         end
         return tree_lua"
 

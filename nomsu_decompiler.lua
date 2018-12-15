@@ -85,7 +85,14 @@ tree_to_inline_nomsu = function(tree)
     end
     return nomsu
   elseif "MethodCall" == _exp_0 then
-    return NomsuCode:from(tree.source, tree_to_inline_nomsu(tree[1]), "|", tree_to_inline_nomsu(tree[2]))
+    local nomsu = NomsuCode:from(tree.source, tree_to_inline_nomsu(tree[1]), "|")
+    for i = 2, #tree do
+      if i > 2 then
+        nomsu:add("; ")
+      end
+      nomsu:add(tree_to_inline_nomsu(tree[i]))
+    end
+    return nomsu
   elseif "EscapedNomsu" == _exp_0 then
     local inner_nomsu = tree_to_inline_nomsu(tree[1])
     if not (tree[1].type == "List" or tree[1].type == "Dict" or tree[1].type == "Var") then
@@ -190,7 +197,7 @@ tree_to_inline_nomsu = function(tree)
     end
     return NomsuCode:from(tree.source, s)
   elseif "Var" == _exp_0 then
-    local varname = tree[1]:gsub("_", " ")
+    local varname = tree[1]
     if varname == "" or is_identifier(varname) then
       return NomsuCode:from(tree.source, "$", varname)
     else
@@ -340,7 +347,18 @@ tree_to_nomsu = function(tree)
     end
     nomsu:add(target_nomsu)
     nomsu:add(target_nomsu:is_multiline() and "\n..|" or "|")
-    nomsu:add(tree_to_nomsu(tree[2]))
+    local inner_nomsu = NomsuCode()
+    for i = 2, #tree do
+      if i > 2 then
+        inner_nomsu:add("\n")
+      end
+      inner_nomsu:add(tree_to_nomsu(tree[i]))
+    end
+    if #tree == 2 and nomsu:trailing_line_len() + #inner_nomsu:text():match("^[^\n]*") < MAX_LINE then
+      nomsu:add(inner_nomsu)
+    else
+      nomsu:add("\n    ", inner_nomsu)
+    end
     return nomsu
   elseif "EscapedNomsu" == _exp_0 then
     nomsu = recurse(tree[1])

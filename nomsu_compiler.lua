@@ -250,29 +250,32 @@ local compile = setmetatable({
       lua:add(")")
       return lua
     elseif "MethodCall" == _exp_0 then
-      local stub = tree[2].stub
       local lua = LuaCode:from(tree.source)
       local target_lua = compile(tree[1])
       local target_text = target_lua:text()
-      if target_text:match("^%(.*%)$") or target_text:match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or tree[1].type == "IndexChain" then
+      if not (target_text:match("^%(.*%)$") or target_text:match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or tree[1].type == "IndexChain") then
+        target_lua:parenthesize()
+      end
+      for i = 2, #tree do
+        if i > 2 then
+          lua:add("\n")
+        end
         lua:add(target_lua, ":")
-      else
-        lua:add("(", target_lua, "):")
-      end
-      assert(tree[2].type == "Action")
-      lua:add((stub):as_lua_id(), "(")
-      for i, arg in ipairs(tree[2]:get_args()) do
-        local arg_lua = compile(arg)
-        if arg.type == "Block" then
-          arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
+        lua:add((tree[i].stub):as_lua_id(), "(")
+        for argnum, arg in ipairs(tree[i]:get_args()) do
+          local arg_lua = compile(arg)
+          if arg.type == "Block" then
+            arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
+          end
+          if lua:trailing_line_len() + #arg_lua:text() > MAX_LINE then
+            lua:add(argnum > 1 and ",\n    " or "\n    ")
+          elseif argnum > 1 then
+            lua:add(", ")
+          end
+          lua:add(arg_lua)
         end
-        if i > 1 then
-          lua:add(",")
-        end
-        lua:add(lua:trailing_line_len() + #arg_lua:text() > MAX_LINE and "\n   " or " ")
-        lua:add(arg_lua)
+        lua:add(")")
       end
-      lua:add(")")
       return lua
     elseif "EscapedNomsu" == _exp_0 then
       local lua = LuaCode:from(tree.source, "SyntaxTree{")
