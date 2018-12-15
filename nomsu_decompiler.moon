@@ -264,7 +264,7 @@ tree_to_nomsu = (tree)->
             if tree[1].type == "Block" and not target_nomsu\is_multiline!
                 target_nomsu\parenthesize!
             nomsu\add target_nomsu
-            nomsu\add(target_nomsu\is_multiline! and " \\\n..|" or "|")
+            nomsu\add(target_nomsu\is_multiline! and "\n..|" or "|")
             nomsu\add tree_to_nomsu(tree[2])
             return nomsu
 
