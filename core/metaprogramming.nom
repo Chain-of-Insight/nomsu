@@ -26,7 +26,8 @@ lua> "\
         local body_lua = SyntaxTree:is_instance(\%body) and compile(\%body) or \%body
         if SyntaxTree:is_instance(\%body) and \%body.type ~= "Block" then body_lua:prepend("return ") end
         local lua = LuaCode("(function(")
-        if SyntaxTree:is_instance(\%args) and \%args.type == "Action" then \%args = \%args:get_args()
+        if SyntaxTree:is_instance(\%args) and (\%args.type == "Action" or \%args.type == "MethodCall") then
+            \%args = \%args:get_args()
         elseif SyntaxTree:is_instance(\%args) and \%args.type == "Var" then \%args = {\%args} end
         for i, arg in ipairs(\%args) do
             local arg_lua = SyntaxTree:is_instance(arg) and compile(arg):text() or arg
@@ -38,7 +39,7 @@ lua> "\
             elseif not arg_lua:is_lua_id() then
                 compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
                     "This does not compile to a Lua identifier, so it can't be used as a function argument.",
-                    "This should probably be a Nomsu variable instead (like %x).")
+                    "This should probably be a Nomsu variable instead (like $x).")
             end
             lua:add(i > 1 and ", " or "", arg_lua)
             body_lua:remove_free_vars({arg_lua})
@@ -136,34 +137,38 @@ test:
     lua> "\
         ..
         local lua = LuaCode()
-        local fn_name = \%action.stub:as_lua_id()
-        if \%action.target then lua:add(compile(\%action.target), ".")
-        else lua:add_free_vars({fn_name}) end
-        lua:add(fn_name, " = ", \(\(%action -> %body) as lua), ";")
+        if \%action.type == "MethodCall" then
+            lua:add(compile(\%action[1]), ".", \%action[2].stub:as_lua_id())
+        elseif \%action.type == "Action" then
+            lua:add(\%action.stub:as_lua_id())
+            lua:add_free_vars({\%action.stub:as_lua_id()})
+        else
+            compile_error_at(\%action, "Expected an action or method call here")
+        end
+        lua:add(" = ", \(\(%action -> %body) as lua), ";")
         return lua"
 
 (%actions all mean %body) compiles to:
     lua> "\
-        ..local fn_name = \%actions[1].stub:as_lua_id()
-        local target = \%actions[1].target and compile(\%actions[1].target) or nil
+        ..local lua = \(\(%actions.1 means %body) as lua)
+        local first_def = (\%actions[1].type == "MethodCall"
+            and LuaCode(compile(\%actions[1][1]), ".", \%actions[1].stub:as_lua_id())
+            or LuaCode(\%actions[1].stub:as_lua_id()))
         local \%args = List(\%actions[1]:get_args())
-        local lua = \(\(%actions.1 means %body) as lua)
         for i=2,#\%actions do
             local alias = \%actions[i]
-            local alias_name = alias.stub:as_lua_id()
             local \%alias_args = List(alias:get_args())
             lua:add("\\n")
-            if alias.target then
-                lua:add(compile(alias.target), ".")
+            if alias.type == "MethodCall" then
+                lua:add(compile(alias[1]), ".", alias.stub:as_lua_id())
             else
+                lua:add(alias.stub:as_lua_id())
                 lua:add_free_vars({alias_name})
             end
-            lua:add(alias_name, " = ")
             if \%args == \%alias_args then
-                if target then lua:add(target, ".") end
-                lua:add(fn_name, ";")
+                lua:add(" = ", first_def, ";")
             else
-                lua:add(\(\(%alias_args -> %actions.1) as lua), ";")
+                lua:add(" = ", \(\(%alias_args -> %actions.1) as lua), ";")
             end
         end
         return lua"

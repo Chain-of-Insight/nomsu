@@ -59,9 +59,6 @@ do
           return false
         end
       end
-      if self.target ~= other.target then
-        return false
-      end
       return true
     end,
     as_lua = function(self)
@@ -146,19 +143,31 @@ do
       return replacement
     end,
     get_args = function(self)
-      assert(self.type == "Action", "Only actions have arguments")
-      local args = {
-        self.target
-      }
-      for _index_0 = 1, #self do
-        local tok = self[_index_0]
-        if type(tok) ~= 'string' then
-          args[#args + 1] = tok
+      assert(self.type == "Action" or self.type == "MethodCall", "Only actions and method calls have arguments")
+      local args = { }
+      if self.type == "MethodCall" then
+        args[1] = self[1]
+        local _list_0 = self[2]
+        for _index_0 = 1, #_list_0 do
+          local tok = _list_0[_index_0]
+          if type(tok) ~= 'string' then
+            args[#args + 1] = tok
+          end
+        end
+      else
+        for _index_0 = 1, #self do
+          local tok = self[_index_0]
+          if type(tok) ~= 'string' then
+            args[#args + 1] = tok
+          end
         end
       end
       return args
     end,
     get_stub = function(self)
+      if self.type == "MethodCall" then
+        return self[2]:get_stub()
+      end
       local stub_bits = { }
       local arg_i = 1
       for _index_0 = 1, #self do
@@ -213,6 +222,8 @@ getmetatable(SyntaxTree).__call = function(self, t)
   setmetatable(t, self.__base)
   if t.type == 'Action' then
     t.stub = t:get_stub()
+  elseif t.type == 'MethodCall' then
+    t.stub = t[2]:get_stub()
   end
   return t
 end

@@ -143,7 +143,7 @@ compile = setmetatable({
             when "Action"
                 stub = tree.stub
                 compile_action = compile.action[stub]
-                if not compile_action and not tree.target and math_expression\match(stub)
+                if not compile_action and math_expression\match(stub)
                     lua = LuaCode\from(tree.source)
                     for i,tok in ipairs tree
                         if type(tok) == 'string'
@@ -155,7 +155,7 @@ compile = setmetatable({
                         lua\add " " if i < #tree
                     return lua
 
-                if compile_action and not tree.target
+                if compile_action
                     args = [arg for arg in *tree when type(arg) != "string"]
                     -- Force Lua to avoid tail call optimization for debugging purposes
                     -- TODO: use tail call?
@@ -173,25 +173,37 @@ compile = setmetatable({
                         return compile(ret)
 
                 lua = LuaCode\from(tree.source)
-                if tree.target -- Method call
-                    target_lua = compile tree.target
-                    target_text = target_lua\text!
-                    -- TODO: this parenthesizing is maybe overly conservative
-                    if target_text\match("^%(.*%)$") or target_text\match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or
-                        tree.target.type == "IndexChain"
-                        lua\add target_lua, ":"
-                    else
-                        lua\add "(", target_lua, "):"
                 lua\add((stub)\as_lua_id!,"(")
-                arg_count = 0
-                for i, tok in ipairs tree
-                    if type(tok) == "string" then continue
-                    arg_count += 1
-                    arg_lua = compile(tok)
-                    if tok.type == "Block"
-                        arg_lua = LuaCode\from(tok.source, "(function()\n    ", arg_lua, "\nend)()")
-                    if arg_count > 1
-                        lua\add ","
+                for i, arg in ipairs tree\get_args!
+                    arg_lua = compile(arg)
+                    if arg.type == "Block"
+                        arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
+                    lua\add "," if i > 1
+                    lua\add(lua\trailing_line_len! + #arg_lua\text! > MAX_LINE and "\n   " or " ")
+                    lua\add arg_lua
+                lua\add ")"
+                return lua
+
+            when "MethodCall"
+                stub = tree[2].stub
+                lua = LuaCode\from tree.source
+                target_lua = compile tree[1]
+                target_text = target_lua\text!
+                -- TODO: this parenthesizing is maybe overly conservative
+                if target_text\match("^%(.*%)$") or target_text\match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or
+                    tree[1].type == "IndexChain"
+                    lua\add target_lua, ":"
+                else
+                    lua\add "(", target_lua, "):"
+
+                -- TODO: de-duplicate this code
+                assert tree[2].type == "Action"
+                lua\add((stub)\as_lua_id!,"(")
+                for i, arg in ipairs tree[2]\get_args!
+                    arg_lua = compile(arg)
+                    if arg.type == "Block"
+                        arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
+                    lua\add "," if i > 1
                     lua\add(lua\trailing_line_len! + #arg_lua\text! > MAX_LINE and "\n   " or " ")
                     lua\add arg_lua
                 lua\add ")"

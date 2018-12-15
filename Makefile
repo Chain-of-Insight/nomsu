@@ -1,6 +1,6 @@
 # Nomsu makefile
 # To build, run `make`
-# To install, 
+# To install, run `make install`
 
 # ========= User-controlled variables ========
 LUA= lua
@@ -23,10 +23,10 @@ LIB_LUA_FILES= $(patsubst %.nom,%.lua,$(LIB_NOM_FILES))
 PEG_FILES= $(wildcard nomsu.*.peg)
 GET_VERSION= $(LUA_BIN) nomsu.lua --version
 
-all: build optimize
+all: lua optimize
 
 .PHONY: test
-test: build optimize
+test: lua optimize
 	@echo "\033[1;4mRunning unoptimized tests...\033[0m"
 	@$(LUA_BIN) nomsu.lua -O0 tools/test.nom $(CORE_NOM_FILES) $(LIB_NOM_FILES)
 	@echo "\n\033[1;4mRunning optimized tests...\033[0m"
@@ -42,10 +42,10 @@ test: build optimize
 version: $(LUA_FILES) $(CORE_NOM_FILES) $(LIB_NOM_FILES)
 	@$(LUA_BIN) nomsu.lua --version > version || exit
 
-build: $(LUA_FILES)
+lua: $(LUA_FILES)
 
 .PHONY: optimize
-optimize: build $(CORE_LUA_FILES) $(LIB_LUA_FILES)
+optimize: lua $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
 .PHONY: clean
 clean:
@@ -53,7 +53,7 @@ clean:
 	@rm -rvf version core/*.lua lib/*.lua tools/*.lua compatibility/*.lua
 
 .PHONY: install
-install: build version optimize
+install: lua version optimize
 	@prefix="$(PREFIX)"; \
 	if [[ ! $$prefix ]]; then \
 		read -p $$'\033[1mWhere do you want to install Nomsu? (default: /usr/local) \033[0m' prefix; \

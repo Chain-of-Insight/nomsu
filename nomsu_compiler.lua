@@ -188,7 +188,7 @@ local compile = setmetatable({
     if "Action" == _exp_0 then
       local stub = tree.stub
       local compile_action = compile.action[stub]
-      if not compile_action and not tree.target and math_expression:match(stub) then
+      if not compile_action and math_expression:match(stub) then
         local lua = LuaCode:from(tree.source)
         for i, tok in ipairs(tree) do
           if type(tok) == 'string' then
@@ -206,7 +206,7 @@ local compile = setmetatable({
         end
         return lua
       end
-      if compile_action and not tree.target then
+      if compile_action then
         local args
         do
           local _accum_0 = { }
@@ -235,39 +235,42 @@ local compile = setmetatable({
         end
       end
       local lua = LuaCode:from(tree.source)
-      if tree.target then
-        local target_lua = compile(tree.target)
-        local target_text = target_lua:text()
-        if target_text:match("^%(.*%)$") or target_text:match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or tree.target.type == "IndexChain" then
-          lua:add(target_lua, ":")
-        else
-          lua:add("(", target_lua, "):")
-        end
-      end
       lua:add((stub):as_lua_id(), "(")
-      local arg_count = 0
-      for i, tok in ipairs(tree) do
-        local _continue_0 = false
-        repeat
-          if type(tok) == "string" then
-            _continue_0 = true
-            break
-          end
-          arg_count = arg_count + 1
-          local arg_lua = compile(tok)
-          if tok.type == "Block" then
-            arg_lua = LuaCode:from(tok.source, "(function()\n    ", arg_lua, "\nend)()")
-          end
-          if arg_count > 1 then
-            lua:add(",")
-          end
-          lua:add(lua:trailing_line_len() + #arg_lua:text() > MAX_LINE and "\n   " or " ")
-          lua:add(arg_lua)
-          _continue_0 = true
-        until true
-        if not _continue_0 then
-          break
+      for i, arg in ipairs(tree:get_args()) do
+        local arg_lua = compile(arg)
+        if arg.type == "Block" then
+          arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
         end
+        if i > 1 then
+          lua:add(",")
+        end
+        lua:add(lua:trailing_line_len() + #arg_lua:text() > MAX_LINE and "\n   " or " ")
+        lua:add(arg_lua)
+      end
+      lua:add(")")
+      return lua
+    elseif "MethodCall" == _exp_0 then
+      local stub = tree[2].stub
+      local lua = LuaCode:from(tree.source)
+      local target_lua = compile(tree[1])
+      local target_text = target_lua:text()
+      if target_text:match("^%(.*%)$") or target_text:match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or tree[1].type == "IndexChain" then
+        lua:add(target_lua, ":")
+      else
+        lua:add("(", target_lua, "):")
+      end
+      assert(tree[2].type == "Action")
+      lua:add((stub):as_lua_id(), "(")
+      for i, arg in ipairs(tree[2]:get_args()) do
+        local arg_lua = compile(arg)
+        if arg.type == "Block" then
+          arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
+        end
+        if i > 1 then
+          lua:add(",")
+        end
+        lua:add(lua:trailing_line_len() + #arg_lua:text() > MAX_LINE and "\n   " or " ")
+        lua:add(arg_lua)
       end
       lua:add(")")
       return lua

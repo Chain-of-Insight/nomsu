@@ -11,13 +11,14 @@ externally (print tree %t at indent %indent) means:
     if %t.type is:
         "Action":
             say "\(%indent)Action (\(%t.stub)):"
-            if %t.target:
-                say "\%indent  Target:"
-                print tree %t.target at indent "\%indent    "
-            
             for %arg in %t:
                 if (%arg is syntax tree):
                     print tree %arg at indent "\%indent  "
+
+        "MethodCall":
+            say "\(%indent)MethodCall on:"
+            print tree %t.1 at indent "\%indent    "
+            print tree %t.2 at indent "\%indent    "
         
         "Number":
             say "\%indent\(%t.1)"

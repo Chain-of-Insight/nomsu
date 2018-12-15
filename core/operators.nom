@@ -35,8 +35,7 @@ test:
 # Variable assignment operator
 (%var = %value) compiles to:
     lua> "\
-        ..
-        local lua = LuaCode()
+        ..local lua = LuaCode()
         if \%var.type == "List" then
             for i, \%assignment in ipairs(\%var) do
                 if i > 1 then lua:add(", ") end

@@ -29,7 +29,6 @@ class SyntaxTree
         return false if type(@) != type(other) or #@ != #other or getmetatable(@) != getmetatable(other)
         for i=1,#@
             return false if @[i] != other[i]
-        return false if @target != other.target
         return true
 
     as_lua: =>
@@ -74,13 +73,20 @@ class SyntaxTree
         return replacement
 
     get_args: =>
-        assert(@type == "Action", "Only actions have arguments")
-        args = {@target}
-        for tok in *@
-            if type(tok) != 'string' then args[#args+1] = tok
+        assert(@type == "Action" or @type == "MethodCall", "Only actions and method calls have arguments")
+        args = {}
+        if @type == "MethodCall"
+            args[1] = @[1]
+            for tok in *@[2]
+                if type(tok) != 'string' then args[#args+1] = tok
+        else
+            for tok in *@
+                if type(tok) != 'string' then args[#args+1] = tok
         return args
 
     get_stub: =>
+        if @type == "MethodCall"
+            return @[2]\get_stub!
         stub_bits = {}
         arg_i = 1
         for a in *@
@@ -103,6 +109,8 @@ getmetatable(SyntaxTree).__call = (t)=>
     setmetatable(t, @__base)
     if t.type == 'Action'
         t.stub = t\get_stub!
+    elseif t.type == 'MethodCall'
+        t.stub = t[2]\get_stub!
     return t
 
 return SyntaxTree

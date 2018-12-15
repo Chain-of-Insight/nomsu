@@ -101,17 +101,22 @@ indented_nomsu (EscapedNomsu):
 index_chain (IndexChain):
     noindex_inline_expression ("." (text_word / noindex_inline_expression))+
 
+inline_action: inline_methodcall / _inline_action
+inline_methodcall: 
+    inline_arg ws* "::" ws* _inline_action
 -- Actions need either at least 1 word, or at least 2 tokens
-inline_action (Action):
+_inline_action (Action):
     !section_division
-    ({:target: inline_arg :} ws* "::" ws*)?
     (   (inline_arg (ws* (inline_arg / word))+)
       / (word       (ws* (inline_arg / word))*))
     (ws* inline_block)?
 inline_arg: inline_expression / inline_block
-action (Action):
+
+action: methodcall / _action
+methodcall:
+    arg (nl_nodent "..")? ws* "::" (nl_nodent "..")? ws* _action
+_action (Action):
     !section_division
-    ({:target: arg :} (nl_nodent "..")? ws* "::" (nl_nodent "..")? ws*)?
     (  (arg  ((nl_nodent "..")? ws* (arg / word))+)
      / (word ((nl_nodent "..")? ws* (arg / word))*))
 arg: expression / inline_block / indented_block
