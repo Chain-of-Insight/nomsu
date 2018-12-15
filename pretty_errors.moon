@@ -45,6 +45,9 @@ format_error = (err)->
                     err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0;41;30m#{during}\027[0m#{after}"
                 else
                     err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0;41;30m#{line}\027[0m"
+            if i > err_linenum+1 + 5
+                err_msg ..= "\n       ...\n"
+                break
 
     box_width = 70
     err_text = "\027[47;31;1m#{string2.wrap(" "..err.error, box_width, 16)\gsub("\n", "\n\027[47;31;1m ")}"

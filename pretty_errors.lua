@@ -58,6 +58,10 @@ format_error = function(err)
           end
         end
       end
+      if i > err_linenum + 1 + 5 then
+        err_msg = err_msg .. "\n       ...\n"
+        break
+      end
     end
   end
   local box_width = 70
