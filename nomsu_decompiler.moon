@@ -265,6 +265,7 @@ tree_to_nomsu = (tree)->
                 target_nomsu\parenthesize!
             nomsu\add target_nomsu
             nomsu\add(target_nomsu\is_multiline! and " \\\n..|" or "|")
+            nomsu\add recurse(tree[2])
             return nomsu
 
         when "EscapedNomsu"
