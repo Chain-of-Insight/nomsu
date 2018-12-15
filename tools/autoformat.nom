@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     Auto-format Nomsu code. Usage:
     nomsu tools/autoformat.nom [-i] file1 file2 directory1 ...
@@ -9,18 +9,18 @@ use "lib/os.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-%args = (command line args)
-for %filename in %args.extra_args:
-    %file = (read file %filename)
-    unless %file:
-        barf "File does not exist: \%filename"
-    %leading_indent = (%file::matching "[\n]*([ ]*)")
-    %code = (NomsuCode from (%Source %filename 1 (size of %file)) %file)
-    %tree = (%code parsed)
-    %formatted = "\
-        ..\%leading_indent\(((%tree as nomsu)::text)::with "\n" -> "\n\%leading_indent")"
+$args = (command line args)
+for $filename in $args.extra_args:
+    $file = (read file $filename)
+    unless $file:
+        barf "File does not exist: \$filename"
+    $leading_indent = ($file|matching "[\n]*([ ]*)")
+    $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
+    $tree = ($code parsed)
+    $formatted = "
+        \$leading_indent\((($tree as nomsu)|text)|with "\n" -> "\n\$leading_indent")"
     
-    if %args."-i":
-        write %formatted to file %filename
+    if $args."-i":
+        write $formatted to file $filename
     ..else:
-        say %formatted inline
+        say $formatted inline

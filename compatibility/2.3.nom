@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines upgrades from Nomsu <2.3 to Nomsu 2.3
     
@@ -6,15 +6,15 @@ use "compatibility/compatibility.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-upgrade action (%a = %b) to "2.3" as (%a == %b)
-upgrade action (<- %) to "2.3" as (set %)
-upgrade action (assign %) to "2.3" as (set %)
-upgrade action (%a <- %b) to "2.3" as (%a = %b)
-upgrade action (external %a <- %b) to "2.3" as (external %a = %b)
-upgrade action (%a +<- %b) to "2.3" as (%a += %b)
-upgrade action (%a -<- %b) to "2.3" as (%a -= %b)
-upgrade action (%a *<- %b) to "2.3" as (%a *= %b)
-upgrade action (%a /<- %b) to "2.3" as (%a /= %b)
-upgrade action (%a ^<- %b) to "2.3" as (%a ^= %b)
-upgrade action (%a and<- %b) to "2.3" as (%a and= %b)
-upgrade action (%a or<- %b) to "2.3" as (%a or= %b)
+upgrade action ($a = $b) to "2.3" as ($a == $b)
+upgrade action (<- $) to "2.3" as (set $)
+upgrade action (assign $) to "2.3" as (set $)
+upgrade action ($a <- $b) to "2.3" as ($a = $b)
+upgrade action (external $a <- $b) to "2.3" as (external $a = $b)
+upgrade action ($a +<- $b) to "2.3" as ($a += $b)
+upgrade action ($a -<- $b) to "2.3" as ($a -= $b)
+upgrade action ($a *<- $b) to "2.3" as ($a *= $b)
+upgrade action ($a /<- $b) to "2.3" as ($a /= $b)
+upgrade action ($a ^<- $b) to "2.3" as ($a ^= $b)
+upgrade action ($a and<- $b) to "2.3" as ($a and= $b)
+upgrade action ($a or<- $b) to "2.3" as ($a or= $b)

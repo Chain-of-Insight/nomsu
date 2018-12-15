@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -12,35 +12,31 @@ use "core/control_flow.nom"
 test:
     assume "\[1, 2, 3]" == "[1, 2, 3]"
     assume "foo = \(1 + 2)!" == "foo = 3!"
-    assume "one\ntwo" == "\
-        ..one
-        two"
-    assume "nogap" == "\
-        ..no\
-        ..gap"
-    assume (["x", "y"]::joined with ",") == "x,y"
-    assume (["x", "y"]::joined) == "xy"
-    assume ("BAR"::byte 2) == 65
-    assume ("BAR"::bytes 1 to 2) == [66, 65]
-    assume ("asdf"::capitalized) == "Asdf"
-    assume ("asdf"::uppercase) == "ASDF"
-    assume ("asdf"::with "s" -> "X") == "aXdf"
-    assume ("one\ntwo\n"::lines) == ["one", "two", ""]
-    (%spec とは %body) parses as (%spec means %body)
+    assume "one\ntwo" == "one\ntwo"
+    assume "nogap" == "nogap"
+    assume (["x", "y"]|joined with ",") == "x,y"
+    assume (["x", "y"]|joined) == "xy"
+    assume ("BAR"|byte 2) == 65
+    assume ("BAR"|bytes 1 to 2) == [66, 65]
+    assume ("asdf"|capitalized) == "Asdf"
+    assume ("asdf"|uppercase) == "ASDF"
+    assume ("asdf"|with "s" -> "X") == "aXdf"
+    assume ("one\ntwo\n"|lines) == ["one", "two", ""]
+    ($spec とは $body) parses as ($spec means $body)
 
 test:
-    %こんにちは = "こんにちは"
-    (% と言う) とは "\(%)世界"
-    assume (%こんにちは と言う) == "こんにちは世界"
+    $こんにちは = "こんにちは"
+    ($ と言う) とは "\($)世界"
+    assume ($こんにちは と言う) == "こんにちは世界"
 
-(%expr for %match in %text matching %patt) compiles to:
+($expr for $match in $text matching $patt) compiles to:
     define mangler
     return (..)
-        Lua "\
-            ..(function()
+        Lua "
+            (function()
                 local \(mangle "comprehension") = List{}
-                for \(%match as lua expr) in (\(%text as lua expr)):gmatch(\(%patt as lua expr)) do
-                    \(mangle "comprehension")[#\(mangle "comprehension")+1] = \(%expr as lua)
+                for \($match as lua expr) in (\($text as lua expr)):gmatch(\($patt as lua expr)) do
+                    \(mangle "comprehension")[#\(mangle "comprehension")+1] = \($expr as lua)
                 end
                 return \(mangle "comprehension")
             end)()"
@@ -51,17 +47,17 @@ test:
 test:
     assume (0xDEADBEEF as hex) == "0xDEADBEEF"
 
-externally (%num as hex) means:
-    if (%num < 0):
-        return ("-0x%X"::formatted with (- %num))
+externally ($num as hex) means:
+    if ($num < 0):
+        return ("-0x%X"|formatted with (- $num))
     ..else:
-        return ("0x%X"::formatted with %num)
+        return ("0x%X"|formatted with $num)
 
 # Text literals
-%escapes = {..}
+$escapes = {..}
     nl: "\n", newline: "\n", tab: "\t", bell: "\a", cr: "\r", "carriage return": "\r"
     backspace: "\b", "form feed": "\f", formfeed: "\f", "vertical tab": "\v"
 
-for %name = %str in %escapes:
-    with {%lua: Lua (quote %str)}:
-        %compile.action.%name = (-> %lua)
+for $name = $str in $escapes:
+    with {$lua: Lua (quote $str)}:
+        $compile.action.$name = (-> $lua)

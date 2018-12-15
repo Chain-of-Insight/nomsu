@@ -1,11 +1,11 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines actions for ANSI console color escape codes.
     
 test:
-    % = (bright "\(green)Color test passed.")
+    $ = (bright "\(green)Color test passed.")
 
-%colors = {..}
+$colors = {..}
     normal: 0, "reset color": 0, bright: 1, bold: 1, dim: 2, italic: 3, underscore: 4
     "slow blink": 5, "fast blink": 6, reverse: 7, inverse: 7, inverted: 7
     hidden: 8, # There's some other codes, but they're not currently implemented
@@ -13,14 +13,14 @@ test:
     white: 37, "on black": 40, "on red": 41, "on green": 42, "on yellow": 43
     "on blue": 44, "on magenta": 45, "on cyan": 46, "on white": 47
 
-for %name = %colornum in %colors:
-    %colornum = "\%colornum"
+for $name = $colornum in $colors:
+    $colornum = "\$colornum"
     
     #(=lua "COMPILE_ACTIONS").%name = (..)
         [%nomsu, %tree] -> (Lua "'\\027[\(%colornum)m'")
-    %compile.action.%name = (..)
-        for (%compile %text):
-            if %text:
-                return (Lua "('\\027[\(%colornum)m'..\(%text as lua expr)..'\\027[0m')")
+    $compile.action.$name = (..)
+        for ($compile $text):
+            if $text:
+                return (Lua "('\\027[\($colornum)m'..\($text as lua expr)..'\\027[0m')")
             ..else:
-                return (Lua "'\\027[\(%colornum)m'")
+                return (Lua "'\\027[\($colornum)m'")

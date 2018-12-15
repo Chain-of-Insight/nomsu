@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines upgrades from Nomsu <3.6 to 3.6
     
@@ -7,24 +7,23 @@ use "compatibility/compatibility.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 upgrade action [..]
-    append %item to %list, add %item to %list, to %list add %item, to %list append %item
-..to "3.6" as (%list::add %item)
+    append $item to $list, add $item to $list, to $list add $item, to $list append $item
+..to "3.6" as ($list|add $item)
 
-upgrade action [add %item to %list at index %i] to "3.6" as (..)
-    %list::at index %i add %item
+upgrade action [add $item to $list at index $i] to "3.6" as (..)
+    $list|at index $i add $item
 
-upgrade action [pop from %list, remove last from %list] to "3.6" as (%list::pop)
-upgrade action [remove index %index from %list] to "3.6" as (..)
-    %list::remove index %index
-upgrade action [to %1 write %2, %1 <-write %2] to "3.6" as (%1::add %2)
-upgrade action [to %1 write %2 joined by %3] to "3.6" as (..)
-    %1::add %2 joined by %3
-upgrade action [declare locals in %lua] to "3.6" as (%lua::declare locals)
-upgrade action [declare locals %locs in %lua] to "3.6" as (..)
-    %lua::declare locals %locs
+upgrade action [pop from $list, remove last from $list] to "3.6" as ($list|pop)
+upgrade action [remove index $index from $list] to "3.6" as (..)
+    $list|remove index $index
+upgrade action [to $1 write $2, $1 <-write $2] to "3.6" as ($1|add $2)
+upgrade action [to $1 write $2 joined by $3] to "3.6" as ($1|add $2 joined by $3)
+upgrade action [declare locals in $lua] to "3.6" as ($lua|declare locals)
+upgrade action [declare locals $locs in $lua] to "3.6" as (..)
+    $lua|declare locals $locs
 
-upgrade action [add free vars %vars to %lua] to "3.6" as (..)
-    %lua::add free vars %vars
+upgrade action [add free vars $vars to $lua] to "3.6" as (..)
+    $lua|add free vars $vars
 
-upgrade action [remove free vars %vars from %lua] to "3.6" as (..)
-    %lua::remove free vars %vars
+upgrade action [remove free vars $vars from $lua] to "3.6" as (..)
+    $lua|remove free vars $vars

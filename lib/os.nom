@@ -1,25 +1,25 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines some actions that interact with the operating system and filesystem.
     
 test:
     assume (nomsu files for "core")
 
-externally (files for %path) means:
-    %files = (=lua "Files.list(\%path)")
-    if %files:
-        %files = (List %files)
-    return %files
+externally (files for $path) means:
+    $files = (=lua "Files.list(\$path)")
+    if $files:
+        $files = (List $files)
+    return $files
 
-externally (nomsu files for %path) means:
-    for %nomsupath in (%package.nomsupath::all matches of "[^;]+"):
-        %files = (files for "\(%nomsupath)/\%path")
-        if %files:
-            return %files
+externally (nomsu files for $path) means:
+    for $nomsupath in ($package.nomsupath|all matches of "[^;]+"):
+        $files = (files for "\($nomsupath)/\$path")
+        if $files:
+            return $files
 
-externally (sh> %cmd) means:
-    lua> "\
-        ..local result = io.popen(\%cmd)
+externally (sh> $cmd) means:
+    lua> "
+        local result = io.popen(\$cmd)
         local contents = result:read("*a")
         result:close()
         return contents"
@@ -27,27 +27,24 @@ externally (sh> %cmd) means:
 test:
     read file "lib/os.nom"
 
-externally (read file %filename) means (=lua "Files.read(\%filename)")
+externally (read file $filename) means (=lua "Files.read(\$filename)")
 externally [..]
-    write to file %filename %text, to file %filename write %text
-    write %text to file %filename
+    write to file $filename $text, to file $filename write $text
+    write $text to file $filename
 ..all mean:
-    assume (%filename != "stdin") or barf "Cannot write to stdin"
-    lua> "\
-        ..local file = io.open(\%filename, 'w')
-        file:write(\%text)
-        file:close()"
+    assume ($filename != "stdin") or barf "Cannot write to stdin"
+    lua> "local file = io.open(\$filename, 'w')\nfile:write(\$text)\nfile:close()"
 
-externally (source lines of %tree) means:
-    %source = (%tree.source if (%tree is syntax tree) else %tree)
-    %file = (read file %source.filename)
+externally (source lines of $tree) means:
+    $source = ($tree.source if ($tree is syntax tree) else $tree)
+    $file = (read file $source.filename)
     return (..)
         [..]
             :
-                for % in (%file::line number at %source.start) to (..)
-                    %file::line number at %source.stop
-                ..: add (%file::line %)
-        ..::joined with "\n"
+                for $ in ($file|line number at $source.start) to (..)
+                    $file|line number at $source.stop
+                ..: add ($file|line $)
+        ..|joined with "\n"
 
-externally (spoof file %text) means (%Files.spoof %text)
-externally (spoof file %filename = %text) means (%Files.spoof %filename %text)
+externally (spoof file $text) means ($Files.spoof $text)
+externally (spoof file $filename = $text) means ($Files.spoof $filename $text)

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines upgrades from Nomsu <2.4 to Nomsu 2.4
     
@@ -6,69 +6,65 @@ use "compatibility/compatibility.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-upgrade %tree to "2.4" as:
-    unless (%tree is "Action" syntax tree): return
-    if %tree.stub is:
+upgrade $tree to "2.4" as:
+    unless ($tree is "Action" syntax tree): return
+    if $tree.stub is:
         "when" "if":
-            if ((size of %tree) == 3): return %tree
-            %conditions = []
-            %new_lines = []
-            %body = ((%tree.2 upgraded) if (%tree.2 is "Block" syntax tree) else [%tree.2 upgraded])
-            for %line in %body:
+            if ((size of $tree) == 3): return $tree
+            $conditions = []
+            $new_lines = []
+            $body = (($tree.2 upgraded) if ($tree.2 is "Block" syntax tree) else [$tree.2 upgraded])
+            for $line in $body:
                 when:
-                    (not (%line is "Action" syntax tree)):
-                        %new_lines::add %line
-                    
-                    (%line.stub is "*"):
-                        if ((size of %line) == 2):
-                            %conditions::add %line.2
+                    (not ($line is "Action" syntax tree)): $new_lines|add $line
+                    ($line.stub is "*"):
+                        if ((size of $line) == 2):
+                            $conditions|add $line.2
                         ..else:
-                            %new_lines::add %line
+                            $new_lines|add $line
                     
-                    (%line.stub == "* else"):
-                        %new_lines::add (\(else %block) with vars {block: %line.3})
+                    ($line.stub == "* else"):
+                        $new_lines|add (\(else $block) with vars {block: $line.3})
                     
                     else:
-                        %conditions::add %line.2
-                        %action = %line.3
-                        unless (%action is "Block" syntax tree):
-                            %action = (=lua "SyntaxTree{type='Block', source=\%action.source, \%action}")
-                        %conditions::add %action
-                        %new_lines::add (..)
-                            =lua "SyntaxTree{type='Action', source=\%conditions[1].source, unpack(\%conditions)}"
-                        %conditions = []
+                        $conditions|add $line.2
+                        $action = $line.3
+                        unless ($action is "Block" syntax tree):
+                            $action = (=lua "SyntaxTree{type='Block', source=\$action.source, \$action}")
+                        $conditions|add $action
+                        $new_lines|
+                            add (=lua "SyntaxTree{type='Action', source=\$conditions[1].source, unpack(\$conditions)}")
+                        $conditions = []
             
             return (..)
-                \(when %body) with vars {..}
-                    body: =lua "SyntaxTree{type='Block', source=\%tree[2].source, unpack(\%new_lines)}"
+                \(when $body) with vars {..}
+                    body: =lua "SyntaxTree{type='Block', source=\$tree[2].source, unpack(\$new_lines)}"
         
         "if 1 is ?" "if 1 = ?":
-            %values = []
-            %new_lines = []
-            %body = ((%tree.5 upgraded) if (%tree.5 is "Block" syntax tree) else [%tree.5 upgraded])
-            for %line in %body:
+            $values = []
+            $new_lines = []
+            $body = (($tree.5 upgraded) if ($tree.5 is "Block" syntax tree) else [$tree.5 upgraded])
+            for $line in $body:
                 when:
-                    (not (%line is "Action" syntax tree)):
-                        %new_lines::add %line
-                    
-                    (%line.stub is "*"):
-                        if ((size of %line) == 2):
-                            %values::add %line.2
+                    (not ($line is "Action" syntax tree)): $new_lines|add $line
+                    ($line.stub is "*"):
+                        if ((size of $line) == 2):
+                            $values|add $line.2
                         ..else:
-                            %new_lines::add %line
+                            $new_lines|add $line
                     
-                    (%line.stub == "* else"):
-                        %new_lines::add (\(else %block) with vars {block: %line.3})
+                    ($line.stub == "* else"):
+                        $new_lines|add (\(else $block) with vars {block: $line.3})
                     
                     else:
-                        %values::add %line.2
-                        %action = %line.3
-                        unless (%action is "Block" syntax tree): %action = \(: %action)
-                        %values::add %action
-                        %new_lines::add (..)
-                            =lua "SyntaxTree{type='Action', source=\%values[1].source, unpack(\%values)}"
-                        %values = []
+                        $values|add $line.2
+                        $action = $line.3
+                        unless ($action is "Block" syntax tree): $action = \(: $action)
+                        $values|add $action
+                        $new_lines|
+                            add (=lua "SyntaxTree{type='Action', source=\$values[1].source, unpack(\$values)}")
+                        $values = []
             
             return (..)
-                \(if %var is %body) with vars {..}
-                    var: %tree.2 upgraded, body: =lua "SyntaxTree{type='Block', source=\%tree[5].source, unpack(\%new_lines)}"
+                \(if $var is $body) with vars {..}
+                    var: $tree.2 upgraded, body: =lua "SyntaxTree{type='Block', source=\$tree[5].source, unpack(\$new_lines)}"

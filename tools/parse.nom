@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     Tool to print out a parse tree of files in an easy-to-read format. Usage:
     nomsu tools/parse.nom file1 file2 directory1 ...        
@@ -7,39 +7,39 @@ use "lib/os.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-externally (print tree %t at indent %indent) means:
-    if %t.type is:
+externally (print tree $t at indent $indent) means:
+    if $t.type is:
         "Action":
-            say "\(%indent)Action (\(%t.stub)):"
-            for %arg in %t:
-                if (%arg is syntax tree):
-                    print tree %arg at indent "\%indent  "
-
+            say "\($indent)Action (\($t.stub)):"
+            for $arg in $t:
+                if ($arg is syntax tree):
+                    print tree $arg at indent "\$indent  "
+        
         "MethodCall":
-            say "\(%indent)MethodCall on:"
-            print tree %t.1 at indent "\%indent    "
-            print tree %t.2 at indent "\%indent    "
+            say "\($indent)MethodCall on:"
+            print tree $t.1 at indent "\$indent    "
+            print tree $t.2 at indent "\$indent    "
         
         "Number":
-            say "\%indent\(%t.1)"
+            say "\$indent\($t.1)"
         
         "Var":
-            say "\(%indent)%\(%t.1)"
+            say "\($indent)%\($t.1)"
         
         else:
-            say "\%indent\(%t.type):"
-            for %arg in %t:
+            say "\$indent\($t.type):"
+            for $arg in $t:
                 when:
-                    (%arg is syntax tree):
-                        print tree %arg at indent "\%indent  "
+                    ($arg is syntax tree):
+                        print tree $arg at indent "\$indent  "
                     
                     else:
-                        say "\%indent  \(quote %arg)"
+                        say "\$indent  \(quote $arg)"
 
-for %filename in (command line args).extra_args:
-    %file = (read file %filename)
-    unless %file:
-        barf "File does not exist: \%filename"
-    %nomsu = (NomsuCode from (Source %filename 1 (size of %file)) %file)
-    %tree = (%nomsu parsed)
-    print tree %tree at indent ""
+for $filename in (command line args).extra_args:
+    $file = (read file $filename)
+    unless $file:
+        barf "File does not exist: \$filename"
+    $nomsu = (NomsuCode from (Source $filename 1 (size of $file)) $file)
+    $tree = ($nomsu parsed)
+    print tree $tree at indent ""

@@ -1,19 +1,19 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines upgrades from Nomsu <3.8 to 3.8 (Text method changes)
     
-upgrade action [%texts joined with %glue] to "3.8" as (%texts::joined with %glue)
-upgrade action [%texts joined, joined %texts] to "3.8" as (%texts::joined)
-upgrade action [byte %i of %text] to "3.8" as (%text::byte %i)
-upgrade action [bytes %start to %stop of %text] to "3.8" as (..)
-    %text::bytes %start to %stop
-upgrade action [bytes of %text] to "3.8" as (%text::bytes)
-upgrade action [capitalized %text, %text capitalized] to "3.8" as (..)
-    %text::capitalized
-upgrade action [uppercase %text, %text uppercase] to "3.8" as (%text::uppercase)
+upgrade action [$texts joined with $glue] to "3.8" as ($texts|joined with $glue)
+upgrade action [$texts joined, joined $texts] to "3.8" as ($texts|joined)
+upgrade action [byte $i of $text] to "3.8" as ($text|byte $i)
+upgrade action [bytes $start to $stop of $text] to "3.8" as (..)
+    $text|bytes $start to $stop
+upgrade action [bytes of $text] to "3.8" as ($text|bytes)
+upgrade action [capitalized $text, $text capitalized] to "3.8" as (..)
+    $text|capitalized
+upgrade action [uppercase $text, $text uppercase] to "3.8" as ($text|uppercase)
 upgrade action [..]
-    %text with %sub instead of %patt, %text with %patt replaced by %sub
-    %text s/ %patt / %sub
-..to "3.8" as (%text::with %patt -> %sub)
-upgrade action [%text matches %pattern] to "3.8" as (%text::matches %pattern)
-upgrade action [%text matching %pattern] to "3.8" as (%text::matching %pattern).1
+    $text with $sub instead of $patt, $text with $patt replaced by $sub
+    $text s/ $patt / $sub
+..to "3.8" as ($text|with $patt -> $sub)
+upgrade action [$text matches $pattern] to "3.8" as ($text|matches $pattern)
+upgrade action [$text matching $pattern] to "3.8" as ($text|matching $pattern).1

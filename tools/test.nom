@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     Tool to run all tests in a file (i.e. the code block inside a call to 'test %'). Usage:
     nomsu tools/test.nom file1 file2 directory1 ...
@@ -9,26 +9,26 @@ use "lib/consolecolor.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Make sure all the files get run
-for %filename in (command line args).extra_args: use %filename
-%tests = {: for %s = %t in (tests): add (=lua "Source:from_string(\%s)") = %t}
-for %filename in (command line args).extra_args:
-    %file = (read file %filename)
-    %version = (%file::matching "#![^\n]* nomsu %-V[ ]*([^\n]*)")
-    %file_tests = []
-    for %src = %test in %tests:
-        if (%src.filename == %filename):
-            if %version:
-                %test = "#!/usr/bin/env nomsu -V\%version\n\%test"
-            %file_tests::add {test: %test, source: %src}
+for $filename in (command line args).extra_args: use $filename
+$tests = {: for $s = $t in (tests): add (=lua "Source:from_string(\$s)") = $t}
+for $filename in (command line args).extra_args:
+    $file = (read file $filename)
+    $version = ($file|matching "#![^\n]* nomsu %-V[ ]*([^\n]*)")
+    $file_tests = []
+    for $src = $test in $tests:
+        if ($src.filename == $filename):
+            if $version:
+                $test = "#!/usr/bin/env nomsu -V\$version\n\$test"
+            $file_tests|add {test: $test, source: $src}
     
-    unless (%file_tests is empty):
-        sort %file_tests by % -> %.source
-        lua> "io.write('[ .. ] ', \%filename); io.flush()"
+    unless ($file_tests is empty):
+        sort $file_tests by $ -> $.source
+        lua> "io.write('[ .. ] ', \$filename); io.flush()"
         if (command line args)."-v": say ""
-        for % in %file_tests:
+        for $ in $file_tests:
             if (command line args)."-v":
-                say "    \(yellow (%.test::with "\n" -> "\n    "))"
-            run %.test
+                say "    \(yellow ($.test|with "\n" -> "\n    "))"
+            run $.test
         
         if (command line args)."-v":
             say (green "PASS")

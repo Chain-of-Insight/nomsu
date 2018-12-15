@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines some actions for hashing files and looking up files by hash.
     
@@ -7,47 +7,47 @@ use "lib/base64.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-lua> "local \%use_sha1, \%hashlib = pcall(require, 'openssl.digest')"
+lua> "local \$use_sha1, \$hashlib = pcall(require, 'openssl.digest')"
 test:
     assume (hash "hello world") == (hash "hello world")
-    assume ((hash "hello world") != (hash "goodbye")) or barf "\
-        ..Hash collision:
+    assume ((hash "hello world") != (hash "goodbye")) or barf "
+        Hash collision:
             (hash "hello world") = \(hash "hello world")
             (hash "goodbye") = \(hash "goodbye")"
     
     assume (..)
         (..)
-            hash "\
-                ..This is a really long string meant to stress test the hashing function and
+            hash "
+                This is a really long string meant to stress test the hashing function and
                 ensure that it's not overflowing with long inputs."
         ..!= "inf"
     
-    assume ((hash "\000") != (hash "\000\000\000\000\000")) or barf "\
-        ..Incorrect hashing of null strings"
+    assume ((hash "\000") != (hash "\000\000\000\000\000")) or barf \
+    .."Incorrect hashing of null strings"
     
-    if %use_sha1:
+    if $use_sha1:
         assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
 
-if %use_sha1:
-    externally (hash %) means:
-        %hash = (=lua "\%hashlib.new('sha1'):final(\%)")
-        return (base64 %hash)
+if $use_sha1:
+    externally (hash $) means:
+        $hash = (=lua "\$hashlib.new('sha1'):final(\$)")
+        return (base64 $hash)
 ..else:
     # TODO: remove warning?
     say "\027[31;1mWARNING: OpenSSL module not found. Defaulting to a non-cryptographically secure hash function.\027[0m"
-    externally (hash %) means:
-        %bytes = (%::bytes)
-        %hash = (%bytes.1 << 7)
-        for %i in 2 to (size of %bytes):
-            %hash = ((1000003 * %hash) ~ %bytes.%i)
-        %hash = (%hash ~ (size of %bytes))
-        return "\%hash"
+    externally (hash $) means:
+        $bytes = ($|bytes)
+        $hash = ($bytes.1 << 7)
+        for $i in 2 to (size of $bytes):
+            $hash = ((1000003 * $hash) ~ $bytes.$i)
+        $hash = ($hash ~ (size of $bytes))
+        return "\$hash"
 
-externally (file with hash %hash) means:
-    for %filename in (files for "."):
-        %contents = (read file %filename)
-        %file_hash = (hash %contents)
-        if (%file_hash == %hash):
-            return %filename
+externally (file with hash $hash) means:
+    for $filename in (files for "."):
+        $contents = (read file $filename)
+        $file_hash = (hash $contents)
+        if ($file_hash == $hash):
+            return $filename
 
-(hash of file %filename) parses as (hash (read file %filename))
+(hash of file $filename) parses as (hash (read file $filename))

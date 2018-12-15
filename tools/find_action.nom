@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     Find an action by its stub. Usage:
     nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
@@ -9,33 +9,33 @@ use "lib/consolecolor.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-%stub = (command line args).extra_args.1
-say "Looking for stub: \%stub..."
-for % in 2 to (size of (command line args).extra_args):
-    %filename = (command line args).extra_args.%
-    %file = (read file %filename)
-    unless %file:
-        barf "File does not exist: \%filename"
-    %code = (NomsuCode from (%Source %filename 1 (size of %file)) %file)
+$stub = (command line args).extra_args.1
+say "Looking for stub: \$stub..."
+for $ in 2 to (size of (command line args).extra_args):
+    $filename = (command line args).extra_args.$
+    $file = (read file $filename)
+    unless $file:
+        barf "File does not exist: \$filename"
+    $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
     try:
-        %tree = (%code parsed)
-    ..and if it barfs %msg:
-        say (red "\%filename failed to parse:\n\%msg")
-        %tree = (nil)
+        $tree = ($code parsed)
+    ..and if it barfs $msg:
+        say (red "\$filename failed to parse:\n\$msg")
+        $tree = (nil)
     
-    unless %tree:
-        do next %filename
+    unless $tree:
+        do next $filename
     
-    %results = []
-    for %t in recursive %tree:
-        if ((%t is "Action" syntax tree) and (%t.stub is %stub)):
-            %line_num = (%file::line number at %t.source.start)
-            %results::add {..}
-                line: %line_num, text: "\(blue "\%filename:\%line_num:")\n\(yellow (source lines of %t))"
+    $results = []
+    for $t in recursive $tree:
+        if (($t is "Action" syntax tree) and ($t.stub is $stub)):
+            $line_num = ($file|line number at $t.source.start)
+            $results|
+                add {line: $line_num, text: "\(blue "\$filename:\$line_num:")\n\(yellow (source lines of $t))"}
         
-        if (%t is syntax tree):
-            for %sub in %t:
-                recurse %t on %sub
-    sort %results by % -> %.line
-    for % in %results:
-        say %.text
+        if ($t is syntax tree):
+            for $sub in $t:
+                recurse $t on $sub
+    sort $results by $ -> $.line
+    for $ in $results:
+        say $.text

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -7,114 +7,114 @@ use "lib/os.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-%UPGRADES = {}
-externally (upgrade to %version via %upgrade_fn) means:
-    %UPGRADES.%version = %upgrade_fn
-%ACTION_UPGRADES = ({} with fallback % -> {})
-externally (upgrade action %stub to %version via %upgrade_fn) means:
-    %ACTION_UPGRADES.%version.%stub = %upgrade_fn
+$UPGRADES = {}
+externally (upgrade to $version via $upgrade_fn) means:
+    $UPGRADES.$version = $upgrade_fn
+$ACTION_UPGRADES = ({} with fallback $ -> {})
+externally (upgrade action $stub to $version via $upgrade_fn) means:
+    $ACTION_UPGRADES.$version.$stub = $upgrade_fn
 
-(upgrade %tree to %version as %body) parses as (..)
-    upgrade to %version via ((% %end_version) -> (% with %tree -> %body))
+(upgrade $tree to $version as $body) parses as (..)
+    upgrade to $version via (($ $end_version) -> ($ with $tree -> $body))
 
-(upgrade action %actions to %version as %body) compiles to:
-    if (%actions is "Action" syntax tree):
-        %actions = \[%actions]
-    %lua = (Lua "")
-    for %action in %actions:
-        %replacements = {}
-        for %i in 1 to (size of %action):
-            if (%action.%i is "Var" syntax tree):
-                %replacements.(%action.%i.1) = "\(\%tree as lua id)[\%i]"
+(upgrade action $actions to $version as $body) compiles to:
+    if ($actions is "Action" syntax tree):
+        $actions = \[$actions]
+    $lua = (Lua "")
+    for $action in $actions:
+        $replacements = {}
+        for $i in 1 to (size of $action):
+            if ($action.$i is "Var" syntax tree):
+                $replacements.($action.$i.1) = "\(\$tree as lua id)[\$i]"
         define mangler
-        (make tree %t) means:
+        (make tree $t) means:
             when:
-                (%t is "Var" syntax tree):
-                    if %replacements.(%t.1):
-                        return %replacements.(%t.1)
+                ($t is "Var" syntax tree):
+                    if $replacements.($t.1):
+                        return $replacements.($t.1)
                     ..else:
-                        external %needs_mangle = (yes)
-                        return "SyntaxTree{type=\(quote %t.type), source=\(quote "\(%t.source)"), \(quote (mangle %t.1))}"
+                        external $needs_mangle = (yes)
+                        return "SyntaxTree{type=\(quote $t.type), source=\(quote "\($t.source)"), \(quote (mangle $t.1))}"
                 
-                (%t is syntax tree):
-                    %args = []
-                    for %k = %v in %t:
-                        if ((type of %k) == "number"):
-                            %args::add (make tree %v)
+                ($t is syntax tree):
+                    $args = []
+                    for $k = $v in $t:
+                        if ((type of $k) == "number"):
+                            $args|add (make tree $v)
                         ..else:
-                            %args::add "\(%k)=\(make tree %v)"
-                    return "SyntaxTree{\(%args::joined with ", ")}"
+                            $args|add "\($k)=\(make tree $v)"
+                    return "SyntaxTree{\($args|joined with ", ")}"
                 
                 else:
-                    return (quote %t)
+                    return (quote $t)
         
-        unless ("\%lua" == ""):
-            %lua::add "\n"
+        unless ("\$lua" == ""):
+            $lua|add "\n"
         
-        %retval = (make tree %body)
-        %lua::add (..)
-            Lua "\
-                ..upgrade_action_1_to_2_via(\(quote %action.stub), \(%version as lua expr), function(\(\%tree as lua id))
-                    return \%retval
+        $retval = (make tree $body)
+        $lua|add (..)
+            Lua "
+                upgrade_action_1_to_2_via(\(quote $action.stub), \($version as lua expr), function(\(\$tree as lua id))
+                    return \$retval
                 end)"
-    return %lua
+    return $lua
 
 externally [..]
-    %tree upgraded from %start_version to %end_version
-    %tree upgraded to %end_version from %start_version
+    $tree upgraded from $start_version to $end_version
+    $tree upgraded to $end_version from $start_version
 ..all mean:
-    unless (%tree is syntax tree): return %tree
-    (%ver as list) means ((% as number) for % in %ver matching "[0-9]+")
-    %versions = {}
-    for %v = % in %UPGRADES:
-        %versions.%v = (yes)
+    unless ($tree is syntax tree): return $tree
+    ($ver as list) means (($ as number) for $ in $ver matching "[0-9]+")
+    $versions = {}
+    for $v = $ in $UPGRADES:
+        $versions.$v = (yes)
     
-    for %v = % in %ACTION_UPGRADES:
-        %versions.%v = (yes)
+    for $v = $ in $ACTION_UPGRADES:
+        $versions.$v = (yes)
     
-    %versions = ((keys in %versions) sorted by % -> (% as list))
-    for %ver in %versions:
-        if ((%ver as list) <= (%start_version as list)): do next %ver
-        if ((%ver as list) > (%end_version as list)): stop %ver
-        if %ACTION_UPGRADES.%ver:
-            %tree = (..)
-                %tree with % ->:
-                    if ((% is "Action" syntax tree) and %ACTION_UPGRADES.%ver.(%.stub)):
-                        %with_upgraded_args = {..}
-                            : for %k = %v in %: add %k = (%v upgraded from %start_version to %end_version)
-                        set %with_upgraded_args's metatable to (%'s metatable)
-                        return (%ACTION_UPGRADES.%ver.(%.stub) %with_upgraded_args %end_version)
+    $versions = ((keys in $versions) sorted by $ -> ($ as list))
+    for $ver in $versions:
+        if (($ver as list) <= ($start_version as list)): do next $ver
+        if (($ver as list) > ($end_version as list)): stop $ver
+        if $ACTION_UPGRADES.$ver:
+            $tree = (..)
+                $tree with $ ->:
+                    if (($ is "Action" syntax tree) and $ACTION_UPGRADES.$ver.($.stub)):
+                        $with_upgraded_args = {..}
+                            : for $k = $v in $: add $k = ($v upgraded from $start_version to $end_version)
+                        set $with_upgraded_args's metatable to ($'s metatable)
+                        return ($ACTION_UPGRADES.$ver.($.stub) $with_upgraded_args $end_version)
         
-        if %UPGRADES.%ver:
-            %with_upgraded_args = {..}
+        if $UPGRADES.$ver:
+            $with_upgraded_args = {..}
                 :
-                    for %k = %v in %tree:
-                        add %k = (%v upgraded from %start_version to %end_version)
-            set %with_upgraded_args's metatable to (%tree's metatable)
-            %tree = (%UPGRADES.%ver %with_upgraded_args %end_version)
+                    for $k = $v in $tree:
+                        add $k = ($v upgraded from $start_version to $end_version)
+            set $with_upgraded_args's metatable to ($tree's metatable)
+            $tree = ($UPGRADES.$ver $with_upgraded_args $end_version)
     
-    if (%tree.version != %end_version):
-        %tree = (SyntaxTree {: for %k = %v in %tree: add %k = %v})
-        %tree.version = %end_version
-        if %tree.shebang:
-            %tree.shebang = "#!/usr/bin/env nomsu -V\%end_version\n"
+    if ($tree.version != $end_version):
+        $tree = (SyntaxTree {: for $k = $v in $tree: add $k = $v})
+        $tree.version = $end_version
+        if $tree.shebang:
+            $tree.shebang = "#!/usr/bin/env nomsu -V\$end_version\n"
     
-    return %tree
+    return $tree
 
-externally (%tree upgraded from %start_version) means (..)
-    %tree upgraded from %start_version to (Nomsu version)
+externally ($tree upgraded from $start_version) means (..)
+    $tree upgraded from $start_version to (Nomsu version)
 
-externally (%tree upgraded to %end_version) means (..)
-    %tree upgraded from (%tree.version or (Nomsu version)) to %end_version
+externally ($tree upgraded to $end_version) means (..)
+    $tree upgraded from ($tree.version or (Nomsu version)) to $end_version
 
-externally (%tree upgraded) means (..)
-    %tree upgraded from (%tree.version or (Nomsu version)) to (Nomsu version)
+externally ($tree upgraded) means (..)
+    $tree upgraded from ($tree.version or (Nomsu version)) to (Nomsu version)
 
-externally (use %path from version %version) means:
-    for %filename in (files for %path):
-        if (=lua "LOADED[\%filename]"):
-            do next %filename
-        %file = (read file %filename)
-        %tree = (parse %file from %filename)
-        %tree = (upgrade %tree from %version)
-        run tree %tree
+externally (use $path from version $version) means:
+    for $filename in (files for $path):
+        if (=lua "LOADED[\$filename]"):
+            do next $filename
+        $file = (read file $filename)
+        $tree = (parse $file from $filename)
+        $tree = (upgrade $tree from $version)
+        run tree $tree

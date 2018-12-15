@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines upgrades from Nomsu <=2 to Nomsu 3
     
@@ -6,10 +6,10 @@ use "compatibility/compatibility.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-upgrade action (method %spec %body) to "3" as (my action %spec %body)
-upgrade action (me) to "3" as %me
-upgrade action (@) to "3" as %me
+upgrade action (method $spec $body) to "3" as (my action $spec $body)
+upgrade action (me) to "3" as $me
+upgrade action (@) to "3" as $me
 upgrade action "as" to "3" via (..)
-    for %tree:
-        compile error at %tree "Object API has changed and 'as' is no longer supported." "\
-            ..Use (%obj::action ...) instead of (as %obj: action ...)"
+    for $tree:
+        compile error at $tree "Object API has changed and 'as' is no longer supported." \
+        .."Use (%obj::action ...) instead of (as %obj: action ...)"

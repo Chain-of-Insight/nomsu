@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     A simple UUID function based on RFC 4122: http://www.ietf.org/rfc/rfc4122.txt
     
@@ -10,29 +10,29 @@ use "core/control_flow.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-%NaN_surrogate = {}
-%nil_surrogate = {}
-%obj_by_id = {}
-set %obj_by_id's metatable to {__mode: "v"}
-%id_by_obj = {}
-set %id_by_obj's metatable to {..}
-    __mode: "k", __index: for (%self %key):
-        if (%key == (nil)):
-            return %self.%nil_surrogate
+$NaN_surrogate = {}
+$nil_surrogate = {}
+$obj_by_id = {}
+set $obj_by_id's metatable to {__mode: "v"}
+$id_by_obj = {}
+set $id_by_obj's metatable to {..}
+    __mode: "k", __index: for ($self $key):
+        if ($key == (nil)):
+            return $self.$nil_surrogate
         
-        if (%key != %key):
-            return %self.%NaN_surrogate
+        if ($key != $key):
+            return $self.$NaN_surrogate
         
         --- (retry) ---
-        %id = (uuid)
-        if (%obj_by_id.%id != (nil)): go to (retry)
-        %self.%key = %id
-        %obj_by_id.%id = %key
-        return %id
+        $id = (uuid)
+        if ($obj_by_id.$id != (nil)): go to (retry)
+        $self.$key = $id
+        $obj_by_id.$id = $key
+        return $id
 
 externally (uuid) means:
     # Set all the other bits to randomly (or pseudo-randomly) chosen values.
-    %bytes = [..]
+    $bytes = [..]
         # time-low, time-mid, time-high-and-version
         randint (2 ^ (4 * 8)), randint (2 ^ (2 * 8)), randint (2 ^ (2 * 8 - 4))
         # clock-seq-and-reserved, clock-seq-low
@@ -43,20 +43,20 @@ externally (uuid) means:
     # Set the four most significant bits (bits 12 through 15) of the
     # time_hi_and_version field to the 4-bit version number from
     # Section 4.1.3.
-    %bytes.3 += 0x4000
+    $bytes.3 += 0x4000
     
     # Set the two most significant bits (bits 6 and 7) of the
     # clock_seq_hi_and_reserved to zero and one, respectively.
-    %bytes.4 += 0xC0
-    return (=lua "('%08x-%04x-%04x-%02x%02x-%6x%6x'):format(unpack(\%bytes))")
+    $bytes.4 += 0xC0
+    return (=lua "('%08x-%04x-%04x-%02x%02x-%6x%6x'):format(unpack(\$bytes))")
 
 # For strict identity checking, use (%x's id) == (%y's id)
 test:
     assume (([] == []) and ((id of []) != (id of [])))
     seed random with 0
-    %x = []
-    assume ((id of %x) == (id of %x))
+    $x = []
+    assume ((id of $x) == (id of $x))
     seed random with 0
-    assume ((id of %x) != (id of []))
+    assume ((id of $x) != (id of []))
     seed random
-externally [id of %, %'s id, %'id] all mean %id_by_obj.%
+externally [id of $, $'s id, $'id] all mean $id_by_obj.$

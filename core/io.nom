@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file contains basic input/output code
     
@@ -6,26 +6,26 @@ use "core/metaprogramming.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(say %message) compiles to:
-    lua> "\
-        ..if \%message.type == "Text" then
-            return LuaCode("say(", \(%message as lua expr), ");");
+(say $message) compiles to:
+    lua> "
+        if \$message.type == "Text" then
+            return LuaCode("say(", \($message as lua expr), ");");
         else
-            return LuaCode("say(tostring(", \(%message as lua expr), "));");
+            return LuaCode("say(tostring(", \($message as lua expr), "));");
         end"
 
-(say %message inline) compiles to:
-    lua> "\
-        ..if \%message.type == "Text" then
-            return LuaCode("io.write(", \(%message as lua expr), ")");
+(say $message inline) compiles to:
+    lua> "
+        if \$message.type == "Text" then
+            return LuaCode("io.write(", \($message as lua expr), ")");
         else
-            return LuaCode("io.write(tostring(", \(%message as lua expr), "))");
+            return LuaCode("io.write(tostring(", \($message as lua expr), "))");
         end"
 
-(ask %prompt) compiles to:
-    lua> "\
-        ..if \%prompt.type == "Text" then
-            return LuaCode("(io.write(", \(%prompt as lua expr), ") and io.read())");
+(ask $prompt) compiles to:
+    lua> "
+        if \$prompt.type == "Text" then
+            return LuaCode("(io.write(", \($prompt as lua expr), ") and io.read())");
         else
-            return LuaCode("(io.write(tostring(", \(%prompt as lua expr), ")) and io.read())");
+            return LuaCode("(io.write(tostring(", \($prompt as lua expr), ")) and io.read())");
         end"

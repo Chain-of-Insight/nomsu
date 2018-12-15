@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file defines upgrades from Nomsu 1 to Nomsu 2
     
@@ -6,31 +6,31 @@ use "compatibility/compatibility.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-upgrade %tree to "2" as:
-    unless (%tree is "Action" syntax tree): return
-    if (%tree.stub is "if 1 2 else"):
-        %true_body = (%tree.3 upgraded)
-        unless (%true_body is "Block" syntax tree):
-            %true_body = \(: %true_body)
-        %false_body = (%tree.5 upgraded)
-        unless (%false_body is "Block" syntax tree):
-            %false_body = (=lua "Block(\%false_body.source, \%false_body)")
+upgrade $tree to "2" as:
+    unless ($tree is "Action" syntax tree): return
+    if ($tree.stub is "if 1 2 else"):
+        $true_body = ($tree.3 upgraded)
+        unless ($true_body is "Block" syntax tree):
+            $true_body = \(: $true_body)
+        $false_body = ($tree.5 upgraded)
+        unless ($false_body is "Block" syntax tree):
+            $false_body = (=lua "Block(\$false_body.source, \$false_body)")
         
         return (..)
-            \(if %cond %true_body else %false_body) with vars {..}
-                cond: %tree.2 upgraded, true_body: %true_body, false_body: %false_body
+            \(if $cond $true_body else $false_body) with vars {..}
+                cond: $tree.2 upgraded, true_body: $true_body, false_body: $false_body
     
-    %need_blocks = [..]
+    $need_blocks = [..]
         "if", "unless", "for 1 in", "for 1 = 2 in", "repeat while 1", "repeat 1 times"
         "repeat", "repeat until 1", "for 1 in 2 to 3 by", "for 1 in 2 to 3 via"
         "for 1 in 2 to", "for 1 2 in", "do", "for 1 in recursive", "test", "with", "result of"
         "when"
     
-    for %n in %need_blocks:
-        if (%tree.stub is %n):
-            %bits = [: for % in %tree: add ((% upgraded) if (% is syntax tree) else %)]
-            unless ((%bits::last) is "Block" syntax tree):
-                %body = (%bits::last)
-                %bits.(size of %bits) = (..)
-                    =lua "SyntaxTree{type='Block', source=\%body.source, \%body}"
-            return (=lua "SyntaxTree{type='Action', source=\%tree.source, unpack(\%bits)}")
+    for $n in $need_blocks:
+        if ($tree.stub is $n):
+            $bits = [: for $ in $tree: add (($ upgraded) if ($ is syntax tree) else $)]
+            unless (($bits|last) is "Block" syntax tree):
+                $body = ($bits|last)
+                $bits.(size of $bits) = (..)
+                    =lua "SyntaxTree{type='Block', source=\$body.source, \$body}"
+            return (=lua "SyntaxTree{type='Action', source=\$tree.source, unpack(\$bits)}")

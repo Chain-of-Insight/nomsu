@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V4.12.12.8
+#!/usr/bin/env nomsu -V5.12.12.8
 #
     This file contains definitions of operators like "+" and "and".
     
@@ -11,115 +11,115 @@ test:
     assume (all [1 < 2, 2 > 1, 1 <= 2, 2 >= 1, 1 == 1, 1 != 2])
 
 # Comparison Operators
-(%x < %y) compiles to "(\(%x as lua expr) < \(%y as lua expr))"
-(%x > %y) compiles to "(\(%x as lua expr) > \(%y as lua expr))"
-(%x <= %y) compiles to "(\(%x as lua expr) <= \(%y as lua expr))"
-(%x >= %y) compiles to "(\(%x as lua expr) >= \(%y as lua expr))"
-[%a is %b, %a == %b] all compile to "(\(%a as lua expr) == \(%b as lua expr))"
-[%a isn't %b, %a is not %b, %a not= %b, %a != %b] all compile to "\
-    ..(\(%a as lua expr) ~= \(%b as lua expr))"
+($x < $y) compiles to "(\($x as lua expr) < \($y as lua expr))"
+($x > $y) compiles to "(\($x as lua expr) > \($y as lua expr))"
+($x <= $y) compiles to "(\($x as lua expr) <= \($y as lua expr))"
+($x >= $y) compiles to "(\($x as lua expr) >= \($y as lua expr))"
+[$a is $b, $a == $b] all compile to "(\($a as lua expr) == \($b as lua expr))"
+[$a isn't $b, $a is not $b, $a not= $b, $a != $b] all compile to \
+.."(\($a as lua expr) ~= \($b as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    %x = 10
-    assume (%x == 10)
-    [%x, %y] = [10, 20]
-    assume ((%x == 10) and (%y == 20)) or barf "mutli-assignment failed."
-    [%x, %y] = [%y, %x]
-    assume ((%y == 10) and (%x == 20)) or barf "swapping vars failed."
-    %vals = [4, 5]
-    [%x, %y] = (unpack %vals)
-    assume ((%x == 4) and (%y == 5)) or barf "unpacking failed"
+    $x = 10
+    assume ($x == 10)
+    [$x, $y] = [10, 20]
+    assume (($x == 10) and ($y == 20)) or barf "mutli-assignment failed."
+    [$x, $y] = [$y, $x]
+    assume (($y == 10) and ($x == 20)) or barf "swapping vars failed."
+    $vals = [4, 5]
+    [$x, $y] = (unpack $vals)
+    assume (($x == 4) and ($y == 5)) or barf "unpacking failed"
 
 # Variable assignment operator
-(%var = %value) compiles to:
-    lua> "\
-        ..local lua = LuaCode()
-        if \%var.type == "List" then
-            for i, \%assignment in ipairs(\%var) do
+($var = $value) compiles to:
+    lua> "
+        local lua = LuaCode()
+        if \$var.type == "List" then
+            for i, \$assignment in ipairs(\$var) do
                 if i > 1 then lua:add(", ") end
-                local assignment_lua = \(%assignment as lua expr)
+                local assignment_lua = \($assignment as lua expr)
                 lua:add(assignment_lua)
-                if \%assignment.type == 'Var' then
+                if \$assignment.type == 'Var' then
                     lua:add_free_vars({assignment_lua:text()})
                 end
             end
             lua:add(' = ')
-            if \%value.type == "List" then
-                if #\%value ~= #\%var then
-                    compile_error_at(\%value,
-                        "This assignment has too "..(#\%value > #\%var and "many" or "few").." values.",
+            if \$value.type == "List" then
+                if #\$value ~= #\$var then
+                    compile_error_at(\$value,
+                        "This assignment has too "..(#\$value > #\$var and "many" or "few").." values.",
                         "Make sure it has the same number of values on the left and right hand side of the '\
         ..=' operator.")
                 end
-                for i, \%val in ipairs(\%value) do
+                for i, \$val in ipairs(\$value) do
                     if i > 1 then lua:add(", ") end
-                    local val_lua = \(%val as lua expr)
+                    local val_lua = \($val as lua expr)
                     lua:add(val_lua)
                 end
                 lua:add(";")
             else
-                lua:add(\(%value as lua expr), ';')
+                lua:add(\($value as lua expr), ';')
             end
         else
-            local var_lua = \(%var as lua expr)
+            local var_lua = \($var as lua expr)
             lua:add(var_lua)
-            if \%var.type == 'Var' then
+            if \$var.type == 'Var' then
                 lua:add_free_vars({var_lua:text()})
             end
-            lua:add(' = ', \(%value as lua expr), ';')
+            lua:add(' = ', \($value as lua expr), ';')
         end
         return lua"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    [%foozle, %y] = ["outer", "outer"]
+    [$foozle, $y] = ["outer", "outer"]
     externally (set global x local y) means:
-        external %foozle = "inner"
-        %y = "inner"
+        external $foozle = "inner"
+        $y = "inner"
     set global x local y
-    assume ((%foozle == "inner") and (%y == "outer")) or barf "external failed."
-(external %var = %value) compiles to "\(%var as lua) = \(%value as lua)"
+    assume (($foozle == "inner") and ($y == "outer")) or barf "external failed."
+(external $var = $value) compiles to "\($var as lua) = \($value as lua)"
 test:
-    [%foozle, %y] = ["outer", "outer"]
+    [$foozle, $y] = ["outer", "outer"]
     externally (set global x local y) means:
-        with external [%foozle]:
-            %foozle = "inner"
-            %y = "inner"
+        with external [$foozle]:
+            $foozle = "inner"
+            $y = "inner"
     set global x local y
-    assume ((%foozle == "inner") and (%y == "outer")) or barf "\
-        ..'with external' failed."
+    assume (($foozle == "inner") and ($y == "outer")) or barf \
+    .."'with external' failed."
 
-(with external %externs %body) compiles to:
-    %body_lua = (%body as lua)
-    lua> "\%body_lua:remove_free_vars(table.map(\%externs, function(v) return compile(v):text() end))"
-    return %body_lua
+(with external $externs $body) compiles to:
+    $body_lua = ($body as lua)
+    lua> "\$body_lua:remove_free_vars(table.map(\$externs, function(v) return compile(v):text() end))"
+    return $body_lua
 
 test:
-    [%x, %y] = [1, 2]
-    with {%z, %x: 999}:
-        assume %z == (nil)
-        %z = 999
-        assume (%z == 999) or barf "'with' failed."
-        assume (%x == 999) or barf "'with' assignment failed."
-    assume (%x == 1) or barf "'with' scoping failed"
-    assume (%z == (nil)) or barf "'with' scoping failed"
+    [$x, $y] = [1, 2]
+    with {$z, $x: 999}:
+        assume $z == (nil)
+        $z = 999
+        assume ($z == 999) or barf "'with' failed."
+        assume ($x == 999) or barf "'with' assignment failed."
+    assume ($x == 1) or barf "'with' scoping failed"
+    assume ($z == (nil)) or barf "'with' scoping failed"
 
-(with %assignments %body) compiles to:
-    %lua = (%body as lua)
-    lua> "\
-        ..local lhs, rhs = LuaCode(), LuaCode()
+(with $assignments $body) compiles to:
+    $lua = ($body as lua)
+    lua> "
+        local lhs, rhs = LuaCode(), LuaCode()
         local vars = {}
-        for i, item in ipairs(\%assignments) do
-            local \%target, \%value = item[1], item[2]
-            local target_lua = \(%target as lua)
+        for i, item in ipairs(\$assignments) do
+            local \$target, \$value = item[1], item[2]
+            local target_lua = \($target as lua)
             if not target_lua:text():is_lua_id() then
-                compile_error_at(\%target, "Invalid target for 'with' scope assignment.",
+                compile_error_at(\$target, "Invalid target for 'with' scope assignment.",
                     "This should be either a variable or an action's meaning.")
             end
-            local value_lua = \%value and \(%value as lua) or "nil"
+            local value_lua = \$value and \($value as lua) or "nil"
             if i > 1 then
                 lhs:add(", ")
                 rhs:add(", ")
@@ -128,35 +128,35 @@ test:
             rhs:add(value_lua)
             vars[i] = target_lua:text()
         end
-        \%lua:remove_free_vars(vars)
-        \%lua:prepend("local ", lhs, " = ", rhs, ";\\n")"
-    return (Lua "do\n    \%lua\nend -- 'with' block")
+        \$lua:remove_free_vars(vars)
+        \$lua:prepend("local ", lhs, " = ", rhs, ";\\n")"
+    return (Lua "do\n    \$lua\nend -- 'with' block")
 
 # Math Operators
 test:
     assume ((5 wrapped around 2) == 1) or barf "mod not working"
 
-[%x wrapped around %y, %x mod %y] all compile to "\
-    ..((\(%x as lua expr)) % (\(%y as lua expr)))"
+[$x wrapped around $y, $x mod $y] all compile to \
+.."((\($x as lua expr)) % (\($y as lua expr)))"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
 test:
-    %calls = 0
+    $calls = 0
     (one) means:
-        external %calls = (%calls + 1)
+        external $calls = ($calls + 1)
         return 1
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
-    assume (%calls == 1) or barf "\
-        ..Three-way comparison evaluated middle value multiple times"
-(%x < %y < %z) parses as (((%a %b %c) -> ((%a < %b) and (%b < %c))) %x %y %z)
-(%x <= %y < %z) parses as (((%a %b %c) -> ((%a <= %b) and (%b < %c))) %x %y %z)
-(%x < %y <= %z) parses as (((%a %b %c) -> ((%a < %b) and (%b <= %c))) %x %y %z)
-(%x <= %y <= %z) parses as (((%a %b %c) -> ((%a <= %b) and (%b <= %c))) %x %y %z)
-(%x > %y > %z) parses as (((%a %b %c) -> ((%a > %b) and (%b > %c))) %x %y %z)
-(%x >= %y > %z) parses as (((%a %b %c) -> ((%a >= %b) and (%b > %c))) %x %y %z)
-(%x > %y >= %z) parses as (((%a %b %c) -> ((%a > %b) and (%b >= %c))) %x %y %z)
-(%x >= %y >= %z) parses as (((%a %b %c) -> ((%a >= %b) and (%b >= %c))) %x %y %z)
+    assume ($calls == 1) or barf \
+    .."Three-way comparison evaluated middle value multiple times"
+($x < $y < $z) parses as ((($a $b $c) -> (($a < $b) and ($b < $c))) $x $y $z)
+($x <= $y < $z) parses as ((($a $b $c) -> (($a <= $b) and ($b < $c))) $x $y $z)
+($x < $y <= $z) parses as ((($a $b $c) -> (($a < $b) and ($b <= $c))) $x $y $z)
+($x <= $y <= $z) parses as ((($a $b $c) -> (($a <= $b) and ($b <= $c))) $x $y $z)
+($x > $y > $z) parses as ((($a $b $c) -> (($a > $b) and ($b > $c))) $x $y $z)
+($x >= $y > $z) parses as ((($a $b $c) -> (($a >= $b) and ($b > $c))) $x $y $z)
+($x > $y >= $z) parses as ((($a $b $c) -> (($a > $b) and ($b >= $c))) $x $y $z)
+($x >= $y >= $z) parses as ((($a $b $c) -> (($a >= $b) and ($b >= $c))) $x $y $z)
 
 # TODO: optimize for common case where x,y,z are all either variables or number literals
 # Boolean Operators
@@ -165,8 +165,8 @@ test:
     assume (((no) and (barfer)) == (no))
     assume ((no) or (yes))
     assume ((yes) or (barfer))
-(%x and %y) compiles to "(\(%x as lua expr) and \(%y as lua expr))"
-(%x or %y) compiles to "(\(%x as lua expr) or \(%y as lua expr))"
+($x and $y) compiles to "(\($x as lua expr) and \($y as lua expr))"
+($x or $y) compiles to "(\($x as lua expr) or \($y as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -183,32 +183,32 @@ test:
 # Lua 5.3 introduced bit operators like | and &. Use them when possible, otherwise
     fall back to bit.bor(), bit.band(), etc.
 lua> "if \((is jit) or ((Lua version) == "Lua 5.2")) then"
-[NOT %, ~ %] all compile to "bit.bnot(\(% as lua expr))"
-[%x OR %y, %x | %y] all compile to "\
-    ..bit.bor(\(%x as lua expr), \(%y as lua expr))"
+[NOT $, ~ $] all compile to "bit.bnot(\($ as lua expr))"
+[$x OR $y, $x | $y] all compile to \
+.."bit.bor(\($x as lua expr), \($y as lua expr))"
 
-[%x XOR %y, %x ~ %y] all compile to "\
-    ..bit.bxor(\(%x as lua expr), \(%y as lua expr))"
+[$x XOR $y, $x ~ $y] all compile to \
+.."bit.bxor(\($x as lua expr), \($y as lua expr))"
 
-[%x AND %y, %x & %y] all compile to "\
-    ..bit.band(\(%x as lua expr), \(%y as lua expr))"
+[$x AND $y, $x & $y] all compile to \
+.."bit.band(\($x as lua expr), \($y as lua expr))"
 
-[%x LSHIFT %shift, %x << %shift] all compile to "\
-    ..bit.lshift(\(%x as lua expr), \(%shift as lua expr))"
+[$x LSHIFT $shift, $x << $shift] all compile to \
+.."bit.lshift(\($x as lua expr), \($shift as lua expr))"
 
-[%x RSHIFT %shift, %x >> %shift] all compile to "\
-    ..bit.rshift(\(%x as lua expr), \(%shift as lua expr))"
+[$x RSHIFT $shift, $x >> $shift] all compile to \
+.."bit.rshift(\($x as lua expr), \($shift as lua expr))"
 
 lua> "else"
-[NOT %, ~ %] all compile to "~(\(% as lua expr))"
-[%x OR %y, %x | %y] all compile to "(\(%x as lua expr) | \(%y as lua expr))"
-[%x XOR %y, %x ~ %y] all compile to "(\(%x as lua expr) ~ \(%y as lua expr))"
-[%x AND %y, %x & %y] all compile to "(\(%x as lua expr) & \(%y as lua expr))"
-[%x LSHIFT %shift, %x << %shift] all compile to "\
-    ..(\(%x as lua expr) << \(%shift as lua expr))"
+[NOT $, ~ $] all compile to "~(\($ as lua expr))"
+[$x OR $y, $x | $y] all compile to "(\($x as lua expr) | \($y as lua expr))"
+[$x XOR $y, $x ~ $y] all compile to "(\($x as lua expr) ~ \($y as lua expr))"
+[$x AND $y, $x & $y] all compile to "(\($x as lua expr) & \($y as lua expr))"
+[$x LSHIFT $shift, $x << $shift] all compile to \
+.."(\($x as lua expr) << \($shift as lua expr))"
 
-[%x RSHIFT %shift, %x >> %shift] all compile to "\
-    ..(\(%x as lua expr) >> \(%shift as lua expr))"
+[$x RSHIFT $shift, $x >> $shift] all compile to \
+.."(\($x as lua expr) >> \($shift as lua expr))"
 
 lua> "end"
 
@@ -216,29 +216,29 @@ lua> "end"
 test:
     assume ((- 5) == -5)
     assume ((not (yes)) == (no))
-(- %) compiles to "(- \(% as lua expr))"
-(not %) compiles to "(not \(% as lua expr))"
+(- $) compiles to "(- \($ as lua expr))"
+(not $) compiles to "(not \($ as lua expr))"
 test:
     assume ((size of [1, 2, 3]) == 3)
-(size of %list) compiles to "(#\(%list as lua expr))"
-(%list is empty) compiles to "(#\(%list as lua expr) == 0)"
+(size of $list) compiles to "(#\($list as lua expr))"
+($list is empty) compiles to "(#\($list as lua expr) == 0)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Update operators
 test:
-    %x = 1
-    %x += 1
-    assume (%x == 2) or barf "+= failed"
-    %x *= 2
-    assume (%x == 4) or barf "*= failed"
-    wrap %x around 3
-    assume (%x == 1) or barf "wrap around failed"
-(%var += %) parses as (%var = ((%var or 0) + %))
-(%var -= %) parses as (%var = ((%var or 0) - %))
-(%var *= %) parses as (%var = ((%var or 1) * %))
-(%var /= %) parses as (%var = (%var / %))
-(%var ^= %) parses as (%var = (%var ^ %))
-(%var and= %) parses as (%var = (%var and %))
-(%var or= %) parses as (%var = (%var or %))
-(wrap %var around %) parses as (%var = (%var wrapped around %))
+    $x = 1
+    $x += 1
+    assume ($x == 2) or barf "+= failed"
+    $x *= 2
+    assume ($x == 4) or barf "*= failed"
+    wrap $x around 3
+    assume ($x == 1) or barf "wrap around failed"
+($var += $) parses as ($var = (($var or 0) + $))
+($var -= $) parses as ($var = (($var or 0) - $))
+($var *= $) parses as ($var = (($var or 1) * $))
+($var /= $) parses as ($var = ($var / $))
+($var ^= $) parses as ($var = ($var ^ $))
+($var and= $) parses as ($var = ($var and $))
+($var or= $) parses as ($var = ($var or $))
+(wrap $var around $) parses as ($var = ($var wrapped around $))
