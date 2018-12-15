@@ -85,7 +85,11 @@ tree_to_inline_nomsu = function(tree)
     end
     return nomsu
   elseif "MethodCall" == _exp_0 then
-    local nomsu = NomsuCode:from(tree.source, tree_to_inline_nomsu(tree[1]), "|")
+    local target_nomsu = tree_to_inline_nomsu(tree[1])
+    if tree[1].type == "Action" or tree[1].type == "MethodCall" or tree[1].type == "Block" then
+      target_nomsu:parenthesize()
+    end
+    local nomsu = NomsuCode:from(tree.source, target_nomsu, "|")
     for i = 2, #tree do
       if i > 2 then
         nomsu:add("; ")

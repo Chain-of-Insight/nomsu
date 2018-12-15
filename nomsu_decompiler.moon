@@ -57,7 +57,10 @@ tree_to_inline_nomsu = (tree)->
             return nomsu
 
         when "MethodCall"
-            nomsu = NomsuCode\from(tree.source, tree_to_inline_nomsu(tree[1]), "|")
+            target_nomsu = tree_to_inline_nomsu(tree[1])
+            if tree[1].type == "Action" or tree[1].type == "MethodCall" or tree[1].type == "Block"
+                target_nomsu\parenthesize!
+            nomsu = NomsuCode\from(tree.source, target_nomsu, "|")
             for i=2,#tree
                 nomsu\add "; " if i > 2
                 nomsu\add tree_to_inline_nomsu(tree[i])
