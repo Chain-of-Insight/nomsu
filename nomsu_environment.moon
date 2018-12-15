@@ -60,18 +60,20 @@ nomsu_environment = Importer{
     compile: compile, _1_as_lua: compile, compile_error_at:compile_error,
     :_1_forked, :import_to_1_from,
 
-    _1_parsed: (nomsu_code)->
+    _1_parsed: (nomsu_code, syntax_version)->
         if type(nomsu_code) == 'string'
             filename = Files.spoof(nomsu_code)
             nomsu_code = NomsuCode\from(Source(filename, 1, #nomsu_code), nomsu_code)
         source = nomsu_code.source
         nomsu_code = tostring(nomsu_code)
         version = nomsu_code\match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
-        syntax_version = version and tonumber(version\match("^[0-9]+")) or max_parser_version
+        if syntax_version
+            syntax_version = tonumber(syntax_version\match("^[0-9]+"))
+        syntax_version or= version and tonumber(version\match("^[0-9]+")) or max_parser_version
         parse = Parsers[syntax_version] or Parsers[max_parser_version]
         tree = parse(nomsu_code, source.filename)
         if tree.shebang
-            tree.version = tree.shebang\match("nomsu %-V[ ]*([%d.]*)")
+            tree.version or= tree.shebang\match("nomsu %-V[ ]*([%d.]*)")
         errs = {}
         find_errors = (t)->
             if t.type == "Error"

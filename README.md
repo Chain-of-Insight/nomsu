@@ -2,7 +2,8 @@
 
 Nomsu (named after **Nom**ic, and its creator, Peter **Su**ber) is a programming language
 designed to be used for playing games of [Nomic](https://en.wikipedia.org/wiki/Nomic), or engaging in other similar activities
-revolving around natural language rule-making and self modification.
+revolving around natural language rule-making and self modification. More information is
+available at [Nomsu's homepage](https://nomsu.org).
 
 ## Dependencies
 
@@ -21,17 +22,17 @@ There's a more complete set of example code in [examples/how\_do\_i.nom](example
 ```
 say "Hello"
 
-%my_nums = [5, 23, 42]
-for %num in %my_nums:
-    say "\%num is one of my nums"
+$my_nums = [5, 23, 42]
+for $num in $my_nums:
+    say "\$num is one of my nums"
 
-(sing %n bottles of beer) means:
-    for %i in %n to 1 by -1:
-        say "\
-            ..\%i bottle\("s" if (%i > 1) else "") of beer on the wall,
-            \%i bottle\("s" if (%i > 1) else "") of beer!
+(sing $n bottles of beer) means:
+    for $i in $n to 1 by -1:
+        say "
+            \$i bottle\("s" if ($i > 1) else "") of beer on the wall,
+            \$i bottle\("s" if ($i > 1) else "") of beer!
             Take one down, pass it around..."
-    say "No bottles of beer on the wall. Go to the store, buy some more..."
+    say "No bottles of beer on the wall."
 
 sing 99 bottles of beer
 ```

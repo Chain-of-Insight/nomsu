@@ -137,7 +137,7 @@ local nomsu_environment = Importer({
   compile_error_at = compile_error,
   _1_forked = _1_forked,
   import_to_1_from = import_to_1_from,
-  _1_parsed = function(nomsu_code)
+  _1_parsed = function(nomsu_code, syntax_version)
     if type(nomsu_code) == 'string' then
       local filename = Files.spoof(nomsu_code)
       nomsu_code = NomsuCode:from(Source(filename, 1, #nomsu_code), nomsu_code)
@@ -145,11 +145,14 @@ local nomsu_environment = Importer({
     local source = nomsu_code.source
     nomsu_code = tostring(nomsu_code)
     local version = nomsu_code:match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
-    local syntax_version = version and tonumber(version:match("^[0-9]+")) or max_parser_version
+    if syntax_version then
+      syntax_version = tonumber(syntax_version:match("^[0-9]+"))
+    end
+    syntax_version = syntax_version or (version and tonumber(version:match("^[0-9]+")) or max_parser_version)
     local parse = Parsers[syntax_version] or Parsers[max_parser_version]
     local tree = parse(nomsu_code, source.filename)
     if tree.shebang then
-      tree.version = tree.shebang:match("nomsu %-V[ ]*([%d.]*)")
+      tree.version = tree.version or tree.shebang:match("nomsu %-V[ ]*([%d.]*)")
     end
     local errs = { }
     local find_errors

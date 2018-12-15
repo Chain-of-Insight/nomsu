@@ -22,7 +22,7 @@ for $filename in $args.extra_args:
         barf "File does not exist: \$filename"
     $leading_indent = ($file|matching "[\n]*([ ]*)")
     $code = (NomsuCode from (Source $filename 1 (size of $file)) $file)
-    $tree = ($code parsed)
+    $tree = ($code parsed $start_version)
     $uptree = (..)
         $tree upgraded from ($start_version or ($tree.version or (Nomsu version))) to \
         ..$version
