@@ -179,6 +179,10 @@ nomsu_environment = Importer{
             continue unless files
             for filename in *files
                 lua_filename = filename\gsub("%.nom$", ".lua")
+                -- Need to check here to prevent re-running files
+                if environment.FILE_CACHE[filename]
+                    import_to_1_from(environment, environment.FILE_CACHE[filename], prefix)
+                    continue
                 -- TODO: don't automatically use precompiled version?
                 code = if optimization != 0 and Files.read(lua_filename)
                     -- TODO: use a checksum?
