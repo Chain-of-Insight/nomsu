@@ -24,7 +24,7 @@ for $ in 2 to (size of (command line args).extra_args):
         $tree = (nil)
     
     unless $tree:
-        do next $filename
+        do next $
     
     $results = []
     for $t in recursive $tree:

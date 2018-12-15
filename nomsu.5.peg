@@ -31,15 +31,13 @@ empty_block (Block):
 nodent: (unexpected_indent [^%nl]* / =curr_indent)
 indent: {~ =curr_indent (ws / (%tab -> '    '))+ ~}
 blank_lines: %nl ((nodent comment / ws*) %nl)*
-eol: ws* eol_comment? (!. / &%nl)
+eol: ws* (!. / &%nl)
 
 nl_nodent: blank_lines nodent
 nl_indent: blank_lines tab_error? {:curr_indent: indent :} (comment nl_nodent)*
 
 comment (Comment):
     "#" {~ [^%nl]* (%nl+ (indent -> '') [^%nl]*)* (%nl &%nl)* ~}
-eol_comment (Comment):
-    "#" {[^%nl]*}
 
 unexpected_code: ws* _unexpected_code
 _unexpected_code (Error):
@@ -236,7 +234,7 @@ inline_dict_entry:
 dict_key:
     text_word / inline_expression
 
-operator_char: ['`~@^&*+=|<>?/%!-]
+operator_char: [#'`~@^&*+=|<>?/%!-]
 ident_char: [a-zA-Z0-9_] / %utf8_char
 ws: " "
 

@@ -220,7 +220,8 @@ test:
 (not $) compiles to "(not \($ as lua expr))"
 test:
     assume ((size of [1, 2, 3]) == 3)
-(size of $list) compiles to "(#\($list as lua expr))"
+    assume ((# [1, 2, 3]) == 3)
+[# $list, size of $list] all compile to "(#\($list as lua expr))"
 ($list is empty) compiles to "(#\($list as lua expr) == 0)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

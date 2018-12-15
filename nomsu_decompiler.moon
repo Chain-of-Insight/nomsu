@@ -173,6 +173,8 @@ tree_to_nomsu = (tree)->
         space = MAX_LINE - nomsu\trailing_line_len!
         try_inline = true
         for subtree in coroutine.wrap(-> (t\map(coroutine.yield) and nil))
+            if subtree.type == "Comment"
+                try_inline = false
             if subtree.type == "Block"
                 if #subtree > 1
                     try_inline = false
@@ -356,6 +358,7 @@ tree_to_nomsu = (tree)->
                 if #item_nomsu\text! > MAX_LINE
                     item_nomsu = recurse(item)
                 if item.type == 'Comment'
+                    sep = '\n'
                     item_nomsu = tree_to_nomsu(item)
                 nomsu\add sep
                 nomsu\add item_nomsu

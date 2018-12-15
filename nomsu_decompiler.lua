@@ -227,6 +227,9 @@ tree_to_nomsu = function(tree)
     for subtree in coroutine.wrap(function()
       return (t:map(coroutine.yield) and nil)
     end) do
+      if subtree.type == "Comment" then
+        try_inline = false
+      end
       if subtree.type == "Block" then
         if #subtree > 1 then
           try_inline = false
@@ -456,6 +459,7 @@ tree_to_nomsu = function(tree)
         item_nomsu = recurse(item)
       end
       if item.type == 'Comment' then
+        sep = '\n'
         item_nomsu = tree_to_nomsu(item)
       end
       nomsu:add(sep)
