@@ -333,7 +333,10 @@ tree_to_nomsu = (tree)->
                         interp_nomsu = recurse(bit)
                         unless interp_nomsu\is_multiline!
                             if bit.type == "Var"
-                                if type(tree[i+1]) == 'string' and not match(tree[i+1], "^[ \n\t,.:;#(){}[%]]")
+                                next_str = tree[i+1]
+                                while type(next_str) == 'table' and next_str.type == 'Text'
+                                    next_str = next_str[1]
+                                if type(next_str) == 'string' and not match(next_str, "^[ \n\t,.:;#(){}[%]]")
                                     interp_nomsu\parenthesize!
                             elseif bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain"
                                 interp_nomsu\parenthesize!

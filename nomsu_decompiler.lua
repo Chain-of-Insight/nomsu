@@ -424,7 +424,11 @@ tree_to_nomsu = function(tree)
           local interp_nomsu = recurse(bit)
           if not (interp_nomsu:is_multiline()) then
             if bit.type == "Var" then
-              if type(tree[i + 1]) == 'string' and not match(tree[i + 1], "^[ \n\t,.:;#(){}[%]]") then
+              local next_str = tree[i + 1]
+              while type(next_str) == 'table' and next_str.type == 'Text' do
+                next_str = next_str[1]
+              end
+              if type(next_str) == 'string' and not match(next_str, "^[ \n\t,.:;#(){}[%]]") then
                 interp_nomsu:parenthesize()
               end
             elseif bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain" then
