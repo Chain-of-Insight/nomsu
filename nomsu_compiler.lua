@@ -236,15 +236,16 @@ local compile = setmetatable({
       end
       local lua = LuaCode:from(tree.source)
       lua:add((stub):as_lua_id(), "(")
-      for i, arg in ipairs(tree:get_args()) do
+      for argnum, arg in ipairs(tree:get_args()) do
         local arg_lua = compile(arg)
         if arg.type == "Block" then
           arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
         end
-        if i > 1 then
-          lua:add(",")
+        if lua:trailing_line_len() + #arg_lua:text() > MAX_LINE then
+          lua:add(argnum > 1 and ",\n    " or "\n    ")
+        elseif argnum > 1 then
+          lua:add(", ")
         end
-        lua:add(lua:trailing_line_len() + #arg_lua:text() > MAX_LINE and "\n   " or " ")
         lua:add(arg_lua)
       end
       lua:add(")")

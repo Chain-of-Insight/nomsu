@@ -174,12 +174,14 @@ compile = setmetatable({
 
                 lua = LuaCode\from(tree.source)
                 lua\add((stub)\as_lua_id!,"(")
-                for i, arg in ipairs tree\get_args!
+                for argnum, arg in ipairs tree\get_args!
                     arg_lua = compile(arg)
                     if arg.type == "Block"
                         arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
-                    lua\add "," if i > 1
-                    lua\add(lua\trailing_line_len! + #arg_lua\text! > MAX_LINE and "\n   " or " ")
+                    if lua\trailing_line_len! + #arg_lua\text! > MAX_LINE
+                        lua\add(argnum > 1 and ",\n    " or "\n    ")
+                    elseif argnum > 1
+                        lua\add ", "
                     lua\add arg_lua
                 lua\add ")"
                 return lua
