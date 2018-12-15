@@ -215,7 +215,7 @@ I think "chihuahuas" are worse than "corgis"
     say "-- she said"
 "Howdy pardner" is what she said
 
-# The language only reserves []{}().,:;%#\ as special characters, so actions
+# The language only reserves []{}().,:;$\ as special characters, so actions
     can have really funky names!
 (>> $foo_bar @&' -->< $ @&_~-^-~_~-^ $1 !) means:
     say $foo_bar
