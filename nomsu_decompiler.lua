@@ -340,7 +340,7 @@ tree_to_nomsu = function(tree)
     end
     nomsu:add(target_nomsu)
     nomsu:add(target_nomsu:is_multiline() and " \\\n..|" or "|")
-    nomsu:add(recurse(tree[2]))
+    nomsu:add(tree_to_nomsu(tree[2]))
     return nomsu
   elseif "EscapedNomsu" == _exp_0 then
     nomsu = recurse(tree[1])
