@@ -1,16 +1,55 @@
 #!/usr/bin/env nomsu -V5.12.12.8
 #
-    Find an action by its stub. Usage:
-    nomsu tools/find_action.nom "foo %" file1 file2 directory1 ...
-    Will print all the code locations and code that uses the stub.
+    This is a tool to find syntax trees matching a pattern. ("*" is a wildcard)
+
+        nomsu -t find [flags] "* squared" file1 file2...
+
+    Flags:
+        -l  List only the names of the files with matches
+        --wildcard=<wildcard>  Specify a custom wildcard (in case you need to
+            match an action with a "*" in the name)
+
+    Output:
+        <filename>:<line number>:
+            <matching lines>
     
 use "lib/os.nom"
 use "lib/consolecolor.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-$stub = (command line args).extra_args.1
-say "Looking for stub: \$stub..."
+$wildcard = ((command line args)."--wildcard" or "%*")
+$pattern = ((command line args).extra_args.1|with $wildcard -> "$wildcard")
+$pattern_tree = ($pattern parsed)
+
+($tree matches $patt) means:
+    when:
+        (($patt.type == "Var") and ($patt.1 == "wildcard")):
+            return (yes)
+
+        ($tree.type != $patt.type):
+            return (no)
+
+        ($tree.type == "Action"):
+            if (($tree|get stub) != ($patt|get stub)):
+                return (no)
+            ..else:
+                if ((#$tree) < (#$patt)):
+                    return (no)
+
+        ((#$tree) != (#$patt)):
+            return (no)
+
+    for $ in 1 to (#$patt):
+        if ($patt.$ is syntax tree):
+            unless ($tree.$ matches $patt.$):
+                return (no)
+        ..else:
+            unless ($tree.$ == $patt.$):
+                return (no)
+
+    return (yes)
+
 for $ in 2 to (size of (command line args).extra_args):
     $filename = (command line args).extra_args.$
     $file = (read file $filename)
@@ -28,14 +67,19 @@ for $ in 2 to (size of (command line args).extra_args):
     
     $results = []
     for $t in recursive $tree:
-        if (($t is "Action" syntax tree) and ($t.stub is $stub)):
+        if ($t matches $pattern_tree):
             $line_num = ($file|line number at $t.source.start)
             $results|
-                add {line: $line_num, text: "\(blue "\$filename:\$line_num:")\n\(yellow (source lines of $t))"}
+                add {line: $line_num, text: "\(blue "\$filename:\$line_num:")\n\(source lines of $t)"}
         
-        if ($t is syntax tree):
-            for $sub in $t:
+        for $sub in $t:
+            if ($sub is syntax tree):
                 recurse $t on $sub
-    sort $results by $ -> $.line
-    for $ in $results:
-        say $.text
+
+    if ((command line args)."-l"):
+        if ((#$results) > 0):
+            say $filename
+    ..else:
+        sort $results by $ -> $.line
+        for $ in $results:
+            say $.text
