@@ -52,7 +52,7 @@ peg_tidier = re.compile [[
     captured_def <-
         ({ident} (" "*) "(" {ident} ")" (" "*) "<-" {[^%nl]* (%nl+ " "+ [^%nl]*)*}) ->
 "%1 <- ({| {:type:''->'%2':} {:start:{}:}
-    %3
+    (%3)
     {:stop:{}:} |} %%userdata) -> Tree"
 ]]
 

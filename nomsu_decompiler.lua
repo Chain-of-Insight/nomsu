@@ -73,15 +73,11 @@ tree_to_inline_nomsu = function(tree)
             arg_nomsu:parenthesize()
           end
         else
+          if i > 1 and tree[i - 1] ~= "#" then
+            nomsu:add(" ")
+          end
           if bit.type == "Action" or bit.type == "MethodCall" then
-            if i > 1 then
-              nomsu:add(" ")
-            end
             arg_nomsu:parenthesize()
-          else
-            if i > 1 then
-              nomsu:add(" ")
-            end
           end
         end
         nomsu:add(arg_nomsu)
@@ -264,10 +260,9 @@ tree_to_nomsu = function(tree)
         if (t.type == "Action" or t.type == "MethodCall") then
           inline_nomsu:parenthesize()
         end
-        return inline_nomsu
-      end
-      if t.type == "Text" and #inline_nomsu:text() + 2 < MAX_LINE then
-        return inline_nomsu
+        if t.type ~= "Text" then
+          return inline_nomsu
+        end
       end
     end
     local indented = tree_to_nomsu(t)
@@ -278,7 +273,23 @@ tree_to_nomsu = function(tree)
         indented:parenthesize()
       end
     end
-    if inline_nomsu and indented:text():match("^[^\n]*\n[^\n]*$") and nomsu:trailing_line_len() <= 8 then
+    local indented_lines
+    do
+      local _accum_0 = { }
+      local _len_0 = 1
+      local _list_0 = indented:text():lines()
+      for _index_0 = 1, #_list_0 do
+        local line = _list_0[_index_0]
+        if line:match("%S") then
+          _accum_0[_len_0] = line
+          _len_0 = _len_0 + 1
+        end
+      end
+      indented_lines = _accum_0
+    end
+    if inline_nomsu and #indented_lines == (t.type == 'Block' and 2 or 3) and nomsu:trailing_line_len() <= 8 then
+      return inline_nomsu
+    elseif inline_nomsu and t.type == "Text" and #indented_lines <= 3 and (#inline_nomsu:text() - 2 < MAX_LINE + 4 or #inline_nomsu:text() <= space or #inline_nomsu:text() <= 8) then
       return inline_nomsu
     end
     return indented
@@ -340,7 +351,7 @@ tree_to_nomsu = function(tree)
           if next_space == " " and #bit_nomsu:text() < MAX_LINE then
             next_space = "\n.."
           elseif bit.type == 'Action' or bit.type == "MethodCall" then
-            bit_nomsu = NomsuCode:from(bit.source, "(\n    ", tree_to_nomsu(bit), ")")
+            bit_nomsu = NomsuCode:from(bit.source, "(\n    ", tree_to_nomsu(bit), "\n)")
           else
             bit_nomsu = tree_to_nomsu(bit)
           end
@@ -401,7 +412,7 @@ tree_to_nomsu = function(tree)
       if i > 1 then
         nomsu:add("\n")
         if tree[i - 1].type ~= "Comment" then
-          needs_space[i] = (line_nomsu:is_multiline() and prev_line:is_multiline())
+          needs_space[i] = ((line_nomsu:is_multiline() and prev_line:is_multiline()) or prev_line:text():match("%.%.[^\n]*$"))
           if tree[i].type == "Comment" or needs_space[i] or needs_space[i - 1] then
             nomsu:add("\n")
           end
@@ -473,7 +484,7 @@ tree_to_nomsu = function(tree)
     if nomsu:text():match(" $") then
       nomsu:add("\\;")
     end
-    return NomsuCode:from(tree.source, '"\n    ', nomsu, '\n"')
+    return NomsuCode:from(tree.source, '("\n    ', nomsu, '\n")')
   elseif "List" == _exp_0 or "Dict" == _exp_0 then
     if #tree == 0 then
       nomsu:add(tree.type == "List" and "[]" or "{}")
@@ -520,11 +531,7 @@ tree_to_nomsu = function(tree)
     end
     nomsu:add(tree_to_nomsu(key))
     if value then
-      local value_nomsu = tree_to_nomsu(value)
-      if (value.type == "Block" or value.type == "Action" or value.type == "MethodCall") and not value_nomsu:is_multiline() then
-        value_nomsu:parenthesize()
-      end
-      nomsu:add(" = ", value_nomsu)
+      nomsu:add(" = ", recurse(value))
     end
     return nomsu
   elseif "Comment" == _exp_0 then

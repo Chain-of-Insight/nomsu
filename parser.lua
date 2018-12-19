@@ -60,7 +60,7 @@ local peg_tidier = re.compile([[    file <- %nl* {~ (captured_def/line) (%nl+ (c
     captured_def <-
         ({ident} (" "*) "(" {ident} ")" (" "*) "<-" {[^%nl]* (%nl+ " "+ [^%nl]*)*}) ->
 "%1 <- ({| {:type:''->'%2':} {:start:{}:}
-    %3
+    (%3)
     {:stop:{}:} |} %%userdata) -> Tree"
 ]])
 local make_parser

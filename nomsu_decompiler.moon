@@ -50,11 +50,9 @@ tree_to_inline_nomsu = (tree)->
                         unless i == #tree
                             arg_nomsu\parenthesize!
                     else
+                        nomsu\add " " if i > 1 and tree[i-1] != "#"
                         if bit.type == "Action" or bit.type == "MethodCall"
-                            nomsu\add " " if i > 1
                             arg_nomsu\parenthesize!
-                        else
-                            nomsu\add " " if i > 1
                     nomsu\add arg_nomsu
             return nomsu
 
@@ -203,16 +201,19 @@ tree_to_nomsu = (tree)->
             if #inline_nomsu\text! <= space or #inline_nomsu\text! <= 8
                 if (t.type == "Action" or t.type == "MethodCall")
                     inline_nomsu\parenthesize!
-                return inline_nomsu
-            if t.type == "Text" and #inline_nomsu\text! + 2 < MAX_LINE
-                return inline_nomsu
+                if t.type != "Text"
+                    return inline_nomsu
         indented = tree_to_nomsu(t)
         if t.type == "Action" or t.type == "MethodCall"
             if indented\is_multiline!
                 return NomsuCode\from(t.source, "(\n    ", indented, "\n)")
             else
                 indented\parenthesize!
-        if inline_nomsu and indented\text!\match("^[^\n]*\n[^\n]*$") and nomsu\trailing_line_len! <= 8
+        indented_lines = [line for line in *indented\text!\lines! when line\match("%S")]
+        if inline_nomsu and #indented_lines == (t.type == 'Block' and 2 or 3) and nomsu\trailing_line_len! <= 8
+            return inline_nomsu
+        elseif inline_nomsu and t.type == "Text" and #indented_lines <= 3 and
+            (#inline_nomsu\text! - 2 < MAX_LINE + 4 or #inline_nomsu\text! <= space or #inline_nomsu\text! <= 8)
             return inline_nomsu
         return indented
 
@@ -266,7 +267,7 @@ tree_to_nomsu = (tree)->
                     if next_space == " " and #bit_nomsu\text! < MAX_LINE
                         next_space = "\n.."
                     elseif bit.type == 'Action' or bit.type == "MethodCall"
-                        bit_nomsu = NomsuCode\from bit.source, "(\n    ", tree_to_nomsu(bit), ")"
+                        bit_nomsu = NomsuCode\from bit.source, "(\n    ", tree_to_nomsu(bit), "\n)"
                     else
                         bit_nomsu = tree_to_nomsu(bit)
 
@@ -316,9 +317,11 @@ tree_to_nomsu = (tree)->
                 if i > 1
                     nomsu\add "\n"
                     -- Rule of thumb: add a blank line between two lines if both are
-                    -- multi-line non-comments, or if a comment comes after a non-comment.
+                    -- multi-line non-comments, or if a comment comes after a non-comment,
+                    -- or if the last line starts with ".."
                     if tree[i-1].type != "Comment"
-                        needs_space[i] = (line_nomsu\is_multiline! and prev_line\is_multiline!)
+                        needs_space[i] = ((line_nomsu\is_multiline! and prev_line\is_multiline!) or
+                            prev_line\text!\match("%.%.[^\n]*$"))
                         if tree[i].type == "Comment" or needs_space[i] or needs_space[i-1]
                             nomsu\add "\n"
                 nomsu\add line_nomsu
@@ -370,7 +373,7 @@ tree_to_nomsu = (tree)->
             add_text(tree)
             if nomsu\text!\match(" $")
                 nomsu\add "\\;"
-            return NomsuCode\from(tree.source, '"\n    ', nomsu, '\n"')
+            return NomsuCode\from(tree.source, '("\n    ', nomsu, '\n")')
 
         when "List", "Dict"
             if #tree == 0
@@ -407,10 +410,7 @@ tree_to_nomsu = (tree)->
                 key = {type:"Index", source:key.source, key}
             nomsu\add tree_to_nomsu(key)
             if value
-                value_nomsu = tree_to_nomsu(value)
-                if (value.type == "Block" or value.type == "Action" or value.type == "MethodCall") and not value_nomsu\is_multiline!
-                    value_nomsu\parenthesize!
-                nomsu\add " = ", value_nomsu
+                nomsu\add " = ", recurse(value)
             return nomsu
 
         when "Comment"
