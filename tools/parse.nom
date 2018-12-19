@@ -36,7 +36,7 @@ externally (print tree $t at indent $indent) means:
                     else:
                         say "\$indent  \(quote $arg)"
 
-for $filename in (command line args).extra_args:
+for $filename in $(COMMAND LINE ARGS).extras:
     $file = (read file $filename)
     unless $file:
         barf "File does not exist: \$filename"

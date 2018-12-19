@@ -67,7 +67,7 @@ parser = re.compile([[
              / "-m" %sep (!("--" %sep) {[^%sep]+} %sep)* ("--" %sep)?
              / {[^%sep]+} %sep
              / {~ '' %sep? -> 'nomsu://tools/repl.nom' ~}) |} :})
-      {:nomsu_args: {| (nomsu_flag %sep)* {:extra_args: {| ({[^%sep]+} %sep)* |} :} |} :}
+      {:nomsu_args: {| (nomsu_flag %sep)* {:extras: {| ({[^%sep]+} %sep)* |} :} |} :}
       |} !.
     flag <-
         {:optimization: "-O" (%sep? %number)? :}
@@ -91,8 +91,8 @@ if not args or args.help
 nomsu_args = Dict{}
 for argpair in *args.nomsu_args
     nomsu_args[argpair.key] = argpair.value
-nomsu_args.extra_args = List(args.nomsu_args.extra_args or {})
-nomsu_environment.command_line_args = nomsu_args
+nomsu_args.extras = List(args.nomsu_args.extras or {})
+nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
 nomsu_environment.OPTIMIZATION = tonumber(args.optimization or 1)
 
 run = ->
