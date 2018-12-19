@@ -29,7 +29,6 @@ if (any of [not $pattern, $pattern == "*", $pattern == "**"]):
 $pattern = ($pattern|with "\$wildcard\$wildcard" -> "$multi_wildcard")
 $pattern = ($pattern|with $wildcard -> "$wildcard")
 $pattern_tree = ($pattern parsed)
-say $pattern_tree
 
 ($tree matches $patt) means:
     when:
