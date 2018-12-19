@@ -1,5 +1,5 @@
 -- Nomsu version 1
-file (FileChunks):
+file (FileChunks) <-
     {:curr_indent: ' '* :}
     ("#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* {:version: [0-9.]+ :} [^%nl]*)?
     comment? blank_lines?
@@ -8,108 +8,108 @@ file (FileChunks):
     {:curr_indent: %nil :}
     !.
 
-nodent: (unexpected_indent [^%nl]* / =curr_indent)
-indent: =curr_indent "    "
-blank_lines: %nl ((nodent comment / ws*) %nl)*
-eol: ws* eol_comment? (!. / &%nl)
+nodent <- (unexpected_indent [^%nl]* / =curr_indent)
+indent <- =curr_indent "    "
+blank_lines <- %nl ((nodent comment / ws*) %nl)*
+eol <- ws* eol_comment? (!. / &%nl)
 
-nl_nodent: blank_lines nodent
-nl_indent: blank_lines {:curr_indent: indent :} (comment nl_nodent)*
+nl_nodent <- blank_lines nodent
+nl_indent <- blank_lines {:curr_indent: indent :} (comment nl_nodent)*
 
-comment (Comment):
+comment (Comment) <-
     "#" {~ [^%nl]* (%nl+ (indent -> '') [^%nl]*)* ~}
-eol_comment (Comment):
+eol_comment (Comment) <-
     "#" {[^%nl]*}
 
-unexpected_code: ws* _unexpected_code
-_unexpected_code (Error):
+unexpected_code <- ws* _unexpected_code
+_unexpected_code (Error) <-
     {:error: {~ [^%nl]+ -> "Couldn't parse this code" ~} :}
-unexpected_indent (Error):
+unexpected_indent (Error) <-
     {:error: {~ (=curr_indent ws+) -> "Messed up indentation" ~} :}
     {:hint: {~ '' -> 'Either make sure this line is aligned with the one above it, or make sure the previous line ends with something that uses indentation, like ":" or "(..)"' ~} :}
-missing_paren_err (Error):
+missing_paren_err (Error) <-
     {:error: {~ eol -> 'Line ended without finding a closing )-parenthesis' ~} :}
     {:hint: {~ '' -> 'Put a ")" here' ~} :}
-missing_quote_err (Error):
+missing_quote_err (Error) <-
     {:error: {~ eol -> 'Line ended before finding a closing double quotation mark' ~} :}
     {:hint: {~ "" -> "Put a quotation mark here" ~} :}
-missing_bracket_error (Error):
+missing_bracket_error (Error) <-
     {:error: {~ eol -> "Line ended before finding a closing ]-bracket" ~} :}
     {:hint: {~ '' -> 'Put a "]" here' ~} :}
-missing_brace_error (Error):
+missing_brace_error (Error) <-
     {:error: {~ eol -> "Line ended before finding a closing }-brace" ~} :}
     {:hint: {~ '' -> 'Put a "}" here' ~} :}
-missing_block_expr_error (Error):
+missing_block_expr_error (Error) <-
     {:error: '' -> "Missing expression after the ':'" :}
 
-chunk: block / action / expression
-chunk_delimeter: ("~")^+3 eol
+chunk <- block / action / expression
+chunk_delimeter <- ("~")^+3 eol
 
-inline_block (Block):
+inline_block (Block) <-
     inline_statement (ws* ";" ws* inline_statement)+
-block (Block):
+block (Block) <-
     statement (nl_nodent statement)+
     (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
     {:curr_indent: %nil :}
 
-statement: (action / expression) (eol / unexpected_code)
-inline_statement: (inline_action / inline_expression)
+statement <- (action / expression) (eol / unexpected_code)
+inline_statement <- (inline_action / inline_expression)
 
-noindex_inline_expression:
+noindex_inline_expression <-
     number / variable / inline_text / inline_list / inline_dict / inline_nomsu
     / ( "("
             ws* (inline_block / inline_action / inline_expression) ws*
             (ws* ',' ws* (inline_block / inline_action / inline_expression) ws*)*
         (")" / missing_paren_err / unexpected_code)
       )
-inline_expression: index_chain / noindex_inline_expression 
-indented_expression:
+inline_expression <- index_chain / noindex_inline_expression 
+indented_expression <-
     indented_text / indented_nomsu / indented_list / indented_dict / ({|
         ("(..)")? nl_indent
             (block / action / expression) (eol / unexpected_code)
             (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
         {:curr_indent: %nil :}
     |} -> unpack)
-expression:
+expression <-
     inline_expression
     / (":" ws*
         (inline_block / inline_action / inline_expression / missing_block_expr_error))
     / indented_expression
 
-inline_nomsu (EscapedNomsu): "\" inline_expression
-indented_nomsu (EscapedNomsu):
+inline_nomsu (EscapedNomsu) <- "\" inline_expression
+indented_nomsu (EscapedNomsu) <-
     "\" (
         noindex_inline_expression
         / (":" ws*
             (inline_block / inline_action / inline_expression / missing_block_expr_error))
         / indented_expression)
 
-index_chain (IndexChain):
+index_chain (IndexChain) <-
     noindex_inline_expression ("." (text_word / noindex_inline_expression))+
 
 -- Actions need either at least 1 word, or at least 2 tokens
-inline_action (Action):
+inline_action (Action) <-
     !chunk_delimeter
     (   (inline_expression (ws* (inline_expression / word))+)
       / (word              (ws* (inline_expression / word))*))
     (ws* ":" ws* (inline_block / inline_action / inline_expression
         / missing_block_expr_error))?
-action (Action):
+action (Action) <-
     !chunk_delimeter
     (  (expression ((nl_nodent "..")? ws* (expression / word))+)
      / (word       ((nl_nodent "..")? ws* (expression / word))*))
 
-word: !number { operator_char+ / ident_char+ }
+word <- !number { operator_char+ / ident_char+ }
 
-text_word (Text): word
+text_word (Text) <- word
 
-inline_text (Text):
+inline_text (Text) <-
     !(indented_text)
     '"'
         ({~ (('\"' -> '"') / ('\\' -> '\') / escaped_char / [^%nl\"])+ ~}
         / inline_text_interpolation)*
     ('"' / missing_quote_err / unexpected_code)
-inline_text_interpolation:
+inline_text_interpolation <-
     "\" (
         variable / inline_list / inline_dict / inline_text
         / ("("
@@ -118,63 +118,63 @@ inline_text_interpolation:
         (")" / missing_paren_err / unexpected_code))
     )
 
-indented_text (Text):
+indented_text (Text) <-
     '".."' eol %nl {%nl+}? {:curr_indent: indent :}
         (indented_plain_text / text_interpolation / {~ %nl+ (=curr_indent -> "") ~})*
     unexpected_code?
     {:curr_indent: %nil :}
-indented_plain_text (Text):
+indented_plain_text (Text) <-
     {~ (("\\" -> "\") / (("\" blank_lines =curr_indent "..") -> "") / (!text_interpolation "\") / [^%nl\]+)+
         (%nl+ (=curr_indent -> ""))* ~}
-text_interpolation:
+text_interpolation <-
     inline_text_interpolation / ("\" indented_expression blank_lines =curr_indent "..")
 
-number (Number): (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
+number (Number) <- (("-"? (([0-9]+ "." [0-9]+) / ("." [0-9]+) / ([0-9]+)))-> tonumber)
 
 -- Variables can be nameless (i.e. just %) and can't contain operators like apostrophe
 -- which is a hack to allow %'s to parse as "%" and "' s" separately
-variable (Var): "%" {(ident_char+ ((!"'" operator_char+) / ident_char+)*)?}
+variable (Var) <- "%" {(ident_char+ ((!"'" operator_char+) / ident_char+)*)?}
 
-inline_list (List):
+inline_list (List) <-
     !('[..]')
     "[" ws*
         (inline_list_item (ws* ',' ws* inline_list_item)* (ws* ',')?)? ws*
     ("]" / (","? (missing_bracket_error / unexpected_code)))
-indented_list (List):
+indented_list (List) <-
     "[..]" eol nl_indent
         list_line (nl_nodent list_line)*
         (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
     (","? unexpected_code)?
-list_line:
+list_line <-
       (inline_list_item ws* "," ws*)+ eol
     / (inline_list_item ws* "," ws*)* (action / expression) eol
-inline_list_item: inline_block / inline_action / inline_expression
+inline_list_item <- inline_block / inline_action / inline_expression
 
-inline_dict (Dict):
+inline_dict (Dict) <-
     !('{..}')
     "{" ws*
         (inline_dict_entry (ws* ',' ws* inline_dict_entry)*)? ws*
     ("}" / (","? (missing_brace_error / unexpected_code)))
-indented_dict (Dict):
+indented_dict (Dict) <-
     "{..}" eol nl_indent
         dict_line (nl_nodent dict_line)*
         (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
     (","? unexpected_code)?
-dict_line:
+dict_line <-
       (inline_dict_entry ws* "," ws*)+ eol
     / (inline_dict_entry ws* "," ws*)* dict_entry eol
-dict_entry(DictEntry):
+dict_entry(DictEntry) <-
     dict_key (ws* ":" ws* (action / expression))?
-inline_dict_entry(DictEntry):
+inline_dict_entry(DictEntry) <-
     dict_key (ws* ":" ws* (inline_block / inline_action / inline_expression)?)?
-dict_key:
+dict_key <-
     text_word / inline_expression
 
-operator_char: ['`~!@$^&*+=|<>?/-]
-ident_char: [a-zA-Z0-9_] / %utf8_char
-ws: [ %tab]
+operator_char <- ['`~!@$^&*+=|<>?/-]
+ident_char <- [a-zA-Z0-9_] / %utf8_char
+ws <- [ %tab]
 
-escaped_char:
+escaped_char <-
     ("\"->'') (
         (([xX]->'') ((({[0-9a-fA-F]^2} %number_16) -> tonumber) -> tochar))
       / ((([0-9] [0-9]^-2) -> tonumber) -> tochar)

@@ -51,16 +51,6 @@ lua> "
     compile.action["->"] = compile.action["1 ->"]
     compile.action["for"] = compile.action["1 ->"]"
 
-lua> "
-    compile.action["what 1 compiles to"] = function(compile, \$action)
-        local lua = LuaCode("compile.action[", \$action.stub:as_lua(), "](")
-        local lua_args = table.map(\$action:get_args(), compile)
-        table.insert(lua_args, 1, "compile")
-        lua:concat_add(lua_args, ", ")
-        lua:add(")")
-        return lua
-    end"
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
@@ -90,7 +80,7 @@ lua> "
         if \$body.type == "Text" then
             \$body = SyntaxTree{source=\$body.source, type="Action", "Lua", \$body}
         end
-        return LuaCode("compile.action[", \$action.stub:as_lua(),
+        return LuaCode("compile.action[", \$action:get_stub():as_lua(),
             "] = ", \(\($args -> $body) as lua))
     end"
 
@@ -107,13 +97,13 @@ lua> "
         for i=2,#\$actions do
             local alias = \$actions[i]
             local \$alias_args = List{\(\$compile), unpack(alias:get_args())}
-            lua:add("\\ncompile.action[", alias.stub:as_lua(), "] = ")
+            lua:add("\\ncompile.action[", alias:get_stub():as_lua(), "] = ")
             if \$alias_args == \$args then
-                lua:add("compile.action[", \$actions[1].stub:as_lua(), "]")
+                lua:add("compile.action[", \$actions[1]:get_stub():as_lua(), "]")
             else
                 lua:add("function(")
                 lua:concat_add(table.map(\$alias_args, compile), ", ")
-                lua:add(") return compile.action[", \$actions[1].stub:as_lua(), "](")
+                lua:add(") return compile.action[", \$actions[1]:get_stub():as_lua(), "](")
                 lua:concat_add(\$compiled_args, ", ")
                 lua:add(") end")
             end
@@ -138,10 +128,10 @@ test:
         
         local lua = LuaCode()
         if \$action.type == "MethodCall" then
-            lua:add(compile(\$action[1]), ".", \$action[2].stub:as_lua_id())
+            lua:add(compile(\$action[1]), ".", \$action[2]:get_stub():as_lua_id())
         elseif \$action.type == "Action" then
-            lua:add(\$action.stub:as_lua_id())
-            lua:add_free_vars({\$action.stub:as_lua_id()})
+            lua:add(\$action:get_stub():as_lua_id())
+            lua:add_free_vars({\$action:get_stub():as_lua_id()})
         else
             compile_error_at(\$action, "Expected an action or method call here")
         end
@@ -152,17 +142,17 @@ test:
     lua> "
         local lua = \(\($actions.1 means $body) as lua)
         local first_def = (\$actions[1].type == "MethodCall"
-            and LuaCode(compile(\$actions[1][1]), ".", \$actions[1].stub:as_lua_id())
-            or LuaCode(\$actions[1].stub:as_lua_id()))
+            and LuaCode(compile(\$actions[1][1]), ".", \$actions[1]:get_stub():as_lua_id())
+            or LuaCode(\$actions[1]:get_stub():as_lua_id()))
         local \$args = List(\$actions[1]:get_args())
         for i=2,#\$actions do
             local alias = \$actions[i]
             local \$alias_args = List(alias:get_args())
             lua:add("\\n")
             if alias.type == "MethodCall" then
-                lua:add(compile(alias[1]), ".", alias.stub:as_lua_id())
+                lua:add(compile(alias[1]), ".", alias:get_stub():as_lua_id())
             else
-                lua:add(alias.stub:as_lua_id())
+                lua:add(alias:get_stub():as_lua_id())
                 lua:add_free_vars({alias_name})
             end
             if \$args == \$alias_args then
@@ -185,19 +175,19 @@ test:
 (externally $action means $body) compiles to:
     lua> "
         local lua = \(\($action means $body) as lua)
-        lua:remove_free_vars({\$action.stub:as_lua_id()})
+        lua:remove_free_vars({\$action:get_stub():as_lua_id()})
         return lua"
 
 (externally $actions all mean $body) compiles to:
     lua> "
         local lua = \(\($actions all mean $body) as lua)
-        lua:remove_free_vars(table.map(\$actions, function(a) return a.stub:as_lua_id() end))
+        lua:remove_free_vars(table.map(\$actions, function(a) return a:get_stub():as_lua_id() end))
         return lua"
 
 test:
     assume (((say $)'s meaning) == (=lua "say"))
 
-($action's meaning) compiles to (Lua ($action.stub|as lua id))
+($action's meaning) compiles to (Lua (($action|get stub)|as lua id))
 test:
     (swap $x and $y) parses as (..)
         do:
@@ -330,7 +320,7 @@ externally ($tree with vars $replacements) means (..)
 externally (match $tree with $patt) means:
     lua> "
         if \$patt.type == "Var" then return Dict{[\$patt[1]]=\$tree} end
-        if \$patt.type == "Action" and \$patt.stub ~= \$tree.stub then return nil end
+        if \$patt.type == "Action" and \$patt:get_stub() ~= \$tree:get_stub() then return nil end
         if #\$patt ~= #\$tree then return nil end
         local matches = Dict{}
         for \($i)=1,#\$patt do
@@ -412,7 +402,7 @@ test:
 (Nomsu compiler version) compiles to "NOMSU_COMPILER_VERSION"
 (core version) compiles to "NOMSU_CORE_VERSION"
 (lib version) compiles to "NOMSU_LIB_VERSION"
-(command line args) compiles to "command_line_args"
+(command line args) compiles to "COMMAND_LINE_ARGS"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

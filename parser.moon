@@ -4,6 +4,18 @@ re = require 're'
 lpeg.setmaxstack 20000
 {:P,:R,:S,:C,:Cmt,:Carg,:Cc} = lpeg
 
+-- foldr {A{a1,a2,...},B{b1,b2,...},C{c1,c2,...}} -> C{B{A{a1,a2,...},b1,b2...},c1,c2...}
+foldr = (...)->
+    inner = select(1,...)
+    for i=2,select('#',...) do
+        assert inner.type
+        outer = select(i,...)
+        table.insert(outer, 1, inner)
+        inner.start = outer.start
+        inner = outer
+    assert inner.type
+    return inner
+
 DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
     .nl = P("\r")^-1 * P("\n")
@@ -18,6 +30,7 @@ DEFS = with {}
         R("\224\239")*R("\128\191")*R("\128\191") +
         R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
     .Tree = (t, userdata)-> userdata.make_tree(t, userdata)
+    .foldr = foldr
 
 setmetatable(DEFS, {__index:(key)=>
     if i = key\match("^ascii_(%d+)$")
@@ -30,19 +43,17 @@ setmetatable(DEFS, {__index:(key)=>
         return p
 })
 
--- Just for cleanliness, I put the language spec in its own file using a slightly modified
--- version of the lpeg.re syntax.
+-- Just for cleanliness, I put the language spec in its own file using a slightly
+-- extended version of the lpeg.re syntax.
 peg_tidier = re.compile [[
-file <- %nl* {~ (def/comment) (%nl+ (def/comment))* %nl* ~}
-def <- anon_def / captured_def
-anon_def <-
-    ({ident} (" "*) ":" {[^%nl]* (%nl+ " "+ [^%nl]*)*}) 
-    -> "%1 <- %2"
-captured_def <-
-    ({ident} (" "*) "(" {ident} ")" (" "*) ":" {[^%nl]* (%nl+ " "+ [^%nl]*)*})
-    -> "%1 <- ({| {:start:{}:} %3 {:stop:{}:} {:type: (''->'%2') :} |} %%userdata) -> Tree"
-ident <- [a-zA-Z_][a-zA-Z0-9_]*
-comment <- "--" [^%nl]*
+    file <- %nl* {~ (captured_def/line) (%nl+ (captured_def/line))* %nl* ~}
+    ident <- [a-zA-Z_][a-zA-Z0-9_]*
+    line <- [^%nl]*
+    captured_def <-
+        ({ident} (" "*) "(" {ident} ")" (" "*) "<-" {[^%nl]* (%nl+ " "+ [^%nl]*)*}) ->
+"%1 <- ({| {:type:''->'%2':} {:start:{}:}
+    %3
+    {:stop:{}:} |} %%userdata) -> Tree"
 ]]
 
 make_parser = (peg, make_tree=nil)->

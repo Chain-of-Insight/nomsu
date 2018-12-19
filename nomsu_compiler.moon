@@ -122,7 +122,6 @@ compile = setmetatable({
         ["use 1 with prefix"]: (compile, path, prefix)->
             LuaCode("run_file_1_in(#{compile(path)}, _ENV, OPTIMIZATION, ", compile(prefix), ")")
 
-        ["tests"]: (compile)-> LuaCode("TESTS")
         ["test"]: (compile, body)->
             unless body.type == 'Block'
                 compile_error(body, "This should be a Block")
@@ -150,6 +149,7 @@ compile = setmetatable({
                             lua\add tok
                         else
                             tok_lua = compile(tok)
+                            -- TODO: this is overly eager, should be less aggressive
                             tok_lua\parenthesize! if tok.type == "Action"
                             lua\add tok_lua
                         lua\add " " if i < #tree
@@ -271,16 +271,13 @@ compile = setmetatable({
                         string_buffer = ""
 
                     bit_lua = compile(bit)
+                    if bit.type == "Block" and #bit == 1
+                        bit = bit[1]
                     if bit.type == "Block"
-                        bit_lua = LuaCode\from bit.source, "(function()",
-                            "\n    local _buffer = List{}",
-                            "\n    local function add(bit) _buffer:add(bit) end",
-                            "\n    local function join_with(glue) _buffer = _buffer:joined_with(glue) end",
+                        bit_lua = LuaCode\from bit.source, "List(function(add)",
                             "\n    ", bit_lua,
-                            "\n    if lua_type_of(_buffer) == 'table' then _buffer = _buffer:joined() end",
-                            "\n    return _buffer",
-                            "\nend)()"
-                    if bit.type != "Text"
+                            "\nend):joined()"
+                    elseif bit.type != "Text" and bit.type != "Number"
                         bit_lua = LuaCode\from(bit.source, "tostring(",bit_lua,")")
                     add_bit bit_lua
 
@@ -296,84 +293,75 @@ compile = setmetatable({
                 return lua
 
             when "List", "Dict"
+                if #tree == 0
+                    return LuaCode\from tree.source, tree.type, "{}"
+
                 lua = LuaCode\from tree.source
+                chunks = 0
                 i = 1
-                sep = ''
-                while i <= #tree
-                    item = tree[i]
-                    if item.type == "Block"
-                        break
-                    lua\add sep
-                    if item.type == "Comment"
-                        lua\add compile(item), "\n"
-                        sep = ''
-                    else
-                        item_lua = compile(item)
-                        lua\add item_lua
-                        sep = ', '
-                    i += 1
-
-                if lua\is_multiline!
-                    lua = LuaCode\from tree.source, "#{tree.type}{\n    ", lua, "\n}"
-                else
-                    lua = LuaCode\from tree.source, "#{tree.type}{", lua, "}"
-
-                -- List/dict comprehenstion
-                if i <= #tree
-                    lua = LuaCode\from tree.source, "(function()\n    local comprehension = ", lua
-                    if tree.type == "List"
-                        lua\add "\n    local function add(x) comprehension[#comprehension+1] = x end"
-                    else
-                        lua\add "\n    local function #{("add 1 =")\as_lua_id!}(k, v) comprehension[k] = v end"
-                    while i <= #tree
-                        lua\add "\n    "
-                        if tree[i].type == 'Block' or tree[i].type == 'Comment'
-                            lua\add compile(tree[i])
-                        elseif tree[i].type == "DictEntry"
-                            entry_lua = compile(tree[i])
-                            lua\add (entry_lua\text!\sub(1,1) == '[' and "comprehension" or "comprehension."), entry_lua
-                        else
-                            lua\add "comprehension[#comprehension+1] = ", compile(tree[i])
+                while tree[i]
+                    if tree[i].type == 'Block'
+                        lua\add " + " if chunks > 0
+                        lua\add tree.type, "(function(", (tree.type == 'List' and "add" or ("add, "..("add 1 =")\as_lua_id!)), ")"
+                        lua\add "\n    ", compile(tree[i]), "\nend)"
+                        chunks += 1
                         i += 1
-                    lua\add "\n    return comprehension\nend)()"
+                    else
+                        lua\add " + " if chunks > 0
+                        sep = ''
+                        items_lua = LuaCode\from tree[i].source
+                        while tree[i]
+                            if tree[i].type == "Block"
+                                break
+                            item_lua = compile tree[i]
+                            if item_lua\text!\match("^%.[a-zA-Z_]")
+                                item_lua = item_lua\text!\sub(2)
+                            if tree.type == 'Dict' and tree[i].type == 'Index'
+                                item_lua = LuaCode\from tree[i].source, item_lua, "=true"
+                            items_lua\add sep, item_lua
+                            if tree[i].type == "Comment"
+                                items_lua\add "\n"
+                                sep = ''
+                            else
+                                sep = ', '
+                            i += 1
+                        if items_lua\is_multiline!
+                            lua\add LuaCode\from items_lua.source, tree.type, "{\n    ", items_lua, "\n}"
+                        else
+                            lua\add LuaCode\from items_lua.source, tree.type, "{", items_lua, "}"
+                        chunks += 1
                 
                 return lua
 
-            when "DictEntry"
-                key, value = tree[1], tree[2]
-                key_lua = compile(key)
-                value_lua = value and compile(value) or LuaCode\from(key.source, "true")
-                key_str = match(key_lua\text!, [=[^["']([a-zA-Z_][a-zA-Z0-9_]*)['"]$]=])
+            when "Index"
+                key_lua = compile(tree[1])
+                key_str = match(key_lua\text!, '^"([a-zA-Z_][a-zA-Z0-9_]*)"$')
                 return if key_str and key_str\is_lua_id!
-                    LuaCode\from tree.source, key_str,"=",value_lua
+                    LuaCode\from tree.source, ".", key_str
                 elseif sub(key_lua\text!,1,1) == "["
                     -- NOTE: this *must* use a space after the [ to avoid freaking out
                     -- Lua's parser if the inner expression is a long string. Lua
                     -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                    LuaCode\from tree.source, "[ ",key_lua,"]=",value_lua
+                    LuaCode\from tree.source, "[ ",key_lua,"]"
                 else
-                    LuaCode\from tree.source, "[",key_lua,"]=",value_lua
+                    LuaCode\from tree.source, "[",key_lua,"]"
+
+            when "DictEntry"
+                key = tree[1]
+                if key.type != "Index"
+                    key = SyntaxTree{type:"Index", source:key.source, key}
+                return LuaCode\from tree.source, compile(key),"=",(tree[2] and compile(tree[2]) or "true")
             
             when "IndexChain"
                 lua = compile(tree[1])
-                first_char = sub(lua\text!,1,1)
-                if first_char == "{" or first_char == '"' or first_char == "["
+                if lua\text!\match("['\"}]$") or lua\text!\match("]=*]$")
                     lua\parenthesize!
-
                 for i=2,#tree
                     key = tree[i]
-                    key_lua = compile(key)
-                    key_lua_str = key_lua\text!
-                    lua_id = match(key_lua_str, "^['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]$")
-                    if lua_id and lua_id\is_lua_id!
-                        lua\add ".#{lua_id}"
-                    elseif sub(key_lua_str,1,1) == '['
-                        -- NOTE: this *must* use a space after the [ to avoid freaking out
-                        -- Lua's parser if the inner expression is a long string. Lua
-                        -- parses x[[[y]]] as x("[y]"), not as x["y"]
-                        lua\add "[ ",key_lua," ]"
-                    else
-                        lua\add "[",key_lua,"]"
+                    -- TODO: remove this shim
+                    if key.type != "Index"
+                        key = SyntaxTree{type:"Index", source:key.source, key}
+                    lua\add compile(key)
                 return lua
 
             when "Number"

@@ -38,17 +38,17 @@ do
         local _len_0 = 1
         for _index_0 = 1, #self do
           local b = self[_index_0]
-          _accum_0[_len_0] = tostring(b)
+          _accum_0[_len_0] = type(b) == 'string' and b:as_lua() or tostring(b)
           _len_0 = _len_0 + 1
         end
         bits = _accum_0
       end
       for k, v in pairs(self) do
-        if not (bits[k]) then
-          table.insert(bits, "[ " .. tostring(tostring(k)) .. "]=" .. tostring(tostring(v)))
+        if not (bits[k] or k == 'type' or k == 'source') then
+          table.insert(bits, tostring(k) .. "=" .. tostring(type(v) == 'string' and v:as_lua() or v))
         end
       end
-      return "SyntaxTree{" .. tostring(table.concat(bits, ", ")) .. "}"
+      return tostring(self.type) .. "{" .. tostring(table.concat(bits, ", ")) .. "}"
     end,
     __eq = function(self, other)
       if type(self) ~= type(other) or #self ~= #other or getmetatable(self) ~= getmetatable(other) then
@@ -146,6 +146,7 @@ do
       assert(self.type == "Action" or self.type == "MethodCall", "Only actions and method calls have arguments")
       local args = { }
       if self.type == "MethodCall" then
+        assert(#self == 2, "Can't get arguments for multiple method calls at once.")
         args[1] = self[1]
         local _list_0 = self[2]
         for _index_0 = 1, #_list_0 do
@@ -166,6 +167,7 @@ do
     end,
     get_stub = function(self)
       if self.type == "MethodCall" then
+        assert(#self == 2, "Can't get the stubs of multiple method calls at once.")
         return self[2]:get_stub()
       end
       local stub_bits = { }
@@ -222,8 +224,6 @@ getmetatable(SyntaxTree).__call = function(self, t)
   setmetatable(t, self.__base)
   if t.type == 'Action' then
     t.stub = t:get_stub()
-  elseif t.type == 'MethodCall' then
-    t.stub = t[2]:get_stub()
   end
   return t
 end

@@ -19,11 +19,11 @@ class SyntaxTree
     @__type: "Syntax Tree"
     
     __tostring: =>
-        bits = [tostring(b) for b in *@]
+        bits = [type(b) == 'string' and b\as_lua! or tostring(b) for b in *@]
         for k,v in pairs(@)
-            unless bits[k]
-                table.insert(bits, "[ #{tostring(k)}]=#{tostring(v)}")
-        return "SyntaxTree{#{table.concat(bits, ", ")}}"
+            unless bits[k] or k == 'type' or k == 'source'
+                table.insert(bits, "#{k}=#{type(v) == 'string' and v\as_lua! or v}")
+        return "#{@type}{#{table.concat(bits, ", ")}}"
 
     __eq: (other)=>
         return false if type(@) != type(other) or #@ != #other or getmetatable(@) != getmetatable(other)
@@ -76,6 +76,7 @@ class SyntaxTree
         assert(@type == "Action" or @type == "MethodCall", "Only actions and method calls have arguments")
         args = {}
         if @type == "MethodCall"
+            assert(#@ == 2, "Can't get arguments for multiple method calls at once.")
             args[1] = @[1]
             for tok in *@[2]
                 if type(tok) != 'string' then args[#args+1] = tok
@@ -86,6 +87,7 @@ class SyntaxTree
 
     get_stub: =>
         if @type == "MethodCall"
+            assert(#@ == 2, "Can't get the stubs of multiple method calls at once.")
             return @[2]\get_stub!
         stub_bits = {}
         arg_i = 1
@@ -109,8 +111,6 @@ getmetatable(SyntaxTree).__call = (t)=>
     setmetatable(t, @__base)
     if t.type == 'Action'
         t.stub = t\get_stub!
-    elseif t.type == 'MethodCall'
-        t.stub = t[2]\get_stub!
     return t
 
 return SyntaxTree

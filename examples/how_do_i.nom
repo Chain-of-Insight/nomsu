@@ -63,7 +63,7 @@ say "
     ..start the next line with two periods, like that.
     
     Similarly, you can put a long interpolated indented value like: \(..)
-        100 + 200 + 300 + 400 + 500 + 600 + 700 + 800 + 900
+        1000 + 2000 + 3000 + 4000 + 5000 + 6000 + 7000 + 8000 + 9000
     ..between a backslash and two periods."
 say "Single-line text can contain escape sequences like \", \\, \000, and \n"
 

@@ -68,7 +68,7 @@ test:
             if \$var.type == 'Var' then
                 lua:add_free_vars({var_lua:text()})
             end
-            lua:add(' = ', \($value as lua expr), ';')
+            lua:add(' = ', \($value as lua expr))
         end
         return lua"
 
