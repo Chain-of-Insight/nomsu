@@ -21,11 +21,20 @@ for $filename in $filenames:
         barf "File does not exist: \$filename"
     $leading_indent = ($file|matching "[\n]*([ ]*)")
     $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
-    $tree = ($code parsed)
-    $formatted = "
-        \$leading_indent\((($tree as nomsu)|text)|with "\n" -> "\n\$leading_indent")"
+    try:
+        $tree = ($code parsed)
+    ..and if it barfs $msg:
+        if $(COMMAND LINE ARGS)."-q":
+            $formatted = $file
+        ..else:
+            say $msg
+
+    if ($tree and (not $formatted)):
+        $formatted = "
+            \$leading_indent\((($tree as nomsu)|text)|with "\n" -> "\n\$leading_indent")"
     
-    if $(COMMAND LINE ARGS)."-i":
-        write $formatted to file $filename
-    ..else:
-        say $formatted inline
+    if $formatted:
+        if $(COMMAND LINE ARGS)."-i":
+            write $formatted to file $filename
+        ..else:
+            say $formatted inline
