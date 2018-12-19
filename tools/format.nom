@@ -1,7 +1,7 @@
 #!/usr/bin/env nomsu -V5.12.12.8
 #
     Auto-format Nomsu code. Usage:
-        nomsu -t autoformat [-i] file1 file2...
+        nomsu -t format [-i] file1 file2...
 
     If the "-i" flag is used, the file will be edited in-place.
     If no files are passed in, this will read from stdin.
@@ -12,7 +12,7 @@ use "lib/os.nom"
 
 $filenames = $(COMMAND LINE ARGS).extras
 if ((#$filenames) == 0):
-    say "Warning: reading from stdin (ctrl-d to abort). To avoid this message, use nomsu -t autoformat -"
+    say "Warning: reading from stdin (ctrl-d to abort). To avoid this message, use nomsu -t format -"
     $filenames = ["stdin"]
 
 for $filename in $filenames:
