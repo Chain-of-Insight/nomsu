@@ -75,6 +75,8 @@ print_error = (error_message, start_fn, stop_fn)->
                 calling_fn.lastlinedefined = assert(map[calling_fn.lastlinedefined])
             --calling_fn.short_src = calling_fn.source\match('"([^[]*)')
             filename,start,stop = calling_fn.source\match('@([^[]*)%[([0-9]+):([0-9]+)]')
+            if not filename
+                filename,start = calling_fn.source\match('@([^[]*)%[([0-9]+)]')
             assert(filename)
             file = files.read(filename)
             -- TODO: get name properly

@@ -115,6 +115,9 @@ print_error = function(error_message, start_fn, stop_fn)
             calling_fn.lastlinedefined = assert(map[calling_fn.lastlinedefined])
           end
           local filename, start, stop = calling_fn.source:match('@([^[]*)%[([0-9]+):([0-9]+)]')
+          if not filename then
+            filename, start = calling_fn.source:match('@([^[]*)%[([0-9]+)]')
+          end
           assert(filename)
           local file = files.read(filename)
           if calling_fn.name then
