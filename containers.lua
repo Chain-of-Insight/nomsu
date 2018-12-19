@@ -235,7 +235,21 @@ local _list_mt = {
 _list_mt.__index.as_lua = _list_mt.as_lua
 _list_mt.__index.as_nomsu = _list_mt.as_nomsu
 List = function(t)
-  return setmetatable(t, _list_mt)
+  if type(t) == 'table' then
+    return setmetatable(t, _list_mt)
+  elseif type(t) == 'function' then
+    local l = setmetatable({ }, _list_mt)
+    local add
+    add = function(...)
+      for i = 1, select('#', ...) do
+        l[#l + 1] = select(i, ...)
+      end
+    end
+    t(add)
+    return l
+  else
+    return error("Unsupported List type: " .. type(t))
+  end
 end
 local walk_items
 walk_items = function(self, i)
@@ -396,7 +410,25 @@ local _dict_mt = {
   end
 }
 Dict = function(t)
-  return setmetatable(t, _dict_mt)
+  if type(t) == 'table' then
+    return setmetatable(t, _dict_mt)
+  elseif type(t) == 'function' then
+    local d = setmetatable({ }, _dict_mt)
+    local add
+    add = function(...)
+      for i = 1, select('#', ...) do
+        d[select(i, ...)] = true
+      end
+    end
+    local add_1_eq_2
+    add_1_eq_2 = function(k, v)
+      d[k] = v
+    end
+    t(add, add_1_eq_2)
+    return d
+  else
+    return error("Unsupported Dict type: " .. type(t))
+  end
 end
 for i, entry in ipairs(Dict({
   x = 99

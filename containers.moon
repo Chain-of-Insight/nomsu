@@ -95,7 +95,16 @@ _list_mt =
 _list_mt.__index.as_lua = _list_mt.as_lua
 _list_mt.__index.as_nomsu = _list_mt.as_nomsu
 
-List = (t)-> setmetatable(t, _list_mt)
+List = (t)->
+    if type(t) == 'table'
+        return setmetatable(t, _list_mt)
+    elseif type(t) == 'function'
+        l = setmetatable({}, _list_mt)
+        add = (...)->
+            for i=1,select('#',...) do l[#l+1] = select(i,...)
+        t(add)
+        return l
+    else error("Unsupported List type: "..type(t))
 
 walk_items = (i)=>
     i = i + 1
@@ -150,7 +159,17 @@ _dict_mt =
             if ret[k] == nil then ret[k] = -v
             else ret[k] -= v
         return Dict(ret)
-Dict = (t)-> setmetatable(t, _dict_mt)
+Dict = (t)->
+    if type(t) == 'table'
+        return setmetatable(t, _dict_mt)
+    elseif type(t) == 'function'
+        d = setmetatable({}, _dict_mt)
+        add = (...)->
+            for i=1,select('#',...) do d[select(i,...)] = true
+        add_1_eq_2 = (k, v)-> d[k] = v
+        t(add, add_1_eq_2)
+        return d
+    else error("Unsupported Dict type: "..type(t))
 
 for i,entry in ipairs(Dict({x:99}))
     assert(i == 1 and entry.key == "x" and entry.value == 99, "ipairs compatibility issue")
