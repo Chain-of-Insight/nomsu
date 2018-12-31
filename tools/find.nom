@@ -21,7 +21,7 @@ use "lib/consolecolor.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-$wildcard = ($(COMMAND LINE ARGS)."--wildcard" or "%*")
+$wildcard = ($(COMMAND LINE ARGS).wildcard or "%*")
 $pattern = $(COMMAND LINE ARGS).extras.1
 if (any of [not $pattern, $pattern == "*", $pattern == "**"]):
     barf ("
@@ -84,7 +84,7 @@ for $filename in $filenames:
             if ($sub is syntax tree):
                 recurse $t on $sub
     
-    if $(COMMAND LINE ARGS)."-l":
+    if $(COMMAND LINE ARGS).l:
         if ((#$results) > 0):
             say $filename
     ..else:

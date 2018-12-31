@@ -33,14 +33,14 @@ for $filename in $(COMMAND LINE ARGS).extras:
         sort $file_tests by $ -> $.source
         lua> "io.write('[ .. ] ', \$filename); io.flush()"
         
-        if (command line args)."-v": say ""
+        if (command line args).v: say ""
         
         for $ in $file_tests:
-            if (command line args)."-v":
+            if (command line args).v:
                 say "    \(yellow ($.test, with "\n" -> "\n    "))"
             run $.test
         
-        if (command line args)."-v":
+        if (command line args).v:
             say (green "PASS")
         ..else:
             say "\r[\(green "PASS")"

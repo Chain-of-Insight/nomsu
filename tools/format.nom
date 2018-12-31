@@ -4,6 +4,7 @@
     nomsu -t format [-i] file1 file2...
     
     If the "-i" flag is used, the file will be edited in-place.
+    If the "-q" flag is used and an error occurs, the original file will be printed.
     If no files are passed in, this will read from stdin.
     
 use "lib/os.nom"
@@ -26,7 +27,7 @@ for $filename in $filenames:
     try:
         $tree = ($code parsed)
     ..and if it barfs $msg:
-        if $(COMMAND LINE ARGS)."-q":
+        if $(COMMAND LINE ARGS).q:
             $formatted = $file
         ..else:
             say $msg
@@ -36,7 +37,7 @@ for $filename in $filenames:
             "\$leading_indent\($tree as nomsu, text, with "\n" -> "\n\$leading_indent")"
     
     if $formatted:
-        if $(COMMAND LINE ARGS)."-i":
+        if $(COMMAND LINE ARGS).i:
             write $formatted to file $filename
         ..else:
             say $formatted inline

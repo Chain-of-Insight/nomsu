@@ -11,10 +11,10 @@ use "lib/consolecolor.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-$inplace = ($(COMMAND LINE ARGS)."-i" or $(COMMAND LINE ARGS)."--inplace")
-$start_version = $(COMMAND LINE ARGS)."--upgrade-from"
-$version = ($(COMMAND LINE ARGS)."--upgrade-to" or (Nomsu version))
-$test = ($(COMMAND LINE ARGS)."-t" or $(COMMAND LINE ARGS)."--test")
+$inplace = ($(COMMAND LINE ARGS).i or $(COMMAND LINE ARGS).inplace)
+$start_version = $(COMMAND LINE ARGS)."upgrade-from"
+$version = ($(COMMAND LINE ARGS)."upgrade-to" or (Nomsu version))
+$test = ($(COMMAND LINE ARGS).t or $(COMMAND LINE ARGS).test)
 for $filename in $(COMMAND LINE ARGS).extras:
     $file = (read file $filename)
     unless $file:

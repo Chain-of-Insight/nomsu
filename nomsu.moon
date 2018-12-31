@@ -69,17 +69,25 @@ parser = re.compile([[
              / {~ '' %sep? -> 'nomsu://tools/repl.nom' ~}) |} :})
       {:nomsu_args: {| (nomsu_flag %sep)* {:extras: {| ({[^%sep]+} %sep)* |} :} |} :}
       |} !.
-    flag <-
-        {:optimization: "-O" (%sep? %number)? :}
-      / ({:check_syntax: "-s" %true:})
-      / ({:compile: "-c" %true:})
-      / {:verbose: "-v" %true :}
-      / {:help: ("-h" / "--help") %true :}
+
+    flag <- longflag / shortflag / "-" shortboolflag+
+    longflag <-
+        {:help: "--help" %true :}
       / {:version: "--version" %true :}
       / {:no_core: "--no-core" %true :}
-      / {:debugger: ("-d" %sep? {[^%sep]*}) :}
-      / {:requested_version: "-V" (%sep? {([0-9.])+})? :}
-    nomsu_flag <- {| ({:key: ('-' [a-z]) :} {:value: %true :}) / ({:key: ('--' [^%sep=]+) :} {:value: ('=' {[^%sep]+}) / %true :}) |}
+    shortflag <-
+        {:optimization: "-O" %sep? %number :}
+      / {:debugger: ("-d" %sep? {[^%sep]+}) :}
+      / {:requested_version: "-V" %sep? {([0-9.])+} :}
+    shortboolflag <-
+        {:check_syntax: "s" %true:}
+      / {:compile: "c" %true:}
+      / {:verbose: "v" %true :}
+      / {:help: "h" %true :}
+
+    nomsu_flag <- nomsu_longflag / "-" nomsu_shortboolflag+
+    nomsu_shortboolflag <- {| {:key: [a-zA-Z] :} {:value: %true :} |}
+    nomsu_longflag <- '--' {| {:key: [^%sep=]+ :} {:value: ('=' {[^%sep]+}) / %true :} |}
 ]], {
     true:lpeg.Cc(true), number:lpeg.R("09")^1/tonumber, sep:lpeg.P(sep)
 })
