@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file contains definitions of operators like "+" and "and".
     
@@ -16,7 +16,7 @@ test:
 ($x <= $y) compiles to "(\($x as lua expr) <= \($y as lua expr))"
 ($x >= $y) compiles to "(\($x as lua expr) >= \($y as lua expr))"
 [$a is $b, $a == $b] all compile to "(\($a as lua expr) == \($b as lua expr))"
-[$a isn't $b, $a is not $b, $a not= $b, $a != $b] all compile to \
+[$a isn't $b, $a is not $b, $a not= $b, $a != $b] all compile to
 .."(\($a as lua expr) ~= \($b as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -34,7 +34,7 @@ test:
 
 # Variable assignment operator
 ($var = $value) compiles to:
-    lua> "
+    lua> ("
         local lua = LuaCode()
         if \$var.type == "List" then
             for i, \$assignment in ipairs(\$var) do
@@ -50,8 +50,8 @@ test:
                 if #\$value ~= #\$var then
                     compile_error_at(\$value,
                         "This assignment has too "..(#\$value > #\$var and "many" or "few").." values.",
-                        "Make sure it has the same number of values on the left and right hand side of the '\
-        ..=' operator.")
+                        "Make sure it has the same number of values on the left and right hand side \
+        ..of the '=' operator.")
                 end
                 for i, \$val in ipairs(\$value) do
                     if i > 1 then lua:add(", ") end
@@ -70,7 +70,8 @@ test:
             end
             lua:add(' = ', \($value as lua expr))
         end
-        return lua"
+        return lua
+    ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -89,7 +90,7 @@ test:
             $foozle = "inner"
             $y = "inner"
     set global x local y
-    assume (($foozle == "inner") and ($y == "outer")) or barf \
+    assume (($foozle == "inner") and ($y == "outer")) or barf
     .."'with external' failed."
 
 (with external $externs $body) compiles to:
@@ -99,7 +100,7 @@ test:
 
 test:
     [$x, $y] = [1, 2]
-    with {$z, $x: 999}:
+    with [$z, $x = 999]:
         assume $z == (nil)
         $z = 999
         assume ($z == 999) or barf "'with' failed."
@@ -108,35 +109,30 @@ test:
     assume ($z == (nil)) or barf "'with' scoping failed"
 
 (with $assignments $body) compiles to:
-    $lua = ($body as lua)
-    lua> "
-        local lhs, rhs = LuaCode(), LuaCode()
-        local vars = {}
-        for i, item in ipairs(\$assignments) do
-            local \$target, \$value = item[1], item[2]
-            local target_lua = \($target as lua)
-            if not target_lua:text():is_lua_id() then
-                compile_error_at(\$target, "Invalid target for 'with' scope assignment.",
-                    "This should be either a variable or an action's meaning.")
+    lua> ("
+        local \$defs = LuaCode()
+        for i, \$item in ipairs(\$assignments) do
+            if i > 1 then \$defs:add("\\n") end
+            local item_lua = \($item as lua)
+            if \$item.type == 'Action' and \$item.stub == '1 =' then
+                item_lua:remove_free_vars(item_lua.free_vars)
             end
-            local value_lua = \$value and \($value as lua) or "nil"
-            if i > 1 then
-                lhs:add(", ")
-                rhs:add(", ")
-            end
-            lhs:add(target_lua)
-            rhs:add(value_lua)
-            vars[i] = target_lua:text()
+            \$defs:add("local ", item_lua, ";")
         end
-        \$lua:remove_free_vars(vars)
-        \$lua:prepend("local ", lhs, " = ", rhs, ";\\n")"
-    return (Lua "do\n    \$lua\nend -- 'with' block")
+    ")
+    return
+        Lua ("
+            do
+                \$defs
+                \($body as lua)
+            end -- 'with' block
+        ")
 
 # Math Operators
 test:
     assume ((5 wrapped around 2) == 1) or barf "mod not working"
 
-[$x wrapped around $y, $x mod $y] all compile to \
+[$x wrapped around $y, $x mod $y] all compile to
 .."((\($x as lua expr)) % (\($y as lua expr)))"
 
 # 3-part chained comparisons
@@ -147,9 +143,11 @@ test:
         external $calls = ($calls + 1)
         return 1
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
-    assume ($calls == 1) or barf \
+    assume ($calls == 1) or barf
     .."Three-way comparison evaluated middle value multiple times"
+
 ($x < $y < $z) parses as ((($a $b $c) -> (($a < $b) and ($b < $c))) $x $y $z)
+
 ($x <= $y < $z) parses as ((($a $b $c) -> (($a <= $b) and ($b < $c))) $x $y $z)
 ($x < $y <= $z) parses as ((($a $b $c) -> (($a < $b) and ($b <= $c))) $x $y $z)
 ($x <= $y <= $z) parses as ((($a $b $c) -> (($a <= $b) and ($b <= $c))) $x $y $z)
@@ -184,30 +182,31 @@ test:
     fall back to bit.bor(), bit.band(), etc.
 lua> "if \((is jit) or ((Lua version) == "Lua 5.2")) then"
 [NOT $, ~ $] all compile to "bit.bnot(\($ as lua expr))"
-[$x OR $y, $x | $y] all compile to \
+[$x OR $y, $x | $y] all compile to
 .."bit.bor(\($x as lua expr), \($y as lua expr))"
 
-[$x XOR $y, $x ~ $y] all compile to \
+[$x XOR $y, $x ~ $y] all compile to
 .."bit.bxor(\($x as lua expr), \($y as lua expr))"
 
-[$x AND $y, $x & $y] all compile to \
+[$x AND $y, $x & $y] all compile to
 .."bit.band(\($x as lua expr), \($y as lua expr))"
 
-[$x LSHIFT $shift, $x << $shift] all compile to \
+[$x LSHIFT $shift, $x << $shift] all compile to
 .."bit.lshift(\($x as lua expr), \($shift as lua expr))"
 
-[$x RSHIFT $shift, $x >> $shift] all compile to \
+[$x RSHIFT $shift, $x >> $shift] all compile to
 .."bit.rshift(\($x as lua expr), \($shift as lua expr))"
 
 lua> "else"
+
 [NOT $, ~ $] all compile to "~(\($ as lua expr))"
 [$x OR $y, $x | $y] all compile to "(\($x as lua expr) | \($y as lua expr))"
 [$x XOR $y, $x ~ $y] all compile to "(\($x as lua expr) ~ \($y as lua expr))"
 [$x AND $y, $x & $y] all compile to "(\($x as lua expr) & \($y as lua expr))"
-[$x LSHIFT $shift, $x << $shift] all compile to \
+[$x LSHIFT $shift, $x << $shift] all compile to
 .."(\($x as lua expr) << \($shift as lua expr))"
 
-[$x RSHIFT $shift, $x >> $shift] all compile to \
+[$x RSHIFT $shift, $x >> $shift] all compile to
 .."(\($x as lua expr) >> \($shift as lua expr))"
 
 lua> "end"
@@ -220,8 +219,8 @@ test:
 (not $) compiles to "(not \($ as lua expr))"
 test:
     assume ((size of [1, 2, 3]) == 3)
-    assume ((# [1, 2, 3]) == 3)
-[# $list, size of $list] all compile to "(#\($list as lua expr))"
+    assume ((#[1, 2, 3]) == 3)
+[#$list, size of $list] all compile to "(#\($list as lua expr))"
 ($list is empty) compiles to "(#\($list as lua expr) == 0)"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

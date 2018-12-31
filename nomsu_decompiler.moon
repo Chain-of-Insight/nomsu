@@ -185,7 +185,7 @@ tree_to_nomsu = (tree)->
     nomsu = NomsuCode\from(tree.source)
 
     -- For concision:
-    recurse = (t)->
+    recurse = (t, argnum=nil)->
         space = MAX_LINE - nomsu\trailing_line_len!
         try_inline = true
         for subtree in coroutine.wrap(-> (t\map(coroutine.yield) and nil))
@@ -206,11 +206,16 @@ tree_to_nomsu = (tree)->
         indented = tree_to_nomsu(t)
         if t.type == "Action" or t.type == "MethodCall"
             if indented\is_multiline!
-                return NomsuCode\from(t.source, "(\n    ", indented, "\n)")
+                if argnum == nil or argnum == 1
+                    return NomsuCode\from(t.source, "(\n    ", indented, "\n)")
+                else
+                    return NomsuCode\from(t.source, "\n    ", indented)
+            elseif argnum and argnum > 1
+                return NomsuCode\from(t.source, "\n    ", indented)
             else
                 indented\parenthesize!
         indented_lines = [line for line in *indented\text!\lines! when line\match("%S")]
-        if inline_nomsu and #indented_lines == (t.type == 'Block' and 2 or 3) and nomsu\trailing_line_len! <= 8
+        if inline_nomsu and #indented_lines == ((t.type == 'Block' or t.type == 'Action' or t.type == 'MethodCall') and 2 or 3) and nomsu\trailing_line_len! <= 8
             return inline_nomsu
         elseif inline_nomsu and t.type == "Text" and #indented_lines <= 3 and
             (#inline_nomsu\text! - 2 < MAX_LINE + 4 or #inline_nomsu\text! <= space or #inline_nomsu\text! <= 8)
@@ -237,6 +242,7 @@ tree_to_nomsu = (tree)->
             word_buffer = {}
             num_args = 0
             for i,bit in ipairs tree
+                -- TODO: properly wrap super long chains of words
                 if type(bit) == "string"
                     if #word_buffer > 0 and is_operator(bit) == is_operator(word_buffer[#word_buffer])
                         table.insert word_buffer, " "
@@ -255,7 +261,7 @@ tree_to_nomsu = (tree)->
                     next_space = " "
 
                 num_args += 1
-                bit_nomsu = recurse(bit)
+                bit_nomsu = recurse(bit, i)
                 if bit.type == "Block"
                     -- Rule of thumb: nontrivial one-liner block arguments should be no more
                     -- than golden ratio * the length of the proceeding part of the line
@@ -267,15 +273,15 @@ tree_to_nomsu = (tree)->
                     if next_space == " " and #bit_nomsu\text! < MAX_LINE
                         next_space = "\n.."
                     elseif bit.type == 'Action' or bit.type == "MethodCall"
-                        bit_nomsu = NomsuCode\from bit.source, "(\n    ", tree_to_nomsu(bit), "\n)"
+                        bit_nomsu = NomsuCode\from bit.source, "\n    ", tree_to_nomsu(bit)
                     else
                         bit_nomsu = tree_to_nomsu(bit)
 
-                unless next_space == " " and bit_nomsu\text!\match("^:")
+                unless next_space == " " and bit_nomsu\text!\match("^[:\n]")
                     nomsu\add next_space
 
                 nomsu\add bit_nomsu
-                next_space = (bit.type == 'Block' and bit_nomsu\is_multiline!) and "\n.." or " "
+                next_space = (bit.type == 'Block' or (i > 1 and (bit.type == 'Action' or bit.type == 'MethodCall')) and bit_nomsu\is_multiline!) and "\n.." or " "
 
             if #word_buffer > 0
                 words = table.concat(word_buffer)
@@ -410,7 +416,8 @@ tree_to_nomsu = (tree)->
                 key = {type:"Index", source:key.source, key}
             nomsu\add tree_to_nomsu(key)
             if value
-                nomsu\add " = ", recurse(value)
+                value_nomsu = recurse(value)
+                nomsu\add " = ", value_nomsu
             return nomsu
 
         when "Comment"

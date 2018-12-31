@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     Tool to run all tests in a file (i.e. the code block inside a call to 'test %'). Usage:
     nomsu tools/test.nom file1 file2 directory1 ...
@@ -13,21 +13,26 @@ for $filename in $(COMMAND LINE ARGS).extras: use $filename
 $tests = {: for $s = $t in $TESTS: add (=lua "Source:from_string(\$s)") = $t}
 for $filename in $(COMMAND LINE ARGS).extras:
     $file = (read file $filename)
-    $version = ($file|matching "#![^\n]* nomsu %-V[ ]*([^\n]*)")
+    $version = ($file, matching "#![^\n]* nomsu %-V[ ]*([^\n]*)")
     $file_tests = []
     for $src = $test in $tests:
         if ($src.filename == $filename):
             if $version:
-                $test = "#!/usr/bin/env nomsu -V\$version\n\$test"
-            $file_tests|add {test: $test, source: $src}
+                $test = ("
+                    #!/usr/bin/env nomsu -V\$version
+                    \$test
+                ")
+            $file_tests, add {.test = $test, .source = $src}
     
     unless ($file_tests is empty):
         sort $file_tests by $ -> $.source
         lua> "io.write('[ .. ] ', \$filename); io.flush()"
+        
         if (command line args)."-v": say ""
+        
         for $ in $file_tests:
             if (command line args)."-v":
-                say "    \(yellow ($.test|with "\n" -> "\n    "))"
+                say "    \(yellow ($.test, with "\n" -> "\n    "))"
             run $.test
         
         if (command line args)."-v":

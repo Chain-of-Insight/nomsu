@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -35,7 +35,7 @@ $foobar += 1
 
 # How do I define a multi-line string?
 # In Nomsu, the name "text" is used, rather than "string", and multi-line text looks like:
-$multi_text = "
+$multi_text = ("
     Start with a quotation mark, then put indented lines below it. The indented
     lines will not include the indentation, except when the lines are indented
     more than 4 spaces relative to the original quote mark.
@@ -43,10 +43,11 @@ $multi_text = "
     But this line will have no leading spaces.
     
     The text will continue until a closing quotation at the end of the text's
-    indentation level."
+    indentation level.
+")
 
 # How do I put values inside text? (AKA string formatting, string interpolation)
-say "
+say ("
     Text can contain a backslash followed by a variable, list, dict, or parenthesized
     expression. This escaped value will be converted to readable text, like so:
     The value of %foobar is \$foobar, isn't that nice?
@@ -59,12 +60,13 @@ say "
     Or, two backlashes will be treated as a single backslash, no matter what follows,
     like this: \\%foobar <- won't insert any values
     
-    If you need to split a long line without inserting a newline, you can end a line with backslash and \
-    ..start the next line with two periods, like that.
+    If you need to split a long line without inserting a newline, you can end a line with backslash \
+    ..and start the next line with two periods, like that.
     
-    Similarly, you can put a long interpolated indented value like: \(..)
+    Similarly, you can put a long interpolated indented value like: \(
         1000 + 2000 + 3000 + 4000 + 5000 + 6000 + 7000 + 8000 + 9000
-    ..between a backslash and two periods."
+    ) between a backslash and two periods.
+")
 say "Single-line text can contain escape sequences like \", \\, \000, and \n"
 
 # How do I define a list?
@@ -72,9 +74,10 @@ $my_list = ["first", "second", "third", 4]
 
 # Really long lists can use [..] followed by a bunch of indented values delimited
     by commas and/or newlines
-$my_really_long_list = [..]
+$my_really_long_list = [
     10000, 20000, 30000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000
     120000, 130000, 140000, 150000, 160000, 170000
+]
 
 # How do I use a list?
 # Lists are 1-indexed because they're implemented as Lua tables, so this prints "first"
@@ -84,13 +87,13 @@ say $my_list.1
 $my_list.1 = "ONE!!!"
 
 # Or appended to/removed from:
-$my_list|add "extra item"
-$my_list|pop
+$my_list, add "extra item"
+$my_list, pop
 
 # How do I define a dictionary/hash map?
     One-word text keys don't need quotes, otherwise the key is an expression.
     If the expression is more complex than a literal, it needs parentheses:
-$my_dict = {x: 101, y: 2, "how many bottles": 99, 653: 292, (5 + 6): 11}
+$my_dict = {.x = 101, .y = 2, ."my value" = 99, .653 = 292, .(5 + 6) = 11}
 
 # How do I use a dict?
 # Dicts are also implemented as Lua tables, so they're accessed and modified the same way as lists
@@ -200,12 +203,12 @@ say both "Hello" and also "world!"
 say (first fibonacci above 10)
 
 # Actions can have aliases, which may or may not have the arguments in different order
-[..]
+[
     I hate $worse_things more than $better_things
     I think $worse_things are worse than $better_things
     I like $better_things more than $worse_things
-..all mean:
-    say "\($better_things|capitalized) rule and \$worse_things drool!"
+] all mean:
+    say "\($better_things, capitalized) rule and \$worse_things drool!"
 I like "dogs" more than "cats"
 I think "chihuahuas" are worse than "corgis"
 
@@ -244,8 +247,9 @@ say (2 + 3)
 say (2 + 3)
 
 # If you need to keep going after an indented region, you can start the next line with ".."
-say both "Very long first argument that needs its own line" and also \
+say both "Very long first argument that needs its own line" and also
 .."short second arg"
+
 (my favorite number) means (21 + 2)
 
 # This can be nested:
@@ -313,7 +317,7 @@ say (best of [2, -3, 4, -8] according to (($ squared)'s meaning))
 # But nomsu was designed with flexible alternatives that are often better than passing functions.
     For example, instead of calling a key function on every item, you could instead define a macro
     that gives you a value based on an inlined expression:
-(best of $items where $item has score $key_expr) parses as (..)
+(best of $items where $item has score $key_expr) parses as
     result of:
         $best = (nil)
         $best_key = (nil)

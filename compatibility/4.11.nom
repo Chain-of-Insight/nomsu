@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file defines upgrades from Nomsu <4.11 to Nomsu 4.11
     (overhaul of function literals, deleting (if all of ...), etc. shorthand)
@@ -8,16 +8,16 @@ use "compatibility/compatibility.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Overhaul of function literals:
-upgrade action "call 1 with" to "4.11" via (..)
+upgrade action "call 1 with" to "4.11" via
     for ($tree $end_version):
-        $tree2 = {type: "Action", source: $tree.source, 1: $tree.2}
+        $tree2 = {.type = "Action", .source = $tree.source, .1 = $tree.2}
         for $arg in $tree.4 at $i:
             $tree2.($i + 1) = $arg
         return (SyntaxTree $tree2)
 upgrade action (-> $yield_value) to "4.11" as (yield $yield_value)
 
 # Replace set {%x:1, %y:2} with [%x, %y] = [1, 2]
-upgrade action "set" to "4.11" via (..)
+upgrade action "set" to "4.11" via
     for ($tree $end_version):
         [$lhs, $rhs] = [\[], \[]]
         $lhs.source = $tree.2.source
@@ -25,71 +25,76 @@ upgrade action "set" to "4.11" via (..)
         for $entry in $tree.2 at $i:
             $lhs.$i = $entry.1
             $rhs.$i = $entry.2
-        return (SyntaxTree {type: "Action", source: $tree.source, 1: $lhs, 2: "=", 3: $rhs})
+        
+        return
+            SyntaxTree {
+                .type = "Action", .source = $tree.source, .1 = $lhs, .2 = "=", .3 = $rhs
+            }
 
-upgrade action "1 with 2 ~>" to "4.11" via (..)
+upgrade action "1 with 2 ~>" to "4.11" via
     for $tree:
-        compile error at $tree "This method has been deprecated." \
+        compile error at $tree "This method has been deprecated."
         .."Perhaps this could be use %tree::map instead."
 
 # Changing filesystem API:
-upgrade action (for file $f in $path $body) to "4.11" as (..)
+upgrade action (for file $f in $path $body) to "4.11" as
     for $f in (files for $path) $body
 
-upgrade action ($expr for file $f in $path) to "4.11" as [..]
+upgrade action ($expr for file $f in $path) to "4.11" as [
     : for $f in (files for $path): add $expr
+]
 
-upgrade action (line $n in $text) to "4.11" as ($text|line $n)
-upgrade action (line number of $pos in $text) to "4.11" as (..)
-    $text|line number at $pos
+upgrade action (line $n in $text) to "4.11" as ($text, line $n)
+upgrade action (line number of $pos in $text) to "4.11" as
+    $text, line number at $pos
 
 # Deduplicating goto labels:
 upgrade action [=== $label ===, *** $label ***] to "4.11" as (--- $label ---)
-upgrade action [===stop $label ===, ***stop $label ***] to "4.11" as (..)
+upgrade action [===stop $label ===, ***stop $label ***] to "4.11" as
     ---stop $label ---
 
-upgrade action [===next $label ===, ***next $label ***] to "4.11" as (..)
+upgrade action [===next $label ===, ***next $label ***] to "4.11" as
     ---next $label ---
 
 # Deprecating shorthand functions:
-upgrade action [if all of $items $body, if all of $items then $body] to "4.11" as (..)
+upgrade action [if all of $items $body, if all of $items then $body] to "4.11" as
     if (all of $items) $body
 
-upgrade action [unless all of $items $body, unless all of $items then $body] to \
+upgrade action [unless all of $items $body, unless all of $items then $body] to
 .."4.11" as (if (not (all of $items)) $body)
 
-upgrade action [if any of $items $body, if any of $items then $body] to "4.11" as (..)
+upgrade action [if any of $items $body, if any of $items then $body] to "4.11" as
     if (any of $items) $body
 
-upgrade action [unless any of $items $body, unless any of $items then $body] to \
+upgrade action [unless any of $items $body, unless any of $items then $body] to
 .."4.11" as (if (not (any of $items)) $body)
 
-upgrade action [if none of $items $body, if none of $items then $body] to "4.11" \
+upgrade action [if none of $items $body, if none of $items then $body] to "4.11"
 ..as (if (not (any of $items)) $body)
 
-upgrade action [unless none of $items $body, unless none of $items then $body] to \
+upgrade action [unless none of $items $body, unless none of $items then $body] to
 .."4.11" as (if (any of $items) $body)
 
-upgrade action [..]
+upgrade action [
     if all of $items $body else $else, if all of $items then $body else $else
-..to "4.11" as (if (all of $items) $body else $else)
+] to "4.11" as (if (all of $items) $body else $else)
 
-upgrade action [..]
+upgrade action [
     unless all of $items $body else $else, unless all of $items then $body else $else
-..to "4.11" as (if (not (all of $items)) $body else $else)
+] to "4.11" as (if (not (all of $items)) $body else $else)
 
-upgrade action [..]
+upgrade action [
     if any of $items $body else $else, if any of $items then $body else $else
-..to "4.11" as (if (any of $items) $body else $else)
+] to "4.11" as (if (any of $items) $body else $else)
 
-upgrade action [..]
+upgrade action [
     unless any of $items $body else $else, unless any of $items then $body else $else
-..to "4.11" as (if (not (any of $items)) $body else $else)
+] to "4.11" as (if (not (any of $items)) $body else $else)
 
-upgrade action [..]
+upgrade action [
     if none of $items $body else $else, if none of $items then $body else $else
-..to "4.11" as (if (not (any of $items)) $body else $else)
+] to "4.11" as (if (not (any of $items)) $body else $else)
 
-upgrade action [..]
+upgrade action [
     unless none of $items $body else $else, unless none of $items then $body else $else
-..to "4.11" as (if (any of $items) $body else $else)
+] to "4.11" as (if (any of $items) $body else $else)

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file defines some common math literals and functions
     
@@ -12,9 +12,11 @@ use "core/collections.nom"
 
 # Literals:
 test:
-    assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf \
+    assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf
     .."math constants failed"
+    
     $nan = (NaN)
+    
     assume ($nan != $nan) or barf "NaN failed"
 [infinity, inf] all compile to "math.huge"
 [not a number, NaN, nan] all compile to "(0/0)"
@@ -29,38 +31,47 @@ test:
 (($ as a number)'s meaning) = ((tonumber $)'s meaning)
 (($ as number)'s meaning) = ((tonumber $)'s meaning)
 test:
-    assume (..)
-        all of [..]
+    assume
+        all of [
             abs 5, | 5 |, sqrt 5, √ 5, sine 5, cosine 5, tangent 5, arc sine 5, arc cosine 5
             arc tangent 5, arc tangent 5 / 10, hyperbolic sine 5, hyperbolic cosine 5
             hyperbolic tangent 5, e^ 5, ln 5, log base 2 of 5, floor 5, ceiling 5, round 5
+        ]
     ..or barf "math functions failed"
+
 [absolute value $, | $ |, abs $] all compile to "math.abs(\($ as lua expr))"
-[square root $, square root of $, √ $, sqrt $] all compile to \
+
+[square root $, square root of $, √ $, sqrt $] all compile to
 .."math.sqrt(\($ as lua expr))"
+
 [sine $, sin $] all compile to "math.sin(\($ as lua expr))"
+
 [cosine $, cos $] all compile to "math.cos(\($ as lua expr))"
 [tangent $, tan $] all compile to "math.tan(\($ as lua expr))"
 [arc sine $, asin $] all compile to "math.asin(\($ as lua expr))"
 [arc cosine $, acos $] all compile to "math.acos(\($ as lua expr))"
 [arc tangent $, atan $] all compile to "math.atan(\($ as lua expr))"
-[arc tangent $y / $x, atan2 $y $x] all compile to \
+[arc tangent $y / $x, atan2 $y $x] all compile to
 .."math.atan2(\($y as lua expr), \($x as lua expr))"
+
 [hyperbolic sine $, sinh $] all compile to "math.sinh(\($ as lua expr))"
+
 [hyperbolic cosine $, cosh $] all compile to "math.cosh(\($ as lua expr))"
 [hyperbolic tangent $, tanh $] all compile to "math.tanh(\($ as lua expr))"
 [e^ $, exp $] all compile to "math.exp(\($ as lua expr))"
 [natural log $, ln $, log $] all compile to "math.log(\($ as lua expr))"
-[log $ base $base, log base $base of $] all compile to \
+[log $ base $base, log base $base of $] all compile to
 .."math.log(\($ as lua expr), \($base as lua expr))"
+
 (floor $) compiles to "math.floor(\($ as lua expr))"
+
 [ceiling $, ceil $] all compile to "math.ceil(\($ as lua expr))"
 [round $, $ rounded] all compile to "math.floor(\($ as lua expr) + .5)"
 test:
     assume ((463 to the nearest 100) == 500) or barf "rounding failed"
     assume ((2.6 to the nearest 0.25) == 2.5) or barf "rounding failed"
 
-externally ($n to the nearest $rounder) means (..)
+externally ($n to the nearest $rounder) means
     =lua "(\$rounder)*math.floor((\$n / \$rounder) + .5)"
 
 # Any/all
@@ -140,7 +151,7 @@ externally [product of $items, product $items] all mean:
     %lua::add ")"
     return %lua
     
-externally [avg of $items, average of $items] all mean (..)
+externally [avg of $items, average of $items] all mean
     (sum of $items) / (size of $items)
 
 # Min/max
@@ -150,9 +161,9 @@ externally [min of $items, smallest of $items, lowest of $items] all mean:
         if (($best == (nil)) or ($ < $best)): $best = $
     return $best
 
-externally [..]
+externally [
     max of $items, biggest of $items, largest of $items, highest of $items
-..all mean:
+] all mean:
     $best = (nil)
     for $ in $items:
         if (($best == (nil)) or ($ > $best)): $best = $
@@ -162,7 +173,7 @@ test:
     assume ((min of [3, -4, 1, 2] by $ = ($ * $)) == 1)
     assume ((max of [3, -4, 1, 2] by $ = ($ * $)) == -4)
 
-(min of $items by $item = $value_expr) parses as (..)
+(min of $items by $item = $value_expr) parses as
     result of:
         $best = (nil)
         $best_key = (nil)
@@ -173,7 +184,7 @@ test:
                 $best_key = $key
         return $best
 
-(max of $items by $item = $value_expr) parses as (..)
+(max of $items by $item = $value_expr) parses as
     result of:
         $best = (nil)
         $best_key = (nil)
@@ -186,15 +197,18 @@ test:
 
 # Random functions
 externally (seed random with $) means:
-    lua> "math.randomseed(\$);\nfor i=1,20 do math.random(); end"
+    lua> ("
+        math.randomseed(\$);
+        for i=1,20 do math.random(); end
+    ")
 (seed random) parses as (seed random with (=lua "os.time()"))
 [random number, random, rand] all compile to "math.random()"
-[random int $n, random integer $n, randint $n] all compile to \
+[random int $n, random integer $n, randint $n] all compile to
 .."math.random(\($n as lua expr))"
 
-[random from $low to $high, random number from $low to $high, rand $low $high] \
+[random from $low to $high, random number from $low to $high, rand $low $high]
 ..all compile to "math.random(\($low as lua expr), \($high as lua expr))"
 
-externally [..]
+externally [
     random choice from $elements, random choice $elements, random $elements
-..all mean (=lua "\$elements[math.random(#\$elements)]")
+] all mean (=lua "\$elements[math.random(#\$elements)]")

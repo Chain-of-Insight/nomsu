@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -14,7 +14,7 @@ $ACTION_UPGRADES = ({} with fallback $ -> {})
 externally (upgrade action $stub to $version via $upgrade_fn) means:
     $ACTION_UPGRADES.$version.$stub = $upgrade_fn
 
-(upgrade $tree to $version as $body) parses as (..)
+(upgrade $tree to $version as $body) parses as
     upgrade to $version via (($ $end_version) -> ($ with $tree -> $body))
 
 (upgrade action $actions to $version as $body) compiles to:
@@ -40,29 +40,30 @@ externally (upgrade action $stub to $version via $upgrade_fn) means:
                     $args = []
                     for $k = $v in $t:
                         if ((type of $k) == "number"):
-                            $args|add (make tree $v)
+                            $args, add (make tree $v)
                         ..else:
-                            $args|add "\($k)=\(make tree $v)"
-                    return "SyntaxTree{\($args|joined with ", ")}"
+                            $args, add "\($k)=\(make tree $v)"
+                    return "SyntaxTree{\($args, joined with ", ")}"
                 
                 else:
                     return (quote $t)
         
         unless ("\$lua" == ""):
-            $lua|add "\n"
+            $lua, add "\n"
         
         $retval = (make tree $body)
-        $lua|add (..)
-            Lua "
+        $lua, add
+            Lua ("
                 upgrade_action_1_to_2_via(\(quote $action.stub), \($version as lua expr), function(\(\$tree as lua id))
                     return \$retval
-                end)"
+                end)
+            ")
     return $lua
 
-externally [..]
+externally [
     $tree upgraded from $start_version to $end_version
     $tree upgraded to $end_version from $start_version
-..all mean:
+] all mean:
     unless ($tree is syntax tree): return $tree
     ($ver as list) means (($ as number) for $ in $ver matching "[0-9]+")
     $versions = {}
@@ -77,19 +78,21 @@ externally [..]
         if (($ver as list) <= ($start_version as list)): do next $ver
         if (($ver as list) > ($end_version as list)): stop $ver
         if $ACTION_UPGRADES.$ver:
-            $tree = (..)
+            $tree =
                 $tree with $ ->:
                     if (($ is "Action" syntax tree) and $ACTION_UPGRADES.$ver.($.stub)):
-                        $with_upgraded_args = {..}
+                        $with_upgraded_args = {
                             : for $k = $v in $: add $k = ($v upgraded from $start_version to $end_version)
+                        }
                         set $with_upgraded_args's metatable to ($'s metatable)
                         return ($ACTION_UPGRADES.$ver.($.stub) $with_upgraded_args $end_version)
         
         if $UPGRADES.$ver:
-            $with_upgraded_args = {..}
+            $with_upgraded_args = {
                 :
                     for $k = $v in $tree:
                         add $k = ($v upgraded from $start_version to $end_version)
+            }
             set $with_upgraded_args's metatable to ($tree's metatable)
             $tree = ($UPGRADES.$ver $with_upgraded_args $end_version)
     
@@ -101,13 +104,13 @@ externally [..]
     
     return $tree
 
-externally ($tree upgraded from $start_version) means (..)
+externally ($tree upgraded from $start_version) means
     $tree upgraded from $start_version to (Nomsu version)
 
-externally ($tree upgraded to $end_version) means (..)
+externally ($tree upgraded to $end_version) means
     $tree upgraded from ($tree.version or (Nomsu version)) to $end_version
 
-externally ($tree upgraded) means (..)
+externally ($tree upgraded) means
     $tree upgraded from ($tree.version or (Nomsu version)) to (Nomsu version)
 
 externally (use $path from version $version) means:

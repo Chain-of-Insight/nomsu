@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file contains basic error reporting code
     
@@ -6,33 +6,39 @@ use "core/metaprogramming.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(barf $msg) compiles to \
+(barf $msg) compiles to
 .."error(\(=lua "\$msg and \($msg as lua expr) or 'nil'"), 0);"
 
 (assume $condition) compiles to:
     lua> "local \$assumption = 'Assumption failed: '..tostring((\$condition):get_source_code())"
-    return (..)
-        Lua "
+    
+    return
+        Lua ("
             if not \($condition as lua expr) then
                 error(\(quote "\$assumption"), 0)
-            end"
+            end
+        ")
 
 (assume $a == $b) compiles to:
     lua> "local \$assumption = 'Assumption failed: '..tostring(\(\($a == $b) as nomsu))"
+    
     define mangler
-    return (..)
-        Lua "
+    
+    return
+        Lua ("
             do
                 local \(mangle "a"), \(mangle "b") = \($a as lua expr), \($b as lua expr)
                 if \(mangle "a") ~= \(mangle "b") then
                     error(\(quote "\$assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\(mangle "b")), 0)
                 end
-            end"
+            end
+        ")
 
-(assume $condition or barf $message) compiles to "
+(assume $condition or barf $message) compiles to ("
     if not \($condition as lua expr) then
         error(\($message as lua expr), 0)
-    end"
+    end
+")
 
 test:
     try (barf) and if it succeeds:
@@ -50,10 +56,10 @@ test:
     assume ($x == 3) or barf "do/then always failed"
 
 # Try/except
-[..]
+[
     try $action and if it succeeds $success or if it barfs $msg $fallback
     try $action and if it barfs $msg $fallback or if it succeeds $success
-..all compile to "
+] all compile to ("
     do
         local fell_through = false
         local err, erred = nil, false
@@ -74,7 +80,8 @@ test:
         elseif erred then
             error(err, 0)
         end
-    end"
+    end
+")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -87,14 +94,14 @@ test:
     
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     
-(try $action) parses as (..)
+(try $action) parses as
     try $action and if it succeeds (do nothing) or if it barfs (do nothing)
 
 #(try %action and if it barfs %fallback) parses as (..)
     try %action and if it succeeds (do nothing) or if it barfs %fallback
     
-(try $action and if it barfs $msg $fallback) parses as (..)
+(try $action and if it barfs $msg $fallback) parses as
     try $action and if it succeeds (do nothing) or if it barfs $msg $fallback
 
-(try $action and if it succeeds $success) parses as (..)
+(try $action and if it succeeds $success) parses as
     try $action and if it succeeds $success or if it barfs (do nothing)

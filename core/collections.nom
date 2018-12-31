@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.
@@ -15,35 +15,36 @@ test:
     $visited = {}
     for $i = $x in $list:
         $visited.$i = (yes)
-    assume ($visited == {1, 2, 3, 4, 5})
+    assume ($visited == {.1, .2, .3, .4, .5})
     $visited = {}
     for $x in $list:
         $visited.$x = (yes)
-    assume ($visited == {1, 2, 3, 4, 5})
-    assume (($list|2 nd to last) == 4)
-    assume (($list|first) == 1)
-    assume ($list|has 3)
-    assume (($list|index of 3) == 3)
+    assume ($visited == {.1, .2, .3, .4, .5})
+    assume (($list, 2 nd to last) == 4)
+    assume (($list, first) == 1)
+    assume ($list, has 3)
+    assume (($list, index of 3) == 3)
     assume ((size of $list) == 5)
-    $list|add 6
-    assume (($list|last) == 6)
-    $list|pop
-    assume (($list|last) == 5)
-    $list|remove index 1
-    assume (($list|first) == 2)
+    $list, add 6
+    assume (($list, last) == 6)
+    $list, pop
+    assume (($list, last) == 5)
+    $list, remove index 1
+    assume (($list, first) == 2)
     assume (([1, 2] + [3, 4]) == [1, 2, 3, 4])
 
 # Dict functionality
 test:
-    $dict = {x: 1, y: 2, z: 3}
+    $dict = {.x = 1, .y = 2, .z = 3}
     assume (size of $dict) == 3
-    assume [: for $ in {x: 1}: add $] == [{key: "x", value: 1}]
-    assume [: for $k = $v in {x: 1}: add {key: $k, value: $v}] == [..]
-        {key: "x", value: 1}
-    assume ({x: 1, y: 1} + {y: 10, z: 10}) == {x: 1, y: 11, z: 10}
-    assume ({x: 1, y: 1} | {y: 10, z: 10}) == {x: 1, y: 1, z: 10}
-    assume ({x: 1, y: 1} & {y: 10, z: 10}) == {y: 1}
-    assume ({x: 1, y: 1} ~ {y: 10, z: 10}) == {x: 1, z: 10}
+    assume [: for $ in {.x = 1}: add $] == [{.key = "x", .value = 1}]
+    assume [: for $k = $v in {.x = 1}: add {.key = $k, .value = $v}] == [
+        {.key = "x", .value = 1}
+    ]
+    assume ({.x = 1, .y = 1} + {.y = 10, .z = 10}) == {.x = 1, .y = 11, .z = 10}
+    assume ({.x = 1, .y = 1} | {.y = 10, .z = 10}) == {.x = 1, .y = 1, .z = 10}
+    assume ({.x = 1, .y = 1} & {.y = 10, .z = 10}) == {.y = 1}
+    assume ({.x = 1, .y = 1} ~ {.y = 10, .z = 10}) == {.x = 1, .z = 10}
 
 test:
     assume (([[1, 2], [3, 4]] flattened) == [1, 2, 3, 4])
@@ -55,34 +56,39 @@ externally ($lists flattened) means:
             for $ in $item:
                 recurse $item on $
         ..else:
-            $flat|add $item
+            $flat, add $item
     return $flat
 
 test:
-    assume ((entries in {x: 1}) == [{key: "x", value: 1}])
+    assume ((entries in {.x = 1}) == [{.key = "x", .value = 1}])
 
-(entries in $dict) parses as [: for $k = $v in $dict: add {key: $k, value: $v}]
+(entries in $dict) parses as [
+    : for $k = $v in $dict: add {.key = $k, .value = $v}
+]
+
 test:
-    assume ((keys in {x: 1}) == ["x"])
+    assume ((keys in {.x = 1}) == ["x"])
+
 [keys in $dict, keys of $dict] all parse as [: for $k = $v in $dict: add $k]
 test:
-    assume ((values in {x: 1}) == [1])
+    assume ((values in {.x = 1}) == [1])
 [values in $dict, values of $dict] all parse as [: for $k = $v in $dict: add $v]
 
 # Metatable stuff
 test:
     $t = {}
-    set $t's metatable to {__tostring: $ -> "XXX"}
+    set $t's metatable to {.__tostring = ($ -> "XXX")}
     assume ("\$t" == "XXX")
 
-(set $dict's metatable to $metatable) compiles to \
+(set $dict's metatable to $metatable) compiles to
 .."setmetatable(\($dict as lua expr), \($metatable as lua expr));"
 
 [$'s metatable, $'metatable] all compile to "getmetatable(\($ as lua expr))"
+
 test:
     assume (({} with fallback $ -> ($ + 1)).10 == 11)
 
-($dict with fallback $key -> $value) compiles to "
+($dict with fallback $key -> $value) compiles to ("
     (function(d)
         local mt = {}
         for k,v in pairs(getmetatable(d) or {}) do mt[k] = v end
@@ -92,7 +98,8 @@ test:
             return value
         end
         return setmetatable(d, mt)
-    end)(\($dict as lua expr))"
+    end)(\($dict as lua expr))
+")
 
 # Sorting
 test:
@@ -101,12 +108,12 @@ test:
     assume ($x == [1, 2, 3])
     sort $x by $ = (- $)
     assume ($x == [3, 2, 1])
-    $keys = {1: 999, 2: 0, 3: 50}
+    $keys = {.1 = 999, .2 = 0, .3 = 50}
     sort $x by $ = $keys.$
     assume ($x == [2, 3, 1])
 (sort $items) compiles to "table.sort(\($items as lua expr));"
-[sort $items by $item = $key_expr, sort $items by $item -> $key_expr] \
-..all parse as (..)
+[sort $items by $item = $key_expr, sort $items by $item -> $key_expr]
+..all parse as
     do:
         $keys = ({} with fallback $item -> $key_expr)
         lua> "table.sort(\$items, function(x,y) return \$keys[x] < \$keys[y] end)"
@@ -121,7 +128,7 @@ externally [$items sorted, sorted $items] all mean:
     sort $copy
     return $copy
 
-[$items sorted by $item = $key, $items sorted by $item -> $key] all parse as (..)
+[$items sorted by $item = $key, $items sorted by $item -> $key] all parse as
     result of:
         $copy = [: for $ in $items: add $]
         sort $copy by $item = $key
@@ -135,6 +142,6 @@ externally (unique $items) means:
     $seen = {}
     for $ in $items:
         unless $seen.$:
-            $unique|add $
+            $unique, add $
             $seen.$ = (yes)
     return $unique

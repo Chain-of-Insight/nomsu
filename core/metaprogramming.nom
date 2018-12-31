@@ -1,11 +1,11 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
     
 lua> "NOMSU_CORE_VERSION = 12"
 lua> "NOMSU_LIB_VERSION = 8"
-lua> "
+lua> ("
     do
         local mangle_index = 0
         function mangler()
@@ -18,13 +18,15 @@ lua> "
     end
     compile.action["define mangler"] = function(compile)
         return LuaCode("local mangle = mangler()")
-    end"
+    end
+")
 
-lua> "
+lua> ("
     compile.action["1 ->"] = function(compile, \$args, \$body)
         if \$args and not \$body then \$args, \$body = {}, \$args end
         local body_lua = SyntaxTree:is_instance(\$body) and compile(\$body) or \$body
-        if SyntaxTree:is_instance(\$body) and \$body.type ~= "Block" then body_lua:prepend("return ") end
+        if SyntaxTree:is_instance(\$body) and \$body.type ~= "Block" then body_lua:prepend("\
+    ..return ") end
         local lua = LuaCode("(function(")
         if SyntaxTree:is_instance(\$args) and (\$args.type == "Action" or \$args.type == "MethodCall") then
             \$args = \$args:get_args()
@@ -34,11 +36,13 @@ lua> "
             if arg_lua == "..." then
                 if i < #\$args then
                     compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
-                        "Extra arguments must come last.", "Try removing any arguments after (*extra arguments*)")
+                        "Extra arguments must come last.", "Try removing any arguments after \
+    ..(*extra arguments*)")
                 end
             elseif not arg_lua:is_lua_id() then
                 compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
-                    "This does not compile to a Lua identifier, so it can't be used as a function argument.",
+                    "This does not compile to a Lua identifier, so it can't be used as a function \
+    ..argument.",
                     "This should probably be a Nomsu variable instead (like $x).")
             end
             lua:add(i > 1 and ", " or "", arg_lua)
@@ -49,7 +53,8 @@ lua> "
         return lua
     end
     compile.action["->"] = compile.action["1 ->"]
-    compile.action["for"] = compile.action["1 ->"]"
+    compile.action["for"] = compile.action["1 ->"]
+")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -74,7 +79,7 @@ test:
     asdf
     assume ($tmp is (nil)) or barf "compile to is leaking variables"
 
-lua> "
+lua> ("
     compile.action["1 compiles to"] = function(compile, \$action, \$body)
         local \$args = List{\(\$compile), unpack(\$action:get_args())}
         if \$body.type == "Text" then
@@ -82,12 +87,13 @@ lua> "
         end
         return LuaCode("compile.action[", \$action:get_stub():as_lua(),
             "] = ", \(\($args -> $body) as lua))
-    end"
+    end
+")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ($actions all compile to $body) compiles to:
-    lua> "
+    lua> ("
         if \$actions.type ~= "List" then
             compile_error(\$actions, "This should be a list of actions.")
         end
@@ -108,13 +114,14 @@ lua> "
                 lua:add(") end")
             end
         end
-        return lua"
+        return lua
+    ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
     (foo $x) means "outer"
-    with {((foo $)'s meaning)}:
+    with [(foo $)'s meaning]:
         (foo $x) means:
             $y = ($x + 1)
             return $y
@@ -124,7 +131,7 @@ test:
     assume ((foo 1) == "outer")
 
 ($action means $body) compiles to:
-    lua> "
+    lua> ("
         
         local lua = LuaCode()
         if \$action.type == "MethodCall" then
@@ -136,10 +143,11 @@ test:
             compile_error_at(\$action, "Expected an action or method call here")
         end
         lua:add(" = ", \(\($action -> $body) as lua), ";")
-        return lua"
+        return lua
+    ")
 
 ($actions all mean $body) compiles to:
-    lua> "
+    lua> ("
         local lua = \(\($actions.1 means $body) as lua)
         local first_def = (\$actions[1].type == "MethodCall"
             and LuaCode(compile(\$actions[1][1]), ".", \$actions[1]:get_stub():as_lua_id())
@@ -161,7 +169,8 @@ test:
                 lua:add(" = ", \(\($alias_args -> $actions.1) as lua), ";")
             end
         end
-        return lua"
+        return lua
+    ")
 
 test:
     externally (baz1) means:
@@ -173,23 +182,25 @@ test:
     assume ((baz2) == "baz2")
 
 (externally $action means $body) compiles to:
-    lua> "
+    lua> ("
         local lua = \(\($action means $body) as lua)
         lua:remove_free_vars({\$action:get_stub():as_lua_id()})
-        return lua"
+        return lua
+    ")
 
 (externally $actions all mean $body) compiles to:
-    lua> "
+    lua> ("
         local lua = \(\($actions all mean $body) as lua)
         lua:remove_free_vars(table.map(\$actions, function(a) return a:get_stub():as_lua_id() end))
-        return lua"
+        return lua
+    ")
 
 test:
     assume (((say $)'s meaning) == (=lua "say"))
 
-($action's meaning) compiles to (Lua (($action|get stub)|as lua id))
+($action's meaning) compiles to (Lua ($action, get stub, as lua id))
 test:
-    (swap $x and $y) parses as (..)
+    (swap $x and $y) parses as
         do:
             $tmp = $x
             $x = $y
@@ -198,15 +209,17 @@ test:
 test:
     [$1, $2] = [1, 2]
     swap $1 and $2
-    assume (($1 == 2) and ($2 == 1)) or barf \
+    assume (($1 == 2) and ($2 == 1)) or barf
     .."'parse % as %' failed on 'swap % and %'"
+    
     [$tmp, $tmp2] = [1, 2]
+    
     swap $tmp and $tmp2
-    assume (($tmp == 2) and ($tmp2 == 1)) or barf \
+    assume (($tmp == 2) and ($tmp2 == 1)) or barf
     .."'parse % as %' variable mangling failed."
 
 ($actions all parse as $body) compiles to:
-    lua> "
+    lua> ("
         local replacements = {}
         if \$actions.type ~= "List" then
             compile_error(\$actions, "This should be a list.")
@@ -219,8 +232,8 @@ test:
                 if replacements[t[1]] then
                     return replacements[t[1]]
                 else
-                    return "SyntaxTree{mangle("..t[1]:as_lua().."), type="..t.type:as_lua()..", source="..tostring(\
-        ..t.source):as_lua().."}"
+                    return "SyntaxTree{mangle("..t[1]:as_lua().."), type="..t.type:as_lua()..", \
+        ..source="..tostring(t.source):as_lua().."}"
                 end
             elseif SyntaxTree:is_instance(t) then
                 local ret = {}
@@ -248,7 +261,8 @@ test:
             "local mangle = mangler()",
             "\\nreturn ", make_tree(\$body))
         local ret = \(\($actions all compile to $new_body) as lua)
-        return ret"
+        return ret
+    ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -256,25 +270,28 @@ test:
 
 #(%tree as lua expr) compiles to "compile(\(=lua "compile(\%tree, true)"), true)"
 externally ($tree as lua expr) means:
-    lua> "
+    lua> ("
         local tree_lua = compile(\$tree)
         if \$tree.type == 'Block' then
             tree_lua = LuaCode:from(\$tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
         elseif \$tree.type == 'MethodCall' and #\$tree > 2 then
-            compile_error_at(\$tree, "This must be a single value instead of "..(#\$tree - 1).." method calls.",
+            compile_error_at(\$tree, "This must be a single value instead of "..(#\$tree - 1).."\
+        .. method calls.",
                 "Replace this with a single method call.")
         end
-        return tree_lua"
+        return tree_lua
+    ")
 
 externally [$var as lua identifier, $var as lua id] all mean:
-    lua> "
+    lua> ("
         local lua = \($var as lua)
         if not lua:text():is_a_lua_id() then
             compile_error(\$var,
                 "This is supposed to be something that compiles to a valid Lua identifier.",
                 "This should probably be a variable.")
         end
-        return lua"
+        return lua
+    ")
 
 test:
     (num args (*extra arguments*)) means (select "#" (*extra arguments*))
@@ -285,40 +302,46 @@ test:
     assume (third arg 5 6 7 8) == 7
 
 (*extra arguments*) compiles to "..."
+
 ($ is syntax tree) compiles to "SyntaxTree:is_instance(\($ as lua expr))"
-externally ($ is $kind syntax tree) means (..)
+
+externally ($ is $kind syntax tree) means
     =lua "SyntaxTree:is_instance(\$) and \$.type == \$kind"
 
-($tree with $t -> $replacement) compiles to "
+($tree with $t -> $replacement) compiles to ("
     \($tree as lua expr):map(function(\($t as lua expr))
         \(=lua "\$replacement.type == 'Block' and \($replacement as lua) or 'return '..\($replacement as lua expr)")
-    end)"
+    end)
+")
 
-externally ($tree with vars $replacements) means (..)
-    =lua "
+externally ($tree with vars $replacements) means
+    =lua ("
         \$tree:map(function(\$t)
             if \$t.type == "Var" then
                 return \$replacements[\$t[1]]
             end
-        end)"
+        end)
+    ")
 
-(tree $tree with vars $replacements) compiles to "
+(tree $tree with vars $replacements) compiles to ("
     \(=lua "(\$tree):as_lua()"):map(function(t)
         if t.type == "Var" then
             return \($replacements as lua expr)[t[1]]
         end
-    end)"
+    end)
+")
 
-($tree has subtree $match_tree) compiles to "
+($tree has subtree $match_tree) compiles to ("
     (function()
         local match_tree = \($match_tree as lua expr)
         for subtree in coroutine_wrap(function() \($tree as lua expr):map(yield) end) do
             if subtree == match_tree then return true end
         end
-    end)()"
+    end)()
+")
 
 externally (match $tree with $patt) means:
-    lua> "
+    lua> ("
         if \$patt.type == "Var" then return Dict{[\$patt[1]]=\$tree} end
         if \$patt.type == "Action" and \$patt:get_stub() ~= \$tree:get_stub() then return nil end
         if #\$patt ~= #\$tree then return nil end
@@ -333,7 +356,8 @@ externally (match $tree with $patt) means:
                 end
             end
         end
-        return matches"
+        return matches
+    ")
 
 test:
     assume ((quote "one\n\"two\"") == "\"one\\n\\\"two\\\"\"")
@@ -346,21 +370,22 @@ test:
     assume ("" is text)
     assume ("" isn't a "Dict")
 externally ($ is text) means (=lua "\(lua type of $) == 'string'")
-externally [$ is not text, $ isn't text] all mean (..)
+externally [$ is not text, $ isn't text] all mean
     =lua "\(lua type of $) ~= 'string'"
 
 externally (type of $) means:
-    lua> "
+    lua> ("
         local lua_type = \(lua type of $)
         if lua_type == 'string' then return 'Text'
         elseif lua_type == 'table' or lua_type == 'userdata' then
             local mt = getmetatable(\$)
             if mt and mt.__type then return mt.__type end
         end
-        return lua_type"
+        return lua_type
+    ")
 
 [$ is a $type, $ is an $type] all parse as ((type of $) == $type)
-[$ isn't a $type, $ isn't an $type, $ is not a $type, $ is not an $type] \
+[$ isn't a $type, $ isn't an $type, $ is not a $type, $ is not an $type]
 ..all parse as ((type of $) != $type)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -374,7 +399,7 @@ test:
     assume $x == 1
     assume (run \(return \(\(5) + \(5)))) == 10
 (run $nomsu_code) compiles to "run_1_in(\($nomsu_code as lua expr), _ENV)"
-[compile $block, compiled $block, $block compiled] all compile to \
+[compile $block, compiled $block, $block compiled] all compile to
 .."compile(\($block as lua))"
 
 test:
@@ -385,14 +410,15 @@ test:
 # Return statement is wrapped in a do..end block because Lua is unhappy if you
     put code after a return statement, unless you wrap it in a block.
 (return (*extra arguments*)) compiles to:
-    lua> "
+    lua> ("
         local lua = \(Lua "do return ")
         for i=1,select('#',...) do
             if i > 1 then lua:add(", ") end
             lua:add(_1_as_lua((select(i, ...))))
         end
         lua:add(" end")
-        return lua"
+        return lua
+    ")
 
 # Literals
 (yes) compiles to "true"
@@ -406,14 +432,15 @@ test:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(with local compile actions $body) compiles to "
+(with local compile actions $body) compiles to ("
     do
         --local compile = _1_forked(compile)
         local old_action = compile.action
         compile.action = _1_forked(old_action)
         \($body as lua)
         compile.action = old_action
-    end"
+    end
+")
 
 externally (Nomsu version) means:
     return "\(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)"

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -19,23 +19,25 @@ test:
     if (no):
         barf "conditional fail"
 
-(if $condition $if_body) compiles to "
+(if $condition $if_body) compiles to ("
     if \($condition as lua expr) then
         \($if_body as lua)
-    end"
+    end
+")
 
 test:
     unless (yes):
         barf "conditional fail"
 
 (unless $condition $unless_body) parses as (if (not $condition) $unless_body)
-[if $condition $if_body else $else_body, unless $condition $else_body else $if_body] \
-..all compile to "
+[if $condition $if_body else $else_body, unless $condition $else_body else $if_body]
+..all compile to ("
     if \($condition as lua expr) then
         \($if_body as lua)
     else
         \($else_body as lua)
-    end"
+    end
+")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -46,29 +48,31 @@ test:
     assume ((1 if (yes) else 2) == 1)
     assume ((1 if (no) else 2) == 2)
 
-[..]
+[
     $when_true_expr if $condition else $when_false_expr
     $when_true_expr if $condition otherwise $when_false_expr
     $when_false_expr unless $condition else $when_true_expr
     $when_false_expr unless $condition then $when_true_expr
-..all compile to:
+] all compile to:
     #   If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
         equivalent of a conditional expression: (cond and if_true or if_false)
-    if {Text, List, Dict, Number}.($when_true_expr.type):
-        return (Lua "(\($condition as lua expr) and \($when_true_expr as lua expr) or \($when_false_expr as lua expr))")
+    if {.Text, .List, .Dict, .Number}.($when_true_expr.type):
+        return
+            Lua "(\($condition as lua expr) and \($when_true_expr as lua expr) or \($when_false_expr as lua expr))"
     ..else:
         #   Otherwise, need to do an anonymous inline function (yuck, too bad lua 
             doesn't have a proper ternary operator!)
             To see why this is necessary consider: (random()<.5 and false or 99)
-        return (..)
-            Lua "
+        return
+            Lua ("
                 ((function()
                     if \($condition as lua expr) then
                         return \($when_true_expr as lua expr)
                     else
                         return \($when_false_expr as lua expr)
                     end
-                end)())"
+                end)())
+            ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -86,17 +90,19 @@ test:
         go to (Loop)
     assume ($i == 0)
 
-(--- $label ---) compiles to "
-    ::label_\(..)
-        ($label.stub|as lua id) if ($label.type == "Action") else (..)
+(--- $label ---) compiles to ("
+    ::label_\(
+        ($label.stub, as lua id) if ($label.type == "Action") else
             $label as lua identifier
-    ..::"
+    )::
+")
 
-(go to $label) compiles to "
-    goto label_\(..)
-        ($label.stub|as lua id) if ($label.type == "Action") else (..)
+(go to $label) compiles to ("
+    goto label_\(
+        ($label.stub, as lua id) if ($label.type == "Action") else
             $label as lua identifier
-    .."
+    )
+")
 
 # Basic loop control
 (stop $var) compiles to:
@@ -131,8 +137,8 @@ test:
 (repeat while $condition $body) compiles to:
     $lua = (Lua "while \($condition as lua expr) do\n    \($body as lua)")
     if ($body has subtree \(do next)):
-        $lua|add "\n    ::continue::"
-    $lua|add "\nend --while-loop"
+        $lua, add "\n    ::continue::"
+    $lua, add "\nend --while-loop"
     return $lua
 
 (repeat $body) parses as (repeat while (yes) $body)
@@ -143,50 +149,52 @@ test:
 test:
     $nums = []
     for $x in 1 to 5:
-        $nums|add $x
+        $nums, add $x
     assume ($nums == [1, 2, 3, 4, 5])
     $nums = []
     for $x in 1 to 5 via 2:
-        $nums|add $x
+        $nums, add $x
     assume ($nums == [1, 3, 5])
     $nums = []
     for $outer in 1 to 100:
         for $inner in $outer to ($outer + 2):
             if ($inner == 2):
-                $nums|add -2
+                $nums, add -2
                 do next $inner
-            $nums|add $inner
+            $nums, add $inner
             if ($inner == 5):
                 stop $outer
     assume ($nums == [1, -2, 3, -2, 3, 4, 3, 4, 5])
 
 # Numeric range for loops
-[..]
+[
     for $var in $start to $stop by $step $body
     for $var in $start to $stop via $step $body
-..all compile to:
+] all compile to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
-    $lua = (Lua "for \($var as lua identifier)=\($start as lua expr),\($stop as lua expr),\($step as lua expr) do")
-    $lua|add "\n    " ($body as lua)
+    $lua =
+        Lua "for \($var as lua identifier)=\($start as lua expr),\($stop as lua expr),\($step as lua expr) do"
+    $lua, add "\n    " ($body as lua)
     if ($body has subtree \(do next)):
-        $lua|add "\n    ::continue::"
+        $lua, add "\n    ::continue::"
     
     if ($body has subtree \(do next $var)):
-        $lua|add "\n    " (\(---next $var ---) as lua)
+        $lua, add "\n    " (\(---next $var ---) as lua)
     
-    $lua|add "\nend -- numeric for " ($var as lua identifier) " loop"
+    $lua, add "\nend -- numeric for " ($var as lua identifier) " loop"
     if ($body has subtree \(stop $var)):
-        $lua = (..)
-            Lua "
+        $lua =
+            Lua ("
                 do -- scope for (stop \($var as lua identifier))
                     \$lua
                     \(\(---stop $var ---) as lua)
-                end -- scope for (stop \($var as lua identifier))"
+                end -- scope for (stop \($var as lua identifier))
+            ")
     return $lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(for $var in $start to $stop $body) parses as (..)
+(for $var in $start to $stop $body) parses as
     for $var in $start to $stop via 1 $body
 
 test:
@@ -200,7 +208,7 @@ test:
     $a = [10, 20, 30, 40, 50]
     $b = []
     for $x in $a:
-        $b|add $x
+        $b, add $x
     assume ($a == $b)
     $b = []
     for $x in $a:
@@ -210,37 +218,38 @@ test:
         if ($x == 50):
             stop $x
         
-        $b|add $x
+        $b, add $x
     assume ($b == [20, 30, 40])
 
 # For-each loop (lua's "ipairs()")
 (for $var in $iterable at $i $body) compiles to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
-    $lua = (..)
-        Lua "
+    $lua =
+        Lua ("
             for \($i as lua identifier),\($var as lua identifier) in ipairs(\($iterable as lua expr)) do
-                "
-    $lua|add ($body as lua)
+                \;
+        ")
+    $lua, add ($body as lua)
     if ($body has subtree \(do next)):
-        $lua|add "\n    ::continue::"
+        $lua, add "\n    ::continue::"
     
     if ($body has subtree \(do next $var)):
-        $lua|add "\n    " (\(---next $var ---) as lua)
+        $lua, add "\n    " (\(---next $var ---) as lua)
     
-    $lua|add "\nend --for \($var as lua identifier) loop"
+    $lua, add "\nend --for \($var as lua identifier) loop"
     if ($body has subtree \(stop $var)):
         $inner_lua = $lua
         $lua = (Lua "do -- scope for stopping for-loop\n    ")
-        $lua|add $inner_lua "\n    "
-        $lua|add (\(---stop $var ---) as lua)
-        $lua|add "\nend -- end of scope for stopping for-loop"
+        $lua, add $inner_lua "\n    "
+        $lua, add (\(---stop $var ---) as lua)
+        $lua, add "\nend -- end of scope for stopping for-loop"
     return $lua
 
-(for $var in $iterable $body) parses as (..)
+(for $var in $iterable $body) parses as
     for $var in $iterable at (=lua "__") $body
 
 test:
-    $d = {a: 10, b: 20, c: 30, d: 40, e: 50}
+    $d = {.a = 10, .b = 20, .c = 30, .d = 40, .e = 50}
     $result = []
     for $k = $v in $d:
         if ($k == "a"):
@@ -249,35 +258,36 @@ test:
         if ($v == 20):
             do next $v
         
-        $result|add "\$k = \$v"
+        $result, add "\$k = \$v"
     assume (($result sorted) == ["c = 30", "d = 40", "e = 50"])
 
 # Dict iteration (lua's "pairs()")
-[for $key = $value in $iterable $body, for $key $value in $iterable $body] \
+[for $key = $value in $iterable $body, for $key $value in $iterable $body]
 ..all compile to:
-    $lua = (Lua "for \($key as lua identifier),\($value as lua identifier) in pairs(\($iterable as lua expr)) do")
-    $lua|add "\n    " ($body as lua)
+    $lua =
+        Lua "for \($key as lua identifier),\($value as lua identifier) in pairs(\($iterable as lua expr)) do"
+    $lua, add "\n    " ($body as lua)
     if ($body has subtree \(do next)):
-        $lua|add "\n    ::continue::"
+        $lua, add "\n    ::continue::"
     
     if ($body has subtree \(do next $key)):
-        $lua|add "\n    " (\(---next $key ---) as lua)
+        $lua, add "\n    " (\(---next $key ---) as lua)
     
     if ($body has subtree \(do next $value)):
-        $lua|add "\n    " (\(---next $value ---) as lua)
+        $lua, add "\n    " (\(---next $value ---) as lua)
     
-    $lua|add "\nend --foreach-loop"
+    $lua, add "\nend --foreach-loop"
     $stop_labels = (Lua "")
     if ($body has subtree \(stop $key)):
-        $stop_labels|add "\n" (\(---stop $key ---) as lua)
+        $stop_labels, add "\n" (\(---stop $key ---) as lua)
     
     if ($body has subtree \(stop $value)):
-        $stop_labels|add "\n" (\(---stop $value ---) as lua)
+        $stop_labels, add "\n" (\(---stop $value ---) as lua)
     
     if ((size of "\$stop_labels") > 0):
         $inner_lua = $lua
         $lua = (Lua "do -- scope for stopping for % = % loop\n    ")
-        $lua|add $inner_lua $stop_labels "\nend"
+        $lua, add $inner_lua $stop_labels "\nend"
     
     return $lua
 
@@ -303,45 +313,58 @@ test:
     $clause = "if"
     $else_allowed = (yes)
     unless ($body.type is "Block"):
-        compile error at $body "'if' expected a Block, but got a \($body.type)." \
+        compile error at $body "'if' expected a Block, but got a \($body.type)."
         .."Perhaps you forgot to put a ':' after 'if'?"
     
     for $line in $body:
-        unless (..)
-            (($line.type is "Action") and ((size of $line) >= 2)) and (..)
+        unless
+            (($line.type is "Action") and ((size of $line) >= 2)) and
                 $line.(size of $line) is "Block" syntax tree
         ..:
-            compile error at $line "Invalid line for the body of an 'if' block." "
-                Each line should contain one or more conditional expressions followed by a block, or "else" followed \
-                ..by a block."
+            compile error at $line "Invalid line for the body of an 'if' block." ("
+                Each line should contain one or more conditional expressions followed by a block, or "else"\
+                .. followed by a block.
+            ")
         $action = $line.(size of $line)
         if (($line.1 is "else") and ((size of $line) == 2)):
             unless $else_allowed:
-                compile error at $line "You can't have two 'else' blocks." \
+                compile error at $line "You can't have two 'else' blocks."
                 .."Merge all of the 'else' blocks together."
             
             unless ((size of "\$code") > 0):
-                compile error at $line \
-                .."You can't have an 'else' block without a preceding condition" "
-                    If you want the code in this block to always execute, you don't need a conditional block around it. \
-                    ..Otherwise, make sure the 'else' block comes last."
+                compile error at $line
+                .."You can't have an 'else' block without a preceding condition" ("
+                    If you want the code in this block to always execute, you don't need a conditional block \
+                    ..around it. Otherwise, make sure the 'else' block comes last.
+                ")
             
-            $code|add "\nelse\n    " ($action as lua)
+            $code, add ("
+                
+                else
+                    \;
+            ") ($action as lua)
+            
             $else_allowed = (no)
         ..else:
-            $code|add $clause " "
+            $code, add $clause " "
             for $i in 1 to ((size of $line) - 1):
                 if ($i > 1):
-                    $code|add " or "
-                $code|add ($line.$i as lua expr)
-            $code|add " then\n    " ($action as lua)
+                    $code, add " or "
+                $code, add ($line.$i as lua expr)
+            
+            $code, add ("
+                 then
+                    \;
+            ") ($action as lua)
+            
             $clause = "\nelseif"
     
     if ((size of "\$code") == 0):
-        compile error at $body "'if' block has an empty body." \
+        compile error at $body "'if' block has an empty body."
         .."This means nothing would happen, so the 'if' block should be deleted."
     
-    $code|add "\nend --when"
+    $code, add "\nend --when"
+    
     return $code
 
 test:
@@ -365,53 +388,72 @@ test:
     $else_allowed = (yes)
     define mangler
     unless ($body.type is "Block"):
-        compile error at $body "'if' expected a Block, but got a \($body.type)" \
+        compile error at $body "'if' expected a Block, but got a \($body.type)"
         .."Perhaps you forgot to put a ':' after the 'is'?"
     
     for $line in $body:
-        unless (..)
-            (($line.type is "Action") and ((size of $line) >= 2)) and (..)
+        unless
+            (($line.type is "Action") and ((size of $line) >= 2)) and
                 $line.(size of $line) is "Block" syntax tree
         ..:
-            compile error at $line "Invalid line for 'if' block." "
-                Each line should contain expressions followed by a block, or "else" followed by a block"
+            compile error at $line "Invalid line for 'if' block." ("
+                Each line should contain expressions followed by a block, or "else" followed by a block
+            ")
         $action = $line.(size of $line)
         if (($line.1 is "else") and ((size of $line) == 2)):
             unless $else_allowed:
-                compile error at $line "You can't have two 'else' blocks." \
+                compile error at $line "You can't have two 'else' blocks."
                 .."Merge all of the 'else' blocks together."
             
             unless ((size of "\$code") > 0):
-                compile error at $line \
-                .."You can't have an 'else' block without a preceding condition" "
-                    If you want the code in this block to always execute, you don't need a conditional block around it. \
-                    ..Otherwise, make sure the 'else' block comes last."
+                compile error at $line
+                .."You can't have an 'else' block without a preceding condition" ("
+                    If you want the code in this block to always execute, you don't need a conditional block \
+                    ..around it. Otherwise, make sure the 'else' block comes last.
+                ")
             
-            $code|add "\nelse\n    " ($action as lua)
+            $code, add ("
+                
+                else
+                    \;
+            ") ($action as lua)
+            
             $else_allowed = (no)
         ..else:
-            $code|add $clause " "
+            $code, add $clause " "
             for $i in 1 to ((size of $line) - 1):
                 if ($i > 1):
-                    $code|add " or "
-                $code|add "\(mangle "branch value") == " ($line.$i as lua expr)
-            $code|add " then\n    " ($action as lua)
+                    $code, add " or "
+                $code, add "\(mangle "branch value") == " ($line.$i as lua expr)
+            
+            $code, add ("
+                 then
+                    \;
+            ") ($action as lua)
+            
             $clause = "\nelseif"
     
     if ((size of "\$code") == 0):
-        compile error at $body "'if' block has an empty body." \
+        compile error at $body "'if' block has an empty body."
         .."This means nothing would happen, so the 'if' block should be deleted."
     
-    $code|add "\nend --when"
-    return (..)
-        Lua "
+    $code, add "\nend --when"
+    
+    return
+        Lua ("
             do --if % is...
                 local \(mangle "branch value") = \($branch_value as lua expr)
                 \$code
-            end -- if % is..."
+            end -- if % is...
+        ")
 
 # Do/finally
-(do $action) compiles to "do\n    \($action as lua)\nend -- do"
+(do $action) compiles to ("
+    do
+        \($action as lua)
+    end -- do
+")
+
 test:
     $d = {}
     try:
@@ -424,8 +466,8 @@ test:
 
 (do $action then always $final_action) compiles to:
     define mangler
-    return (..)
-        Lua "
+    return
+        Lua ("
             do
                 local \(mangle "fell_through") = false
                 local \(mangle "ok"), \(mangle "ret") = pcall(function()
@@ -435,7 +477,8 @@ test:
                 \($final_action as lua)
                 if not \(mangle "ok") then error(ret, 0) end
                 if not \(mangle "fell_through") then return ret end
-            end"
+            end
+        ")
 
 test:
     assume ((result of: return 99) == 99)
@@ -450,32 +493,33 @@ test:
             for $2 in $:
                 recurse $ on $2
         ..else:
-            $flat|add $
+            $flat, add $
     assume (sorted $flat) == [1, 2, 3, 4, 5, 6]
 
 # Recurion control flow
 (for $var in recursive $structure $body) compiles to:
     with local compile actions:
         define mangler
-        (recurse $v on $x) compiles to (..)
+        (recurse $v on $x) compiles to
             Lua "table.insert(\(mangle "stack \($v.1)"), \($x as lua expr))"
         
-        $lua = (..)
-            Lua "
+        $lua =
+            Lua ("
                 do
                     local \(mangle "stack \($var.1)") = List{\($structure as lua expr)}
                     while #\(mangle "stack \($var.1)") > 0 do
                         \($var as lua expr) = table.remove(\(mangle "stack \($var.1)"), 1)
-                        \($body as lua)"
+                        \($body as lua)
+            ")
         
         if ($body has subtree \(do next)):
-            $lua|add "\n        ::continue::"
+            $lua, add "\n        ::continue::"
         
         if ($body has subtree \(do next $var)):
-            $lua|add "\n        \(\(---next $var ---) as lua)"
+            $lua, add "\n        \(\(---next $var ---) as lua)"
         
-        $lua|add "\n    end -- Recursive loop"
+        $lua, add "\n    end -- Recursive loop"
         if ($body has subtree \(stop $var)):
-            $lua|add "\n        \(\(---stop $var ---) as lua)"
-        $lua|add "\nend -- Recursive scope"
+            $lua, add "\n        \(\(---stop $var ---) as lua)"
+        $lua, add "\nend -- Recursive scope"
         return $lua

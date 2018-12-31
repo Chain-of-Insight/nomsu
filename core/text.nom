@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -12,16 +12,22 @@ use "core/control_flow.nom"
 test:
     assume "\[1, 2, 3]" == "[1, 2, 3]"
     assume "foo = \(1 + 2)!" == "foo = 3!"
-    assume "one\ntwo" == "one\ntwo"
+    assume ("
+        one
+        two
+    ") == ("
+        one
+        two
+    ")
     assume "nogap" == "nogap"
-    assume (["x", "y"]|joined with ",") == "x,y"
-    assume (["x", "y"]|joined) == "xy"
-    assume ("BAR"|byte 2) == 65
-    assume ("BAR"|bytes 1 to 2) == [66, 65]
-    assume ("asdf"|capitalized) == "Asdf"
-    assume ("asdf"|uppercase) == "ASDF"
-    assume ("asdf"|with "s" -> "X") == "aXdf"
-    assume ("one\ntwo\n"|lines) == ["one", "two", ""]
+    assume (["x", "y"], joined with ",") == "x,y"
+    assume (["x", "y"], joined) == "xy"
+    assume ("BAR", byte 2) == 65
+    assume ("BAR", bytes 1 to 2) == [66, 65]
+    assume ("asdf", capitalized) == "Asdf"
+    assume ("asdf", uppercase) == "ASDF"
+    assume ("asdf", with "s" -> "X") == "aXdf"
+    assume ("one\ntwo\n", lines) == ["one", "two", ""]
     ($spec とは $body) parses as ($spec means $body)
 
 test:
@@ -31,15 +37,16 @@ test:
 
 ($expr for $match in $text matching $patt) compiles to:
     define mangler
-    return (..)
-        Lua "
+    return
+        Lua ("
             (function()
                 local \(mangle "comprehension") = List{}
                 for \($match as lua expr) in (\($text as lua expr)):gmatch(\($patt as lua expr)) do
                     \(mangle "comprehension")[#\(mangle "comprehension")+1] = \($expr as lua)
                 end
                 return \(mangle "comprehension")
-            end)()"
+            end)()
+        ")
 
 test:
     assume "\n" == (newline)
@@ -49,15 +56,16 @@ test:
 
 externally ($num as hex) means:
     if ($num < 0):
-        return ("-0x%X"|formatted with (- $num))
+        return ("-0x%X", formatted with (- $num))
     ..else:
-        return ("0x%X"|formatted with $num)
+        return ("0x%X", formatted with $num)
 
 # Text literals
-$escapes = {..}
-    nl: "\n", newline: "\n", tab: "\t", bell: "\a", cr: "\r", "carriage return": "\r"
-    backspace: "\b", "form feed": "\f", formfeed: "\f", "vertical tab": "\v"
+$escapes = {
+    .nl = "\n", .newline = "\n", .tab = "\t", .bell = "\a", .cr = "\r", ."carriage return" = "\r"
+    .backspace = "\b", ."form feed" = "\f", .formfeed = "\f", ."vertical tab" = "\v"
+}
 
 for $name = $str in $escapes:
-    with {$lua: Lua (quote $str)}:
+    with [$lua = (Lua (quote $str))]:
         $compile.action.$name = (-> $lua)

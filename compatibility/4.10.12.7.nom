@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     This file defines upgrades from Nomsu <4.10.12.7 to 4.10.12.7
 use "compatibility/compatibility.nom"
@@ -6,42 +6,53 @@ use "compatibility/compatibility.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 upgrade action ($ as lua statements) to "4.10.12.7" as ($ as lua)
-upgrade action ($ as lua return) to "4.10.12.7" as (..)
+upgrade action ($ as lua return) to "4.10.12.7" as
     =lua "\$.type == 'Block' and \($ as lua) or 'return '..\($ as lua expr)"
+
 upgrade action (Lua value $) to "4.10.12.7" as (Lua $)
+
 upgrade action ($e for $ in $items) to "4.10.12.7" as [: for $ in $items: add $e]
-upgrade action ($e for $k = $v in $items) to "4.10.12.7" as [..]
+upgrade action ($e for $k = $v in $items) to "4.10.12.7" as [
     : for $k = $v in $items: add $e
+]
 
-upgrade action ($e for $i in $start to $stop) to "4.10.12.7" as [..]
+upgrade action ($e for $i in $start to $stop) to "4.10.12.7" as [
     : for $i in $start to $stop: add $e
+]
 
-upgrade action ($e for $i in $start to $stop by $step) to "4.10.12.7" as [..]
+upgrade action ($e for $i in $start to $stop by $step) to "4.10.12.7" as [
     : for $i in $start to $stop by $step: add $e
+]
 
-upgrade action ($e for $i in $start to $stop via $step) to "4.10.12.7" as [..]
+upgrade action ($e for $i in $start to $stop via $step) to "4.10.12.7" as [
     : for $i in $start to $stop by $step: add $e
+]
 
-upgrade action ($k = $v for $ in $items) to "4.10.12.7" as {..}
+upgrade action ($k = $v for $ in $items) to "4.10.12.7" as {
     : for $ in $items: add $k = $v
+}
 
-upgrade action ($k = $v for $k0 = $v0 in $items) to "4.10.12.7" as {..}
+upgrade action ($k = $v for $k0 = $v0 in $items) to "4.10.12.7" as {
     : for $k0 = $v0 in $items: add $k = $v
+}
 
-upgrade action ($k = $v for $i in $start to $stop) to "4.10.12.7" as {..}
+upgrade action ($k = $v for $i in $start to $stop) to "4.10.12.7" as {
     : for $i in $start to $stop: add $k = $v
+}
 
-upgrade action ($k = $v for $i in $start to $stop by $step) to "4.10.12.7" as {..}
+upgrade action ($k = $v for $i in $start to $stop by $step) to "4.10.12.7" as {
     : for $i in $start to $stop by $step: add $k = $v
+}
 
-upgrade action ($k = $v for $i in $start to $stop via $step) to "4.10.12.7" as {..}
+upgrade action ($k = $v for $i in $start to $stop via $step) to "4.10.12.7" as {
     : for $i in $start to $stop by $step: add $k = $v
+}
 
-upgrade action (parse $text from $filename) to "4.10.12.7" as (..)
+upgrade action (parse $text from $filename) to "4.10.12.7" as
     (NomsuCode from (Source $filename 1 (size of $text)) $text) parsed
 
 upgrade action ($ as lua statements) to "4.10.12.7" as ($ as lua)
-upgrade action (compile error at $pos $err hint $hint) to "4.10.12.7" as (..)
+upgrade action (compile error at $pos $err hint $hint) to "4.10.12.7" as
     compile error at $pos $err $hint
 
 # In old code, it was okay to have imports at the top of the file in the same chunk,
@@ -61,9 +72,10 @@ upgrade $tree to "4.10.12.7" as:
             $i += 1
         return
         --- (insert chunk) ---
-        [$chunk1, $chunk2] = [..]
-            SyntaxTree {type: "Block", source: $first_chunk.source}
-            SyntaxTree {type: "Block", source: $first_chunk.source}
+        [$chunk1, $chunk2] = [
+            SyntaxTree {.type = "Block", .source = $first_chunk.source}
+            SyntaxTree {.type = "Block", .source = $first_chunk.source}
+        ]
         
         for $j in 1 to ($i - 1):
             $chunk1.$j = $first_chunk.$j
@@ -71,8 +83,10 @@ upgrade $tree to "4.10.12.7" as:
         for $j in $i to (size of $first_chunk):
             $chunk2.($j - $i + 1) = $first_chunk.$j
         
-        $new_tree = (..)
-            SyntaxTree {source: $tree.source, type: "FileChunks", 1: $chunk1, 2: $chunk2}
+        $new_tree =
+            SyntaxTree {
+                .source = $tree.source, .type = "FileChunks", .1 = $chunk1, .2 = $chunk2
+            }
         
         for $i in 2 to (size of $tree):
             $new_tree.($i + 1) = $tree.$i

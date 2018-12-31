@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V5.12.12.8
+#!/usr/bin/env nomsu -V6.12.12.8
 #
     A simple UUID function based on RFC 4122: http://www.ietf.org/rfc/rfc4122.txt
     
@@ -13,32 +13,36 @@ use "core/control_flow.nom"
 $NaN_surrogate = {}
 $nil_surrogate = {}
 $obj_by_id = {}
-set $obj_by_id's metatable to {__mode: "v"}
+set $obj_by_id's metatable to {.__mode = "v"}
 $id_by_obj = {}
-set $id_by_obj's metatable to {..}
-    __mode: "k", __index: for ($self $key):
-        if ($key == (nil)):
-            return $self.$nil_surrogate
-        
-        if ($key != $key):
-            return $self.$NaN_surrogate
-        
-        --- (retry) ---
-        $id = (uuid)
-        if ($obj_by_id.$id != (nil)): go to (retry)
-        $self.$key = $id
-        $obj_by_id.$id = $key
-        return $id
+set $id_by_obj's metatable to {
+    .__mode = "k", .__index = (
+        for ($self $key):
+            if ($key == (nil)):
+                return $self.$nil_surrogate
+            
+            if ($key != $key):
+                return $self.$NaN_surrogate
+            
+            --- (retry) ---
+            $id = (uuid)
+            if ($obj_by_id.$id != (nil)): go to (retry)
+            $self.$key = $id
+            $obj_by_id.$id = $key
+            return $id
+    )
+}
 
 externally (uuid) means:
     # Set all the other bits to randomly (or pseudo-randomly) chosen values.
-    $bytes = [..]
+    $bytes = [
         # time-low, time-mid, time-high-and-version
         randint (2 ^ (4 * 8)), randint (2 ^ (2 * 8)), randint (2 ^ (2 * 8 - 4))
         # clock-seq-and-reserved, clock-seq-low
         randint (2 ^ (1 * 8 - 2)), randint (2 ^ (1 * 8)), randint (2 ^ (3 * 8))
         # node
         randint (2 ^ (3 * 8))
+    ]
     
     # Set the four most significant bits (bits 12 through 15) of the
     # time_hi_and_version field to the 4-bit version number from
