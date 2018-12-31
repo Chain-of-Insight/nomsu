@@ -24,7 +24,7 @@ externally (print tree $t at indent $indent) means:
             say "\$indent\($t.1)"
         
         "Var":
-            say "\($indent)%\($t.1)"
+            say "\($indent)$\($t.1)"
         
         else:
             say "\$indent\($t.type):"

@@ -72,38 +72,12 @@ externally [all of $items, all $items] all mean:
         unless $:
             return (no)
     return (yes)
-
-#[all of %items, all %items] all compile to:
-    unless (%items.type is "List"):
-    return \(all of %items)
-    
-    if ((size of %items) == 0):
-    return (Lua "true")
-    
-    %lua = (Lua "(")
-    %lua::add [: for % in %items: add (% as lua expr)] joined with " and "
-    %lua::add ")"
-    return %lua
-    
 [not all of $items, not all $items] all parse as (not (all of $items))
 externally [any of $items, any $items] all mean:
     for $ in $items:
         if $:
             return (yes)
     return (no)
-
-#[any of %items, any %items] all compile to:
-    unless (%items.type is "List"):
-    return \(any of %items)
-    
-    if ((size of %items) == 0):
-    return (Lua "false")
-    
-    %lua = (Lua "(")
-    %lua::add [: for % in %items: add (% as lua expr)] joined with " or "
-    %lua::add ")"
-    return %lua
-    
 [none of $items, none $items] all parse as (not (any of $items))
 
 # Sum/product
@@ -113,36 +87,12 @@ externally [sum of $items, sum $items] all mean:
         $total += $
     return $total
 
-#[sum of %items, sum %items] all compile to:
-    unless (%items.type is "List"):
-    return \(sum of %items)
-    
-    if ((size of %items) == 0):
-    return (Lua "0")
-    
-    %lua = (Lua "(")
-    %lua::add [: for % in %items: add (% as lua expr)] joined with " + "
-    %lua::add ")"
-    return %lua
-    
 externally [product of $items, product $items] all mean:
     $prod = 1
     for $ in $items:
         $prod *= $
     return $prod
 
-#[product of %items, product %items] all compile to:
-    unless (%items.type is "List"):
-    return \(product of %items)
-    
-    if ((size of %items) == 0):
-    return (Lua "1")
-    
-    %lua = (Lua "(")
-    %lua::add [: for % in %items: add (% as lua expr)] joined with " * "
-    %lua::add ")"
-    return %lua
-    
 externally [avg of $items, average of $items] all mean
     (sum of $items) / (size of $items)
 

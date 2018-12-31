@@ -54,7 +54,7 @@ externally (uuid) means:
     $bytes.4 += 0xC0
     return (=lua "('%08x-%04x-%04x-%02x%02x-%6x%6x'):format(unpack(\$bytes))")
 
-# For strict identity checking, use (%x's id) == (%y's id)
+# For strict identity checking, use ($x's id) == ($y's id)
 test:
     assume (([] == []) and ((id of []) != (id of [])))
     seed random with 0

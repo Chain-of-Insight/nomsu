@@ -210,11 +210,11 @@ test:
     [$1, $2] = [1, 2]
     swap $1 and $2
     assume (($1 == 2) and ($2 == 1)) or barf
-        "'parse % as %' failed on 'swap % and %'"
+        "'parse $ as $' failed on 'swap $ and $'"
     [$tmp, $tmp2] = [1, 2]
     swap $tmp and $tmp2
     assume (($tmp == 2) and ($tmp2 == 1)) or barf
-        "'parse % as %' variable mangling failed."
+        "'parse $ as $' variable mangling failed."
 
 ($actions all parse as $body) compiles to:
     lua> ("
@@ -266,7 +266,6 @@ test:
 
 [$action parses as $body] all parse as ([$action] all parse as $body)
 
-#(%tree as lua expr) compiles to "compile(\(=lua "compile(\%tree, true)"), true)"
 externally ($tree as lua expr) means:
     lua> ("
         local tree_lua = compile(\$tree)

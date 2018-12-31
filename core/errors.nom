@@ -88,21 +88,9 @@ test:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#
-    [..]
-    try %action and if it succeeds %success or if it barfs %fallback
-    try %action and if it barfs %fallback or if it succeeds %success
-    ..all parse as (..)
-    try %action and if it succeeds %success or if it barfs (=lua "") %fallback
-    
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
 (try $action) parses as
     try $action and if it succeeds (do nothing) or if it barfs (do nothing)
 
-#(try %action and if it barfs %fallback) parses as (..)
-    try %action and if it succeeds (do nothing) or if it barfs %fallback
-    
 (try $action and if it barfs $msg $fallback) parses as
     try $action and if it succeeds (do nothing) or if it barfs $msg $fallback
 

@@ -18,7 +18,7 @@ use "lib"
 say "Hello world!"
 
 # How do I set a variable?
-# Variables have "%" prefix:
+# Variables have "$" prefix:
 $foobar = 1
 $text = "Hello world"
 
@@ -50,7 +50,7 @@ $multi_text = ("
 say ("
     Text can contain a backslash followed by a variable, list, dict, or parenthesized
     expression. This escaped value will be converted to readable text, like so:
-    The value of %foobar is \$foobar, isn't that nice?
+    The value of $foobar is \$foobar, isn't that nice?
     These are some numbers: \[1, 2, 3]
     The sum of 2 and 4 is \(2 + 4).
     
@@ -58,7 +58,7 @@ say ("
     like this: \\ will just be treated as a backslash.
     
     Or, two backlashes will be treated as a single backslash, no matter what follows,
-    like this: \\%foobar <- won't insert any values
+    like this: \\$foobar <- won't insert any values
     
     If you need to split a long line without inserting a newline, you can end a line with backslash \
     ..and start the next line with two periods, like that.
@@ -139,12 +139,12 @@ if (1 + 2) is:
 # How do I loop over a list (a foreach loop)?
 $list = [1, 2, 3]
 for $x in $list:
-    say "For %x loop #\$x"
+    say "For $x loop #\$x"
 
 # How do I loop over a number range?
 # This is inclusive, so it will loop over 1,2, and 3
 for $i in 1 to 3:
-    say "For %i in 1 to 3 loop #\$i"
+    say "For $i in 1 to 3 loop #\$i"
 
 # This will print 0,2, and 4
 for $even in 0 to 5 by 2:
@@ -247,28 +247,28 @@ say (2 + 3)
 say (2 + 3)
 
 # If you need to keep going after an indented region, you can start the next line with ".."
-say both "Very long first argument that needs its own line" and also
-    "short second arg"
+say both "Very very very very long first argument that needs its own line"
+..and also "short second arg"
 (my favorite number) means (21 + 2)
 
 # This can be nested:
 say both (my favorite number) and also "foo"
 
 # Macros: 
-# The "lua> %" and "=lua %" macros can be used to write raw lua code: 
+# The "lua>" and "=lua" macros can be used to write raw lua code: 
 (say the time) means:
     lua> "io.write(\"The OS time is: \", os.time(), \"\\n\");"
 say the time
 say "Math expression result is: \(=lua "(1 + 2*3 + 3*4)^2 % 5")"
 
-# Variables can be accessed via \%var
+# Variables can be accessed via \$var
 (square root of $n) means (=lua "math.sqrt(\$n)")
 say "The square root of 2 is \(square root of 2)"
 
-# Macros can be defined to transform one bit of nomsu code into another using "parse % as %":
+# Macros can be defined to transform one bit of nomsu code into another using "parse $ as $":
 (if $condition is untrue $body) parses as (if (not $condition) $body)
 
-# Or to transform nomsu code into custom lua code using "compile % to %"
+# Or to transform nomsu code into custom lua code using "compile $ to $"
 (debug only $body) compiles to:
     if $DEBUG_ENABLED:
         return
@@ -310,10 +310,10 @@ debug only:
             $best_key = $key
     return $best
 
-# Function literals look like: %x -> (%x * %x)
+# Function literals look like: $x -> ($x * $x)
 say (best of [2, -3, 4, -8] according to ($x -> ($x * $x)))
 
-# Or, you can use ((foo %)'s meaning) to access the function that gets called by (foo %)
+# Or, you can use ((foo $)'s meaning) to access the function that gets called by (foo $)
 ($x squared) means ($x * $x)
 say (best of [2, -3, 4, -8] according to (($ squared)'s meaning))
 
