@@ -44,7 +44,7 @@ test:
 
 # Conditional expression (ternary operator)
 #   Note: this uses a function instead of "(condition and if_expr or else_expr)"
-    because that breaks if %if_expr is falsey, e.g. "x < 5 and false or 99"
+    because that breaks if $if_expr is falsey, e.g. "x < 5 and false or 99"
 test:
     assume ((1 if (yes) else 2) == 1)
     assume ((1 if (no) else 2) == 2)
@@ -55,7 +55,7 @@ test:
     $when_false_expr unless $condition else $when_true_expr
     $when_false_expr unless $condition then $when_true_expr
 ] all compile to:
-    #   If %when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
+    #   If $when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
         equivalent of a conditional expression: (cond and if_true or if_false)
     if {.Text, .List, .Dict, .Number}.($when_true_expr.type):
         return
@@ -302,7 +302,7 @@ test:
     
     if ((size of "\$stop_labels") > 0):
         $inner_lua = $lua
-        $lua = (Lua "do -- scope for stopping for % = % loop\n    ")
+        $lua = (Lua "do -- scope for stopping for $ = $ loop\n    ")
         $lua, add $inner_lua $stop_labels "\nend"
     
     return $lua
@@ -435,10 +435,10 @@ test:
     $code, add "\nend --when"
     return
         Lua ("
-            do --if % is...
+            do --if $ is...
                 local \(mangle "branch value") = \($branch_value as lua expr)
                 \$code
-            end -- if % is...
+            end -- if $ is...
         ")
 
 # Do/finally
