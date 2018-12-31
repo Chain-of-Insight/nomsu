@@ -202,7 +202,6 @@ do
   })
   _base_0.__class = _class_0
   local self = _class_0
-  self.__type = "Syntax Tree"
   self.source_code_for_tree = setmetatable({ }, {
     __index = function(self, t)
       local s = t.source
@@ -217,6 +216,7 @@ do
   end
   SyntaxTree = _class_0
 end
+SyntaxTree.__base.__type = "Syntax Tree"
 getmetatable(SyntaxTree).__call = function(self, t)
   if type(t.source) == 'string' then
     t.source = Source:from_string(t.source)

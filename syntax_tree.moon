@@ -16,8 +16,6 @@ as_lua = =>
 --types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
 --    "IndexChain", "Action", "FileChunks", "Error", "Comment"}
 class SyntaxTree
-    @__type: "Syntax Tree"
-    
     __tostring: =>
         bits = [type(b) == 'string' and b\as_lua! or tostring(b) for b in *@]
         for k,v in pairs(@)
@@ -104,6 +102,7 @@ class SyntaxTree
     @is_instance: (t)=>
         type(t) == 'table' and getmetatable(t) == @__base
 
+SyntaxTree.__base.__type = "Syntax Tree"
 
 getmetatable(SyntaxTree).__call = (t)=>
     if type(t.source) == 'string'

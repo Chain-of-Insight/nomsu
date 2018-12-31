@@ -139,7 +139,7 @@ tree_to_inline_nomsu = (tree)->
         when "IndexChain"
             nomsu = NomsuCode\from(tree.source)
             for i, bit in ipairs tree
-                nomsu\add "." if i > 1
+                nomsu\add "." if i > 1 and bit.type != "Index"
                 local bit_nomsu
                 bit_nomsu = if i > 1 and bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and is_identifier(bit[1])
                     bit[1]

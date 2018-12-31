@@ -186,7 +186,7 @@ tree_to_inline_nomsu = function(tree)
   elseif "IndexChain" == _exp_0 then
     local nomsu = NomsuCode:from(tree.source)
     for i, bit in ipairs(tree) do
-      if i > 1 then
+      if i > 1 and bit.type ~= "Index" then
         nomsu:add(".")
       end
       local bit_nomsu
