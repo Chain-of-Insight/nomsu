@@ -125,7 +125,7 @@ run = ->
             if nomsu_name = f\match("^nomsu://(.*)")
                 for nomsupath in package.nomsupath\gmatch("[^;]+")
                     files = Files.list(nomsupath.."/"..nomsu_name)
-                    continue unless files
+                    break if files
             else
                 files = Files.list(f)
             unless files and #files > 0

@@ -199,16 +199,8 @@ run = function()
         local nomsu_name = f:match("^nomsu://(.*)")
         if nomsu_name then
           for nomsupath in package.nomsupath:gmatch("[^;]+") do
-            local _continue_0 = false
-            repeat
-              files = Files.list(nomsupath .. "/" .. nomsu_name)
-              if not (files) then
-                _continue_0 = true
-                break
-              end
-              _continue_0 = true
-            until true
-            if not _continue_0 then
+            files = Files.list(nomsupath .. "/" .. nomsu_name)
+            if files then
               break
             end
           end
