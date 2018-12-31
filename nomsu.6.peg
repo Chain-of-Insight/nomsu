@@ -1,0 +1,272 @@
+-- Nomsu version 5
+file <-
+    {:curr_indent: ' '* :}
+    (((methodchain / action / expression / inline_block) eol !.)
+     / file_chunks / comment? blank_lines?)
+    {:curr_indent: %nil :}
+    !.
+
+shebang <- "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* [0-9.]+ [^%nl]* (%nl / !.)
+
+file_chunks (FileChunks) <-
+    {:curr_indent: ' '* :}
+    {:shebang: shebang :}?
+    (top_block (nl_nodent section_division top_block)*)
+    blank_lines?
+    ws* unexpected_chunk?
+    {:curr_indent: %nil :}
+
+section_division <- ("~")^+3 eol
+
+eof <- !.
+eol <- ws* (&%nl / !.)
+nodent <- (unexpected_indent [^%nl]* / =curr_indent)
+indent <- {~ =curr_indent "    " ~}
+blank_lines <- %nl ((nodent comment / ws*) %nl)*
+nl_nodent <- blank_lines nodent
+nl_indent <- blank_lines tab_error? {:curr_indent: indent :} (comment nl_nodent)*
+
+
+comment (Comment) <-
+    "#" {~ [^%nl]* (%nl+ (indent -> '') [^%nl]*)* (%nl &%nl)* ~}
+
+
+top_block (Block) <-
+    {:curr_indent: ' '* :}
+    comment? blank_lines? statement (nl_nodent statement)*
+    {:curr_indent: %nil :}
+
+inline_block (Block) <-
+    ":" ws* (inline_statement (ws* ";" ws* inline_statement)*)?
+    (&eol !nl_indent / &(ws* ([)},;] / "]")))
+
+indented_block (Block) <-
+    ":" eol nl_indent statement (nl_nodent statement)*
+    (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
+    {:curr_indent: %nil :}
+
+statement_block (Block) <-
+    ":" ws* (methodchain / action / expression)
+
+
+statement <-
+    (methodchain / action / expression / statement_block) (eol / unexpected_code)
+
+inline_statement <-
+    inline_methodchain / inline_action / inline_expression
+
+noindex_inline_expression <-
+    number / variable / inline_text / inline_list / inline_dict / inline_nomsu /
+     "("
+       ws* (inline_block / inline_methodchain / inline_action / inline_expression) ws*
+    (")" / eof / missing_paren_err / unexpected_code)
+
+inline_expression <- inline_index_chain / noindex_inline_expression / inline_index / inline_block
+
+indented_expression <-
+    indented_text / indented_nomsu / indented_list / indented_dict / indented_block /
+    indented_parens
+
+indented_parens <-
+    "(" indented_naked_expression (nl_nodent ")" / missing_paren_err / unexpected_code)
+
+indented_naked_expression <-
+    ({| nl_indent
+        (methodchain / action / expression) (eol / unexpected_code)
+        (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
+        {:curr_indent: %nil :}
+    |} -> unpack)
+
+expression <-
+    inline_expression / indented_index_chain / indented_expression / inline_index / indented_index
+
+inline_nomsu (EscapedNomsu) <- "\" inline_expression
+indented_nomsu (EscapedNomsu) <- "\" expression
+
+
+inline_index (Index) <-
+    "." (hex_integer / integer / text_word / noindex_inline_expression)
+_inline_index (IndexChain) <- inline_index
+inline_index_chain <-
+    (noindex_inline_expression _inline_index+) -> foldr
+
+indented_index (Index) <- "." indented_expression
+_indented_index (IndexChain) <- indented_index
+indented_index_chain <-
+    (noindex_inline_expression inline_index* (inline_index / _indented_index)) -> foldr
+
+
+-- Actions need 1 argument and either another argument or a word.
+inline_action (Action) <-
+    !section_division
+    (  word (ws* arg)*
+     / inline_expression ((ws* arg)+ / "(" ws* ")"))
+inline_arg <- inline_expression / word
+
+action (Action) <-
+    !section_division
+    (  word ((linesplit / ws*) arg)*
+     / arg (((linesplit / ws*) arg)+ / "(" ws* ")"))
+arg <- expression / indented_naked_expression / word
+linesplit <- eol nl_nodent ".." ws* 
+
+
+inline_methodsuffix (MethodCall) <-
+    inline_action
+    / "(" ws* inline_action (ws* ";" ws* inline_action)* ")"
+inline_methodchain <-
+    ((inline_action / inline_expression) (ws* "," ws* inline_methodsuffix)+) -> foldr
+
+methodsuffix (MethodCall) <-
+      action
+    / "(" ws* inline_action (ws* ";" ws* inline_action)* ws* ")"
+    / eol ({| nl_indent
+        (action eol) (nl_nodent action eol)* 
+        (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
+        {:curr_indent: %nil :}
+    |} -> unpack)
+methodchain <-
+    ((inline_action / expression) ((linesplit / ws*) "," ws* methodsuffix)+) -> foldr
+
+word <- !number { operator_char+ / ident_char+ }
+
+
+text_word (Text) <- word
+
+inline_text (Text) <-
+    '"' !eol _inline_text* ('"' / eof / missing_quote_err / unexpected_code)
+_inline_text <-
+    {~ (('\"' -> '"') / ('\\' -> '\') / escaped_char / text_char+)+ ~}
+    / inline_text_interpolation / illegal_char
+inline_text_interpolation <-
+    "\" (
+        variable / inline_list / inline_dict
+        / ("("
+            ws* ((inline_methodchain / inline_action / inline_expression) ws*)?
+            (")" / eof / missing_paren_err / unexpected_code))
+    )
+
+text_char <- %utf8_char / !["\] %print / %tab
+
+nonterminal_quote <- '"' &([^%nl] / (%nl (ws* eol)?)+ =curr_indent [^%nl])
+
+indented_text (Text) <-
+    '("' %nl {%nl*} ({|
+        {:curr_indent: indent :}
+            (indented_plain_text / text_interpolation / illegal_char / blank_text_lines)*
+        {:curr_indent: %nil :}
+    |} -> unpack)
+    (nl_nodent '")' / eof / missing_indented_quote_err)
+
+-- Tracking text-lines-within-indented-text as separate objects allows for better debugging line info
+indented_plain_text (Text) <-
+    {~ 
+        ((("\" blank_lines =curr_indent "..") -> "") / ('\\' -> '\') / ('\"' -> '"') / ('\;' -> '')
+        / (!text_interpolation ((!("\n") escaped_char) / '\'))
+        / (nonterminal_quote / text_char)+)+
+        blank_text_lines?
+    ~}
+blank_text_lines <- 
+    {~ (%nl ((ws* -> '') (&%nl / !.) / (=curr_indent -> '') &[^%nl]))+ ~}
+
+text_interpolation <-
+    ("\" (indented_block (blank_lines =curr_indent "..")? / indented_expression))
+    / inline_text_interpolation
+
+
+number <-
+    hex_integer / real_number / integer
+
+integer (Number) <-
+    (("-"? [0-9]+)-> tonumber)
+
+hex_integer (Number) <-
+    (("-"? "0x" [0-9a-fA-F]+)-> tonumber)
+    {:hex: '' -> 'yes' :}
+
+real_number (Number) <-
+    (("-"? [0-9]+ "." [0-9]+)-> tonumber)
+
+
+variable (Var) <- "$" ({ident_char+} / "(" {(ws+ / operator_char+ / ident_char+)*} ")" / {''})
+
+
+inline_list (List) <-
+    "[" ws* !eol
+        (inline_list_item (ws* ',' ws* inline_list_item)* (ws* ',')?)? ws*
+    ("]" / eof / (","? (missing_bracket_error / unexpected_code)))
+inline_list_item <- inline_action / inline_expression
+
+indented_list (List) <-
+    ({|
+        "[" eol nl_indent
+            list_line (nl_nodent list_line)*
+        {:curr_indent: %nil :}
+    |} -> unpack)
+    (nl_nodent "]" / eof / missing_bracket_error / unexpected_code)
+list_line <-
+      (inline_list_item ws* "," ws*)+ eol
+    / (inline_list_item ws* "," ws*)* (action / statement_block / expression) eol
+
+
+inline_dict (Dict) <-
+    "{" ws* !eol
+        ((inline_action / inline_expression) (ws* ',' ws* (inline_action / inline_expression))*)? ws*
+    ("}" / eof / (","? (missing_brace_error / unexpected_code)))
+
+indented_dict (Dict) <-
+    ({|
+        "{" eol nl_indent
+            dict_line (nl_nodent dict_line)*
+            (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
+        {:curr_indent: %nil :}
+    |} -> unpack)
+    (nl_nodent "}" / eof / missing_brace_error / unexpected_code)
+dict_line <-
+      ((inline_action / inline_expression) ws* "," ws*)+ eol
+    / ((inline_action / inline_expression) ws* "," ws*)* (action / statement_block / expression) eol
+
+operator_char <- [#'`~@^&*+=<>?/%!|-]
+ident_char <- [a-zA-Z0-9_] / %utf8_char
+ws <- " "
+
+escaped_char <-
+    ("\"->'') (
+        (([xX]->'') ((({[0-9a-fA-F]^2} %number_16) -> tonumber) -> tochar))
+      / ((([0-9] [0-9]^-2) -> tonumber) -> tochar)
+      / ("a"->ascii_7)  / ("b"->ascii_8)  / ("t"->ascii_9)  / ("n"->ascii_10)
+      / ("v"->ascii_11) / ("f"->ascii_12) / ("r"->ascii_13)
+    )
+
+
+-- Errors
+unexpected_code <- ws* _unexpected_code
+_unexpected_code (Error) <-
+    {:error: {~ [^%nl]+ -> "Couldn't parse this code" ~} :}
+unexpected_chunk (Error) <-
+    {:error: {~ .+ -> "Couldn't parse this code" ~} :}
+unexpected_indent (Error) <-
+    {:error: {~ (=curr_indent ws+) -> "Messed up indentation" ~} :}
+    {:hint: {~ '' -> 'Either make sure this line is aligned with the one above it, or make sure the previous line ends with something that uses indentation, like ":" or "(..)"' ~} :}
+missing_paren_err (Error) <-
+    {:error: {~ eol -> 'This expression is missing a closing )-parenthesis' ~} :}
+    {:hint: {~ '' -> 'Put a ")" here' ~} :}
+missing_quote_err (Error) <-
+    {:error: {~ eol -> "This text is missing a closing quotation mark." ~} :}
+    {:hint: {~ "" -> "Put a quotation mark here." ~} :}
+missing_indented_quote_err (Error) <-
+    {:error: {~ &. -> 'This text is missing a closing ")-quotation mark.' ~} :}
+    {:hint: {~ "" -> 'Put a ") after this line, at the same level of indentation as the opening (".' ~} :}
+missing_bracket_error (Error) <-
+    {:error: {~ eol -> "This list is missing a closing ]-bracket" ~} :}
+    {:hint: {~ '' -> 'Put a "]" here' ~} :}
+missing_brace_error (Error) <-
+    {:error: {~ eol -> "This dict is missing a closing }-brace" ~} :}
+    {:hint: {~ '' -> 'Put a "}" here' ~} :}
+tab_error (Error) <-
+    &(=curr_indent %tab)
+    {:error: {~ '' -> 'Tabs are not allowed for indentation.' ~} :}
+    {:hint: {~ '' -> 'Use spaces instead of tabs.' ~} :}
+illegal_char (Error) <-
+    {:error: {~ (!(%nl / %tab / %print) .) -> "Illegal unprintable character here (it may not be visible, but it's there)" ~} :}
+    {:hint: {~ '' -> "This sort of thing can happen when copying and pasting code. Try deleting and retyping the code." ~} :}
