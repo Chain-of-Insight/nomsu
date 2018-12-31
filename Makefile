@@ -89,7 +89,7 @@ uninstall: version
 	version="$(UNINSTALL_VERSION)"; \
 	if [[ ! $$version ]]; then version="`cat version`"; fi;\
 	rm -rvf $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/bin/nomsu$$version; \
-	if [[ "`find -E $$prefix/bin -type f -regex '.*/nomsu[0-9.]+\$$'`" == "" ]]; then \
+	if [[ "`find $$prefix/bin -type f -regex '.*/nomsu[0-9.]+\$$'`" == "" ]]; then \
 		rm -vf $$prefix/bin/nomsu $$prefix/share/man/man1/nomsu.1; \
 	else \
 		if [ -f $$prefix/bin/nomsu ]; then \
