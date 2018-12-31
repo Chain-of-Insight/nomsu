@@ -7,19 +7,18 @@ use "compatibility/compatibility.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 upgrade action [$index st to last in $list] to "3.7" as
-..($list, $index st to last)
+    $list, $index st to last
 
 upgrade action [$index nd to last in $list] to "3.7" as
-..($list, $index nd to last)
+    $list, $index nd to last
 
 upgrade action [$index rd to last in $list] to "3.7" as
-..($list, $index rd to last)
+    $list, $index rd to last
 
 upgrade action [$index th to last in $list] to "3.7" as
-..($list, $index rd th last)
+    $list, $index rd th last
 
 upgrade action [last in $list] to "3.7" as ($list, last)
-
 upgrade action [first in $list] to "3.7" as ($list, first)
 upgrade action [$item is in $list, $list contains $item, $list has $item] to
 .."3.7" as ($list, has $item)

@@ -34,7 +34,9 @@ externally (upgrade action $stub to $version via $upgrade_fn) means:
                         return $replacements.($t.1)
                     ..else:
                         external $needs_mangle = (yes)
-                        return "SyntaxTree{type=\(quote $t.type), source=\(quote "\($t.source)"), \(quote (mangle $t.1))}"
+                        return ("
+                            SyntaxTree{type=\(quote $t.type), source=\(quote "\($t.source)"), \(quote (mangle $t.1))}
+                        ")
                 
                 ($t is syntax tree):
                     $args = []
@@ -54,7 +56,8 @@ externally (upgrade action $stub to $version via $upgrade_fn) means:
         $retval = (make tree $body)
         $lua, add
             Lua ("
-                upgrade_action_1_to_2_via(\(quote $action.stub), \($version as lua expr), function(\(\$tree as lua id))
+                upgrade_action_1_to_2_via(\(quote $action.stub), \($version as lua expr), function(\
+                ..\(\$tree as lua id))
                     return \$retval
                 end)
             ")

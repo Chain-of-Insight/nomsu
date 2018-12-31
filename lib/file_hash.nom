@@ -25,7 +25,7 @@ test:
         ) != "inf"
     
     assume ((hash "\000") != (hash "\000\000\000\000\000")) or barf
-    .."Incorrect hashing of null strings"
+        "Incorrect hashing of null strings"
     
     if $use_sha1:
         assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")

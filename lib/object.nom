@@ -81,7 +81,7 @@ test:
 (object $classname extends $parent $class_body) compiles to:
     unless ($classname.type == "Action"):
         compile error at $classname
-        .."Expected this to be an action, not a \$classname.type"
+            "Expected this to be an action, not a \$classname.type"
     
     for $ in $classname:
         unless ($ is text):

@@ -37,12 +37,15 @@ upgrade $tree to "2.4" as:
                             $action = (=lua "SyntaxTree{type='Block', source=\$action.source, \$action}")
                         $conditions, add $action
                         $new_lines, add
-                            =lua "SyntaxTree{type='Action', source=\$conditions[1].source, unpack(\$conditions)}"
+                            =lua ("
+                                SyntaxTree{type='Action', source=\$conditions[1].source, unpack(\$conditions)}
+                            ")
                         $conditions = []
             
             return
                 \(when $body) with vars {
-                    .body = (=lua "SyntaxTree{type='Block', source=\$tree[2].source, unpack(\$new_lines)}")
+                    .body =
+                        =lua "SyntaxTree{type='Block', source=\$tree[2].source, unpack(\$new_lines)}"
                 }
         
         "if 1 is ?" "if 1 = ?":
@@ -70,11 +73,13 @@ upgrade $tree to "2.4" as:
                         $action = $line.3
                         unless ($action is "Block" syntax tree): $action = \(: $action)
                         $values, add $action
-                        $new_lines, 
-                            add (=lua "SyntaxTree{type='Action', source=\$values[1].source, unpack(\$values)}")
+                        $new_lines, add
+                            =lua "SyntaxTree{type='Action', source=\$values[1].source, unpack(\$values)}"
                         $values = []
             
             return
                 \(if $var is $body) with vars {
-                    .var = ($tree.2 upgraded), .body = (=lua "SyntaxTree{type='Block', source=\$tree[5].source, unpack(\$new_lines)}")
+                    .var = ($tree.2 upgraded)
+                    .body =
+                        =lua "SyntaxTree{type='Block', source=\$tree[5].source, unpack(\$new_lines)}"
                 }

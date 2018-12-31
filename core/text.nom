@@ -27,7 +27,14 @@ test:
     assume ("asdf", capitalized) == "Asdf"
     assume ("asdf", uppercase) == "ASDF"
     assume ("asdf", with "s" -> "X") == "aXdf"
-    assume ("one\ntwo\n", lines) == ["one", "two", ""]
+    assume
+        ("
+            one
+            two
+            
+        "), lines
+    ..== ["one", "two", ""]
+    
     ($spec とは $body) parses as ($spec means $body)
 
 test:

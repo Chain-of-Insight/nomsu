@@ -13,7 +13,12 @@ for $filename in $(COMMAND LINE ARGS).extras: use $filename
 $tests = {: for $s = $t in $TESTS: add (=lua "Source:from_string(\$s)") = $t}
 for $filename in $(COMMAND LINE ARGS).extras:
     $file = (read file $filename)
-    $version = ($file, matching "#![^\n]* nomsu %-V[ ]*([^\n]*)")
+    $version =
+        $file, matching ("
+            #![^
+            ]* nomsu %-V[ ]*([^
+            ]*)
+        ")
     $file_tests = []
     for $src = $test in $tests:
         if ($src.filename == $filename):

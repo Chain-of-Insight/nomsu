@@ -24,10 +24,8 @@ for $filename in $(COMMAND LINE ARGS).extras:
     $tree = ($code parsed $start_version)
     $uptree =
         $tree upgraded from ($start_version or ($tree.version or (Nomsu version))) to
-        ..$version
-    
+            $version
     $text = "\$leading_indent\($uptree as nomsu, text, with "\n" -> "\n\$leading_indent")"
-    
     when:
         $inplace:
             say "Upgraded \$filename"

@@ -12,41 +12,32 @@ upgrade action ($ as lua return) to "4.10.12.7" as
 upgrade action (Lua value $) to "4.10.12.7" as (Lua $)
 
 upgrade action ($e for $ in $items) to "4.10.12.7" as [: for $ in $items: add $e]
-upgrade action ($e for $k = $v in $items) to "4.10.12.7" as [
-    : for $k = $v in $items: add $e
-]
+upgrade action ($e for $k = $v in $items) to "4.10.12.7" as
+    [: for $k = $v in $items: add $e]
 
-upgrade action ($e for $i in $start to $stop) to "4.10.12.7" as [
-    : for $i in $start to $stop: add $e
-]
+upgrade action ($e for $i in $start to $stop) to "4.10.12.7" as
+    [: for $i in $start to $stop: add $e]
 
-upgrade action ($e for $i in $start to $stop by $step) to "4.10.12.7" as [
-    : for $i in $start to $stop by $step: add $e
-]
+upgrade action ($e for $i in $start to $stop by $step) to "4.10.12.7" as
+    [: for $i in $start to $stop by $step: add $e]
 
-upgrade action ($e for $i in $start to $stop via $step) to "4.10.12.7" as [
-    : for $i in $start to $stop by $step: add $e
-]
+upgrade action ($e for $i in $start to $stop via $step) to "4.10.12.7" as
+    [: for $i in $start to $stop by $step: add $e]
 
-upgrade action ($k = $v for $ in $items) to "4.10.12.7" as {
-    : for $ in $items: add $k = $v
-}
+upgrade action ($k = $v for $ in $items) to "4.10.12.7" as
+    {: for $ in $items: add $k = $v}
 
-upgrade action ($k = $v for $k0 = $v0 in $items) to "4.10.12.7" as {
-    : for $k0 = $v0 in $items: add $k = $v
-}
+upgrade action ($k = $v for $k0 = $v0 in $items) to "4.10.12.7" as
+    {: for $k0 = $v0 in $items: add $k = $v}
 
-upgrade action ($k = $v for $i in $start to $stop) to "4.10.12.7" as {
-    : for $i in $start to $stop: add $k = $v
-}
+upgrade action ($k = $v for $i in $start to $stop) to "4.10.12.7" as
+    {: for $i in $start to $stop: add $k = $v}
 
-upgrade action ($k = $v for $i in $start to $stop by $step) to "4.10.12.7" as {
-    : for $i in $start to $stop by $step: add $k = $v
-}
+upgrade action ($k = $v for $i in $start to $stop by $step) to "4.10.12.7" as
+    {: for $i in $start to $stop by $step: add $k = $v}
 
-upgrade action ($k = $v for $i in $start to $stop via $step) to "4.10.12.7" as {
-    : for $i in $start to $stop by $step: add $k = $v
-}
+upgrade action ($k = $v for $i in $start to $stop via $step) to "4.10.12.7" as
+    {: for $i in $start to $stop by $step: add $k = $v}
 
 upgrade action (parse $text from $filename) to "4.10.12.7" as
     (NomsuCode from (Source $filename 1 (size of $text)) $text) parsed
@@ -84,9 +75,8 @@ upgrade $tree to "4.10.12.7" as:
             $chunk2.($j - $i + 1) = $first_chunk.$j
         
         $new_tree =
-            SyntaxTree {
-                .source = $tree.source, .type = "FileChunks", .1 = $chunk1, .2 = $chunk2
-            }
+            SyntaxTree
+                {.source = $tree.source, .type = "FileChunks", .1 = $chunk1, .2 = $chunk2}
         
         for $i in 2 to (size of $tree):
             $new_tree.($i + 1) = $tree.$i

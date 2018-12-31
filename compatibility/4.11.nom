@@ -27,22 +27,20 @@ upgrade action "set" to "4.11" via
             $rhs.$i = $entry.2
         
         return
-            SyntaxTree {
-                .type = "Action", .source = $tree.source, .1 = $lhs, .2 = "=", .3 = $rhs
-            }
+            SyntaxTree
+                {.type = "Action", .source = $tree.source, .1 = $lhs, .2 = "=", .3 = $rhs}
 
 upgrade action "1 with 2 ~>" to "4.11" via
     for $tree:
         compile error at $tree "This method has been deprecated."
-        .."Perhaps this could be use %tree::map instead."
+            "Perhaps this could be use %tree::map instead."
 
 # Changing filesystem API:
 upgrade action (for file $f in $path $body) to "4.11" as
     for $f in (files for $path) $body
 
-upgrade action ($expr for file $f in $path) to "4.11" as [
-    : for $f in (files for $path): add $expr
-]
+upgrade action ($expr for file $f in $path) to "4.11" as
+    [: for $f in (files for $path): add $expr]
 
 upgrade action (line $n in $text) to "4.11" as ($text, line $n)
 upgrade action (line number of $pos in $text) to "4.11" as

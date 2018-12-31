@@ -248,8 +248,7 @@ say (2 + 3)
 
 # If you need to keep going after an indented region, you can start the next line with ".."
 say both "Very long first argument that needs its own line" and also
-.."short second arg"
-
+    "short second arg"
 (my favorite number) means (21 + 2)
 
 # This can be nested:
@@ -272,7 +271,11 @@ say "The square root of 2 is \(square root of 2)"
 # Or to transform nomsu code into custom lua code using "compile % to %"
 (debug only $body) compiles to:
     if $DEBUG_ENABLED:
-        return (Lua "-- Debug code:\n\($body as lua)")
+        return
+            Lua ("
+                -- Debug code:
+                \($body as lua)
+            ")
     ..else:
         return (Lua "-- (debug code removed for production)")
 $DEBUG_ENABLED = (yes)

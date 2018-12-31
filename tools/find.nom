@@ -24,7 +24,9 @@ use "lib/consolecolor.nom"
 $wildcard = ($(COMMAND LINE ARGS)."--wildcard" or "%*")
 $pattern = $(COMMAND LINE ARGS).extras.1
 if (any of [not $pattern, $pattern == "*", $pattern == "**"]):
-    barf "Usage: nomsu -t find [-l] [--wildcard=<wildcard>] <pattern>, where <pattern> is valid Nomsu code"
+    barf ("
+        Usage: nomsu -t find [-l] [--wildcard=<wildcard>] <pattern>, where <pattern> is valid Nomsu code
+    ")
 $pattern = ($pattern, with "\$wildcard\$wildcard" -> "$multi_wildcard")
 $pattern = ($pattern, with $wildcard -> "$wildcard")
 $pattern_tree = ($pattern parsed)
@@ -47,7 +49,9 @@ $pattern_tree = ($pattern parsed)
     return (yes)
 $filenames = ($(COMMAND LINE ARGS).extras, from 2 to -1)
 if ((#$filenames) == 0):
-    say "Warning: searching stdin (ctrl-d to abort). To avoid this message, use nomsu -t find -"
+    say ("
+        Warning: searching stdin (ctrl-d to abort). To avoid this message, use nomsu -t find -
+    ")
     $filenames = ["stdin"]
 
 for $filename in $filenames:
@@ -58,7 +62,11 @@ for $filename in $filenames:
     try:
         $tree = ($code parsed)
     ..and if it barfs $msg:
-        say (red "\$filename failed to parse:\n\$msg")
+        say
+            red ("
+                \$filename failed to parse:
+                \$msg
+            ")
         $tree = (nil)
     
     unless $tree:
@@ -68,8 +76,9 @@ for $filename in $filenames:
     for $t in recursive $tree:
         if ($t matches $pattern_tree):
             $line_num = ($file, line number at $t.source.start)
-            $results, 
-                add {.line = $line_num, .text = "\(blue "\$filename:\$line_num:")\n\(source lines of $t)"}
+            $results, add {
+                .line = $line_num, .text = "\(blue "\$filename:\$line_num:")\n\(source lines of $t)"
+            }
         
         for $sub in $t:
             if ($sub is syntax tree):

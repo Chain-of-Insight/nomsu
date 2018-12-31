@@ -16,7 +16,8 @@ $obj_by_id = {}
 set $obj_by_id's metatable to {.__mode = "v"}
 $id_by_obj = {}
 set $id_by_obj's metatable to {
-    .__mode = "k", .__index = (
+    .__mode = "k"
+    .__index =
         for ($self $key):
             if ($key == (nil)):
                 return $self.$nil_surrogate
@@ -30,7 +31,6 @@ set $id_by_obj's metatable to {
             $self.$key = $id
             $obj_by_id.$id = $key
             return $id
-    )
 }
 
 externally (uuid) means:

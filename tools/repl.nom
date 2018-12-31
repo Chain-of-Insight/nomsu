@@ -17,7 +17,8 @@ externally (help) means:
 
 say ("
     
-    \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\(reset color)
+    \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\
+    ..\(reset color)
            press 'enter' twice to run a command
     
 ")

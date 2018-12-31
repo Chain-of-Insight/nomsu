@@ -30,8 +30,9 @@ test:
         barf "conditional fail"
 
 (unless $condition $unless_body) parses as (if (not $condition) $unless_body)
-[if $condition $if_body else $else_body, unless $condition $else_body else $if_body]
-..all compile to ("
+[
+    if $condition $if_body else $else_body, unless $condition $else_body else $if_body
+] all compile to ("
     if \($condition as lua expr) then
         \($if_body as lua)
     else
@@ -58,7 +59,10 @@ test:
         equivalent of a conditional expression: (cond and if_true or if_false)
     if {.Text, .List, .Dict, .Number}.($when_true_expr.type):
         return
-            Lua "(\($condition as lua expr) and \($when_true_expr as lua expr) or \($when_false_expr as lua expr))"
+            Lua ("
+                (\($condition as lua expr) and \($when_true_expr as lua expr) or \
+                ..\($when_false_expr as lua expr))
+            ")
     ..else:
         #   Otherwise, need to do an anonymous inline function (yuck, too bad lua 
             doesn't have a proper ternary operator!)
@@ -135,9 +139,15 @@ test:
     assume ($x == 20)
 
 (repeat while $condition $body) compiles to:
-    $lua = (Lua "while \($condition as lua expr) do\n    \($body as lua)")
+    $lua =
+        Lua ("
+            while \($condition as lua expr) do
+                \($body as lua)
+        ")
+    
     if ($body has subtree \(do next)):
         $lua, add "\n    ::continue::"
+    
     $lua, add "\nend --while-loop"
     return $lua
 
@@ -173,7 +183,10 @@ test:
 ] all compile to:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     $lua =
-        Lua "for \($var as lua identifier)=\($start as lua expr),\($stop as lua expr),\($step as lua expr) do"
+        Lua ("
+            for \($var as lua identifier)=\($start as lua expr),\($stop as lua expr),\
+            ..\($step as lua expr) do
+        ")
     $lua, add "\n    " ($body as lua)
     if ($body has subtree \(do next)):
         $lua, add "\n    ::continue::"
@@ -265,7 +278,10 @@ test:
 [for $key = $value in $iterable $body, for $key $value in $iterable $body]
 ..all compile to:
     $lua =
-        Lua "for \($key as lua identifier),\($value as lua identifier) in pairs(\($iterable as lua expr)) do"
+        Lua ("
+            for \($key as lua identifier),\($value as lua identifier) in pairs(\
+            ..\($iterable as lua expr)) do
+        ")
     $lua, add "\n    " ($body as lua)
     if ($body has subtree \(do next)):
         $lua, add "\n    ::continue::"
@@ -314,7 +330,7 @@ test:
     $else_allowed = (yes)
     unless ($body.type is "Block"):
         compile error at $body "'if' expected a Block, but got a \($body.type)."
-        .."Perhaps you forgot to put a ':' after 'if'?"
+            "Perhaps you forgot to put a ':' after 'if'?"
     
     for $line in $body:
         unless
@@ -329,7 +345,7 @@ test:
         if (($line.1 is "else") and ((size of $line) == 2)):
             unless $else_allowed:
                 compile error at $line "You can't have two 'else' blocks."
-                .."Merge all of the 'else' blocks together."
+                    "Merge all of the 'else' blocks together."
             
             unless ((size of "\$code") > 0):
                 compile error at $line
@@ -338,12 +354,7 @@ test:
                     ..around it. Otherwise, make sure the 'else' block comes last.
                 ")
             
-            $code, add ("
-                
-                else
-                    \;
-            ") ($action as lua)
-            
+            $code, add "\nelse\n    " ($action as lua)
             $else_allowed = (no)
         ..else:
             $code, add $clause " "
@@ -351,20 +362,14 @@ test:
                 if ($i > 1):
                     $code, add " or "
                 $code, add ($line.$i as lua expr)
-            
-            $code, add ("
-                 then
-                    \;
-            ") ($action as lua)
-            
+            $code, add " then\n    " ($action as lua)
             $clause = "\nelseif"
     
     if ((size of "\$code") == 0):
         compile error at $body "'if' block has an empty body."
-        .."This means nothing would happen, so the 'if' block should be deleted."
+            "This means nothing would happen, so the 'if' block should be deleted."
     
     $code, add "\nend --when"
-    
     return $code
 
 test:
@@ -389,7 +394,7 @@ test:
     define mangler
     unless ($body.type is "Block"):
         compile error at $body "'if' expected a Block, but got a \($body.type)"
-        .."Perhaps you forgot to put a ':' after the 'is'?"
+            "Perhaps you forgot to put a ':' after the 'is'?"
     
     for $line in $body:
         unless
@@ -403,7 +408,7 @@ test:
         if (($line.1 is "else") and ((size of $line) == 2)):
             unless $else_allowed:
                 compile error at $line "You can't have two 'else' blocks."
-                .."Merge all of the 'else' blocks together."
+                    "Merge all of the 'else' blocks together."
             
             unless ((size of "\$code") > 0):
                 compile error at $line
@@ -412,12 +417,7 @@ test:
                     ..around it. Otherwise, make sure the 'else' block comes last.
                 ")
             
-            $code, add ("
-                
-                else
-                    \;
-            ") ($action as lua)
-            
+            $code, add "\nelse\n    " ($action as lua)
             $else_allowed = (no)
         ..else:
             $code, add $clause " "
@@ -425,20 +425,14 @@ test:
                 if ($i > 1):
                     $code, add " or "
                 $code, add "\(mangle "branch value") == " ($line.$i as lua expr)
-            
-            $code, add ("
-                 then
-                    \;
-            ") ($action as lua)
-            
+            $code, add " then\n    " ($action as lua)
             $clause = "\nelseif"
     
     if ((size of "\$code") == 0):
         compile error at $body "'if' block has an empty body."
-        .."This means nothing would happen, so the 'if' block should be deleted."
+            "This means nothing would happen, so the 'if' block should be deleted."
     
     $code, add "\nend --when"
-    
     return
         Lua ("
             do --if % is...

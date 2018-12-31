@@ -17,7 +17,7 @@ test:
 ($x >= $y) compiles to "(\($x as lua expr) >= \($y as lua expr))"
 [$a is $b, $a == $b] all compile to "(\($a as lua expr) == \($b as lua expr))"
 [$a isn't $b, $a is not $b, $a not= $b, $a != $b] all compile to
-.."(\($a as lua expr) ~= \($b as lua expr))"
+    "(\($a as lua expr) ~= \($b as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -91,11 +91,13 @@ test:
             $y = "inner"
     set global x local y
     assume (($foozle == "inner") and ($y == "outer")) or barf
-    .."'with external' failed."
+        "'with external' failed."
 
 (with external $externs $body) compiles to:
     $body_lua = ($body as lua)
-    lua> "\$body_lua:remove_free_vars(table.map(\$externs, function(v) return compile(v):text() end))"
+    lua> ("
+        \$body_lua:remove_free_vars(table.map(\$externs, function(v) return compile(v):text() end))
+    ")
     return $body_lua
 
 test:
@@ -120,6 +122,7 @@ test:
             \$defs:add("local ", item_lua, ";")
         end
     ")
+    
     return
         Lua ("
             do
@@ -133,7 +136,7 @@ test:
     assume ((5 wrapped around 2) == 1) or barf "mod not working"
 
 [$x wrapped around $y, $x mod $y] all compile to
-.."((\($x as lua expr)) % (\($y as lua expr)))"
+    "((\($x as lua expr)) % (\($y as lua expr)))"
 
 # 3-part chained comparisons
 # (uses a lambda to avoid re-evaluating middle value, while still being an expression)
@@ -144,10 +147,8 @@ test:
         return 1
     assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
     assume ($calls == 1) or barf
-    .."Three-way comparison evaluated middle value multiple times"
-
+        "Three-way comparison evaluated middle value multiple times"
 ($x < $y < $z) parses as ((($a $b $c) -> (($a < $b) and ($b < $c))) $x $y $z)
-
 ($x <= $y < $z) parses as ((($a $b $c) -> (($a <= $b) and ($b < $c))) $x $y $z)
 ($x < $y <= $z) parses as ((($a $b $c) -> (($a < $b) and ($b <= $c))) $x $y $z)
 ($x <= $y <= $z) parses as ((($a $b $c) -> (($a <= $b) and ($b <= $c))) $x $y $z)
@@ -183,31 +184,30 @@ test:
 lua> "if \((is jit) or ((Lua version) == "Lua 5.2")) then"
 [NOT $, ~ $] all compile to "bit.bnot(\($ as lua expr))"
 [$x OR $y, $x | $y] all compile to
-.."bit.bor(\($x as lua expr), \($y as lua expr))"
+    "bit.bor(\($x as lua expr), \($y as lua expr))"
 
 [$x XOR $y, $x ~ $y] all compile to
-.."bit.bxor(\($x as lua expr), \($y as lua expr))"
+    "bit.bxor(\($x as lua expr), \($y as lua expr))"
 
 [$x AND $y, $x & $y] all compile to
-.."bit.band(\($x as lua expr), \($y as lua expr))"
+    "bit.band(\($x as lua expr), \($y as lua expr))"
 
 [$x LSHIFT $shift, $x << $shift] all compile to
-.."bit.lshift(\($x as lua expr), \($shift as lua expr))"
+    "bit.lshift(\($x as lua expr), \($shift as lua expr))"
 
 [$x RSHIFT $shift, $x >> $shift] all compile to
-.."bit.rshift(\($x as lua expr), \($shift as lua expr))"
+    "bit.rshift(\($x as lua expr), \($shift as lua expr))"
 
 lua> "else"
-
 [NOT $, ~ $] all compile to "~(\($ as lua expr))"
 [$x OR $y, $x | $y] all compile to "(\($x as lua expr) | \($y as lua expr))"
 [$x XOR $y, $x ~ $y] all compile to "(\($x as lua expr) ~ \($y as lua expr))"
 [$x AND $y, $x & $y] all compile to "(\($x as lua expr) & \($y as lua expr))"
 [$x LSHIFT $shift, $x << $shift] all compile to
-.."(\($x as lua expr) << \($shift as lua expr))"
+    "(\($x as lua expr) << \($shift as lua expr))"
 
 [$x RSHIFT $shift, $x >> $shift] all compile to
-.."(\($x as lua expr) >> \($shift as lua expr))"
+    "(\($x as lua expr) >> \($shift as lua expr))"
 
 lua> "end"
 

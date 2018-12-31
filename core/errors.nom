@@ -7,10 +7,12 @@ use "core/metaprogramming.nom"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (barf $msg) compiles to
-.."error(\(=lua "\$msg and \($msg as lua expr) or 'nil'"), 0);"
+    "error(\(=lua "\$msg and \($msg as lua expr) or 'nil'"), 0);"
 
 (assume $condition) compiles to:
-    lua> "local \$assumption = 'Assumption failed: '..tostring((\$condition):get_source_code())"
+    lua> ("
+        local \$assumption = 'Assumption failed: '..tostring((\$condition):get_source_code())
+    ")
     
     return
         Lua ("
@@ -29,7 +31,8 @@ use "core/metaprogramming.nom"
             do
                 local \(mangle "a"), \(mangle "b") = \($a as lua expr), \($b as lua expr)
                 if \(mangle "a") ~= \(mangle "b") then
-                    error(\(quote "\$assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\(mangle "b")), 0)
+                    error(\(quote "\$assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\
+            ..\(mangle "b")), 0)
                 end
             end
         ")
