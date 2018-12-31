@@ -28,10 +28,11 @@ for $num in $my_nums:
 
 (sing $n bottles of beer) means:
     for $i in $n to 1 by -1:
-        say "
+        say ("
             \$i bottle\("s" if ($i > 1) else "") of beer on the wall,
             \$i bottle\("s" if ($i > 1) else "") of beer!
-            Take one down, pass it around..."
+            Take one down, pass it around...
+        ")
     say "No bottles of beer on the wall."
 
 sing 99 bottles of beer
