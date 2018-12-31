@@ -427,6 +427,11 @@ tree_to_nomsu = (tree)->
                 elseif item.type == 'Comment'
                     item_nomsu = tree_to_nomsu(item)
                     sep = '\n' if i > 1
+                elseif item.type == 'Block' and #item == 1
+                    -- Comprehensions use the more concise ": for $ in $: ..." form
+                    item_nomsu = tree_to_nomsu(item[1])
+                    item_nomsu\prepend ": "
+                    sep = '\n' if i > 1
                 else
                     item_nomsu = tree_to_inline_nomsu(item)
                     if #item_nomsu\text! > MAX_LINE
@@ -434,7 +439,8 @@ tree_to_nomsu = (tree)->
                         item_nomsu = tree_to_nomsu(item)
                 nomsu\add sep
                 nomsu\add item_nomsu
-                if item_nomsu\is_multiline! or item.type == 'Comment' or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE
+                if item_nomsu\is_multiline! or item.type == 'Comment' or item.type == "Block" or
+                    nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE
                     sep = '\n'
                 else
                     sep = ', '

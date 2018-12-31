@@ -562,6 +562,12 @@ tree_to_nomsu = function(tree)
         if i > 1 then
           sep = '\n'
         end
+      elseif item.type == 'Block' and #item == 1 then
+        item_nomsu = tree_to_nomsu(item[1])
+        item_nomsu:prepend(": ")
+        if i > 1 then
+          sep = '\n'
+        end
       else
         item_nomsu = tree_to_inline_nomsu(item)
         if #item_nomsu:text() > MAX_LINE then
@@ -573,7 +579,7 @@ tree_to_nomsu = function(tree)
       end
       nomsu:add(sep)
       nomsu:add(item_nomsu)
-      if item_nomsu:is_multiline() or item.type == 'Comment' or nomsu:trailing_line_len() + #tostring(item_nomsu) >= MAX_LINE then
+      if item_nomsu:is_multiline() or item.type == 'Comment' or item.type == "Block" or nomsu:trailing_line_len() + #tostring(item_nomsu) >= MAX_LINE then
         sep = '\n'
       else
         sep = ', '
