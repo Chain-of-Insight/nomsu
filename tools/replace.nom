@@ -3,7 +3,7 @@
     This is a tool to replace syntax trees with something new.
     
     Usage:
-        nomsu -t replace [-i] [--literal="$v1 $v2..."] <pattern> <replacement> file1 file2...
+        nomsu -t replace [-i] [-f] [-q] [--literal="$v1 $v2..."] <pattern> <replacement> file1 file2...
     
     Example:
         nomsu -t replace "($1 and $2) and $3" "all of [$1, $2, $3]" my_file.nom
@@ -11,6 +11,8 @@
     If the "-i" flag is used, the file(s) will be edited in-place.
     When editing in-place, if the "-f" flag is not used, each change will be
         run past the user first.
+    If the "-q" flag is used and a file fails to parse, the original file
+        contents will be output.
     If no files are passed in, this will read from stdin.
     
 use "lib/os.nom"
@@ -89,12 +91,11 @@ for $filename in $filenames:
     try:
         $tree = ($code parsed)
     ..and if it barfs $msg:
-        say
-            red ("
-                \$filename failed to parse:
-                \$msg
-            ")
-        $tree = (nil)
+        if $(COMMAND LINE ARGS).q:
+            unless $(COMMAND LINE ARGS).i:
+                say $code
+        ..else:
+            say $msg
     
     unless $tree:
         do next $filename
