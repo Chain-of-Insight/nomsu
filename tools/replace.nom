@@ -44,6 +44,8 @@ $pattern_vars = {
                 recurse $ on $child
 }
 
+# TODO: support wildcards and unpacking
+    e.g. nomsu -t replace "test(: $test; *$more_tests)" "*$more_tests; *$test"
 ($tree matches $patt with $substitution_values) means:
     # TODO: optimize
     $substitution_values = {: for $k = $v in $substitution_values: add $k = $v}
