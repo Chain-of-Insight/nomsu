@@ -328,6 +328,7 @@ local nomsu_environment = Importer({
               local lua_filename = filename:gsub("%.nom$", ".lua")
               if environment.FILE_CACHE[filename] then
                 import_to_1_from(environment, environment.FILE_CACHE[filename], prefix)
+                did_anything = true
                 _continue_1 = true
                 break
               end
@@ -356,7 +357,7 @@ local nomsu_environment = Importer({
       end
     end
     if not (did_anything) then
-      error("File not found: " .. tostring(path), 0)
+      error("File not found: " .. tostring(path) .. "\n(searched in " .. tostring(package.nomsupath) .. ")", 0)
     end
     import_to_1_from(environment, mod, prefix)
     environment.FILE_CACHE[path] = mod

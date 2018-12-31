@@ -182,6 +182,7 @@ nomsu_environment = Importer{
                 -- Need to check here to prevent re-running files
                 if environment.FILE_CACHE[filename]
                     import_to_1_from(environment, environment.FILE_CACHE[filename], prefix)
+                    did_anything = true
                     continue
                 -- TODO: don't automatically use precompiled version?
                 code = if optimization != 0 and Files.read(lua_filename)
@@ -195,7 +196,7 @@ nomsu_environment = Importer{
                 did_anything = true
             break
         unless did_anything
-            error("File not found: #{path}", 0)
+            error("File not found: #{path}\n(searched in #{package.nomsupath})", 0)
         import_to_1_from(environment, mod, prefix)
         environment.FILE_CACHE[path] = mod
         _currently_running_files\remove!
