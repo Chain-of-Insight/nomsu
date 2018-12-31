@@ -19,7 +19,7 @@ for $filename in $filenames:
     $file = (read file $filename)
     unless $file:
         barf "File does not exist: \$filename"
-    $leading_indent = ($file, matching "[\n]*([ ]*)")
+    $leading_indent = ($file, matching "\n*([ ]*)")
     $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
     try:
         $tree = ($code parsed)

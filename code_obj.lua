@@ -168,9 +168,6 @@ do
             _continue_0 = true
             break
           end
-          if type(b) ~= 'string' then
-            b.dirty = error
-          end
           bits[#bits + 1] = b
           _continue_0 = true
         until true

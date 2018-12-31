@@ -19,7 +19,7 @@ for $filename in $(COMMAND LINE ARGS).extras:
     $file = (read file $filename)
     unless $file:
         barf "File does not exist: \$filename"
-    $leading_indent = ($file, matching "[\n]*([ ]*)")
+    $leading_indent = ($file, matching "\n*([ ]*)")
     $code = (NomsuCode from (Source $filename 1 (size of $file)) $file)
     $tree = ($code parsed $start_version)
     $uptree =

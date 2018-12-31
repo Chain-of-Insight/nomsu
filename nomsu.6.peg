@@ -148,8 +148,6 @@ inline_text_interpolation <-
 
 text_char <- %utf8_char / !["\] %print / %tab
 
-nonterminal_quote <- '"' &([^%nl] / (%nl (ws* eol)?)+ =curr_indent [^%nl])
-
 indented_text (Text) <-
     '("' %nl {%nl*} ({|
         {:curr_indent: indent :}
@@ -163,7 +161,7 @@ indented_plain_text (Text) <-
     {~ 
         ((("\" blank_lines =curr_indent "..") -> "") / ('\\' -> '\') / ('\"' -> '"') / ('\;' -> '')
         / (!text_interpolation ((!("\n") escaped_char) / '\'))
-        / (nonterminal_quote / text_char)+)+
+        / ('"' / text_char)+)+
         blank_text_lines?
     ~}
 blank_text_lines <- 
@@ -255,7 +253,7 @@ missing_quote_err (Error) <-
     {:error: {~ eol -> "This text is missing a closing quotation mark." ~} :}
     {:hint: {~ "" -> "Put a quotation mark here." ~} :}
 missing_indented_quote_err (Error) <-
-    {:error: {~ &. -> 'This text is missing a closing ")-quotation mark.' ~} :}
+    {:error: {~ '' -> 'This text is missing a closing ")-quotation mark.' ~} :}
     {:hint: {~ "" -> 'Put a ") after this line, at the same level of indentation as the opening (".' ~} :}
 missing_bracket_error (Error) <-
     {:error: {~ eol -> "This list is missing a closing ]-bracket" ~} :}

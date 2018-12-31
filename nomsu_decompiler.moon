@@ -133,24 +133,26 @@ tree_to_inline_nomsu = (tree)->
                 key[1]
             else
                 tree_to_inline_nomsu(key)
-            key_nomsu\parenthesize! if key.type == "Block" or key.type == "Action" or key.type == "MethodCall"
+            switch key.type
+                when "Block", "Action", "MethodCall", "IndexChain"
+                    key_nomsu\parenthesize!
             return NomsuCode\from(key.source, ".", key_nomsu)
         
         when "IndexChain"
             nomsu = NomsuCode\from(tree.source)
-            for i, bit in ipairs tree
-                nomsu\add "." if i > 1 and bit.type != "Index"
-                local bit_nomsu
-                bit_nomsu = if i > 1 and bit.type == "Text" and #bit == 1 and type(bit[1]) == 'string' and is_identifier(bit[1])
-                    bit[1]
-                else tree_to_inline_nomsu(bit)
-                assert bit.type != "Block"
-                switch bit.type
-                    when "Action", "MethodCall", "IndexChain"
-                        bit_nomsu\parenthesize!
-                    when "Number"
-                        bit_nomsu\parenthesize! if bit_nomsu\text!\match("%.")
-                nomsu\add bit_nomsu
+            target = tree[1]
+            target_nomsu = tree_to_inline_nomsu(target)
+            switch target.type
+                when "Action", "MethodCall"
+                    target_nomsu\parenthesize!
+                when "Number"
+                    target_nomsu\parenthesize! if target_nomsu\text!\match("%.")
+            nomsu\add target_nomsu
+            for i=2,#tree
+                -- TODO: remove shim?
+                if tree[i].type != "Index"
+                    tree[i] = {type:"Index", source:tree[i].source, tree[i]}
+                nomsu\add tree_to_inline_nomsu(tree[i])
             return nomsu
         
         when "Number"
@@ -189,18 +191,27 @@ tree_to_nomsu = (tree)->
         space = MAX_LINE - nomsu\trailing_line_len!
         try_inline = true
         for subtree in coroutine.wrap(-> (t\map(coroutine.yield) and nil))
-            if subtree.type == "Comment"
-                try_inline = false
-            if subtree.type == "Block"
-                if #subtree > 1
+            switch subtree.type
+                when "Comment"
                     try_inline = false
+                when "Block"
+                    if #subtree > 1
+                        try_inline = false
+                when "Text"
+                    indented = tree_to_nomsu(subtree)
+                    indented_lines = [line for line in *indented\text!\lines! when line\match("^    +([^ ].*)")]
+                    for i=#indented_lines,1,-1
+                        if indented_lines[i]\match("^ *\\;$")
+                            table.remove(indented_lines, i)
+                    if #indented_lines > 1 or (#indented_lines == 1 and #indented_lines[1] > MAX_LINE + 8)
+                        try_inline = false
         
         local inline_nomsu
         if try_inline
             inline_nomsu = tree_to_inline_nomsu(t)
+            if (t.type == "Action" or t.type == "MethodCall")
+                inline_nomsu\parenthesize!
             if #inline_nomsu\text! <= space or #inline_nomsu\text! <= 8
-                if (t.type == "Action" or t.type == "MethodCall")
-                    inline_nomsu\parenthesize!
                 if t.type != "Text"
                     return inline_nomsu
         indented = tree_to_nomsu(t)
@@ -214,11 +225,13 @@ tree_to_nomsu = (tree)->
                 return NomsuCode\from(t.source, "\n    ", indented)
             else
                 indented\parenthesize!
-        indented_lines = [line for line in *indented\text!\lines! when line\match("%S")]
-        if inline_nomsu and #indented_lines == ((t.type == 'Block' or t.type == 'Action' or t.type == 'MethodCall') and 2 or 3) and nomsu\trailing_line_len! <= 8
-            return inline_nomsu
-        elseif inline_nomsu and t.type == "Text" and #indented_lines <= 3 and
-            (#inline_nomsu\text! - 2 < MAX_LINE + 4 or #inline_nomsu\text! <= space or #inline_nomsu\text! <= 8)
+        indented_lines = [line for line in *indented\text!\lines! when line\match("^    +([^ ].*)")]
+        if t.type == "Text"
+            for i=#indented_lines,1,-1
+                if indented_lines[i]\match("^ *\\;$")
+                    table.remove(indented_lines, i)
+        if inline_nomsu and (#inline_nomsu\text! < MAX_LINE or #inline_nomsu\text! <= space) and
+            #indented_lines <= 1
             return inline_nomsu
         return indented
 
@@ -265,13 +278,21 @@ tree_to_nomsu = (tree)->
                 if bit.type == "Block"
                     -- Rule of thumb: nontrivial one-liner block arguments should be no more
                     -- than golden ratio * the length of the proceeding part of the line
-                    if not bit_nomsu\is_multiline! and #bit_nomsu\text! > nomsu\trailing_line_len! * GOLDEN_RATIO and #bit_nomsu\text! > 8
+                    if not bit_nomsu\is_multiline! and
+                        (#bit_nomsu\text! > nomsu\trailing_line_len! * GOLDEN_RATIO and #bit_nomsu\text! > 8) or
+                        #bit_nomsu\text! + nomsu\trailing_line_len! > MAX_LINE
                         bit_nomsu = tree_to_nomsu(bit)
                 elseif (not bit_nomsu\is_multiline! and
                     nomsu\trailing_line_len! + #bit_nomsu\text! > MAX_LINE and
                     nomsu\trailing_line_len! > 8)
                     if next_space == " " and #bit_nomsu\text! < MAX_LINE
-                        next_space = "\n.."
+                        if i == #tree
+                            bit_nomsu = tree_to_inline_nomsu(bit)
+                            next_space = "\n    "
+                        elseif bit.type == "List" or bit.type == "Dict"
+                            bit_nomsu = tree_to_nomsu(bit)
+                        else
+                            next_space = "\n.."
                     elseif bit.type == 'Action' or bit.type == "MethodCall"
                         bit_nomsu = NomsuCode\from bit.source, "\n    ", tree_to_nomsu(bit)
                     else
@@ -281,7 +302,7 @@ tree_to_nomsu = (tree)->
                     nomsu\add next_space
 
                 nomsu\add bit_nomsu
-                next_space = (bit.type == 'Block' or (i > 1 and (bit.type == 'Action' or bit.type == 'MethodCall')) and bit_nomsu\is_multiline!) and "\n.." or " "
+                next_space = (bit.type == "Block" or bit_nomsu\text!\matches("\n    [^\n]*$")) and "\n.." or " "
 
             if #word_buffer > 0
                 words = table.concat(word_buffer)
@@ -365,12 +386,25 @@ tree_to_nomsu = (tree)->
                         nomsu\add "\\"
                         interp_nomsu = recurse(bit)
                         unless interp_nomsu\is_multiline!
+                            space = max_line - nomsu\trailing_line_len!
                             if bit.type == "Var"
                                 next_str = tree[i+1]
                                 while type(next_str) == 'table' and next_str.type == 'Text'
                                     next_str = next_str[1]
                                 if type(next_str) == 'string' and not match(next_str, "^[ \n\t,.:;#(){}[%]]")
                                     interp_nomsu\parenthesize!
+                            elseif #interp_nomsu\text! > space
+                                interp_nomsu2 = if bit.type == "Action" or bit.type == "MethodCall"
+                                    NomsuCode\from(bit.source, "(\n    ", tree_to_nomsu(bit), "\n)")
+                                else
+                                    tree_to_nomsu(bit)
+
+                                if #interp_nomsu2\text!\lines! > 3 or #interp_nomsu2\text! >= MAX_LINE*GOLDEN_RATIO
+                                    interp_nomsu = interp_nomsu2
+                                else
+                                    nomsu\add "\n..\\"
+                                    if bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain"
+                                        interp_nomsu\parenthesize!
                             elseif bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain"
                                 interp_nomsu\parenthesize!
                         nomsu\add interp_nomsu
@@ -396,7 +430,8 @@ tree_to_nomsu = (tree)->
                 else
                     item_nomsu = tree_to_inline_nomsu(item)
                     if #item_nomsu\text! > MAX_LINE
-                        item_nomsu = recurse(item)
+                        sep = '\n' if i > 1
+                        item_nomsu = tree_to_nomsu(item)
                 nomsu\add sep
                 nomsu\add item_nomsu
                 if item_nomsu\is_multiline! or item.type == 'Comment' or nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE

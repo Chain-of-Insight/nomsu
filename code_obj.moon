@@ -100,7 +100,6 @@ class Code
             assert(b, "code bit is nil")
             assert(not Source\is_instance(b), "code bit is a Source")
             if b == '' then continue
-            b.dirty = error if type(b) != 'string'
             bits[#bits+1] = b
         @dirty!
     
