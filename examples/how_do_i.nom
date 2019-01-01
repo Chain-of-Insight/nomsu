@@ -316,7 +316,7 @@ say (best of [2, -3, 4, -8] according to ($x -> ($x * $x)))
 
 # Or, you can use $(foo $) to access the function that gets called by (foo $)
 ($x squared) means ($x * $x)
-say (best of [2, -3, 4, -8] according to $($ squared)
+say (best of [2, -3, 4, -8] according to $($ squared))
 
 # But nomsu was designed with flexible alternatives that are often better than passing functions.
     For example, instead of calling a key function on every item, you could instead define a macro
