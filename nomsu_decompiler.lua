@@ -220,10 +220,10 @@ tree_to_inline_nomsu = function(tree)
     return NomsuCode:from(tree.source, s)
   elseif "Var" == _exp_0 then
     local varname = tree[1]
-    if varname == "" or is_identifier(varname) then
+    if type(varname) == "string" then
       return NomsuCode:from(tree.source, "$", varname)
     else
-      return NomsuCode:from(tree.source, "$(", varname, ")")
+      return NomsuCode:from(tree.source, "$(", tree_to_inline_nomsu(varname), ")")
     end
   elseif "FileChunks" == _exp_0 then
     return error("Can't inline a FileChunks")

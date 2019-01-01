@@ -473,7 +473,12 @@ local compile = setmetatable({
     elseif "Number" == _exp_0 then
       return LuaCode:from(tree.source, tostring(tree[1]))
     elseif "Var" == _exp_0 then
-      return LuaCode:from(tree.source, (concat(tree, " ")):as_lua_id())
+      if type(tree[1]) == 'string' then
+        return LuaCode:from(tree.source, (concat(tree, " ")):as_lua_id())
+      else
+        assert(tree[1].type == 'Action')
+        return LuaCode:from(tree.source, tree[1]:get_stub():as_lua_id())
+      end
     elseif "FileChunks" == _exp_0 then
       return error("Can't convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")
     elseif "Comment" == _exp_0 then

@@ -190,7 +190,7 @@ real_number (Number) <-
     (("-"? [0-9]+ "." [0-9]+)-> tonumber)
 
 
-variable (Var) <- "$" ({ident_char+} / "(" {(ws+ / operator_char+ / ident_char+)*} ")" / {''})
+variable (Var) <- "$" ({ident_char+} / "(" ws* inline_action ws* ")" / {''})
 
 
 inline_list (List) <-

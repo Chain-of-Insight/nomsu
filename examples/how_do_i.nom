@@ -1,4 +1,5 @@
 #!/usr/bin/env nomsu -V6.13.12.8
+
 # How do I...
 # Write a comment? Put a # and go till the end of the line
 # How do I write a multi-line comment?
@@ -313,9 +314,9 @@ debug only:
 # Function literals look like: $x -> ($x * $x)
 say (best of [2, -3, 4, -8] according to ($x -> ($x * $x)))
 
-# Or, you can use ((foo $)'s meaning) to access the function that gets called by (foo $)
+# Or, you can use $(foo $) to access the function that gets called by (foo $)
 ($x squared) means ($x * $x)
-say (best of [2, -3, 4, -8] according to (($ squared)'s meaning))
+say (best of [2, -3, 4, -8] according to $($ squared)
 
 # But nomsu was designed with flexible alternatives that are often better than passing functions.
     For example, instead of calling a key function on every item, you could instead define a macro

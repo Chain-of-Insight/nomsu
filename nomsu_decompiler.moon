@@ -165,10 +165,10 @@ tree_to_inline_nomsu = (tree)->
 
         when "Var"
             varname = tree[1]
-            if varname == "" or is_identifier(varname)
+            if type(varname) == "string"
                 return NomsuCode\from(tree.source, "$", varname)
             else
-                return NomsuCode\from(tree.source, "$(", varname, ")")
+                return NomsuCode\from(tree.source, "$(", tree_to_inline_nomsu(varname), ")")
 
         when "FileChunks"
             error("Can't inline a FileChunks")
