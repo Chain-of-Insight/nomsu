@@ -320,6 +320,10 @@ do
       return self:dirty()
     end,
     remove_free_vars = function(self, vars)
+      if vars == nil then
+        vars = nil
+      end
+      vars = vars or self:get_free_vars()
       if not (#vars > 0) then
         return 
       end
@@ -351,33 +355,34 @@ do
       end
       return self:dirty()
     end,
+    get_free_vars = function(self)
+      local vars, seen = { }, { }
+      local gather_from
+      gather_from = function(self)
+        local _list_0 = self.free_vars
+        for _index_0 = 1, #_list_0 do
+          local var = _list_0[_index_0]
+          if not (seen[var]) then
+            seen[var] = true
+            vars[#vars + 1] = var
+          end
+        end
+        local _list_1 = self.bits
+        for _index_0 = 1, #_list_1 do
+          local bit = _list_1[_index_0]
+          if not (type(bit) == 'string') then
+            gather_from(bit)
+          end
+        end
+      end
+      gather_from(self)
+      return vars
+    end,
     declare_locals = function(self, to_declare)
       if to_declare == nil then
         to_declare = nil
       end
-      if to_declare == nil then
-        local seen
-        to_declare, seen = { }, { }
-        local gather_from
-        gather_from = function(self)
-          local _list_0 = self.free_vars
-          for _index_0 = 1, #_list_0 do
-            local var = _list_0[_index_0]
-            if not (seen[var]) then
-              seen[var] = true
-              to_declare[#to_declare + 1] = var
-            end
-          end
-          local _list_1 = self.bits
-          for _index_0 = 1, #_list_1 do
-            local bit = _list_1[_index_0]
-            if not (type(bit) == 'string') then
-              gather_from(bit)
-            end
-          end
-        end
-        gather_from(self)
-      end
+      to_declare = to_declare or self:get_free_vars()
       if #to_declare > 0 then
         self:remove_free_vars(to_declare)
         self:prepend("local " .. tostring(concat(to_declare, ", ")) .. ";\n")

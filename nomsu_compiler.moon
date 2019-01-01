@@ -234,7 +234,7 @@ compile = setmetatable({
                     entry_lua\add as_lua(v)
                     if needs_comma then lua\add ","
                     if lua\trailing_line_len! + #(entry_lua\text!\match("^[\n]*")) > MAX_LINE
-                        lua\add "\n"
+                        lua\add "\n    "
                     elseif needs_comma
                         lua\add " "
                     lua\add entry_lua
@@ -322,6 +322,8 @@ compile = setmetatable({
                             if tree[i].type == "Comment"
                                 items_lua\add "\n"
                                 sep = ''
+                            elseif items_lua\trailing_line_len! > MAX_LINE
+                                sep = ',\n    '
                             else
                                 sep = ', '
                             i += 1

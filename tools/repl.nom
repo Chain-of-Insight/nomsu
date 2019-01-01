@@ -42,25 +42,44 @@ repeat:
     
     if ((size of $buff) == 0): stop
     $buff = ($buff, joined)
-    
-    # TODO: support local variables
     spoof file $buff
     try:
-        $ret = (run $buff)
-    ..and if it barfs $err: say $err
-    ..or if it succeeds:
-        if (type of $ret) is:
-            "nil":
-                do nothing
-            
-            "boolean":
-                say "= \("yes" if $ret else "no")"
-            
-            "table":
-                if $ret.as_nomsu:
-                    say "= \($ret, as nomsu)"
-                ..else:
+        $tree = ($buff parsed)
+    ..and if it barfs $err:
+        say $err
+        do next
+    
+    unless $tree:
+        do next
+    
+    for $chunk in $tree:
+        try:
+            $lua = ($chunk as lua)
+        ..and if it barfs $err: say $err
+        
+        unless $lua:
+            do next
+        
+        # TODO: this is a bit hacky, it just defaults variables to global
+            so that stuff mostly works across multiple lines. It would be
+            nicer if local variables actually worked.
+        $lua, remove free vars
+        try:
+            $ret = (run $lua)
+        ..and if it barfs $err: say $err
+        ..or if it succeeds:
+            if (type of $ret) is:
+                "nil":
+                    do nothing
+                
+                "boolean":
+                    say "= \("yes" if $ret else "no")"
+                
+                "table":
+                    if $ret.as_nomsu:
+                        say "= \($ret, as nomsu)"
+                    ..else:
+                        say "= \$ret"
+                
+                else:
                     say "= \$ret"
-            
-            else:
-                say "= \$ret"

@@ -106,13 +106,6 @@ List = (t)->
         return l
     else error("Unsupported List type: "..type(t))
 
-walk_items = (i)=>
-    i = i + 1
-    k, v = next(@table, @key)
-    if k != nil
-        @key = k
-        return i, Dict{key:k, value:v}
-
 _dict_mt =
     __type: "Dict"
     __eq: (other)=>
@@ -133,32 +126,31 @@ _dict_mt =
         "{"..concat(["#{as_nomsu(k)}: #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_lua: =>
         "Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
-    __ipairs: => walk_items, {table:@, key:nil}, 0
     __band: (other)=>
         Dict{k,v for k,v in pairs(@) when other[k] != nil}
     __bor: (other)=>
-        ret = {k,v for k,v in pairs(@)}
+        ret = Dict{k,v for k,v in pairs(@)}
         for k,v in pairs(other)
             if ret[k] == nil then ret[k] = v
-        return Dict(ret)
+        return ret
     __bxor: (other)=>
-        ret = {k,v for k,v in pairs(@)}
+        ret = Dict{k,v for k,v in pairs(@)}
         for k,v in pairs(other)
             if ret[k] == nil then ret[k] = v
             else ret[k] = nil
-        return Dict(ret)
+        return ret
     __add: (other)=>
-        ret = {k,v for k,v in pairs(@)}
+        ret = Dict{k,v for k,v in pairs(@)}
         for k,v in pairs(other)
             if ret[k] == nil then ret[k] = v
             else ret[k] += v
-        return Dict(ret)
+        return ret
     __sub: (other)=>
-        ret = {k,v for k,v in pairs(@)}
+        ret = Dict{k,v for k,v in pairs(@)}
         for k,v in pairs(other)
             if ret[k] == nil then ret[k] = -v
             else ret[k] -= v
-        return Dict(ret)
+        return ret
 Dict = (t)->
     if type(t) == 'table'
         return setmetatable(t, _dict_mt)
@@ -171,8 +163,6 @@ Dict = (t)->
         return d
     else error("Unsupported Dict type: "..type(t))
 
-for i,entry in ipairs(Dict({x:99}))
-    assert(i == 1 and entry.key == "x" and entry.value == 99, "ipairs compatibility issue")
 
 do
     {:reverse, :upper, :lower, :find, :byte, :match, :gmatch, :gsub, :sub, :format, :rep} = string
@@ -204,7 +194,7 @@ do
         line_position_at: (i)=> select(3, line_at(@, i))
         matches: (patt)=> match(@, patt) and true or false
         matching: (patt)=> (match(@, patt))
-        matching_groups: (patt)=> {match(@, patt)}
+        matching_groups: (patt)=> List{match(@, patt)}
         [as_lua_id "* 1"]: (n)=> rep(@, n)
         all_matches_of: (patt)=>
             result = {}

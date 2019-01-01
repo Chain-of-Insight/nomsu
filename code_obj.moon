@@ -179,7 +179,8 @@ class LuaCode extends Code
                 seen[var] = true
         @dirty!
     
-    remove_free_vars: (vars)=>
+    remove_free_vars: (vars=nil)=>
+        vars or= @get_free_vars!
         return unless #vars > 0
         removals = {}
         for var in *vars
@@ -198,18 +199,21 @@ class LuaCode extends Code
                     stack[#stack+1] = b
         @dirty!
 
+    get_free_vars: =>
+        vars, seen = {}, {}
+        gather_from = =>
+            for var in *@free_vars
+                unless seen[var]
+                    seen[var] = true
+                    vars[#vars+1] = var
+            for bit in *@bits
+                unless type(bit) == 'string'
+                    gather_from bit
+        gather_from self
+        return vars
+
     declare_locals: (to_declare=nil)=>
-        if to_declare == nil
-            to_declare, seen = {}, {}
-            gather_from = =>
-                for var in *@free_vars
-                    unless seen[var]
-                        seen[var] = true
-                        to_declare[#to_declare+1] = var
-                for bit in *@bits
-                    unless type(bit) == 'string'
-                        gather_from bit
-            gather_from self
+        to_declare or= @get_free_vars!
         if #to_declare > 0
             @remove_free_vars to_declare
             @prepend "local #{concat to_declare, ", "};\n"

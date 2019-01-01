@@ -37,7 +37,6 @@ test:
 test:
     $dict = {.x = 1, .y = 2, .z = 3}
     assume (size of $dict) == 3
-    assume [: for $ in {.x = 1}: add $] == [{.key = "x", .value = 1}]
     assume [: for $k = $v in {.x = 1}: add {.key = $k, .value = $v}] ==
         [{.key = "x", .value = 1}]
     assume ({.x = 1, .y = 1} + {.y = 10, .z = 10}) == {.x = 1, .y = 11, .z = 10}

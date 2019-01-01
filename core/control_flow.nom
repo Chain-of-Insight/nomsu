@@ -5,7 +5,6 @@
     
 use "core/metaprogramming.nom"
 use "core/operators.nom"
-use "core/errors.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -447,32 +446,6 @@ test:
         \($action as lua)
     end -- do
 ")
-
-test:
-    $d = {}
-    try:
-        do:
-            $d.x = "bad"
-            barf
-        ..then always:
-            $d.x = "good"
-    assume ($d.x == "good")
-
-(do $action then always $final_action) compiles to:
-    define mangler
-    return
-        Lua ("
-            do
-                local \(mangle "fell_through") = false
-                local \(mangle "ok"), \(mangle "ret") = pcall(function()
-                    \($action as lua)
-                    \(mangle "fell_through") = true
-                end)
-                \($final_action as lua)
-                if not \(mangle "ok") then error(ret, 0) end
-                if not \(mangle "fell_through") then return ret end
-            end
-        ")
 
 test:
     assume ((result of: return 99) == 99)

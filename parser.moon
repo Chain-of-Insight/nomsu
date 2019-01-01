@@ -25,6 +25,13 @@ DEFS = with {}
     .unpack = unpack or table.unpack
     .nil = Cc(nil)
     .userdata = Carg(1)
+    -- Always match and capture the indentation (spaces only) of the current line
+    -- i.e. the leading space of the chunk of non-newline characters leading up to s[i]
+    .indentation = lpeg.Cmt P(0),
+        (s, i)->
+            sub = string.sub
+            while i > 1 and sub(s,i-1,i-1) != '\n' do i -= 1
+            return true, (s\match("^ *", i))
     .utf8_char = (
         R("\194\223")*R("\128\191") +
         R("\224\239")*R("\128\191")*R("\128\191") +

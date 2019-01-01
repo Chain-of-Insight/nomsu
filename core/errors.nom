@@ -3,11 +3,12 @@
     This file contains basic error reporting code
     
 use "core/metaprogramming.nom"
+use "core/operators.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(barf $msg) compiles to
-    "error(\(=lua "\$msg and \($msg as lua expr) or 'nil'"), 0);"
+(fail $msg) compiles to
+    "error(\(($msg as lua expr) if $msg else "nil"), 0);"
 
 (assume $condition) compiles to:
     lua> ("
@@ -37,62 +38,86 @@ use "core/metaprogramming.nom"
             end
         ")
 
-(assume $condition or barf $message) compiles to ("
-    if not \($condition as lua expr) then
-        error(\($message as lua expr), 0)
-    end
-")
-
 test:
-    try (barf) and if it succeeds:
-        barf "try failed."
+    try: fail
     $worked = (no)
-    try (barf) and if it barfs:
+    try: fail
+    ..if it fails:
         $worked = (yes)
-    assume $worked or barf "try/catch failed"
-    $x = 1
-    try:
-        $x = 2
-        do (barf) then always: $x = 3
-    ..and if it barfs:
-        do nothing
-    assume ($x == 3) or barf "do/then always failed"
-
+    ..if it succeeds:
+        fail "'try' incorrectly ran success case."
+    
+    unless $worked:
+        fail "'try' failed to recover from failure"
 # Try/except
 [
-    try $action and if it succeeds $success or if it barfs $msg $fallback
-    try $action and if it barfs $msg $fallback or if it succeeds $success
-] all compile to ("
-    do
-        local fell_through = false
-        local err, erred = nil, false
-        local ok, ret = xpcall(function()
-            \($action as lua)
-            fell_through = true
-        end, function(\(=lua "\$fallback and \($msg as lua expr) or ''"))
-            local ok, ret = pcall(function()
-                \((=lua "\$fallback or \$msg") as lua)
-            end)
-            if not ok then err, erred = ret, true end
-        end)
-        if ok then
-            \($success as lua)
-            if not fell_through then
-                return ret
+    try $action if it succeeds $success if it fails $fallback
+    try $action if it fails $fallback if it succeeds $success
+] all compile to:
+    $success_lua = ($success as lua)
+    if ((#"\$success_lua") > 0): $success_lua, add "\n"
+    $success_lua, prepend "-- Success:\n"
+    $success_lua, add "if not _fell_through then return table.unpack(_result, 2) end"
+    $fallback_lua = ($fallback as lua)
+    if ((#"\$fallback_lua") > 0):
+        $fallback_lua, prepend "\nlocal function failure() return _result[2] end\n"
+    $fallback_lua, prepend "-- Failure:"
+    return
+        Lua ("
+            do
+                local _fell_through = false
+                local _result = {pcall(function()
+                    \($action as lua)
+                    _fell_through = true
+                end)}
+                if _result[1] then
+                    \$success_lua
+                else
+                    \$fallback_lua
+                end
             end
-        elseif erred then
-            error(err, 0)
-        end
-    end
-")
+        ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (try $action) parses as
-    try $action and if it succeeds (do nothing) or if it barfs (do nothing)
+    try $action if it succeeds (do nothing) if it fails (do nothing)
 
-(try $action and if it barfs $msg $fallback) parses as
-    try $action and if it succeeds (do nothing) or if it barfs $msg $fallback
+(try $action if it fails $msg $fallback) parses as
+    try $action if it succeeds (do nothing) if it fails $msg $fallback
 
-(try $action and if it succeeds $success) parses as
-    try $action and if it succeeds $success or if it barfs (do nothing)
+(try $action if it succeeds $success) parses as
+    try $action if it succeeds $success if it fails (do nothing)
+
+(try $action if it fails $fallback if it succeeds $success) parses as
+    try $action if it succeeds $success if it fails $fallback
+
+test:
+    $success = (no)
+    try:
+        do: fail
+        ..then always:
+            $success = (yes)
+    ..if it succeeds:
+        fail "'try ... then always ...' didn't propagate failure"
+    
+    unless $success:
+        fail "'try ... then always ...' didn't execute the 'always' code"
+
+(do $action then always $final_action) compiles to ("
+    do -- do/then always
+        local _fell_through = false
+        local _results = {pcall(function()
+            \($action as lua)
+            _fell_through = true
+        end)}
+        \($final_action as lua)
+        if not _results[1] then error(_results[2], 0) end
+        if not _fell_through then return table.unpack(_results, 2) end
+    end
+")
+
+~~~
+
+(barf $) parses as (fail $)
+(assume $1 or barf $2) parses as (unless $1: fail $2)

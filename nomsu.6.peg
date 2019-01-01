@@ -168,7 +168,11 @@ blank_text_lines <-
     {~ (%nl ((ws* -> '') (&%nl / !.) / (=curr_indent -> '') &[^%nl]))+ ~}
 
 text_interpolation <-
-    ("\" (indented_block (blank_lines =curr_indent "..")? / indented_expression))
+    ({|
+    -- %indentation will backtrack and match the actual indentation of the current line
+        "\" {:curr_indent: %indentation :}
+        (indented_block (blank_lines =curr_indent "..")? / indented_expression)
+    |} -> unpack)
     / inline_text_interpolation
 
 

@@ -304,7 +304,7 @@ local compile = setmetatable({
           lua:add(",")
         end
         if lua:trailing_line_len() + #(entry_lua:text():match("^[\n]*")) > MAX_LINE then
-          lua:add("\n")
+          lua:add("\n    ")
         elseif needs_comma then
           lua:add(" ")
         end
@@ -417,6 +417,8 @@ local compile = setmetatable({
             if tree[i].type == "Comment" then
               items_lua:add("\n")
               sep = ''
+            elseif items_lua:trailing_line_len() > MAX_LINE then
+              sep = ',\n    '
             else
               sep = ', '
             end

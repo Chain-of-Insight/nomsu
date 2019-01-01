@@ -251,18 +251,6 @@ List = function(t)
     return error("Unsupported List type: " .. type(t))
   end
 end
-local walk_items
-walk_items = function(self, i)
-  i = i + 1
-  local k, v = next(self.table, self.key)
-  if k ~= nil then
-    self.key = k
-    return i, Dict({
-      key = k,
-      value = v
-    })
-  end
-end
 local _dict_mt = {
   __type = "Dict",
   __eq = function(self, other)
@@ -321,12 +309,6 @@ local _dict_mt = {
       return _accum_0
     end)(), ", ") .. "}"
   end,
-  __ipairs = function(self)
-    return walk_items, {
-      table = self,
-      key = nil
-    }, 0
-  end,
   __band = function(self, other)
     return Dict((function()
       local _tbl_0 = { }
@@ -339,30 +321,28 @@ local _dict_mt = {
     end)())
   end,
   __bor = function(self, other)
-    local ret
-    do
+    local ret = Dict((function()
       local _tbl_0 = { }
       for k, v in pairs(self) do
         _tbl_0[k] = v
       end
-      ret = _tbl_0
-    end
+      return _tbl_0
+    end)())
     for k, v in pairs(other) do
       if ret[k] == nil then
         ret[k] = v
       end
     end
-    return Dict(ret)
+    return ret
   end,
   __bxor = function(self, other)
-    local ret
-    do
+    local ret = Dict((function()
       local _tbl_0 = { }
       for k, v in pairs(self) do
         _tbl_0[k] = v
       end
-      ret = _tbl_0
-    end
+      return _tbl_0
+    end)())
     for k, v in pairs(other) do
       if ret[k] == nil then
         ret[k] = v
@@ -370,17 +350,16 @@ local _dict_mt = {
         ret[k] = nil
       end
     end
-    return Dict(ret)
+    return ret
   end,
   __add = function(self, other)
-    local ret
-    do
+    local ret = Dict((function()
       local _tbl_0 = { }
       for k, v in pairs(self) do
         _tbl_0[k] = v
       end
-      ret = _tbl_0
-    end
+      return _tbl_0
+    end)())
     for k, v in pairs(other) do
       if ret[k] == nil then
         ret[k] = v
@@ -388,17 +367,16 @@ local _dict_mt = {
         ret[k] = ret[k] + v
       end
     end
-    return Dict(ret)
+    return ret
   end,
   __sub = function(self, other)
-    local ret
-    do
+    local ret = Dict((function()
       local _tbl_0 = { }
       for k, v in pairs(self) do
         _tbl_0[k] = v
       end
-      ret = _tbl_0
-    end
+      return _tbl_0
+    end)())
     for k, v in pairs(other) do
       if ret[k] == nil then
         ret[k] = -v
@@ -406,7 +384,7 @@ local _dict_mt = {
         ret[k] = ret[k] - v
       end
     end
-    return Dict(ret)
+    return ret
   end
 }
 Dict = function(t)
@@ -429,11 +407,6 @@ Dict = function(t)
   else
     return error("Unsupported Dict type: " .. type(t))
   end
-end
-for i, entry in ipairs(Dict({
-  x = 99
-})) do
-  assert(i == 1 and entry.key == "x" and entry.value == 99, "ipairs compatibility issue")
 end
 do
   local reverse, upper, lower, find, byte, match, gmatch, gsub, sub, format, rep
@@ -502,9 +475,9 @@ do
       return (match(self, patt))
     end,
     matching_groups = function(self, patt)
-      return {
+      return List({
         match(self, patt)
-      }
+      })
     end,
     [as_lua_id("* 1")] = function(self, n)
       return rep(self, n)

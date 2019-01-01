@@ -26,6 +26,13 @@ do
   _with_0.unpack = unpack or table.unpack
   _with_0["nil"] = Cc(nil)
   _with_0.userdata = Carg(1)
+  _with_0.indentation = lpeg.Cmt(P(0), function(s, i)
+    local sub = string.sub
+    while i > 1 and sub(s, i - 1, i - 1) ~= '\n' do
+      i = i - 1
+    end
+    return true, (s:match("^ *", i))
+  end)
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
   _with_0.Tree = function(t, userdata)
     return userdata.make_tree(t, userdata)

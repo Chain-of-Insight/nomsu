@@ -308,11 +308,11 @@ externally ($ is $kind syntax tree) means
 ($tree with $t -> $replacement) compiles to ("
     \($tree as lua expr):map(function(\($t as lua expr))
         \(
-        =lua ("
-            \$replacement.type == 'Block' and \($replacement as lua) or 'return '..\
-            ..\($replacement as lua expr)
-        ")
-    )
+            =lua ("
+                \$replacement.type == 'Block' and \($replacement as lua) or 'return '..\
+                ..\($replacement as lua expr)
+            ")
+        )
     end)
 ")
 
