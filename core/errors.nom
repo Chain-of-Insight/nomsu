@@ -128,8 +128,3 @@ test:
         if not _fell_through then return table.unpack(_results, 2) end
     end
 ")
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-(barf $) parses as (fail $)
-(assume $1 or barf $2) parses as (unless $1: fail $2)
