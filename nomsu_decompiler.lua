@@ -506,7 +506,10 @@ tree_to_nomsu = function(tree)
         else
           nomsu:add("\\")
           local interp_nomsu = recurse(bit)
-          if not (interp_nomsu:is_multiline()) then
+          if interp_nomsu:is_multiline() then
+            local curr_indent = nomsu:text():match("\n( *)[^\n]*$") or nomsu:text():match("^( *)")
+            interp_nomsu = NomsuCode((interp_nomsu:text():gsub("\n", "\n" .. curr_indent)))
+          else
             local space = max_line - nomsu:trailing_line_len()
             if bit.type == "Var" then
               local next_str = tree[i + 1]
@@ -524,6 +527,8 @@ tree_to_nomsu = function(tree)
                 interp_nomsu2 = tree_to_nomsu(bit)
               end
               if #interp_nomsu2:text():lines() > 3 or #interp_nomsu2:text() >= MAX_LINE * GOLDEN_RATIO then
+                local curr_indent = nomsu:text():match("\n( *)[^\n]*$") or nomsu:text():match("^( *)")
+                interp_nomsu2 = NomsuCode((interp_nomsu2:text():gsub("\n", "\n" .. curr_indent)))
                 interp_nomsu = interp_nomsu2
               else
                 nomsu:add("\n..\\")

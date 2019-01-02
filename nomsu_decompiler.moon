@@ -385,7 +385,10 @@ tree_to_nomsu = (tree)->
                     else
                         nomsu\add "\\"
                         interp_nomsu = recurse(bit)
-                        unless interp_nomsu\is_multiline!
+                        if interp_nomsu\is_multiline!
+                            curr_indent = nomsu\text!\match("\n( *)[^\n]*$") or nomsu\text!\match("^( *)")
+                            interp_nomsu = NomsuCode((interp_nomsu\text!\gsub("\n", "\n"..curr_indent)))
+                        else
                             space = max_line - nomsu\trailing_line_len!
                             if bit.type == "Var"
                                 next_str = tree[i+1]
@@ -400,6 +403,8 @@ tree_to_nomsu = (tree)->
                                     tree_to_nomsu(bit)
 
                                 if #interp_nomsu2\text!\lines! > 3 or #interp_nomsu2\text! >= MAX_LINE*GOLDEN_RATIO
+                                    curr_indent = nomsu\text!\match("\n( *)[^\n]*$") or nomsu\text!\match("^( *)")
+                                    interp_nomsu2 = NomsuCode((interp_nomsu2\text!\gsub("\n", "\n"..curr_indent)))
                                     interp_nomsu = interp_nomsu2
                                 else
                                     nomsu\add "\n..\\"

@@ -370,11 +370,7 @@ compile = setmetatable({
                 return LuaCode\from(tree.source, tostring(tree[1]))
 
             when "Var"
-                if type(tree[1]) == 'string'
-                    return LuaCode\from(tree.source, (concat(tree, " "))\as_lua_id!)
-                else
-                    assert(tree[1].type == 'Action')
-                    return LuaCode\from(tree.source, tree[1]\get_stub!\as_lua_id!)
+                return LuaCode\from(tree.source, tree\as_var!\as_lua_id!)
 
             when "FileChunks"
                 error("Can't convert FileChunks to a single block of lua, since each chunk's "..

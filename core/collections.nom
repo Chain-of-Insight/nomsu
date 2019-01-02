@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.
@@ -60,8 +60,10 @@ externally ($lists flattened) means:
 test:
     assume ((entries in {.x = 1}) == [{.key = "x", .value = 1}])
 
-(entries in $dict) parses as
-    [: for $k = $v in $dict: add {.key = $k, .value = $v}]
+(entries in $dict) parses as [
+    : for $k = $v in $dict:
+        add {.key = $k, .value = $v}
+]
 
 test:
     assume ((keys in {.x = 1}) == ["x"])

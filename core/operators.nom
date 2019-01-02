@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file contains definitions of operators like "+" and "and".
     
@@ -24,12 +24,15 @@ test:
     $x = 10
     assume ($x == 10)
     [$x, $y] = [10, 20]
-    assume (($x == 10) and ($y == 20)) or barf "mutli-assignment failed."
+    unless (($x == 10) and ($y == 20)):
+        fail "mutli-assignment failed."
     [$x, $y] = [$y, $x]
-    assume (($y == 10) and ($x == 20)) or barf "swapping vars failed."
+    unless (($y == 10) and ($x == 20)):
+        fail "swapping vars failed."
     $vals = [4, 5]
     [$x, $y] = (unpack $vals)
-    assume (($x == 4) and ($y == 5)) or barf "unpacking failed"
+    unless (($x == 4) and ($y == 5)):
+        fail "unpacking failed"
 
 # Variable assignment operator
 ($var = $value) compiles to:
@@ -80,7 +83,7 @@ test:
         external $foozle = "inner"
         $y = "inner"
     set global x local y
-    assume (($foozle == "inner") and ($y == "outer")) or barf "external failed."
+    unless (($foozle == "inner") and ($y == "outer")): fail "external failed."
 (external $var = $value) compiles to "\($var as lua) = \($value as lua)"
 test:
     [$foozle, $y] = ["outer", "outer"]
@@ -89,8 +92,8 @@ test:
             $foozle = "inner"
             $y = "inner"
     set global x local y
-    assume (($foozle == "inner") and ($y == "outer")) or barf
-        "'with external' failed."
+    unless (($foozle == "inner") and ($y == "outer")):
+        fail "'with external' failed."
 
 (with external $externs $body) compiles to:
     $body_lua = ($body as lua)
@@ -104,10 +107,17 @@ test:
     with [$z, $x = 999]:
         assume $z == (nil)
         $z = 999
-        assume ($z == 999) or barf "'with' failed."
-        assume ($x == 999) or barf "'with' assignment failed."
-    assume ($x == 1) or barf "'with' scoping failed"
-    assume ($z == (nil)) or barf "'with' scoping failed"
+        unless ($z == 999):
+            fail "'with' failed."
+        
+        unless ($x == 999):
+            fail "'with' assignment failed."
+    
+    unless ($x == 1):
+        fail "'with' scoping failed"
+    
+    unless ($z == (nil)):
+        fail "'with' scoping failed"
 
 (with $assignments $body) compiles to:
     lua> ("
@@ -132,7 +142,8 @@ test:
 
 # Math Operators
 test:
-    assume ((5 wrapped around 2) == 1) or barf "mod not working"
+    unless ((5 wrapped around 2) == 1):
+        fail "mod not working"
 
 [$x wrapped around $y, $x mod $y] all compile to
     "((\($x as lua expr)) % (\($y as lua expr)))"
@@ -144,9 +155,12 @@ test:
     (one) means:
         external $calls = ($calls + 1)
         return 1
-    assume (0 <= (one) <= 2) or barf "Three-way chained comparison failed."
-    assume ($calls == 1) or barf
-        "Three-way comparison evaluated middle value multiple times"
+    
+    unless (0 <= (one) <= 2):
+        fail "Three-way chained comparison failed."
+    
+    unless ($calls == 1):
+        fail "Three-way comparison evaluated middle value multiple times"
 ($x < $y < $z) parses as ((($a $b $c) -> (($a < $b) and ($b < $c))) $x $y $z)
 ($x <= $y < $z) parses as ((($a $b $c) -> (($a <= $b) and ($b < $c))) $x $y $z)
 ($x < $y <= $z) parses as ((($a $b $c) -> (($a < $b) and ($b <= $c))) $x $y $z)
@@ -159,7 +173,7 @@ test:
 # TODO: optimize for common case where x,y,z are all either variables or number literals
 # Boolean Operators
 test:
-    (barfer) means (barf "short circuiting failed")
+    (barfer) means (fail "short circuiting failed")
     assume (((no) and (barfer)) == (no))
     assume ((no) or (yes))
     assume ((yes) or (barfer))
@@ -228,11 +242,14 @@ test:
 test:
     $x = 1
     $x += 1
-    assume ($x == 2) or barf "+= failed"
+    unless ($x == 2):
+        fail "+= failed"
     $x *= 2
-    assume ($x == 4) or barf "*= failed"
+    unless ($x == 4):
+        fail "*= failed"
     wrap $x around 3
-    assume ($x == 1) or barf "wrap around failed"
+    unless ($x == 1):
+        fail "wrap around failed"
 ($var += $) parses as ($var = (($var or 0) + $))
 ($var -= $) parses as ($var = (($var or 0) - $))
 ($var *= $) parses as ($var = (($var or 1) * $))

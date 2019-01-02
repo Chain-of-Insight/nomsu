@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file defines upgrades from Nomsu <4.10.12.7 to 4.10.12.7
 use "compatibility/compatibility.nom"
@@ -24,8 +24,10 @@ upgrade action ($e for $i in $start to $stop by $step) to "4.10.12.7" as
 upgrade action ($e for $i in $start to $stop via $step) to "4.10.12.7" as
     [: for $i in $start to $stop by $step: add $e]
 
-upgrade action ($k = $v for $ in $items) to "4.10.12.7" as
-    {: for $ in $items: add $k = $v}
+upgrade action ($k = $v for $ in $items) to "4.10.12.7" as {
+    : for $ in $items:
+        add $k = $v
+}
 
 upgrade action ($k = $v for $k0 = $v0 in $items) to "4.10.12.7" as
     {: for $k0 = $v0 in $items: add $k = $v}

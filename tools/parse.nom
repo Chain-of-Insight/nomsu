@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     Tool to print out a parse tree of files in an easy-to-read format. Usage:
     nomsu tools/parse.nom file1 file2 directory1 ...        
@@ -39,7 +39,7 @@ externally (print tree $t at indent $indent) means:
 for $filename in $(COMMAND LINE ARGS).extras:
     $file = (read file $filename)
     unless $file:
-        barf "File does not exist: \$filename"
+        fail "File does not exist: \$filename"
     $nomsu = (NomsuCode from (Source $filename 1 (size of $file)) $file)
     $tree = ($nomsu parsed)
     print tree $tree at indent ""

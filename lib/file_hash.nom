@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file defines some actions for hashing files and looking up files by hash.
     
@@ -10,11 +10,12 @@ use "lib/base64.nom"
 lua> "local \$use_sha1, \$hashlib = pcall(require, 'openssl.digest')"
 test:
     assume (hash "hello world") == (hash "hello world")
-    assume ((hash "hello world") != (hash "goodbye")) or barf ("
-        Hash collision:
-            (hash "hello world") = \(hash "hello world")
-            (hash "goodbye") = \(hash "goodbye")
-    ")
+    if ((hash "hello world") == (hash "goodbye")):
+        fail ("
+            Hash collision:
+                (hash "hello world") = \(hash "hello world")
+                (hash "goodbye") = \(hash "goodbye")
+        ")
     
     assume
         (
@@ -24,8 +25,8 @@ test:
             ")
         ) != "inf"
     
-    assume ((hash "\000") != (hash "\000\000\000\000\000")) or barf
-        "Incorrect hashing of null strings"
+    if ((hash "\000") == (hash "\000\000\000\000\000")):
+        fail "Incorrect hashing of null strings"
     
     if $use_sha1:
         assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")

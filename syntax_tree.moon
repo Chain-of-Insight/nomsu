@@ -99,6 +99,13 @@ class SyntaxTree
             stub_bits[#stub_bits] = nil
         return concat stub_bits, " "
 
+    as_var: =>
+        assert(@type == "Var")
+        if type(@[1]) == 'string'
+            return @[1]
+        else
+            return @[1]\get_stub!
+
     @is_instance: (t)=>
         type(t) == 'table' and getmetatable(t) == @__base
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file defines some common math literals and functions
     
@@ -12,10 +12,11 @@ use "core/collections.nom"
 
 # Literals:
 test:
-    assume (all of [inf, NaN, pi, tau, golden ratio, e]) or barf
-        "math constants failed"
+    unless (all of [inf, NaN, pi, tau, golden ratio, e]):
+        fail "math constants failed"
     $nan = (NaN)
-    assume ($nan != $nan) or barf "NaN failed"
+    unless ($nan != $nan):
+        fail "NaN failed"
 [infinity, inf] all compile to "math.huge"
 [not a number, NaN, nan] all compile to "(0/0)"
 [pi, Pi, PI] all compile to "math.pi"
@@ -26,19 +27,18 @@ test:
 # Functions:
 test:
     assume (("5" as a number) == 5)
-(($ as a number)'s meaning) = ((tonumber $)'s meaning)
-(($ as number)'s meaning) = ((tonumber $)'s meaning)
+external $($ as a number) = $(tonumber $)
+external $($ as number) = $(tonumber $)
 test:
-    assume
+    unless
         all of [
             abs 5, | 5 |, sqrt 5, √ 5, sine 5, cosine 5, tangent 5, arc sine 5, arc cosine 5
             arc tangent 5, arc tangent 5 / 10, hyperbolic sine 5, hyperbolic cosine 5
             hyperbolic tangent 5, e^ 5, ln 5, log base 2 of 5, floor 5, ceiling 5, round 5
         ]
-    ..or barf "math functions failed"
-
+    ..:
+        fail "math functions failed"
 [absolute value $, | $ |, abs $] all compile to "math.abs(\($ as lua expr))"
-
 [square root $, square root of $, √ $, sqrt $] all compile to
     "math.sqrt(\($ as lua expr))"
 [sine $, sin $] all compile to "math.sin(\($ as lua expr))"
@@ -60,8 +60,8 @@ test:
 [ceiling $, ceil $] all compile to "math.ceil(\($ as lua expr))"
 [round $, $ rounded] all compile to "math.floor(\($ as lua expr) + .5)"
 test:
-    assume ((463 to the nearest 100) == 500) or barf "rounding failed"
-    assume ((2.6 to the nearest 0.25) == 2.5) or barf "rounding failed"
+    unless ((463 to the nearest 100) == 500): fail "rounding failed"
+    unless ((2.6 to the nearest 0.25) == 2.5): fail "rounding failed"
 
 externally ($n to the nearest $rounder) means
     =lua "(\$rounder)*math.floor((\$n / \$rounder) + .5)"

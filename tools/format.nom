@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     Auto-format Nomsu code. Usage:
     nomsu -t format [-i] file1 file2...
@@ -21,12 +21,12 @@ if ((#$filenames) == 0):
 for $filename in $filenames:
     $file = (read file $filename)
     unless $file:
-        barf "File does not exist: \$filename"
+        fail "File does not exist: \$filename"
     $leading_indent = ($file, matching "\n*([ ]*)")
     $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
     try:
         $tree = ($code parsed)
-    ..and if it barfs $msg:
+    ..if it fails $msg:
         if $(COMMAND LINE ARGS).q:
             $formatted = $file
         ..else:

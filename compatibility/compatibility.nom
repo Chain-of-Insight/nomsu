@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -85,16 +85,16 @@ externally [
                 $tree with $ ->:
                     if (($ is "Action" syntax tree) and $ACTION_UPGRADES.$ver.($.stub)):
                         $with_upgraded_args = {
-                            : for $k = $v in $: add $k = ($v upgraded from $start_version to $end_version)
+                            : for $k = $v in $:
+                                add $k = ($v upgraded from $start_version to $end_version)
                         }
                         set $with_upgraded_args's metatable to ($'s metatable)
                         return ($ACTION_UPGRADES.$ver.($.stub) $with_upgraded_args $end_version)
         
         if $UPGRADES.$ver:
             $with_upgraded_args = {
-                :
-                    for $k = $v in $tree:
-                        add $k = ($v upgraded from $start_version to $end_version)
+                : for $k = $v in $tree:
+                    add $k = ($v upgraded from $start_version to $end_version)
             }
             set $with_upgraded_args's metatable to ($tree's metatable)
             $tree = ($UPGRADES.$ver $with_upgraded_args $end_version)

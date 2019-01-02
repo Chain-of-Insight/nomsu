@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -16,7 +16,7 @@ test:
 # Conditionals
 test:
     if (no):
-        barf "conditional fail"
+        fail "conditional fail"
 
 (if $condition $if_body) compiles to ("
     if \($condition as lua expr) then
@@ -26,7 +26,7 @@ test:
 
 test:
     unless (yes):
-        barf "conditional fail"
+        fail "conditional fail"
 
 (unless $condition $unless_body) parses as (if (not $condition) $unless_body)
 [
@@ -134,7 +134,7 @@ test:
         $x += 1
         if (yes):
             do next
-        barf "Failed to 'do next'"
+        fail "Failed to 'do next'"
     assume ($x == 20)
 
 (repeat while $condition $body) compiles to:
@@ -311,16 +311,16 @@ test:
 test:
     when:
         (1 == 2) (100 < 0):
-            barf "bad conditional"
+            fail "bad conditional"
         (1 == 0) (1 == 1) $not_a_variable.x: do nothing
         (1 == 1):
-            barf "bad conditional"
+            fail "bad conditional"
         
         (1 == 2):
-            barf "bad conditional"
+            fail "bad conditional"
         
         else:
-            barf "bad conditional"
+            fail "bad conditional"
 
 # Multi-branch conditional (if..elseif..else)
 (when $body) compiles to:
@@ -374,16 +374,16 @@ test:
 test:
     if 5 is:
         1 2 3:
-            barf "bad switch statement"
+            fail "bad switch statement"
         
         4 5:
             do nothing
         
         5 6:
-            barf "bad switch statement"
+            fail "bad switch statement"
         
         else:
-            barf "bad switch statement"
+            fail "bad switch statement"
 
 # Switch statement
 [if $branch_value is $body, when $branch_value is $body] all compile to:

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file contains the implementation of an Object-Oriented programming system.
     
@@ -37,7 +37,9 @@ test:
     assume ($d.genus == "Canus")
     assume ($d.barks == 3)
     $d2 = (Dog {})
-    assume ($d2.barks == 0) or barf "Default initializer failed"
+    unless ($d2.barks == 0):
+        fail "Default initializer failed"
+    
     with [$d = (Dog {.barks = 1})]:
         assume (($d, bark) == "Bark!")
     
@@ -50,8 +52,12 @@ test:
     $corg = (Corgi {})
     assume ($corg.barks == 0)
     with [$d = (Corgi {.barks = 1})]:
-        assume (($d, sploot) == "splooted") or barf "subclass method failed"
-        assume (($d, bark) == "Yip!") or barf "inheritance failed"
+        unless (($d, sploot) == "splooted"):
+            fail "subclass method failed"
+        
+        unless (($d, bark) == "Yip!"):
+            fail "inheritance failed"
+        
         assume (($d, woof) == "Yip!")
     
     with [$d = (Dog {.barks = 2})]:

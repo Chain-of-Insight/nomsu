@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This is a tool to find syntax trees matching a pattern. "*" is a wildcard
     that will match any subtree, and "**" is a wildcard that will match any
@@ -24,7 +24,7 @@ use "lib/consolecolor.nom"
 $wildcard = ($(COMMAND LINE ARGS).wildcard or "%*")
 $pattern = $(COMMAND LINE ARGS).extras.1
 if (any of [not $pattern, $pattern == "*", $pattern == "**"]):
-    barf ("
+    fail ("
         Usage: nomsu -t find [-l] [--wildcard=<wildcard>] <pattern>, where <pattern> is valid Nomsu code
     ")
 $pattern = ($pattern, with "\$wildcard\$wildcard" -> "$multi_wildcard")
@@ -57,11 +57,11 @@ if ((#$filenames) == 0):
 for $filename in $filenames:
     $file = (read file $filename)
     unless $file:
-        barf "File does not exist: \$filename"
+        fail "File does not exist: \$filename"
     $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
     try:
         $tree = ($code parsed)
-    ..and if it barfs $msg:
+    ..if it fails $msg:
         say
             red ("
                 \$filename failed to parse:

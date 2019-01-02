@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     Tool to automatically update code from old versions of Nomsu. Usage:
     nomsu tools/upgrade.nom [-i] file1 file2 directory1 ...
@@ -18,7 +18,7 @@ $test = ($(COMMAND LINE ARGS).t or $(COMMAND LINE ARGS).test)
 for $filename in $(COMMAND LINE ARGS).extras:
     $file = (read file $filename)
     unless $file:
-        barf "File does not exist: \$filename"
+        fail "File does not exist: \$filename"
     $leading_indent = ($file, matching "\n*([ ]*)")
     $code = (NomsuCode from (Source $filename 1 (size of $file)) $file)
     $tree = ($code parsed $start_version)

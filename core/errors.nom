@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file contains basic error reporting code
     
@@ -7,9 +7,7 @@ use "core/operators.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(fail $msg) compiles to
-    "error(\(($msg as lua expr) if $msg else "nil"), 0);"
-
+(fail $msg) compiles to "error(\(($msg as lua expr) if $msg else "nil"), 0);"
 (assume $condition) compiles to:
     lua> ("
         local \$assumption = 'Assumption failed: '..tostring((\$condition):get_source_code())
@@ -41,26 +39,34 @@ use "core/operators.nom"
 test:
     try: fail
     $worked = (no)
-    try: fail
-    ..if it fails:
+    try:
+        fail "xx"
+    ..if it fails with $failure:
         $worked = (yes)
     ..if it succeeds:
         fail "'try' incorrectly ran success case."
-    
+    assume $failure == "xx"
     unless $worked:
         fail "'try' failed to recover from failure"
+
 # Try/except
 [
-    try $action if it succeeds $success if it fails $fallback
-    try $action if it fails $fallback if it succeeds $success
+    try $action if it succeeds $success if it fails with $msg $fallback
+    try $action if it fails with $msg $fallback if it succeeds $success
 ] all compile to:
     $success_lua = ($success as lua)
-    if ((#"\$success_lua") > 0): $success_lua, add "\n"
+    if ((#"\$success_lua") > 0):
+        $success_lua, add "\n"
     $success_lua, prepend "-- Success:\n"
-    $success_lua, add "if not _fell_through then return table.unpack(_result, 2) end"
+    $success_lua, 
+        add "if not _fell_through then return table.unpack(_result, 2) end"
     $fallback_lua = ($fallback as lua)
     if ((#"\$fallback_lua") > 0):
-        $fallback_lua, prepend "\nlocal function failure() return _result[2] end\n"
+        $msg_lua = ($msg as lua expr)
+        if ((#"\$msg_lua") > 0):
+            $fallback_lua, prepend "\n\$msg_lua = _result[2]\n"
+            if ($msg_lua, text, is lua id):
+                $fallback_lua, add free vars [($msg_lua, text)]
     $fallback_lua, prepend "-- Failure:"
     return
         Lua ("
@@ -83,14 +89,20 @@ test:
 (try $action) parses as
     try $action if it succeeds (do nothing) if it fails (do nothing)
 
-(try $action if it fails $msg $fallback) parses as
-    try $action if it succeeds (do nothing) if it fails $msg $fallback
+(try $action if it fails $fallback) parses as
+    try $action if it succeeds (do nothing) if it fails $fallback
+
+(try $action if it fails with $msg $fallback) parses as
+    try $action if it succeeds (do nothing) if it fails with $msg $fallback
 
 (try $action if it succeeds $success) parses as
     try $action if it succeeds $success if it fails (do nothing)
 
 (try $action if it fails $fallback if it succeeds $success) parses as
-    try $action if it succeeds $success if it fails $fallback
+    try $action if it fails with (=lua "") $fallback if it succeeds $success
+
+(try $action if it succeeds $success if it fails $fallback) parses as
+    try $action if it succeeds $success if it fails with (=lua "") $fallback
 
 test:
     $success = (no)
@@ -117,7 +129,7 @@ test:
     end
 ")
 
-~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (barf $) parses as (fail $)
 (assume $1 or barf $2) parses as (unless $1: fail $2)

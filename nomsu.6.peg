@@ -99,14 +99,14 @@ indented_index_chain <-
 -- Actions need 1 argument and either another argument or a word.
 inline_action (Action) <-
     !section_division
-    (  word (ws* arg)*
-     / inline_expression ((ws* arg)+ / "(" ws* ")"))
+    (  word (ws* inline_arg)*
+     / inline_expression ((ws* inline_arg)+ / "(" ws* ")"))
 inline_arg <- inline_expression / word
 
 action (Action) <-
     !section_division
     (  word ((linesplit / ws*) arg)*
-     / arg (((linesplit / ws*) arg)+ / "(" ws* ")"))
+     / !statement_block arg (((linesplit / ws*) arg)+ / "(" ws* ")"))
 arg <- expression / indented_naked_expression / word
 linesplit <- eol nl_nodent ".." ws* 
 

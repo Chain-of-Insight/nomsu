@@ -1,9 +1,9 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
     
-lua> "NOMSU_CORE_VERSION = 13"
+lua> "NOMSU_CORE_VERSION = 14"
 lua> "NOMSU_LIB_VERSION = 8"
 lua> ("
     do
@@ -62,22 +62,27 @@ test:
     (five) compiles to "5"
 
 test:
-    assume ((five) == 5) or barf "Compile to expression failed."
+    unless ((five) == 5):
+        fail "Compile to expression failed."
     (loc x) compiles to "local x = 99;"
 
 test:
     lua> "do"
     loc x
-    assume ($x is 99) or barf "Compile to statements with locals failed."
+    unless ($x is 99):
+        fail "Compile to statements with locals failed."
     lua> "end"
-    assume ($x is (nil)) or barf "Failed to properly localize a variable."
+    unless ($x is (nil)):
+        fail "Failed to properly localize a variable."
+    
     (asdf) compiles to:
         $tmp = ""
         return (Lua $tmp)
 
 test:
     asdf
-    assume ($tmp is (nil)) or barf "compile to is leaking variables"
+    unless ($tmp is (nil)):
+        fail "compile to is leaking variables"
 
 lua> ("
     compile.action["1 compiles to"] = function(compile, \$action, \$body)
@@ -121,12 +126,17 @@ lua> ("
 
 test:
     (foo $x) means "outer"
-    with [(foo $)'s meaning]:
+    with [$(foo $)]:
         (foo $x) means:
             $y = ($x + 1)
             return $y
-        assume ((foo 10) == 11) or barf "Action didn't work."
-        assume ($y is (nil)) or barf "Action leaked a local into globals."
+        
+        unless ((foo 10) == 11):
+            fail "Action didn't work."
+        
+        unless ($y is (nil)):
+            fail "Action leaked a local into globals."
+        
         (baz $) parses as (foo $)
     assume ((foo 1) == "outer")
 
@@ -196,10 +206,6 @@ test:
     ")
 
 test:
-    assume (((say $)'s meaning) == (=lua "say"))
-
-($action's meaning) compiles to (Lua ($action, get stub, as lua id))
-test:
     (swap $x and $y) parses as
         do:
             $tmp = $x
@@ -209,12 +215,12 @@ test:
 test:
     [$1, $2] = [1, 2]
     swap $1 and $2
-    assume (($1 == 2) and ($2 == 1)) or barf
-        "'parse $ as $' failed on 'swap $ and $'"
+    unless (($1 == 2) and ($2 == 1)):
+        fail "'parse $ as $' failed on 'swap $ and $'"
     [$tmp, $tmp2] = [1, 2]
     swap $tmp and $tmp2
-    assume (($tmp == 2) and ($tmp2 == 1)) or barf
-        "'parse $ as $' variable mangling failed."
+    unless (($tmp == 2) and ($tmp2 == 1)):
+        fail "'parse $ as $' variable mangling failed."
 
 ($actions all parse as $body) compiles to:
     lua> ("
@@ -227,10 +233,10 @@ test:
         end
         local function make_tree(t)
             if SyntaxTree:is_instance(t) and t.type == "Var" then
-                if replacements[t[1]] then
-                    return replacements[t[1]]
+                if replacements[t:as_var()] then
+                    return replacements[t:as_var()]
                 else
-                    return "SyntaxTree{mangle("..t[1]:as_lua().."), type="..t.type:as_lua()..", \
+                    return "SyntaxTree{mangle("..t:as_var():as_lua().."), type="..t.type:as_lua()..", \
         ..source="..tostring(t.source):as_lua().."}"
                 end
             elseif SyntaxTree:is_instance(t) then
@@ -265,7 +271,6 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [$action parses as $body] all parse as ([$action] all parse as $body)
-
 externally ($tree as lua expr) means:
     lua> ("
         local tree_lua = compile(\$tree)
@@ -320,7 +325,7 @@ externally ($tree with vars $replacements) means
     =lua ("
         \$tree:map(function(\$t)
             if \$t.type == "Var" then
-                return \$replacements[\$t[1]]
+                return \$replacements[\$t:as_var()]
             end
         end)
     ")
@@ -328,7 +333,7 @@ externally ($tree with vars $replacements) means
 (tree $tree with vars $replacements) compiles to ("
     \(=lua "(\$tree):as_lua()"):map(function(t)
         if t.type == "Var" then
-            return \($replacements as lua expr)[t[1]]
+            return \($replacements as lua expr)[t:as_var()]
         end
     end)
 ")
@@ -344,7 +349,7 @@ externally ($tree with vars $replacements) means
 
 externally (match $tree with $patt) means:
     lua> ("
-        if \$patt.type == "Var" then return Dict{[\$patt[1]]=\$tree} end
+        if \$patt.type == "Var" then return Dict{[\$patt:as_var()]=\$tree} end
         if \$patt.type == "Action" and \$patt:get_stub() ~= \$tree:get_stub() then return nil end
         if #\$patt ~= #\$tree then return nil end
         local matches = Dict{}

@@ -185,6 +185,14 @@ do
         stub_bits[#stub_bits] = nil
       end
       return concat(stub_bits, " ")
+    end,
+    as_var = function(self)
+      assert(self.type == "Var")
+      if type(self[1]) == 'string' then
+        return self[1]
+      else
+        return self[1]:get_stub()
+      end
     end
   }
   _base_0.__index = _base_0

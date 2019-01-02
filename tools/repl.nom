@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     This file defines a Read-Evaluate-Print-Loop (REPL) for Nomsu
     
@@ -45,7 +45,7 @@ repeat:
     spoof file $buff
     try:
         $tree = ($buff parsed)
-    ..and if it barfs $err:
+    ..if it fails $err:
         say $err
         do next
     
@@ -55,7 +55,7 @@ repeat:
     for $chunk in $tree:
         try:
             $lua = ($chunk as lua)
-        ..and if it barfs $err: say $err
+        ..if it fails $err: say $err
         
         unless $lua:
             do next
@@ -66,8 +66,8 @@ repeat:
         $lua, remove free vars
         try:
             $ret = (run $lua)
-        ..and if it barfs $err: say $err
-        ..or if it succeeds:
+        ..if it fails $err: say $err
+        ..if it succeeds:
             if (type of $ret) is:
                 "nil":
                     do nothing

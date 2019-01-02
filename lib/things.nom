@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.13.12.8
+#!/usr/bin/env nomsu -V6.14
 #
     A library for simple object oriented programming.
     
@@ -30,7 +30,9 @@ test:
     assume ($d.genus == "Canus")
     assume ($d.barks == 3)
     $d2 = (a Dog)
-    assume ($d2.barks == 0) or barf "Default initializer failed"
+    unless ($d2.barks == 0):
+        fail "Default initializer failed"
+    
     with [$d = (a Dog with {.barks = 1})]:
         assume (($d, bark) == "Bark!")
     
@@ -47,8 +49,12 @@ test:
     assume ($corg.barks == 0)
     assume "\$corg" == "Dogloaf {barks: 0}"
     with [$d = (a Corgi with {.barks = 1})]:
-        assume (($d, sploot) == "sploooot") or barf "subclass method failed"
-        assume (($d, bark) == "Yip!") or barf "inheritance failed"
+        unless (($d, sploot) == "sploooot"):
+            fail "subclass method failed"
+        
+        unless (($d, bark) == "Yip!"):
+            fail "inheritance failed"
+        
         assume (($d, woof) == "Yip!")
     
     with [$d = (a Dog with {.barks = 2})]:
@@ -87,9 +93,8 @@ $METAMETHOD_MAP = {
     .size = "__len", .iterate = "__ipairs", ."iterate all" = "__pairs"
 }
 
-(($ as text like a dict)'s meaning) = ({}'s metatable).__tostring
-externally (a class named $classname with $members ((initialize $it)'s meaning))
-..means:
+$($ as text like a dict) = ({}'s metatable).__tostring
+externally (a class named $classname with $members $(initialize $)) means:
     $class = {.__type = $classname}
     $class.__index = $class
     $class.class = $class
@@ -103,7 +108,7 @@ externally (a class named $classname with $members ((initialize $it)'s meaning))
                 if $members.$key:
                     rawset $its $key $value
                 ..else:
-                    barf "Cannot set \$key, it's not one of the allowed member fields."
+                    fail "Cannot set \$key, it's not one of the allowed member fields."
     
     set $class's metatable to {
         .__tostring = ($class -> $class.__type)
@@ -116,7 +121,7 @@ externally (a class named $classname with $members ((initialize $it)'s meaning))
                 return $initial_values
     }
     
-    if ((initialize)'s meaning):
+    if $(initialize $):
         initialize $class
         for $stub = $metamethod in $METAMETHOD_MAP:
             if $class.($stub, as lua id):
