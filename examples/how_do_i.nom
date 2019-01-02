@@ -302,36 +302,42 @@ debug only:
 # How do I use an action as a value?
 # Well... it's always *possible* to fall back to Lua behavior for something like this:
 (best of $items according to $key_fn) means:
-    $best = (nil)
-    $best_key = (nil)
+    [$best, $best_key] = [nil, nil]
     for $item in $items:
         $key = ($key_fn $item)
         if (($best is (nil)) or ($key > $best_key)):
-            $best = $item
-            $best_key = $key
+            [$best, $best_key] = [$item, $key]
     return $best
 
 # Function literals look like: $x -> ($x * $x)
 say (best of [2, -3, 4, -8] according to ($x -> ($x * $x)))
 
-# Or, you can use $(foo $) to access the function that gets called by (foo $)
+# Or, you can surround an action with $(...) to refer to it:
 ($x squared) means ($x * $x)
 say (best of [2, -3, 4, -8] according to $($ squared))
 
-# But nomsu was designed with flexible alternatives that are often better than passing functions.
-    For example, instead of calling a key function on every item, you could instead define a macro
-    that gives you a value based on an inlined expression:
+# However, nomsu was designed with flexible alternatives that are often better
+    than passing functions. For example, instead of calling a key function on
+    every item, you could instead define a macro that will inline an expression
+    to produce faster code:
 (best of $items where $item has score $key_expr) parses as
     result of:
-        $best = (nil)
-        $best_key = (nil)
+        [$best, $best_key] = [nil, nil]
         for $item in $items:
             $key = $key_expr
             if (($best is (nil)) or ($key > $best_key)):
-                $best = $item
-                $best_key = $key
+                [$best, $best_key] = [$item, $key]
         return $best
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 say (best of [2, -3, 4, -8] where $x has score ($x * $x))
+# The line above expands to:
+say
+    result of:
+        [$best, $best_key] = [nil, nil]
+        for $x in [2, -3, 4, -8]:
+            $key = ($x * $x)
+            if (($best is (nil)) or ($key > $best_key)):
+                [$best, $best_key] = [$x, $key]
+        return $best
