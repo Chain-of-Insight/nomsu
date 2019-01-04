@@ -16,9 +16,9 @@ MOON_FILES= code_obj.moon error_handling.moon files.moon nomsu.moon nomsu_compil
 LUA_FILES= code_obj.lua consolecolors.lua error_handling.lua files.lua nomsu.lua nomsu_compiler.lua \
 		   syntax_tree.lua containers.lua bitops.lua parser.lua pretty_errors.lua \
 		   string2.lua nomsu_decompiler.lua nomsu_environment.lua importer.lua
-CORE_NOM_FILES= $(wildcard core/*.nom)
+CORE_NOM_FILES= $(wildcard core/**.nom)
 CORE_LUA_FILES= $(patsubst %.nom,%.lua,$(CORE_NOM_FILES))
-LIB_NOM_FILES= $(wildcard lib/*.nom)
+LIB_NOM_FILES= $(wildcard lib/**.nom)
 LIB_LUA_FILES= $(patsubst %.nom,%.lua,$(LIB_NOM_FILES))
 PEG_FILES= $(wildcard nomsu.*.peg)
 GET_VERSION= $(LUA_BIN) nomsu.lua --version
@@ -50,13 +50,16 @@ optimize: lua $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 .PHONY: clean
 clean:
 	@echo "\033[1mDeleting...\033[0m"
-	@rm -rvf version core/*.lua lib/*.lua tools/*.lua compatibility/*.lua
+	@rm -rvf version core/**.lua lib/**.lua tools/**.lua compatibility/**.lua
 
 .PHONY: install
 install: lua version optimize
 	@prefix="$(PREFIX)"; \
 	if [[ ! $$prefix ]]; then \
 		read -p $$'\033[1mWhere do you want to install Nomsu? (default: /usr/local) \033[0m' prefix; \
+	fi; \
+	if [[ ! $$prefix ]]; then \
+		prefix="/usr/local"; \
 	fi; \
 	if [[ $$prefix != "`realpath $$prefix`" ]]; then \
 		echo $$'\033[1;31mWarning: '$$prefix$$' is not an absolute path. This may cause problems.\033[0m'; \
@@ -78,6 +81,9 @@ uninstall: version
 	@prefix="$(PREFIX)"; \
 	if [[ ! $$prefix ]]; then \
 		read -p $$'\033[1mWhere do you want to uninstall Nomsu from? (default: /usr/local) \033[0m' prefix; \
+	fi; \
+	if [[ ! $$prefix ]]; then \
+		prefix="/usr/local"; \
 	fi; \
 	echo "\033[1mNomsu will be uninstalled from:\033[0m"; \
 	echo "    $$prefix/bin"; \
