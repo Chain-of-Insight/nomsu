@@ -23,9 +23,10 @@ Files.spoof = (filename, contents)->
     return filename
 
 -- Read a file's contents
-Files.read = (filename)->
-    if file_contents = _FILE_CACHE[filename]
-        return file_contents or nil
+Files.read = (filename, skip_cache=nil)->
+    unless skip_cache
+        if file_contents = _FILE_CACHE[filename]
+            return file_contents or nil
     if filename == 'stdin' or filename == '-'
         contents = io.read('*a')
         Files.spoof('stdin', contents)
@@ -35,7 +36,8 @@ Files.read = (filename)->
     return nil unless file
     contents = file\read("*a")
     file\close!
-    _FILE_CACHE[filename] = contents
+    unless skip_cache
+        _FILE_CACHE[filename] = contents
     return contents or nil
 
 {:match, :gsub} = string
@@ -59,7 +61,7 @@ Files.list = (path)->
         local files
         _BROWSE_CACHE[path] = if _SPOOFED_FILES[path] or path == 'stdin' or path == '-'
             {path}
-        else run_cmd('find -L "'..path..'" -not -path "*/\\.*" -type f') or false
+        else run_cmd('find -L "'..path..'" -not -path "*/\\.*" -type f 2>/dev/null') or false
     return _BROWSE_CACHE[path]
 
 ok, lfs = pcall(require, "lfs")
@@ -95,7 +97,7 @@ if ok
                     if f\match("^%./") then _BROWSE_CACHE[path][i] = f\sub(3)
         return _BROWSE_CACHE[path]
 else
-    unless run_cmd('find . -maxdepth 0')
+    unless run_cmd('find . -maxdepth 0 2>/dev/null')
         url = if jit
             'https://github.com/spacewander/luafilesystem'
         else 'https://github.com/keplerproject/luafilesystem'

@@ -33,11 +33,16 @@ Files.spoof = function(filename, contents)
   _SPOOFED_FILES[filename] = contents
   return filename
 end
-Files.read = function(filename)
-  do
-    local file_contents = _FILE_CACHE[filename]
-    if file_contents then
-      return file_contents or nil
+Files.read = function(filename, skip_cache)
+  if skip_cache == nil then
+    skip_cache = nil
+  end
+  if not (skip_cache) then
+    do
+      local file_contents = _FILE_CACHE[filename]
+      if file_contents then
+        return file_contents or nil
+      end
     end
   end
   if filename == 'stdin' or filename == '-' then
@@ -52,7 +57,9 @@ Files.read = function(filename)
   end
   local contents = file:read("*a")
   file:close()
-  _FILE_CACHE[filename] = contents
+  if not (skip_cache) then
+    _FILE_CACHE[filename] = contents
+  end
   return contents or nil
 end
 local match, gsub
@@ -88,7 +95,7 @@ Files.list = function(path)
         path
       }
     else
-      _BROWSE_CACHE[path] = run_cmd('find -L "' .. path .. '" -not -path "*/\\.*" -type f') or false
+      _BROWSE_CACHE[path] = run_cmd('find -L "' .. path .. '" -not -path "*/\\.*" -type f 2>/dev/null') or false
     end
   end
   return _BROWSE_CACHE[path]
@@ -162,7 +169,7 @@ if ok then
     return _BROWSE_CACHE[path]
   end
 else
-  if not (run_cmd('find . -maxdepth 0')) then
+  if not (run_cmd('find . -maxdepth 0 2>/dev/null')) then
     local url
     if jit then
       url = 'https://github.com/spacewander/luafilesystem'
