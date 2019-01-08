@@ -5,6 +5,7 @@ do
 end
 local Source
 Source = require("code_obj").Source
+local Files = require('files')
 local unpack = unpack or table.unpack
 local as_lua
 as_lua = function(self)
@@ -213,7 +214,6 @@ do
   self.source_code_for_tree = setmetatable({ }, {
     __index = function(self, t)
       local s = t.source
-      local Files = require('files')
       local f = Files.read(s.filename)
       return f
     end,

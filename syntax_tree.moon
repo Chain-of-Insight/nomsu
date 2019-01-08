@@ -2,6 +2,7 @@
 -- as well as the logic for converting them to Lua code.
 {:insert, :remove, :concat} = table
 {:Source} = require "code_obj"
+Files = require 'files'
 unpack or= table.unpack
 
 as_lua = =>
@@ -39,7 +40,6 @@ class SyntaxTree
     @source_code_for_tree: setmetatable({}, {
         __index:(t)=>
             s = t.source
-            Files = require 'files'
             f = Files.read(s.filename)
             return f
         __mode: "k"
