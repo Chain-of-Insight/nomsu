@@ -93,7 +93,7 @@ make_parser = function(peg, make_tree)
         return setmetatable(t, tree_mt)
       end),
       filename = filename,
-      source = input
+      file = input
     }
     local tree = peg:match(input, nil, userdata)
     if not tree then

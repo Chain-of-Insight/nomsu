@@ -71,7 +71,7 @@ make_parser = (peg, make_tree=nil)->
         tree_mt = {__index: {source:input, filename:filename}}
         userdata = {
             make_tree: make_tree or ((t)->setmetatable(t, tree_mt))
-            :filename, source:input
+            :filename, file:input
         }
         tree = peg\match(input, nil, userdata)
         if not tree
