@@ -33,9 +33,10 @@ tree_to_inline_nomsu = (tree)->
     switch tree.type
         when "Action"
             nomsu = NomsuCode\from(tree.source)
-            num_args = 0
+            num_args, num_words = 0, 0
             for i,bit in ipairs tree
                 if type(bit) == "string"
+                    num_words += 1
                     clump_words = if type(tree[i-1]) == 'string'
                         is_operator(bit) != is_operator(tree[i-1])
                     else bit == "'"
@@ -54,6 +55,8 @@ tree_to_inline_nomsu = (tree)->
                         if bit.type == "Action" or bit.type == "MethodCall"
                             arg_nomsu\parenthesize!
                     nomsu\add arg_nomsu
+            if num_args == 1 and num_words == 0
+                nomsu\append "()"
             return nomsu
 
         when "MethodCall"
@@ -253,10 +256,11 @@ tree_to_nomsu = (tree)->
         when "Action"
             next_space = ""
             word_buffer = {}
-            num_args = 0
+            num_args, num_words = 0, 0
             for i,bit in ipairs tree
                 -- TODO: properly wrap super long chains of words
                 if type(bit) == "string"
+                    num_words += 1
                     if #word_buffer > 0 and is_operator(bit) == is_operator(word_buffer[#word_buffer])
                         table.insert word_buffer, " "
                     table.insert word_buffer, bit
@@ -314,6 +318,10 @@ tree_to_nomsu = (tree)->
                 nomsu\add next_space, words
                 next_space = " "
 
+            if num_args == 1 and num_words == 0
+                if next_space != " "
+                    nomsu\append next_space
+                nomsu\append "()"
             return nomsu
 
         when "MethodCall"
@@ -439,7 +447,7 @@ tree_to_nomsu = (tree)->
                     sep = '\n' if i > 1
                 else
                     item_nomsu = tree_to_inline_nomsu(item)
-                    if #item_nomsu\text! > MAX_LINE
+                    if nomsu\trailing_line_len! + #item_nomsu\text! > MAX_LINE
                         sep = '\n' if i > 1
                         item_nomsu = tree_to_nomsu(item)
                 nomsu\add sep

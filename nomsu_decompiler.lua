@@ -49,9 +49,10 @@ tree_to_inline_nomsu = function(tree)
   local _exp_0 = tree.type
   if "Action" == _exp_0 then
     local nomsu = NomsuCode:from(tree.source)
-    local num_args = 0
+    local num_args, num_words = 0, 0
     for i, bit in ipairs(tree) do
       if type(bit) == "string" then
+        num_words = num_words + 1
         local clump_words
         if type(tree[i - 1]) == 'string' then
           clump_words = is_operator(bit) ~= is_operator(tree[i - 1])
@@ -82,6 +83,9 @@ tree_to_inline_nomsu = function(tree)
         end
         nomsu:add(arg_nomsu)
       end
+    end
+    if num_args == 1 and num_words == 0 then
+      nomsu:append("()")
     end
     return nomsu
   elseif "MethodCall" == _exp_0 then
@@ -355,11 +359,12 @@ tree_to_nomsu = function(tree)
   elseif "Action" == _exp_0 then
     local next_space = ""
     local word_buffer = { }
-    local num_args = 0
+    local num_args, num_words = 0, 0
     for i, bit in ipairs(tree) do
       local _continue_0 = false
       repeat
         if type(bit) == "string" then
+          num_words = num_words + 1
           if #word_buffer > 0 and is_operator(bit) == is_operator(word_buffer[#word_buffer]) then
             table.insert(word_buffer, " ")
           end
@@ -424,6 +429,12 @@ tree_to_nomsu = function(tree)
       end
       nomsu:add(next_space, words)
       next_space = " "
+    end
+    if num_args == 1 and num_words == 0 then
+      if next_space ~= " " then
+        nomsu:append(next_space)
+      end
+      nomsu:append("()")
     end
     return nomsu
   elseif "MethodCall" == _exp_0 then
@@ -575,7 +586,7 @@ tree_to_nomsu = function(tree)
         end
       else
         item_nomsu = tree_to_inline_nomsu(item)
-        if #item_nomsu:text() > MAX_LINE then
+        if nomsu:trailing_line_len() + #item_nomsu:text() > MAX_LINE then
           if i > 1 then
             sep = '\n'
           end
