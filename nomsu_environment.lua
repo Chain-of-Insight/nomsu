@@ -137,6 +137,8 @@ local nomsu_environment = Importer({
   compile_error_at = compile_error,
   _1_forked = _1_forked,
   import_to_1_from = import_to_1_from,
+  exit = os.exit,
+  quit = os.exit,
   _1_parsed = function(nomsu_code, syntax_version)
     if type(nomsu_code) == 'string' then
       local filename = Files.spoof(nomsu_code)
@@ -333,7 +335,7 @@ local nomsu_environment = Importer({
                 break
               end
               local code
-              if optimization ~= 0 and Files.read(lua_filename) then
+              if optimization ~= 0 and Files.exists(lua_filename) then
                 local file = Files.read(lua_filename)
                 code = LuaCode:from(Source(filename, 1, #file), file)
               else

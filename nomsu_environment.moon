@@ -58,7 +58,7 @@ nomsu_environment = Importer{
     -- Nomsu functions:
     _1_as_nomsu:tree_to_nomsu, _1_as_inline_nomsu:tree_to_inline_nomsu,
     compile: compile, _1_as_lua: compile, compile_error_at:compile_error,
-    :_1_forked, :import_to_1_from,
+    :_1_forked, :import_to_1_from, exit:os.exit, quit:os.exit,
 
     _1_parsed: (nomsu_code, syntax_version)->
         if type(nomsu_code) == 'string'
@@ -185,7 +185,7 @@ nomsu_environment = Importer{
                     did_anything = true
                     continue
                 -- TODO: don't automatically use precompiled version?
-                code = if optimization != 0 and Files.read(lua_filename)
+                code = if optimization != 0 and Files.exists(lua_filename)
                     -- TODO: use a checksum?
                     file = Files.read(lua_filename)
                     LuaCode\from(Source(filename, 1, #file), file)

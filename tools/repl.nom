@@ -7,7 +7,6 @@ use "lib/os.nom"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-externally [quit, exit] all mean: lua> "os.exit(0)"
 externally (help) means:
     say ("
         This is the Nomsu v\(Nomsu version) interactive console.
