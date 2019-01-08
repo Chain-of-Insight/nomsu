@@ -277,7 +277,7 @@ compile = setmetatable({
                         bit_lua = LuaCode\from bit.source, "List(function(add)",
                             "\n    ", bit_lua,
                             "\nend):joined()"
-                    elseif bit.type != "Text" and bit.type != "Number"
+                    elseif bit.type != "Text"
                         bit_lua = LuaCode\from(bit.source, "tostring(",bit_lua,")")
                     add_bit bit_lua
 

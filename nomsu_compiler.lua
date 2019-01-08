@@ -357,7 +357,7 @@ local compile = setmetatable({
           end
           if bit.type == "Block" then
             bit_lua = LuaCode:from(bit.source, "List(function(add)", "\n    ", bit_lua, "\nend):joined()")
-          elseif bit.type ~= "Text" and bit.type ~= "Number" then
+          elseif bit.type ~= "Text" then
             bit_lua = LuaCode:from(bit.source, "tostring(", bit_lua, ")")
           end
           add_bit(bit_lua)
