@@ -24,11 +24,6 @@ use "core/metaprogramming.nom"
         end
     ")
 
-(ask $prompt) compiles to:
-    lua> ("
-        if \$prompt.type == "Text" then
-            return LuaCode("(io.write(", \($prompt as lua expr), ") and io.read())");
-        else
-            return LuaCode("(io.write(tostring(", \($prompt as lua expr), ")) and io.read())");
-        end
-    ")
+externally (ask $prompt) means:
+    $io.write $prompt
+    return ($io.read())
