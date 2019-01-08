@@ -137,6 +137,11 @@ test:
                 $best_key = $key
         return $best
 
+externally ($ clamped between $min and $max) means:
+    if ($ < $min): return $min
+    if ($ > $max): return $max
+    return $
+
 # Random functions
 externally (seed random with $) means:
     lua> ("
