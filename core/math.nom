@@ -178,11 +178,11 @@ externally ($lo to $hi mixed by $amount) means:
     return ((1 - $) * $lo + $ * $hi)
 
 test:
-    assume ([0,1,11] mixed by 0.00) == 0
-    assume ([0,1,11] mixed by 0.25) == 0.5
-    assume ([0,1,11] mixed by 0.50) == 1
-    assume ([0,1,11] mixed by 0.75) == 6
-    assume ([0,1,11] mixed by 1.00) == 11
+    assume ([0, 1, 11] mixed by 0.0) == 0
+    assume ([0, 1, 11] mixed by 0.25) == 0.5
+    assume ([0, 1, 11] mixed by 0.5) == 1
+    assume ([0, 1, 11] mixed by 0.75) == 6
+    assume ([0, 1, 11] mixed by 1.0) == 11
     assume ([99] mixed by 0.5) == 99
 
 externally ($nums mixed by $amount) means:
