@@ -17,7 +17,7 @@ externally (nomsu files for $path) means:
         if $files:
             return $files
 
-externally (sh> $cmd) means:
+externally (=sh $cmd) means:
     lua> ("
         local result = io.popen(\$cmd)
         local contents = result:read("*a")
@@ -25,10 +25,12 @@ externally (sh> $cmd) means:
         return contents
     ")
 
+external $(sh> $) = $os.execute
+
 test:
     read file "lib/os.nom"
 
-externally (read file $filename) means (=lua "Files.read(\$filename)")
+externally (read file $filename) means (=lua "Files.read(\$filename, true)")
 externally [
     write to file $filename $text, to file $filename write $text
     write $text to file $filename
