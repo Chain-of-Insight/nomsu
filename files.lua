@@ -20,9 +20,6 @@ run_cmd = function(cmd)
   return lines
 end
 local _SPOOFED_FILES = { }
-local _FILE_CACHE = setmetatable({ }, {
-  __index = _SPOOFED_FILES
-})
 local _BROWSE_CACHE = { }
 local _anon_number = 0
 Files.spoof = function(filename, contents)
@@ -33,16 +30,11 @@ Files.spoof = function(filename, contents)
   _SPOOFED_FILES[filename] = contents
   return filename
 end
-Files.read = function(filename, skip_cache)
-  if skip_cache == nil then
-    skip_cache = nil
-  end
-  if not (skip_cache) then
-    do
-      local file_contents = _FILE_CACHE[filename]
-      if file_contents then
-        return file_contents or nil
-      end
+Files.read = function(filename)
+  do
+    local contents = _SPOOFED_FILES[filename]
+    if contents then
+      return contents
     end
   end
   if filename == 'stdin' or filename == '-' then
@@ -57,9 +49,6 @@ Files.read = function(filename, skip_cache)
   end
   local contents = file:read("*a")
   file:close()
-  if not (skip_cache) then
-    _FILE_CACHE[filename] = contents
-  end
   return contents or nil
 end
 local match, gsub

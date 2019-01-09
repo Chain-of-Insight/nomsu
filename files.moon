@@ -10,7 +10,6 @@ run_cmd = (cmd)->
     return lines
         
 _SPOOFED_FILES = {}
-_FILE_CACHE = setmetatable {}, __index:_SPOOFED_FILES
 _BROWSE_CACHE = {}
 
 -- Create a fake file and put it in the cache
@@ -23,10 +22,9 @@ Files.spoof = (filename, contents)->
     return filename
 
 -- Read a file's contents
-Files.read = (filename, skip_cache=nil)->
-    unless skip_cache
-        if file_contents = _FILE_CACHE[filename]
-            return file_contents or nil
+Files.read = (filename)->
+    if contents = _SPOOFED_FILES[filename]
+        return contents
     if filename == 'stdin' or filename == '-'
         contents = io.read('*a')
         Files.spoof('stdin', contents)
@@ -36,8 +34,6 @@ Files.read = (filename, skip_cache=nil)->
     return nil unless file
     contents = file\read("*a")
     file\close!
-    unless skip_cache
-        _FILE_CACHE[filename] = contents
     return contents or nil
 
 {:match, :gsub} = string

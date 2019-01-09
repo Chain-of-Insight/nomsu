@@ -30,7 +30,7 @@ external $(sh> $) = $os.execute
 test:
     read file "lib/os.nom"
 
-externally (read file $filename) means (=lua "Files.read(\$filename, true)")
+external $(read file $filename) = $Files.read
 externally [
     write to file $filename $text, to file $filename write $text
     write $text to file $filename
@@ -54,5 +54,5 @@ externally (source lines of $tree) means:
             ..: add ($file, line $)
         ], joined with "\n"
 
-externally (spoof file $text) means ($Files.spoof $text)
-externally (spoof file $filename = $text) means ($Files.spoof $filename $text)
+external $(spoof file $text) = $Files.spoof
+external $(spoof file $filename = $text) = $Files.spoof
