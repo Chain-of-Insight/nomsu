@@ -103,7 +103,7 @@ print_error = function(error_message, start_fn, stop_fn)
       end
       local line = nil
       do
-        local map = SOURCE_MAP[calling_fn.source]
+        local map = SOURCE_MAP and SOURCE_MAP[calling_fn.source]
         if map then
           if calling_fn.currentline then
             calling_fn.currentline = assert(map[calling_fn.currentline])

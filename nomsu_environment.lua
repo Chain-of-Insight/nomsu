@@ -255,7 +255,7 @@ local nomsu_environment = Importer({
         error("Failed to compile generated code:\n\027[1;34m" .. tostring(line_numbered_lua) .. "\027[0m\n\n" .. tostring(err), 0)
       end
       local source_key = tostring(source)
-      if not (environment.SOURCE_MAP[source_key]) then
+      if not (environment.SOURCE_MAP[source_key] or environment.OPTIMIZATION >= 2) then
         local map = { }
         local file = Files.read(source.filename)
         if not file then

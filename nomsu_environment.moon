@@ -131,7 +131,7 @@ nomsu_environment = Importer{
                 line_numbered_lua = table.concat(lines, "\n")
                 error("Failed to compile generated code:\n\027[1;34m#{line_numbered_lua}\027[0m\n\n#{err}", 0)
             source_key = tostring(source)
-            unless environment.SOURCE_MAP[source_key]
+            unless environment.SOURCE_MAP[source_key] or environment.OPTIMIZATION >= 2
                 map = {}
                 file = Files.read(source.filename)
                 if not file

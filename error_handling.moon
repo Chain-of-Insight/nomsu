@@ -66,7 +66,7 @@ print_error = (error_message, start_fn, stop_fn)->
         if calling_fn.linedefined == 0 then name = "main chunk"
         if name == "run_lua_fn" then continue
         line = nil
-        if map = SOURCE_MAP[calling_fn.source]
+        if map = SOURCE_MAP and SOURCE_MAP[calling_fn.source]
             if calling_fn.currentline
                 calling_fn.currentline = assert(map[calling_fn.currentline])
             if calling_fn.linedefined
