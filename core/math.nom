@@ -34,37 +34,36 @@ test:
         all of [
             abs 5, | 5 |, sqrt 5, √ 5, sine 5, cosine 5, tangent 5, arc sine 5, arc cosine 5
             arc tangent 5, arc tangent 5 / 10, hyperbolic sine 5, hyperbolic cosine 5
-            hyperbolic tangent 5, e^ 5, ln 5, log base 2 of 5, floor 5, ceiling 5, round 5
+            hyperbolic tangent 5, e^ 5, ln 5, log 5 base 2, floor 5, ceiling 5, round 5
         ]
     ..:
         fail "math functions failed"
-[absolute value $, | $ |, abs $] all compile to "math.abs(\($ as lua expr))"
-[square root $, square root of $, √ $, sqrt $] all compile to
-    "math.sqrt(\($ as lua expr))"
-[sine $, sin $] all compile to "math.sin(\($ as lua expr))"
-[cosine $, cos $] all compile to "math.cos(\($ as lua expr))"
-[tangent $, tan $] all compile to "math.tan(\($ as lua expr))"
-[arc sine $, asin $] all compile to "math.asin(\($ as lua expr))"
-[arc cosine $, acos $] all compile to "math.acos(\($ as lua expr))"
-[arc tangent $, atan $] all compile to "math.atan(\($ as lua expr))"
-[arc tangent $y / $x, atan2 $y $x] all compile to
-    "math.atan2(\($y as lua expr), \($x as lua expr))"
-[hyperbolic sine $, sinh $] all compile to "math.sinh(\($ as lua expr))"
-[hyperbolic cosine $, cosh $] all compile to "math.cosh(\($ as lua expr))"
-[hyperbolic tangent $, tanh $] all compile to "math.tanh(\($ as lua expr))"
-[e^ $, exp $] all compile to "math.exp(\($ as lua expr))"
-[natural log $, ln $, log $] all compile to "math.log(\($ as lua expr))"
-[log $ base $base, log base $base of $] all compile to
-    "math.log(\($ as lua expr), \($base as lua expr))"
-(floor $) compiles to "math.floor(\($ as lua expr))"
-[ceiling $, ceil $] all compile to "math.ceil(\($ as lua expr))"
-[round $, $ rounded] all compile to "math.floor(\($ as lua expr) + .5)"
+external [$(absolute value $), $(absolute value of $), $(| $ |), $(abs $)] =
+    [$math.abs, $math.abs, $math.abs, $math.abs]
+external [$(square root $), $(square root of $), $(√ $), $(sqrt $)] =
+    [$math.sqrt, $math.sqrt, $math.sqrt, $math.sqrt]
+external [$(sine $), $(sin $)] = [$math.sin, $math.sin]
+external [$(cosine $), $(cos $)] = [$math.cos, $math.cos]
+external [$(tangent $), $(tan $)] = [$math.tan, $math.tan]
+external [$(arc sine $), $(asin $)] = [$math.asin, $math.asin]
+external [$(arc cosine $), $(acos $)] = [$math.acos, $math.acos]
+external [$(arc tangent $), $(atan $)] = [$math.atan, $math.atan]
+external [$(arc tangent $y / $x), $(atan2 $y $x)] = [$math.atan2, $math.atan2]
+external [$(hyperbolic sine $), $(sinh $)] = [$math.sinh, $math.sinh]
+external [$(hyperbolic cosine $), $(cosh $)] = [$math.cosh, $math.cosh]
+external [$(hyperbolic tangent $), $(tanh $)] = [$math.tanh, $math.tanh]
+external [$(e^ $), $(exp $)] = [$math.exp, $math.exp]
+external [$(natural log $), $(ln $), $(log $), $(log $ base $)] = [$math.log, $math.log, $math.log, $math.log]
+external $(floor $) = $math.floor
+external [$(ceiling $), $(ceil $)] = [$math.ceil, $math.ceil]
+externally [round $, $ rounded] all mean
+    floor ($ + 0.5)
 test:
     unless ((463 to the nearest 100) == 500): fail "rounding failed"
     unless ((2.6 to the nearest 0.25) == 2.5): fail "rounding failed"
 
 externally ($n to the nearest $rounder) means
-    =lua "(\$rounder)*math.floor((\$n / \$rounder) + .5)"
+    $rounder * (floor ($n / $rounder + 0.5))
 
 # Any/all
 externally [all of $items, all $items] all mean:
@@ -137,10 +136,62 @@ test:
                 $best_key = $key
         return $best
 
+test:
+    assume (100 clamped between 0 and 10) == 10
+
 externally ($ clamped between $min and $max) means:
-    if ($ < $min): return $min
-    if ($ > $max): return $max
-    return $
+    when:
+        ($ < $min):
+            return $min
+        
+        ($ > $max):
+            return $max
+        
+        else:
+            return $
+
+test:
+    assume (-0.1 smoothed by 2.7) == 0
+    assume (0 smoothed by 2.7) == 0
+    assume (0.5 smoothed by 2.7) == 0.5
+    assume (1 smoothed by 2.7) == 1
+    assume (1.1 smoothed by 2.7) == 1
+
+externally ($ smoothed by $smoothness) means:
+    $ = ($ clamped between 0 and 1)
+    if ($smoothness == 0): return $
+    $k = (2 ^ $smoothness)
+    if ($ < 0.5):
+        return (0.5 * (2 * $) ^ $k)
+    ..else:
+        return (1 - 0.5 * (2 - 2 * $) ^ $k)
+
+test:
+    assume (5 to 7 mixed by -1.0) == 5
+    assume (5 to 7 mixed by 0.0) == 5
+    assume (5 to 7 mixed by 0.5) == 6
+    assume (5 to 7 mixed by 1.0) == 7
+    assume (5 to 7 mixed by 2.0) == 7
+
+externally ($lo to $hi mixed by $amount) means:
+    $ = ($amount clamped between 0 and 1)
+    return ((1 - $) * $lo + $ * $hi)
+
+test:
+    assume ([0,1,11] mixed by 0.00) == 0
+    assume ([0,1,11] mixed by 0.25) == 0.5
+    assume ([0,1,11] mixed by 0.50) == 1
+    assume ([0,1,11] mixed by 0.75) == 6
+    assume ([0,1,11] mixed by 1.00) == 11
+    assume ([99] mixed by 0.5) == 99
+
+externally ($nums mixed by $amount) means:
+    $ = ($amount clamped between 0 and 1)
+    $i = (1 + ($ * ((#$nums) - 1)))
+    if ((floor $i) == (#$nums)):
+        return $nums.(floor $i)
+    [$lo, $hi] = [$nums.(floor $i), $nums.(floor ($i + 1))]
+    return ($lo to $hi mixed by ($i mod 1))
 
 # Random functions
 externally (seed random with $) means:

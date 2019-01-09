@@ -1,0 +1,33 @@
+#!/usr/bin/env nomsu -V6.14
+#
+    This file defines upgrades from Nomsu <6.14 to 6.14
+use "compatibility/compatibility.nom"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+upgrade action
+    try $action and if it succeeds $success or if it barfs $msg $fallback
+..to "6.14" as (try $action if it succeeds $success if it fails $msg $fallback)
+
+upgrade action
+    try $action and if it barfs $msg $fallback or if it succeeds $success
+..to "6.14" as (try $action if it fails $msg $fallback if it succeeds $success)
+
+upgrade action (try $action and if it barfs $fallback or if it succeeds $success)
+..to "6.14" as (try $action if it fails $fallback if it succeeds $success)
+
+upgrade action (try $action and if it barfs $msg $fallback) to "6.14" as
+    try $action if it fails $msg $fallback
+
+upgrade action (try $action and if it succeeds $success) to "6.14" as
+    try $action if it succeeds $success
+
+upgrade action (assume $assumption or barf $err) to "6.14" as
+    unless $assumption: fail $err
+
+upgrade action (barf $msg) to "6.14" as (fail $msg)
+
+upgrade action (\(1's meaning)).stub to "6.14" via
+    $tree -> (SyntaxTree {.source = $tree.source, .type = "Var", $tree.1})
+
+upgrade action (log base $b of $n) to "6.14" as (log $n base $b)
