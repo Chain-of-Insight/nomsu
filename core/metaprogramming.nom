@@ -318,7 +318,7 @@ externally ($ is $kind syntax tree) means
         \(
             =lua ("
                 \$replacement.type == 'Block' and \($replacement as lua) or 'return '..\
-                ..\($replacement as lua expr)
+                ..\($replacement as lua expr):text()
             ")
         )
     end)
