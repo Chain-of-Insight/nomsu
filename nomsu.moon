@@ -1,6 +1,10 @@
 #!/usr/bin/env moon
 -- This file contains the command-line Nomsu runner.
 
+if NOMSU_VERSION and NOMSU_PREFIX
+    package.path = "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?.lua;"..package.path
+    package.cpath = "#{NOMSU_PREFIX}/lib/nomsu/#{NOMSU_VERSION}/?.so;"..package.cpath
+
 EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 
 if _VERSION == "Lua 5.1" and not jit
@@ -8,24 +12,14 @@ if _VERSION == "Lua 5.1" and not jit
     print("Sorry, Nomsu does not run on Lua 5.1. Please use LuaJIT 2+ or Lua 5.2+")
     os.exit(EXIT_FAILURE)
 
-if NOMSU_VERSION and NOMSU_PREFIX
-    ver_bits = [ver_bit for ver_bit in NOMSU_VERSION\gmatch("[0-9]+")]
-    partial_vers = [table.concat(ver_bits,'.',1,i) for i=#ver_bits,1,-1]
-    package.path = table.concat(["#{NOMSU_PREFIX}/share/nomsu/#{v}/?.lua" for v in *partial_vers],";")..";"..package.path
-    package.cpath = table.concat(["#{NOMSU_PREFIX}/lib/nomsu/#{v}/?.so" for v in *partial_vers],";")..";"..package.cpath
-    package.nomsupath = table.concat(["#{NOMSU_PREFIX}/share/nomsu/#{v}" for v in *partial_vers],";")..";."
-else
-    package.nomsupath = "."
-
 usage = [=[
 Nomsu Compiler
 
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [--help | -h] [--version] [-O optimization level] [-v] [-c] [-s] [-d debugger] [--no-core] [(file | -t tool | -e "nomsu code..." | -m files... [--]) [nomsu args...]]
+Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [--help | -h] [--version] [-O optimization level] [-v] [-c] [-s] [-d debugger] [--no-core] [(file | -t tool | -e "nomsu code..." | files... -- ) [nomsu args...]]
 
 OPTIONS
     -t <tool> Run a tool.
     -e Execute the specified string.
-    -m Run multiple files (all extra arguments).
     -O <level> Run the compiler with the given optimization level (>0: use precompiled .lua versions of Nomsu files, when available).
     -v Verbose: print compiled lua code.
     -c Compile the input files into a .lua files.
@@ -47,28 +41,23 @@ if not ok
     os.exit(EXIT_FAILURE)
 Files = require "files"
 Errhand = require "error_handling"
---NomsuCompiler = require "nomsu_compiler"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
---{:Importer, :import_to_1_from, :_1_forked} = require 'importer'
 {:List, :Dict, :Text} = require 'containers'
---SyntaxTree = require "syntax_tree"
-nomsu_environment = require('nomsu_environment')
-
--- If this file was reached via require(), then just return the Nomsu compiler
-if not arg or debug.getinfo(2).func == require
-    return nomsu_environment
 
 sep = "\3"
 parser = re.compile([[
     args <- {| (flag %sep)*
-        (("-e" %sep {:execute: {[^%sep]+} :} %sep)
-         / {:files: {|
-            ("-t" %sep {~ {[^%sep]+} -> "nomsu://tools/%1.nom" ~} %sep
-             / "-m" %sep (!("--" %sep) {[^%sep]+} %sep)* ("--" %sep)?
-             / {[^%sep]+} %sep
-             / {~ '' %sep? -> 'nomsu://tools/repl.nom' ~}) |} :})
+         {:files: {|
+          ( ("-m" %sep)? (!("--" %sep) file)* ("--" %sep)
+           / file
+           / {~ '' %sep? -> 'nomsu://tools/repl.nom' ~}) |} :}
       {:nomsu_args: {| (nomsu_flag %sep)* {:extras: {| ({[^%sep]+} %sep)* |} :} |} :}
       |} !.
+
+    file <-
+        (  "-e" %sep ({[^%sep]+} -> spoof) %sep
+         / "-t" %sep {~ {[^%sep]+} -> "nomsu://tools/%1.nom" ~} %sep
+         / {[^%sep]+} %sep)
 
     flag <- longflag / shortflag / "-" shortboolflag+
     longflag <-
@@ -89,7 +78,8 @@ parser = re.compile([[
     nomsu_shortboolflag <- {| {:key: [a-zA-Z] :} {:value: %true :} |}
     nomsu_longflag <- '--' {| {:key: [^%sep=]+ :} {:value: ('=' {[^%sep]+}) / %true :} |}
 ]], {
-    true:lpeg.Cc(true), number:lpeg.R("09")^1/tonumber, sep:lpeg.P(sep)
+    true:lpeg.Cc(true), number:lpeg.R("09")^1/tonumber, sep:lpeg.P(sep),
+    spoof: Files.spoof
 })
 arg_string = table.concat(arg, sep)..sep
 args = parser\match(arg_string)
@@ -100,39 +90,54 @@ nomsu_args = Dict{}
 for argpair in *args.nomsu_args
     nomsu_args[argpair.key] = argpair.value
 nomsu_args.extras = List(args.nomsu_args.extras or {})
+optimization = tonumber(args.optimization or 1)
+
+nomsupath = {}
+if NOMSU_VERSION and NOMSU_PREFIX
+    if optimization > 0
+        table.insert nomsupath, "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?.lua"
+        table.insert nomsupath, "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?/init.lua"
+    table.insert nomsupath, "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?.nom"
+    table.insert nomsupath, "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?/init.nom"
+
+if NOMSU_PACKAGEPATH
+    if optimization > 0
+        table.insert nomsupath, "#{NOMSU_PACKAGEPATH}/nomsu/?.lua"
+        table.insert nomsupath, "#{NOMSU_PACKAGEPATH}/nomsu/?/init.lua"
+    table.insert nomsupath, "#{NOMSU_PACKAGEPATH}/nomsu/?.nom"
+    table.insert nomsupath, "#{NOMSU_PACKAGEPATH}/nomsu/?/init.nom"
+
+if optimization > 0
+    table.insert nomsupath, "./?.lua"
+    table.insert nomsupath, "./?/init.lua"
+table.insert nomsupath, "./?.nom"
+table.insert nomsupath, "./?/init.nom"
+package.nomsupath = table.concat(nomsupath, ";")
+
+nomsu_environment = require('nomsu_environment')
 nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
-nomsu_environment.OPTIMIZATION = tonumber(args.optimization or 1)
+nomsu_environment.OPTIMIZATION = optimization
+nomsu_environment.NOMSU_PACKAGEPATH = NOMSU_PACKAGEPATH
+nomsu_environment.NOMSU_PREFIX = NOMSU_PREFIX
 
 run = ->
     unless args.no_core
-        for nomsupath in package.nomsupath\gmatch("[^;]+")
-            files = Files.list(nomsupath.."/core")
-            continue unless files
-            for f in *files
-                continue unless f\match("%.nom$")
-                nomsu_environment.run_file_1_in f, nomsu_environment, nomsu_environment.OPTIMIZATION
+        nomsu_environment\export("core")
 
     if args.version
-        nomsu_environment.run_1_in("say (Nomsu version)", nomsu_environment)
+        nomsu_environment\run("say (Nomsu version)")
         os.exit(EXIT_SUCCESS)
 
     input_files = {}
-    if args.execute
-        table.insert input_files, Files.spoof("<input command>", args.execute)
     if args.files
         for f in *args.files
-            local files
-            if nomsu_name = f\match("^nomsu://(.*)")
-                for nomsupath in package.nomsupath\gmatch("[^;]+")
-                    files = Files.list(nomsupath.."/"..nomsu_name)
-                    break if files
+            if nomsu_name = f\match("^nomsu://(.*)%.nom")
+                path, err = package.searchpath(nomsu_name, package.nomsupath, "/")
+                if not path then error(err)
+                table.insert input_files, path
             else
-                files = Files.list(f)
-            unless files and #files > 0
-                error("Could not find: '#{f}'")
-            for filename in *files
-                table.insert input_files, filename
-    
+                table.insert input_files, f
+
     for filename in *input_files
         if args.check_syntax
             -- Check syntax
@@ -150,11 +155,11 @@ run = ->
             tree = nomsu_environment._1_parsed(code)
             tree = {tree} unless tree.type == 'FileChunks'
             for chunk_no, chunk in ipairs tree
-                lua = nomsu_environment.compile(chunk)
+                lua = nomsu_environment\compile(chunk)
                 lua\declare_locals!
                 lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
                 if args.verbose then print(lua\text!)
-                nomsu_environment.run_1_in(chunk, nomsu_environment)
+                nomsu_environment\run(chunk)
                 output\write(lua\text!, "\n")
             print ("Compiled %-25s -> %s")\format(filename, filename\gsub("%.nom$", ".lua"))
             output\close!
@@ -165,14 +170,18 @@ run = ->
             tree = nomsu_environment._1_parsed(code)
             tree = {tree} unless tree.type == 'FileChunks'
             for chunk_no, chunk in ipairs tree
-                lua = nomsu_environment.compile(chunk)
+                lua = nomsu_environment\compile(chunk)
                 lua\declare_locals!
                 lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
                 print(lua\text!)
-                nomsu_environment.run_1_in(lua, nomsu_environment)
+                nomsu_environment\run(lua)
         else
             -- Just run the file
-            nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
+            f = Files.read(filename)
+            if filename\match("%.lua$")
+                f = LuaCode\from(Source(filename, 1, #f), f)
+            nomsu_environment\run(f)
+            --nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
 
 debugger = if args.debugger == "nil" then {}
 else require(args.debugger or 'error_handling')

@@ -163,6 +163,9 @@ do
         repeat
           local b = select(i, ...)
           assert(b, "code bit is nil")
+          if b.Dict then
+            require('ldt').breakpoint()
+          end
           assert(not Source:is_instance(b), "code bit is a Source")
           if b == '' then
             _continue_0 = true

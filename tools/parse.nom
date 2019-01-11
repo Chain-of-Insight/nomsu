@@ -3,7 +3,7 @@
     Tool to print out a parse tree of files in an easy-to-read format. Usage:
     nomsu tools/parse.nom file1 file2 directory1 ...        
     
-use "lib/os.nom"
+use "lib/os"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

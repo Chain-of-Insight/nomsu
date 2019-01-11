@@ -3,7 +3,7 @@
     This file defines upgrades from Nomsu <4.11 to Nomsu 4.11
     (overhaul of function literals, deleting (if all of ...), etc. shorthand)
     
-use "compatibility/compatibility.nom"
+use "compatibility/compatibility"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

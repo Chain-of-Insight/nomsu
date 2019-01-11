@@ -95,7 +95,8 @@ tree_to_inline_nomsu = (tree)->
                         interp_nomsu = tree_to_inline_nomsu(bit)
                         if bit.type != "Var" and bit.type != "List" and bit.type != "Dict"
                             interp_nomsu\parenthesize!
-                        elseif bit.type == "Var" and type(tree[i+1]) == 'string' and not match(tree[i+1], "^[ \n\t,.:;#(){}[%]]")
+                        elseif bit.type == "Var" and type(bit[1]) == 'string' and
+                        type(tree[i+1]) == 'string' and not match(tree[i+1], "^[ \n\t,.:;#(){}[%]]")
                             interp_nomsu\parenthesize!
                         nomsu\add "\\", interp_nomsu
             nomsu = NomsuCode\from(tree.source)

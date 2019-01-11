@@ -3,9 +3,9 @@
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.
     
-use "core/metaprogramming.nom"
-use "core/control_flow.nom"
-use "core/operators.nom"
+use "core/metaprogramming"
+use "core/control_flow"
+use "core/operators"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

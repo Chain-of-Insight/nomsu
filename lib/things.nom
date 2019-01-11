@@ -5,7 +5,6 @@
 test:
     an (Empty) is a thing
     a (Dog) is a thing:
-        [$it, $its] = [Dog, Dog]
         ($its, set up) means:
             $its.barks or= 0
         
@@ -37,7 +36,6 @@ test:
         assume (($d, bark) == "Bark!")
     
     a (Corgi) is a thing:
-        [$it, $its] = [Corgi, Corgi]
         $it [set up, gets pissed off] like a (Dog)
         ($it, as text) means "Dogloaf \{: for $k = $v in $it: add $k = $v}"
         ($its, sploot) means "sploooot"
@@ -61,7 +59,6 @@ test:
         assume (($d, bark) == "Bark! Bark!")
     
     a (Vec) is a thing with {.x, .y}:
-        $its = (Vec)
         ($its, + $other) means (Vec {.x = ($its.x + $other.x), .y = ($its.y + $other.y)})
     
     assume ((Vec {.x = 1, .y = 2}) + (Vec {.x = 10, .y = 10})) ==
@@ -145,6 +142,7 @@ externally (a class named $classname with $members $(initialize $)) means:
                 (
                     Lua ("
                         , function(\$class_id)
+                            local it, its = \$class_id, \$class_id;
                             \$body_lua
                         end
                     ")

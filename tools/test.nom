@@ -3,15 +3,14 @@
     Tool to run all tests in a file (i.e. the code block inside a call to 'test $'). Usage:
     nomsu tools/test.nom file1 file2 directory1 ...
     
-use "lib/os.nom"
-use "lib/consolecolor.nom"
+use "lib/os"
+use "lib/consolecolor"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Make sure all the files get run
-for $filename in $(COMMAND LINE ARGS).extras: use $filename
-$tests = {: for $s = $t in $TESTS: add (=lua "Source:from_string(\$s)") = $t}
 for $filename in $(COMMAND LINE ARGS).extras:
+    $(test environment) = (new environment)
+    $(test environment), use $filename
     $file = (read file $filename)
     $version =
         $file, matching ("
@@ -20,14 +19,13 @@ for $filename in $(COMMAND LINE ARGS).extras:
             ]*)
         ")
     $file_tests = []
-    for $src = $test in $tests:
-        if ($src.filename == $filename):
-            if $version:
-                $test = ("
-                    #!/usr/bin/env nomsu -V\$version
-                    \$test
-                ")
-            $file_tests, add {.test = $test, .source = $src}
+    for $src = $test in $(test environment).TESTS:
+        if $version:
+            $test = ("
+                #!/usr/bin/env nomsu -V\$version
+                \$test
+            ")
+        $file_tests, add {.test = $test, .source = $src}
     
     unless ($file_tests is empty):
         sort $file_tests by $ -> $.source
@@ -38,7 +36,7 @@ for $filename in $(COMMAND LINE ARGS).extras:
         for $ in $file_tests:
             if (command line args).v:
                 say "    \(yellow ($.test, with "\n" -> "\n    "))"
-            run $.test
+            $(test environment), run $.test
         
         if (command line args).v:
             say (green "PASS")

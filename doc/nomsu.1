@@ -15,8 +15,7 @@ nomsu \- run a Nomsu program
 |
 .I -e nomsu_code
 |
-.I -m nomsu_files...
-[--]
+.I nomsu_files... --
 ]
 [
 .I args
@@ -35,7 +34,7 @@ If no input files are provided, \fBnomsu\fR will run in interactive mode.
 .BI \-t " tool"
 Run the specified Nomsu tool (one of the tools/*.nom files provided with the compiler).
 .TP
-.BI \-m " file1 file2... " [--]
+.BI " file1 file2... --"
 Run multiple files. If a "--" is supplied, any additional arguments will be treated as arguments for the files, rather than additional files.
 .TP
 .BI \-e " code"
@@ -93,7 +92,7 @@ Compiles the Nomsu file 'my_file.nom' into a Lua file called 'my_file.lua'
 
 .TP
 .B
-nomsu -m one.nom two.nom three.nom
+nomsu one.nom two.nom three.nom --
 Runs 'one.nom', then 'two.nom', then 'three.nom'.
 
 .TP

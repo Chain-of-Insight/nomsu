@@ -2,8 +2,8 @@
 #
     This file contains basic error reporting code
     
-use "core/metaprogramming.nom"
-use "core/operators.nom"
+use "core/metaprogramming"
+use "core/operators"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

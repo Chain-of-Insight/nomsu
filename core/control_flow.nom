@@ -3,8 +3,8 @@
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
     
-use "core/metaprogramming.nom"
-use "core/operators.nom"
+use "core/metaprogramming"
+use "core/operators"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -464,29 +464,26 @@ test:
     assume (sorted $flat) == [1, 2, 3, 4, 5, 6]
 
 # Recurion control flow
+(recurse $v on $x) compiles to
+    Lua "table.insert(_stack_\($v as lua expr), \($x as lua expr))"
 (for $var in recursive $structure $body) compiles to:
-    with local compile actions:
-        define mangler
-        (recurse $v on $x) compiles to
-            Lua "table.insert(\(mangle "stack \($v.1)"), \($x as lua expr))"
-        
-        $lua =
-            Lua ("
-                do
-                    local \(mangle "stack \($var.1)") = List{\($structure as lua expr)}
-                    while #\(mangle "stack \($var.1)") > 0 do
-                        \($var as lua expr) = table.remove(\(mangle "stack \($var.1)"), 1)
-                        \($body as lua)
-            ")
-        
-        if ($body has subtree \(do next)):
-            $lua, add "\n        ::continue::"
-        
-        if ($body has subtree \(do next $var)):
-            $lua, add "\n        \(\(---next $var ---) as lua)"
-        
-        $lua, add "\n    end -- Recursive loop"
-        if ($body has subtree \(stop $var)):
-            $lua, add "\n        \(\(---stop $var ---) as lua)"
-        $lua, add "\nend -- Recursive scope"
-        return $lua
+    $lua =
+        Lua ("
+            do
+                local _stack_\($var as lua expr) = List{\($structure as lua expr)}
+                while #_stack_\($var as lua expr) > 0 do
+                    \($var as lua expr) = table.remove(_stack_\($var as lua expr), 1)
+                    \($body as lua)
+        ")
+    
+    if ($body has subtree \(do next)):
+        $lua, add "\n        ::continue::"
+    
+    if ($body has subtree \(do next $var)):
+        $lua, add "\n        \(\(---next $var ---) as lua)"
+    
+    $lua, add "\n    end -- Recursive loop"
+    if ($body has subtree \(stop $var)):
+        $lua, add "\n        \(\(---stop $var ---) as lua)"
+    $lua, add "\nend -- Recursive scope"
+    return $lua

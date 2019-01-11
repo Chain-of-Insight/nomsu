@@ -2,7 +2,7 @@
 #
     This file contains definitions of operators like "+" and "and".
     
-use "core/metaprogramming.nom"
+use "core/metaprogramming"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -101,7 +101,7 @@ test:
 (with external $externs $body) compiles to:
     $body_lua = ($body as lua)
     lua> ("
-        \$body_lua:remove_free_vars(table.map(\$externs, function(v) return compile(v):text() end))
+        \$body_lua:remove_free_vars(table.map(\$externs, function(v) return \(nomsu environment):compile(v):text() end))
     ")
     return $body_lua
 

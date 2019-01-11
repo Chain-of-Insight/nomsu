@@ -3,7 +3,7 @@ local re = require('re')
 local Files = { }
 local run_cmd
 run_cmd = function(cmd)
-  local f = io.popen(cmd)
+  local f = io.popen(cmd .. ' 2>/dev/null')
   local lines
   do
     local _accum_0 = { }
@@ -84,7 +84,7 @@ Files.list = function(path)
         path
       }
     else
-      _BROWSE_CACHE[path] = run_cmd('find -L "' .. path .. '" -not -path "*/\\.*" -type f 2>/dev/null') or false
+      _BROWSE_CACHE[path] = run_cmd('find -L "' .. path .. '" -not -path "*/\\.*" -type f') or false
     end
   end
   return _BROWSE_CACHE[path]
@@ -158,7 +158,7 @@ if ok then
     return _BROWSE_CACHE[path]
   end
 else
-  if not (run_cmd('find . -maxdepth 0 2>/dev/null')) then
+  if not (run_cmd('find . -maxdepth 0')) then
     local url
     if jit then
       url = 'https://github.com/spacewander/luafilesystem'

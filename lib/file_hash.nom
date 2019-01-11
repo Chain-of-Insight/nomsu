@@ -2,8 +2,8 @@
 #
     This file defines some actions for hashing files and looking up files by hash.
     
-use "lib/os.nom"
-use "lib/base64.nom"
+use "lib/os"
+use "lib/base64"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

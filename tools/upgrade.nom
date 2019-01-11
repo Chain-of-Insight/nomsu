@@ -6,8 +6,8 @@
     upgraded code will be printed.
     
 use "compatibility"
-use "lib/os.nom"
-use "lib/consolecolor.nom"
+use "lib/os"
+use "lib/consolecolor"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

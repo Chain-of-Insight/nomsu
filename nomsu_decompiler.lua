@@ -130,7 +130,7 @@ tree_to_inline_nomsu = function(tree)
           local interp_nomsu = tree_to_inline_nomsu(bit)
           if bit.type ~= "Var" and bit.type ~= "List" and bit.type ~= "Dict" then
             interp_nomsu:parenthesize()
-          elseif bit.type == "Var" and type(tree[i + 1]) == 'string' and not match(tree[i + 1], "^[ \n\t,.:;#(){}[%]]") then
+          elseif bit.type == "Var" and type(bit[1]) == 'string' and type(tree[i + 1]) == 'string' and not match(tree[i + 1], "^[ \n\t,.:;#(){}[%]]") then
             interp_nomsu:parenthesize()
           end
           nomsu:add("\\", interp_nomsu)

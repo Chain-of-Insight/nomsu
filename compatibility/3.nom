@@ -2,7 +2,7 @@
 #
     This file defines upgrades from Nomsu <=2 to Nomsu 3
     
-use "compatibility/compatibility.nom"
+use "compatibility/compatibility"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

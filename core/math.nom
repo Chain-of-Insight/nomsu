@@ -2,11 +2,11 @@
 #
     This file defines some common math literals and functions
     
-use "core/metaprogramming.nom"
-use "core/text.nom"
-use "core/operators.nom"
-use "core/control_flow.nom"
-use "core/collections.nom"
+use "core/metaprogramming"
+use "core/text"
+use "core/operators"
+use "core/control_flow"
+use "core/collections"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

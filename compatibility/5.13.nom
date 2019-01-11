@@ -1,7 +1,7 @@
 #!/usr/bin/env nomsu -V5.13
 #
     This file defines upgrades from Nomsu <5.13 to 5.13
-use "compatibility/compatibility.nom"
+use "compatibility/compatibility"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

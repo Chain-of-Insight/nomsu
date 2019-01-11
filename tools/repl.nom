@@ -2,8 +2,8 @@
 #
     This file defines a Read-Evaluate-Print-Loop (REPL) for Nomsu
     
-use "lib/consolecolor.nom"
-use "lib/os.nom"
+use "lib/consolecolor"
+use "lib/os"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -44,7 +44,7 @@ repeat:
     spoof file $buff
     try:
         $tree = ($buff parsed)
-    ..if it fails $err:
+    ..if it fails with $err:
         say $err
         do next
     
@@ -54,7 +54,7 @@ repeat:
     for $chunk in $tree:
         try:
             $lua = ($chunk as lua)
-        ..if it fails $err: say $err
+        ..if it fails with $err: say $err
         
         unless $lua:
             do next
@@ -65,7 +65,7 @@ repeat:
         $lua, remove free vars
         try:
             $ret = (run $lua)
-        ..if it fails $err: say $err
+        ..if it fails with $err: say $err
         ..if it succeeds:
             if (type of $ret) is:
                 "nil":

@@ -7,7 +7,7 @@
     If the "-q" flag is used and an error occurs, the original file will be printed.
     If no files are passed in, this will read from stdin.
     
-use "lib/os.nom"
+use "lib/os"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

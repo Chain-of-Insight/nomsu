@@ -16,8 +16,8 @@
     <filename>:<line number>:
     <matching lines>
     
-use "lib/os.nom"
-use "lib/consolecolor.nom"
+use "lib/os"
+use "lib/consolecolor"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

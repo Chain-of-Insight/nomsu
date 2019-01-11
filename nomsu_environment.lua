@@ -3,11 +3,6 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local Importer, import_to_1_from, _1_forked
-do
-  local _obj_0 = require('importer')
-  Importer, import_to_1_from, _1_forked = _obj_0.Importer, _obj_0.import_to_1_from, _obj_0._1_forked
-end
 local List, Dict, Text
 do
   local _obj_0 = require('containers')
@@ -24,26 +19,27 @@ make_tree = function(tree, userdata)
   tree = SyntaxTree(tree)
   return tree
 end
+table.map = function(t, fn)
+  return setmetatable((function()
+    local _accum_0 = { }
+    local _len_0 = 1
+    for _, v in ipairs(t) do
+      _accum_0[_len_0] = fn(v)
+      _len_0 = _len_0 + 1
+    end
+    return _accum_0
+  end)(), getmetatable(t))
+end
 local Parsers = { }
 local max_parser_version = 0
 for version = 1, 999 do
   local peg_file
   if package.nomsupath then
-    for path in package.nomsupath:gmatch("[^;]+") do
-      local _continue_0 = false
-      repeat
-        if path == "." and package.nomsupath ~= "." then
-          _continue_0 = true
-          break
-        end
-        peg_file = io.open(path .. "/nomsu." .. tostring(version) .. ".peg")
-        if peg_file then
-          break
-        end
-        _continue_0 = true
-      until true
-      if not _continue_0 then
-        break
+    local pegpath = package.nomsupath:gsub("%.nom", ".peg")
+    do
+      local path = package.searchpath("nomsu." .. tostring(version), pegpath, "/")
+      if path then
+        peg_file = io.open(path)
       end
     end
   else
@@ -68,8 +64,10 @@ do
   compile, compile_error = _obj_0.compile, _obj_0.compile_error
 end
 local _currently_running_files = List({ })
-local nomsu_environment = Importer({
-  NOMSU_COMPILER_VERSION = 12,
+local nomsu_environment
+local _module_imports = { }
+nomsu_environment = setmetatable({
+  NOMSU_COMPILER_VERSION = 13,
   NOMSU_SYNTAX_VERSION = max_parser_version,
   next = next,
   unpack = unpack or table.unpack,
@@ -129,14 +127,12 @@ local nomsu_environment = Importer({
   NomsuCode_from = (function(src, ...)
     return NomsuCode:from(src, ...)
   end),
-  SOURCE_MAP = Importer({ }),
+  SOURCE_MAP = { },
+  getfenv = getfenv,
   _1_as_nomsu = tree_to_nomsu,
   _1_as_inline_nomsu = tree_to_inline_nomsu,
   compile = compile,
-  _1_as_lua = compile,
   compile_error_at = compile_error,
-  _1_forked = _1_forked,
-  import_to_1_from = import_to_1_from,
   exit = os.exit,
   quit = os.exit,
   _1_parsed = function(nomsu_code, syntax_version)
@@ -208,19 +204,87 @@ local nomsu_environment = Importer({
     end
     return tree
   end,
-  run_1_in = function(to_run, environment)
+  load_module = function(self, package_name)
+    local path
+    if package_name:match("%.nom$") or package_name:match("%.lua") then
+      path = package_name
+    else
+      local err
+      path, err = package.searchpath(package_name, package.nomsupath, "/")
+      if not path then
+        error(err)
+      end
+    end
+    path = path:gsub("^%./", "")
+    do
+      local ret = package.loaded[package_name] or package.loaded[path]
+      if ret then
+        return ret
+      end
+    end
+    if _currently_running_files:has(path) then
+      local i = _currently_running_files:index_of(path)
+      _currently_running_files:add(path)
+      local circle = _currently_running_files:from_1_to(i, -1)
+      error("Circular import detected:\n           " .. circle:joined_with("\n..imports  "))
+    end
+    local mod = self:new_environment()
+    mod.MODULE_NAME = package_name
+    mod.TESTS = Dict({ })
+    local code = Files.read(path)
+    if path:match("%.lua$") then
+      code = LuaCode:from(Source(path, 1, #code), code)
+    else
+      code = NomsuCode:from(Source(path, 1, #code), code)
+    end
+    _currently_running_files:add(path)
+    assert(mod[jit and "_G" or "_ENV"] == mod)
+    mod:run(code)
+    assert(mod[jit and "_G" or "_ENV"] == mod)
+    _currently_running_files:pop()
+    package.loaded[package_name] = mod
+    package.loaded[path] = mod
+    return mod
+  end,
+  use = function(self, package_name)
+    local mod = self:load_module(package_name)
+    assert(mod[jit and "_G" or "_ENV"] == mod)
+    local imports = assert(_module_imports[self])
+    for k, v in pairs(mod) do
+      imports[k] = v
+    end
+    assert(mod[jit and "_G" or "_ENV"] == mod)
+    return mod
+  end,
+  export = function(self, package_name)
+    local mod = self:load_module(package_name)
+    assert(mod[jit and "_G" or "_ENV"] == mod)
+    local imports = assert(_module_imports[self])
+    for k, v in pairs(_module_imports[mod]) do
+      imports[k] = v
+    end
+    for k, v in pairs(mod) do
+      if k ~= "_G" and k ~= "_ENV" then
+        self[k] = v
+      end
+    end
+    assert(mod[jit and "_G" or "_ENV"] == mod)
+    return mod
+  end,
+  run = function(self, to_run)
+    if not to_run then
+      error("Need both something to run and an environment")
+    end
     if type(to_run) == 'string' then
       local filename = Files.spoof(to_run)
       to_run = NomsuCode:from(Source(filename, 1, #to_run), to_run)
-      local ret = environment.run_1_in(to_run, environment)
-      return ret
+      return self:run(to_run)
     elseif NomsuCode:is_instance(to_run) then
-      local tree = environment._1_parsed(to_run)
+      local tree = self._1_parsed(to_run)
       if tree == nil then
         return nil
       end
-      local ret = environment.run_1_in(tree, environment)
-      return ret
+      return self:run(tree)
     elseif SyntaxTree:is_instance(to_run) then
       local filename = to_run.source.filename:gsub("\n.*", "...")
       if to_run.type ~= "FileChunks" then
@@ -230,16 +294,16 @@ local nomsu_environment = Importer({
       end
       local ret = nil
       for chunk_no, chunk in ipairs(to_run) do
-        local lua = environment.compile(chunk)
+        local lua = self:compile(chunk)
         lua:declare_locals()
         lua:prepend("-- File: " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
-        ret = environment.run_1_in(lua, environment)
+        ret = self:run(lua)
       end
       return ret
     elseif LuaCode:is_instance(to_run) then
       local source = to_run.source
       local lua_string = to_run:text()
-      local run_lua_fn, err = load(lua_string, tostring(source), "t", environment)
+      local run_lua_fn, err = load(lua_string, tostring(source), "t", self)
       if not run_lua_fn then
         local lines
         do
@@ -255,7 +319,7 @@ local nomsu_environment = Importer({
         error("Failed to compile generated code:\n\027[1;34m" .. tostring(line_numbered_lua) .. "\027[0m\n\n" .. tostring(err), 0)
       end
       local source_key = tostring(source)
-      if not (environment.SOURCE_MAP[source_key] or environment.OPTIMIZATION >= 2) then
+      if not (self.SOURCE_MAP[source_key] or self.OPTIMIZATION >= 2) then
         local map = { }
         local file = Files.read(source.filename)
         if not file then
@@ -285,87 +349,33 @@ local nomsu_environment = Importer({
         map_sources(to_run)
         map[lua_line] = map[lua_line] or nomsu_line
         map[0] = 0
-        environment.SOURCE_MAP[source_key] = map
+        self.SOURCE_MAP[source_key] = map
       end
       return run_lua_fn()
     else
       return error("Attempt to run unknown thing: " .. tostring(to_run))
     end
   end,
-  FILE_CACHE = { },
-  run_file_1_in = function(path, environment, optimization, prefix)
-    if prefix == nil then
-      prefix = nil
-    end
-    if not optimization then
-      optimization = environment.OPTIMIZATION
-    end
-    if environment.FILE_CACHE[path] then
-      import_to_1_from(environment, environment.FILE_CACHE[path], prefix)
-      return 
-    end
-    if _currently_running_files:has(path) then
-      local i = _currently_running_files:index_of(path)
-      _currently_running_files:add(path)
-      local circle = _currently_running_files:from_1_to(i, -1)
-      error("Circular import detected:\n           " .. circle:joined_with("\n..imports  "))
-    end
-    _currently_running_files:add(path)
-    local mod = _1_forked(environment)
-    local did_anything = false
-    for nomsupath in package.nomsupath:gmatch("[^;]+") do
-      local _continue_0 = false
-      repeat
-        do
-          local full_path = nomsupath == "." and path or nomsupath .. "/" .. path
-          local files = Files.list(full_path)
-          if not (files) then
-            _continue_0 = true
-            break
-          end
-          for _index_0 = 1, #files do
-            local _continue_1 = false
-            repeat
-              local filename = files[_index_0]
-              local lua_filename = filename:gsub("%.nom$", ".lua")
-              if environment.FILE_CACHE[filename] then
-                import_to_1_from(environment, environment.FILE_CACHE[filename], prefix)
-                did_anything = true
-                _continue_1 = true
-                break
-              end
-              local code
-              if optimization ~= 0 and Files.exists(lua_filename) then
-                local file = Files.read(lua_filename)
-                code = LuaCode:from(Source(filename, 1, #file), file)
-              else
-                local file = Files.read(filename)
-                code = NomsuCode:from(Source(filename, 1, #file), file)
-              end
-              environment.run_1_in(code, mod)
-              did_anything = true
-              _continue_1 = true
-            until true
-            if not _continue_1 then
-              break
-            end
-          end
-          break
-        end
-        _continue_0 = true
-      until true
-      if not _continue_0 then
-        break
+  new_environment = function()
+    local env = { }
+    do
+      local _tbl_0 = { }
+      for k, v in pairs(nomsu_environment) do
+        _tbl_0[k] = v
       end
+      _module_imports[env] = _tbl_0
     end
-    if not (did_anything) then
-      error("File not found: " .. tostring(path) .. "\n(searched in " .. tostring(package.nomsupath) .. ")", 0)
-    end
-    import_to_1_from(environment, mod, prefix)
-    environment.FILE_CACHE[path] = mod
-    return _currently_running_files:remove()
+    env[jit and "_G" or "_ENV"] = env
+    setmetatable(env, getmetatable(nomsu_environment))
+    return env
+  end
+}, {
+  __index = function(self, k)
+    return _module_imports[self][k]
   end
 })
-nomsu_environment._ENV = nomsu_environment
+nomsu_environment[jit and "_G" or "_ENV"] = nomsu_environment
+nomsu_environment.COMPILE_RULES = require('bootstrap')
+_module_imports[nomsu_environment] = { }
 SOURCE_MAP = nomsu_environment.SOURCE_MAP
 return nomsu_environment

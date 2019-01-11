@@ -7,15 +7,16 @@ LUA= lua
 LUA_BIN= $(shell which $(LUA))
 
 PREFIX=
+PACKAGEPATH=
 UNINSTALL_VERSION=
 # ========= You shouldn't need to mess with any of these variables below ================
 
 MOON_FILES= code_obj.moon error_handling.moon files.moon nomsu.moon nomsu_compiler.moon \
 			syntax_tree.moon containers.moon bitops.moon parser.moon pretty_errors.moon \
-			string2.moon nomsu_decompiler.moon nomsu_environment.moon importer.moon
+			string2.moon nomsu_decompiler.moon nomsu_environment.moon bootstrap.moon
 LUA_FILES= code_obj.lua consolecolors.lua error_handling.lua files.lua nomsu.lua nomsu_compiler.lua \
 		   syntax_tree.lua containers.lua bitops.lua parser.lua pretty_errors.lua \
-		   string2.lua nomsu_decompiler.lua nomsu_environment.lua importer.lua
+		   string2.lua nomsu_decompiler.lua nomsu_environment.lua bootstrap.lua
 CORE_NOM_FILES= $(wildcard core/**.nom)
 CORE_LUA_FILES= $(patsubst %.nom,%.lua,$(CORE_NOM_FILES))
 LIB_NOM_FILES= $(wildcard lib/**.nom)
@@ -30,7 +31,7 @@ test: lua optimize
 	@echo "\033[1;4mRunning unoptimized tests...\033[0m"
 	@$(LUA_BIN) nomsu.lua -O0 tools/test.nom $(CORE_NOM_FILES) $(LIB_NOM_FILES)
 	@echo "\n\033[1;4mRunning optimized tests...\033[0m"
-	@$(LUA_BIN) nomsu.lua -O1 tools/test.nom $(CORE_NOM_FILES) $(LIB_NOM_FILES)
+	@$(LUA_BIN) nomsu.lua -O1 tools/test.nom $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
 %.lua: %.moon
 	@moonc $<
@@ -58,9 +59,12 @@ install: lua version optimize
 	if [[ ! $$prefix ]]; then \
 		read -p $$'\033[1mWhere do you want to install Nomsu? (default: /usr/local) \033[0m' prefix; \
 	fi; \
-	if [[ ! $$prefix ]]; then \
-		prefix="/usr/local"; \
+	if [[ ! $$prefix ]]; then prefix="/usr/local"; fi; \
+	packagepath="$(PACKAGEPATH)"; \
+	if [[ ! $$packagepath ]]; then \
+		read -p $$'\033[1mWhere do you want Nomsu to put packages you install in the future? (default: /opt) \033[0m' packagepath; \
 	fi; \
+	if [[ ! $$packagepath ]]; then packagepath="/opt"; fi; \
 	if [[ $$prefix != "`realpath $$prefix`" ]]; then \
 		echo $$'\033[1;31mWarning: '$$prefix$$' is not an absolute path. This may cause problems.\033[0m'; \
 		read -p $$'\033[1mWould you rather use '`realpath $$prefix`$$' instead? (recommended)[Y/n]\033[0m ' use_real; \
@@ -69,8 +73,9 @@ install: lua version optimize
 		fi; \
 	fi; \
 	version="`cat version`"; \
-	mkdir -pv $$prefix/bin $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/share/man/man1 \
-	&& echo "#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_PREFIX = [[$$version]], [[$$prefix]]" | cat - nomsu.lua > $$prefix/bin/nomsu$$version \
+	mkdir -pv $$prefix/bin $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/share/man/man1 $$packagepath/nomsu \
+	&& echo "#!$(LUA_BIN)\\nlocal NOMSU_VERSION, NOMSU_PREFIX, NOMSU_PACKAGEPATH = [[$$version]], [[$$prefix]], [[$$packagepath]]" \
+	  | cat - nomsu.lua > $$prefix/bin/nomsu$$version \
 	&& chmod +x $$prefix/bin/nomsu$$version \
 	&& cp -v nomsu $$prefix/bin \
 	&& cp -v doc/nomsu.1 $$prefix/share/man/man1 \
@@ -82,13 +87,18 @@ uninstall: version
 	if [[ ! $$prefix ]]; then \
 		read -p $$'\033[1mWhere do you want to uninstall Nomsu from? (default: /usr/local) \033[0m' prefix; \
 	fi; \
-	if [[ ! $$prefix ]]; then \
-		prefix="/usr/local"; \
+	if [[ ! $$prefix ]]; then prefix="/usr/local"; fi; \
+	packagepath="$(PACKAGEPATH)"; \
+	if [[ ! $$packagepath ]]; then \
+		read -p $$'\033[1mWhere have your Nomsu packages been installed? (default: /opt) \033[0m' packagepath; \
 	fi; \
+	if [[ ! $$packagepath ]]; then packagepath="/opt"; fi; \
 	echo "\033[1mNomsu will be uninstalled from:\033[0m"; \
 	echo "    $$prefix/bin"; \
 	echo "    $$prefix/lib"; \
 	echo "    $$prefix/share"; \
+	echo "\033[1mNomsu packages will be uninstalled from:\033[0m"; \
+	echo "    $$packagepath/nomsu"; \
 	read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
 	if [[ $$ans =~ ^[Nn] ]]; then exit; fi; \
 	echo "\033[1mDeleting...\033[0m"; \
@@ -108,6 +118,12 @@ uninstall: version
 	fi; \
 	if [ "`ls $$prefix/lib/nomsu 2>/dev/null`" == "" ]; then rm -rvf $$prefix/lib/nomsu; fi;\
 	if [ "`ls $$prefix/share/nomsu 2>/dev/null`" == "" ]; then rm -rvf $$prefix/share/nomsu; fi;\
+	if [ -d $$packagepath/nomsu ]; then \
+		read -p $$'\033[1mDo you want to delete all installed libraries from /opt? [y/n] \033[0m' confirm; \
+		if [[ $$confirm == "y" ]]; then \
+			rm -rvf $$packagepath/nomsu; \
+		fi; \
+	fi; \
 	echo $$'\033[1mDone.\033[0m';
 
 # eof

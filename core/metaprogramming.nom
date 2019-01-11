@@ -16,15 +16,15 @@ lua> ("
             end
         end
     end
-    compile.action["define mangler"] = function(compile)
+    COMPILE_RULES["define mangler"] = function(\(nomsu environment))
         return LuaCode("local mangle = mangler()")
     end
 ")
 
 lua> ("
-    compile.action["1 ->"] = function(compile, \$args, \$body)
+    COMPILE_RULES["1 ->"] = function(\(nomsu environment), \$args, \$body)
         if \$args and not \$body then \$args, \$body = {}, \$args end
-        local body_lua = SyntaxTree:is_instance(\$body) and compile(\$body) or \$body
+        local body_lua = SyntaxTree:is_instance(\$body) and \(nomsu environment):compile(\$body) or \$body
         if SyntaxTree:is_instance(\$body) and \$body.type ~= "Block" then body_lua:prepend("\
     ..return ") end
         local lua = LuaCode("(function(")
@@ -32,7 +32,7 @@ lua> ("
             \$args = \$args:get_args()
         elseif SyntaxTree:is_instance(\$args) and \$args.type == "Var" then \$args = {\$args} end
         for i, arg in ipairs(\$args) do
-            local arg_lua = SyntaxTree:is_instance(arg) and compile(arg):text() or arg
+            local arg_lua = SyntaxTree:is_instance(arg) and \(nomsu environment):compile(arg):text() or arg
             if arg_lua == "..." then
                 if i < #\$args then
                     compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
@@ -52,8 +52,8 @@ lua> ("
         lua:add(")\\n    ", body_lua, "\\nend)")
         return lua
     end
-    compile.action["->"] = compile.action["1 ->"]
-    compile.action["for"] = compile.action["1 ->"]
+    COMPILE_RULES["->"] = COMPILE_RULES["1 ->"]
+    COMPILE_RULES["for"] = COMPILE_RULES["1 ->"]
 ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,12 +85,12 @@ test:
         fail "compile to is leaking variables"
 
 lua> ("
-    compile.action["1 compiles to"] = function(compile, \$action, \$body)
-        local \$args = List{\(\$compile), unpack(\$action:get_args())}
+    COMPILE_RULES["1 compiles to"] = function(env, \$action, \$body)
+        local \$args = List{"\(nomsu environment)", unpack(\$action:get_args())}
         if \$body.type == "Text" then
             \$body = SyntaxTree{source=\$body.source, type="Action", "Lua", \$body}
         end
-        return LuaCode("compile.action[", \$action:get_stub():as_lua(),
+        return LuaCode("COMPILE_RULES[", \$action:get_stub():as_lua(),
             "] = ", \(\($args -> $body) as lua))
     end
 ")
@@ -103,18 +103,21 @@ lua> ("
             compile_error(\$actions, "This should be a list of actions.")
         end
         local lua = \(\($actions.1 compiles to $body) as lua)
-        local \$args = List{\(\$compile), unpack(\$actions[1]:get_args())}
-        local \$compiled_args = List(table.map(\$args, compile))
+        local \$args = List{"\(nomsu environment)", unpack(\$actions[1]:get_args())}
+        local \$compiled_args = List{"\(nomsu environment)"};
+        for i=2,#\$args do \$compiled_args[i] = \(nomsu environment):compile(\$args[i]) end
         for i=2,#\$actions do
             local alias = \$actions[i]
-            local \$alias_args = List{\(\$compile), unpack(alias:get_args())}
-            lua:add("\\ncompile.action[", alias:get_stub():as_lua(), "] = ")
+            local \$alias_args = List{"\(nomsu environment)", unpack(alias:get_args())}
+            lua:add("\\nCOMPILE_RULES[", alias:get_stub():as_lua(), "] = ")
             if \$alias_args == \$args then
-                lua:add("compile.action[", \$actions[1]:get_stub():as_lua(), "]")
+                lua:add("COMPILE_RULES[", \$actions[1]:get_stub():as_lua(), "]")
             else
                 lua:add("function(")
-                lua:concat_add(table.map(\$alias_args, compile), ", ")
-                lua:add(") return compile.action[", \$actions[1]:get_stub():as_lua(), "](")
+                local \$compiled_alias_args = List{"\(nomsu environment)"};
+                for i=2,#\$alias_args do \$compiled_alias_args[i] = \(nomsu environment):compile(\$alias_args[i]) end
+                lua:concat_add(\$compiled_alias_args, ", ")
+                lua:add(") return COMPILE_RULES[", \$actions[1]:get_stub():as_lua(), "](")
                 lua:concat_add(\$compiled_args, ", ")
                 lua:add(") end")
             end
@@ -145,7 +148,7 @@ test:
         
         local lua = LuaCode()
         if \$action.type == "MethodCall" then
-            lua:add(compile(\$action[1]), ".", \$action[2]:get_stub():as_lua_id())
+            lua:add(\(nomsu environment):compile(\$action[1]), ".", \$action[2]:get_stub():as_lua_id())
         elseif \$action.type == "Action" then
             lua:add(\$action:get_stub():as_lua_id())
             lua:add_free_vars({\$action:get_stub():as_lua_id()})
@@ -160,7 +163,7 @@ test:
     lua> ("
         local lua = \(\($actions.1 means $body) as lua)
         local first_def = (\$actions[1].type == "MethodCall"
-            and LuaCode(compile(\$actions[1][1]), ".", \$actions[1]:get_stub():as_lua_id())
+            and LuaCode(\(nomsu environment):compile(\$actions[1][1]), ".", \$actions[1]:get_stub():as_lua_id())
             or LuaCode(\$actions[1]:get_stub():as_lua_id()))
         local \$args = List(\$actions[1]:get_args())
         for i=2,#\$actions do
@@ -168,7 +171,7 @@ test:
             local \$alias_args = List(alias:get_args())
             lua:add("\\n")
             if alias.type == "MethodCall" then
-                lua:add(compile(alias[1]), ".", alias:get_stub():as_lua_id())
+                lua:add(\(nomsu environment):compile(alias[1]), ".", alias:get_stub():as_lua_id())
             else
                 lua:add(alias:get_stub():as_lua_id())
                 lua:add_free_vars({alias_name})
@@ -229,7 +232,7 @@ test:
             compile_error(\$actions, "This should be a list.")
         end
         for i,arg in ipairs(\$actions[1]:get_args()) do
-            replacements[arg[1]] = compile(arg):text()
+            replacements[arg[1]] = \(nomsu environment):compile(arg):text()
         end
         local function make_tree(t)
             if SyntaxTree:is_instance(t) and t.type == "Var" then
@@ -273,7 +276,7 @@ test:
 [$action parses as $body] all parse as ([$action] all parse as $body)
 externally ($tree as lua expr) means:
     lua> ("
-        local tree_lua = compile(\$tree)
+        local tree_lua = \(nomsu environment):compile(\$tree)
         if \$tree.type == 'Block' then
             tree_lua = LuaCode:from(\$tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
         elseif \$tree.type == 'MethodCall' and #\$tree > 2 then
@@ -404,18 +407,6 @@ externally (type of $) means:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    assume ((run "return (2 + 99)") == 101)
-    $x = 0
-    externally (set to $) means:
-        external $x = $
-    run "set to 1"
-    assume $x == 1
-    assume (run \(return \(\(5) + \(5)))) == 10
-(run $nomsu_code) compiles to "run_1_in(\($nomsu_code as lua expr), _ENV)"
-[compile $block, compiled $block, $block compiled] all compile to
-    "compile(\($block as lua))"
-
-test:
     (foo) means:
         return 100 200 300
     assume (select 2 (foo)) == 200
@@ -427,7 +418,7 @@ test:
         local lua = \(Lua "do return ")
         for i=1,select('#',...) do
             if i > 1 then lua:add(", ") end
-            lua:add(_1_as_lua((select(i, ...))))
+            lua:add(\(nomsu environment):compile((select(i, ...))))
         end
         lua:add(" end")
         return lua
@@ -445,15 +436,17 @@ test:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(with local compile actions $body) compiles to ("
-    do
-        --local compile = _1_forked(compile)
-        local old_action = compile.action
-        compile.action = _1_forked(old_action)
-        \($body as lua)
-        compile.action = old_action
-    end
-")
+#
+    (with local compile actions $body) compiles to ("
+        do
+            local OLD_RULES = COMPILE_RULES
+            local OLD_ENV = \(nomsu environment)
+            local \(nomsu environment) = setmetatable({
+                COMPILE_RULES=setmetatable({}, {__index=OLD_RULES})
+            }, {__index=OLD_ENV})
+            \($body as lua)
+        end
+    ")
 
 externally (Nomsu version) means:
     return ("

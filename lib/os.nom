@@ -2,20 +2,11 @@
 #
     This file defines some actions that interact with the operating system and filesystem.
     
-test:
-    assume (nomsu files for "core")
-
 externally (files for $path) means:
     $files = (=lua "Files.list(\$path)")
     if $files:
         $files = (List $files)
     return $files
-
-externally (nomsu files for $path) means:
-    for $nomsupath in ($package.nomsupath, all matches of "[^;]+"):
-        $files = (files for "\($nomsupath)/\$path")
-        if $files:
-            return $files
 
 externally (=sh $cmd) means:
     lua> ("

@@ -4,7 +4,7 @@ re = require 're'
 Files = {}
 
 run_cmd = (cmd)->
-    f = io.popen(cmd)
+    f = io.popen(cmd..' 2>/dev/null')
     lines = [line for line in f\lines!]
     return nil unless f\close!
     return lines
@@ -57,7 +57,7 @@ Files.list = (path)->
         local files
         _BROWSE_CACHE[path] = if _SPOOFED_FILES[path] or path == 'stdin' or path == '-'
             {path}
-        else run_cmd('find -L "'..path..'" -not -path "*/\\.*" -type f 2>/dev/null') or false
+        else run_cmd('find -L "'..path..'" -not -path "*/\\.*" -type f') or false
     return _BROWSE_CACHE[path]
 
 ok, lfs = pcall(require, "lfs")
@@ -93,7 +93,7 @@ if ok
                     if f\match("^%./") then _BROWSE_CACHE[path][i] = f\sub(3)
         return _BROWSE_CACHE[path]
 else
-    unless run_cmd('find . -maxdepth 0 2>/dev/null')
+    unless run_cmd('find . -maxdepth 0')
         url = if jit
             'https://github.com/spacewander/luafilesystem'
         else 'https://github.com/keplerproject/luafilesystem'

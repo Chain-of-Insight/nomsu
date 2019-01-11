@@ -3,9 +3,9 @@
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
     
-use "core/metaprogramming.nom"
-use "core/operators.nom"
-use "core/control_flow.nom"
+use "core/metaprogramming"
+use "core/operators"
+use "core/control_flow"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -75,4 +75,4 @@ $escapes = {
 
 for $name = $str in $escapes:
     with [$lua = (Lua (quote $str))]:
-        $compile.action.$name = (-> $lua)
+        $(COMPILE RULES).$name = (-> $lua)

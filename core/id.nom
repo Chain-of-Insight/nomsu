@@ -2,11 +2,11 @@
 #
     A simple UUID function based on RFC 4122: http://www.ietf.org/rfc/rfc4122.txt
     
-use "core/metaprogramming.nom"
-use "core/operators.nom"
-use "core/math.nom"
-use "core/collections.nom"
-use "core/control_flow.nom"
+use "core/metaprogramming"
+use "core/operators"
+use "core/math"
+use "core/collections"
+use "core/control_flow"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
