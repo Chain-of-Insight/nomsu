@@ -38,7 +38,6 @@ compile_error = function(source, err_msg, hint)
   return error(err_str, 0)
 end
 local MAX_LINE = 80
-local ENVNAME = jit and "_G" or "_ENV"
 local compile_actions = {
   [""] = function(self, fn, ...)
     local lua = LuaCode()
@@ -118,16 +117,16 @@ local compile_actions = {
     }))
   end,
   ["1 as lua"] = function(self, code)
-    return LuaCode(tostring(ENVNAME) .. ":compile(", self:compile(code), ")")
+    return LuaCode("_ENV:compile(", self:compile(code), ")")
   end,
   ["use"] = function(self, path)
-    return LuaCode(tostring(ENVNAME) .. ":use(" .. tostring(self:compile(path)) .. ")")
+    return LuaCode("_ENV:use(" .. tostring(self:compile(path)) .. ")")
   end,
   ["export"] = function(self, path)
-    return LuaCode(tostring(ENVNAME) .. ":export(" .. tostring(self:compile(path)) .. ")")
+    return LuaCode("_ENV:export(" .. tostring(self:compile(path)) .. ")")
   end,
   ["run"] = function(self, path)
-    return LuaCode(tostring(ENVNAME) .. ":run(" .. tostring(self:compile(path)) .. ")")
+    return LuaCode("_ENV:run(" .. tostring(self:compile(path)) .. ")")
   end,
   ["test"] = function(self, body)
     if not (body.type == 'Block') then
@@ -154,10 +153,10 @@ local compile_actions = {
     return LuaCode("_VERSION")
   end,
   ["nomsu environment"] = function(self)
-    return LuaCode(ENVNAME)
+    return LuaCode("_ENV")
   end,
   ["nomsu environment name"] = function(self)
-    return LuaCode(ENVNAME:as_lua())
+    return LuaCode('"_ENV"')
   end
 }
 return compile_actions

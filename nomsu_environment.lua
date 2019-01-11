@@ -238,9 +238,7 @@ nomsu_environment = setmetatable({
       code = NomsuCode:from(Source(path, 1, #code), code)
     end
     _currently_running_files:add(path)
-    assert(mod[jit and "_G" or "_ENV"] == mod)
     mod:run(code)
-    assert(mod[jit and "_G" or "_ENV"] == mod)
     _currently_running_files:pop()
     package.loaded[package_name] = mod
     package.loaded[path] = mod
@@ -248,17 +246,14 @@ nomsu_environment = setmetatable({
   end,
   use = function(self, package_name)
     local mod = self:load_module(package_name)
-    assert(mod[jit and "_G" or "_ENV"] == mod)
     local imports = assert(_module_imports[self])
     for k, v in pairs(mod) do
       imports[k] = v
     end
-    assert(mod[jit and "_G" or "_ENV"] == mod)
     return mod
   end,
   export = function(self, package_name)
     local mod = self:load_module(package_name)
-    assert(mod[jit and "_G" or "_ENV"] == mod)
     local imports = assert(_module_imports[self])
     for k, v in pairs(_module_imports[mod]) do
       imports[k] = v
@@ -268,7 +263,6 @@ nomsu_environment = setmetatable({
         self[k] = v
       end
     end
-    assert(mod[jit and "_G" or "_ENV"] == mod)
     return mod
   end,
   run = function(self, to_run)
@@ -365,7 +359,8 @@ nomsu_environment = setmetatable({
       end
       _module_imports[env] = _tbl_0
     end
-    env[jit and "_G" or "_ENV"] = env
+    env._ENV = env
+    env._G = env
     setmetatable(env, getmetatable(nomsu_environment))
     return env
   end
@@ -374,7 +369,8 @@ nomsu_environment = setmetatable({
     return _module_imports[self][k]
   end
 })
-nomsu_environment[jit and "_G" or "_ENV"] = nomsu_environment
+nomsu_environment._ENV = nomsu_environment
+nomsu_environment._G = nomsu_environment
 nomsu_environment.COMPILE_RULES = require('bootstrap')
 _module_imports[nomsu_environment] = { }
 SOURCE_MAP = nomsu_environment.SOURCE_MAP

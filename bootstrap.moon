@@ -24,8 +24,6 @@ compile_error = (source, err_msg, hint=nil)->
     error(err_str, 0)
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
---ENVNAME = jit and "getfenv(1)" or "_ENV"
-ENVNAME = jit and "_G" or "_ENV"
 compile_actions = {
     [""]: (fn, ...)=>
         lua = LuaCode!
@@ -96,16 +94,16 @@ compile_actions = {
         @compile(SyntaxTree{type:"Action", "lua", ">", code})
 
     ["1 as lua"]: (code)=>
-        LuaCode("#{ENVNAME}:compile(", @compile(code), ")")
+        LuaCode("_ENV:compile(", @compile(code), ")")
 
     ["use"]: (path)=>
-        LuaCode("#{ENVNAME}:use(#{@compile(path)})")
+        LuaCode("_ENV:use(#{@compile(path)})")
 
     ["export"]: (path)=>
-        LuaCode("#{ENVNAME}:export(#{@compile(path)})")
+        LuaCode("_ENV:export(#{@compile(path)})")
 
     ["run"]: (path)=>
-        LuaCode("#{ENVNAME}:run(#{@compile(path)})")
+        LuaCode("_ENV:run(#{@compile(path)})")
 
     ["test"]: (body)=>
         unless body.type == 'Block'
@@ -118,8 +116,8 @@ compile_actions = {
 
     ["is jit"]: (code)=> LuaCode("jit")
     ["Lua version"]: (code)=> LuaCode("_VERSION")
-    ["nomsu environment"]: ()=> LuaCode(ENVNAME)
-    ["nomsu environment name"]: ()=> LuaCode(ENVNAME\as_lua!)
+    ["nomsu environment"]: ()=> LuaCode("_ENV")
+    ["nomsu environment name"]: ()=> LuaCode('"_ENV"')
 }
 
 return compile_actions

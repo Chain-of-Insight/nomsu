@@ -125,9 +125,7 @@ nomsu_environment = setmetatable({
         else
             code = NomsuCode\from(Source(path, 1, #code), code)
         _currently_running_files\add path
-        assert(mod[jit and "_G" or "_ENV"] == mod)
         mod\run(code)
-        assert(mod[jit and "_G" or "_ENV"] == mod)
         _currently_running_files\pop!
         package.loaded[package_name] = mod
         package.loaded[path] = mod
@@ -135,23 +133,19 @@ nomsu_environment = setmetatable({
 
     use: (package_name)=>
         mod = @load_module(package_name)
-        assert(mod[jit and "_G" or "_ENV"] == mod)
         imports = assert _module_imports[@]
         for k,v in pairs(mod)
             imports[k] = v
-        assert(mod[jit and "_G" or "_ENV"] == mod)
         return mod
 
     export: (package_name)=>
         mod = @load_module(package_name)
-        assert(mod[jit and "_G" or "_ENV"] == mod)
         imports = assert _module_imports[@]
         for k,v in pairs(_module_imports[mod])
             imports[k] = v
         for k,v in pairs(mod)
             if k != "_G" and k != "_ENV"
                 @[k] = v
-        assert(mod[jit and "_G" or "_ENV"] == mod)
         return mod
 
     run: (to_run)=>
@@ -218,13 +212,15 @@ nomsu_environment = setmetatable({
     new_environment: ->
         env = {}
         _module_imports[env] = {k,v for k,v in pairs(nomsu_environment)}
-        env[jit and "_G" or "_ENV"] = env
+        env._ENV = env
+        env._G = env
         setmetatable(env, getmetatable(nomsu_environment))
         return env
 }, {
     __index: (k)=> _module_imports[@][k]
 })
-nomsu_environment[jit and "_G" or "_ENV"] = nomsu_environment
+nomsu_environment._ENV = nomsu_environment
+nomsu_environment._G = nomsu_environment
 nomsu_environment.COMPILE_RULES = require('bootstrap')
 _module_imports[nomsu_environment] = {}
 
