@@ -85,7 +85,7 @@ test:
         fail "compile to is leaking variables"
 
 lua> ("
-    COMPILE_RULES["1 compiles to"] = function(env, \$action, \$body)
+    COMPILE_RULES["1 compiles to"] = function(\(nomsu environment), \$action, \$body)
         local \$args = List{"\(nomsu environment)", unpack(\$action:get_args())}
         if \$body.type == "Text" then
             \$body = SyntaxTree{source=\$body.source, type="Action", "Lua", \$body}
@@ -274,7 +274,7 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [$action parses as $body] all parse as ([$action] all parse as $body)
-externally ($tree as lua expr) means:
+externally (in (nomsu environment) $tree as lua expr) means:
     lua> ("
         local tree_lua = \(nomsu environment):compile(\$tree)
         if \$tree.type == 'Block' then
@@ -286,6 +286,11 @@ externally ($tree as lua expr) means:
         end
         return tree_lua
     ")
+
+# Need to make sure the proper environment is used for compilation (i.e. the caller's environment)
+($tree as lua expr) compiles to (\(in \(nomsu environment) $tree as lua expr) as lua)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 externally [$var as lua identifier, $var as lua id] all mean:
     lua> ("

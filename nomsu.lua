@@ -48,16 +48,16 @@ end
 local sep = "\3"
 local parser = re.compile([[    args <- {| (flag %sep)*
          {:files: {|
-          ( ("-m" %sep)? (!("--" %sep) file)* ("--" %sep)
-           / file
+          ( ("-m" %sep)? (file %sep)+ "--" %sep
+           / file %sep
            / {~ '' %sep? -> 'nomsu://tools/repl.nom' ~}) |} :}
       {:nomsu_args: {| (nomsu_flag %sep)* {:extras: {| ({[^%sep]+} %sep)* |} :} |} :}
-      |} !.
+      |} ({.+}?)
 
     file <-
-        (  "-e" %sep ({[^%sep]+} -> spoof) %sep
-         / "-t" %sep {~ {[^%sep]+} -> "nomsu://tools/%1.nom" ~} %sep
-         / {[^%sep]+} %sep)
+        (  "-e" %sep ({[^%sep]+} -> spoof)
+         / "-t" %sep {~ {[^%sep]+} -> "nomsu://tools/%1.nom" ~}
+         / !"--" {[^%sep]+})
 
     flag <- longflag / shortflag / "-" shortboolflag+
     longflag <-
@@ -84,8 +84,11 @@ local parser = re.compile([[    args <- {| (flag %sep)*
   spoof = Files.spoof
 })
 local arg_string = table.concat(arg, sep) .. sep
-local args = parser:match(arg_string)
-if not args or args.help then
+local args, err = parser:match(arg_string)
+if not args or err or args.help then
+  if err then
+    print("Didn't understand: \x1b[31;1m" .. tostring(err) .. "\x1b[0m")
+  end
   print(usage)
   os.exit(EXIT_FAILURE)
 end
@@ -98,28 +101,35 @@ end
 nomsu_args.extras = List(args.nomsu_args.extras or { })
 local optimization = tonumber(args.optimization or 1)
 local nomsupath = { }
-if NOMSU_VERSION and NOMSU_PREFIX then
-  if optimization > 0 then
-    table.insert(nomsupath, tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/?.lua")
-    table.insert(nomsupath, tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/?/init.lua")
-  end
-  table.insert(nomsupath, tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/?.nom")
-  table.insert(nomsupath, tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/?/init.nom")
-end
-if NOMSU_PACKAGEPATH then
-  if optimization > 0 then
-    table.insert(nomsupath, tostring(NOMSU_PACKAGEPATH) .. "/nomsu/?.lua")
-    table.insert(nomsupath, tostring(NOMSU_PACKAGEPATH) .. "/nomsu/?/init.lua")
-  end
-  table.insert(nomsupath, tostring(NOMSU_PACKAGEPATH) .. "/nomsu/?.nom")
-  table.insert(nomsupath, tostring(NOMSU_PACKAGEPATH) .. "/nomsu/?/init.nom")
-end
+local suffixes
 if optimization > 0 then
-  table.insert(nomsupath, "./?.lua")
-  table.insert(nomsupath, "./?/init.lua")
+  suffixes = {
+    "?.lua",
+    "?/init.lua",
+    "?.nom",
+    "?/init.nom"
+  }
+else
+  suffixes = {
+    "?.nom",
+    "?/init.nom"
+  }
 end
-table.insert(nomsupath, "./?.nom")
-table.insert(nomsupath, "./?/init.nom")
+local add_path
+add_path = function(p)
+  for _index_0 = 1, #suffixes do
+    local s = suffixes[_index_0]
+    table.insert(nomsupath, p .. "/" .. s)
+  end
+end
+if NOMSU_VERSION and NOMSU_PREFIX then
+  add_path(tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/lib")
+else
+  add_path("./lib")
+end
+local NOMSU_PACKAGEPATH = NOMSU_PACKAGEPATH or "/opt"
+add_path(NOMSU_PACKAGEPATH)
+add_path(".")
 package.nomsupath = table.concat(nomsupath, ";")
 local nomsu_environment = require('nomsu_environment')
 nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
@@ -143,7 +153,8 @@ run = function()
       do
         local nomsu_name = f:match("^nomsu://(.*)%.nom")
         if nomsu_name then
-          local path, err = package.searchpath(nomsu_name, package.nomsupath, "/")
+          local path
+          path, err = package.searchpath(nomsu_name, package.nomsupath, "/")
           if not path then
             error(err)
           end
@@ -171,20 +182,22 @@ run = function()
       local code = Files.read(filename)
       local source = Source(filename, 1, #code)
       code = NomsuCode:from(source, code)
-      local tree = nomsu_environment._1_parsed(code)
+      local env = nomsu_environment.new_environment()
+      env.MODULE_NAME = filename
+      local tree = env._1_parsed(code)
       if not (tree.type == 'FileChunks') then
         tree = {
           tree
         }
       end
       for chunk_no, chunk in ipairs(tree) do
-        local lua = nomsu_environment:compile(chunk)
+        local lua = env:compile(chunk)
         lua:declare_locals()
         lua:prepend((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
         if args.verbose then
           print(lua:text())
         end
-        nomsu_environment:run(chunk)
+        env:run(chunk)
         output:write(lua:text(), "\n")
       end
       print(("Compiled %-25s -> %s"):format(filename, filename:gsub("%.nom$", ".lua")))
@@ -193,25 +206,31 @@ run = function()
       local code = Files.read(filename)
       local source = Source(filename, 1, #code)
       code = NomsuCode:from(source, code)
-      local tree = nomsu_environment._1_parsed(code)
+      local env = nomsu_environment.new_environment()
+      env.MODULE_NAME = filename
+      env.WAS_RUN_DIRECTLY = true
+      local tree = env._1_parsed(code)
       if not (tree.type == 'FileChunks') then
         tree = {
           tree
         }
       end
       for chunk_no, chunk in ipairs(tree) do
-        local lua = nomsu_environment:compile(chunk)
+        local lua = env:compile(chunk)
         lua:declare_locals()
         lua:prepend((chunk_no > 1) and '\n' or '', "-- File " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")
         print(lua:text())
-        nomsu_environment:run(lua)
+        env:run(lua)
       end
     else
       local f = Files.read(filename)
       if filename:match("%.lua$") then
         f = LuaCode:from(Source(filename, 1, #f), f)
       end
-      nomsu_environment:run(f)
+      local env = nomsu_environment.new_environment()
+      env.MODULE_NAME = filename
+      env.WAS_RUN_DIRECTLY = true
+      env:run(f)
     end
   end
 end

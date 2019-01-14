@@ -118,6 +118,8 @@ compile_actions = {
     ["Lua version"]: (code)=> LuaCode("_VERSION")
     ["nomsu environment"]: ()=> LuaCode("_ENV")
     ["nomsu environment name"]: ()=> LuaCode('"_ENV"')
+    ["this file was run directly"]: => LuaCode('WAS_RUN_DIRECTLY')
+    ["the command line arguments"]: => LuaCode('COMMAND_LINE_ARGS')
 }
 
 return compile_actions

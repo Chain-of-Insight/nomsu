@@ -48,16 +48,16 @@ sep = "\3"
 parser = re.compile([[
     args <- {| (flag %sep)*
          {:files: {|
-          ( ("-m" %sep)? (!("--" %sep) file)* ("--" %sep)
-           / file
+          ( ("-m" %sep)? (file %sep)+ "--" %sep
+           / file %sep
            / {~ '' %sep? -> 'nomsu://tools/repl.nom' ~}) |} :}
       {:nomsu_args: {| (nomsu_flag %sep)* {:extras: {| ({[^%sep]+} %sep)* |} :} |} :}
-      |} !.
+      |} ({.+}?)
 
     file <-
-        (  "-e" %sep ({[^%sep]+} -> spoof) %sep
-         / "-t" %sep {~ {[^%sep]+} -> "nomsu://tools/%1.nom" ~} %sep
-         / {[^%sep]+} %sep)
+        (  "-e" %sep ({[^%sep]+} -> spoof)
+         / "-t" %sep {~ {[^%sep]+} -> "nomsu://tools/%1.nom" ~}
+         / !"--" {[^%sep]+})
 
     flag <- longflag / shortflag / "-" shortboolflag+
     longflag <-
@@ -82,8 +82,10 @@ parser = re.compile([[
     spoof: Files.spoof
 })
 arg_string = table.concat(arg, sep)..sep
-args = parser\match(arg_string)
-if not args or args.help
+args, err = parser\match(arg_string)
+if not args or err or args.help
+    if err
+        print("Didn't understand: \x1b[31;1m#{err}\x1b[0m")
     print usage
     os.exit(EXIT_FAILURE)
 nomsu_args = Dict{}
@@ -93,25 +95,18 @@ nomsu_args.extras = List(args.nomsu_args.extras or {})
 optimization = tonumber(args.optimization or 1)
 
 nomsupath = {}
+suffixes = if optimization > 0
+    {"?.lua", "?/init.lua", "?.nom", "?/init.nom"}
+else {"?.nom", "?/init.nom"}
+add_path = (p)->
+    for s in *suffixes do table.insert(nomsupath, p.."/"..s)
 if NOMSU_VERSION and NOMSU_PREFIX
-    if optimization > 0
-        table.insert nomsupath, "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?.lua"
-        table.insert nomsupath, "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?/init.lua"
-    table.insert nomsupath, "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?.nom"
-    table.insert nomsupath, "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?/init.nom"
-
-if NOMSU_PACKAGEPATH
-    if optimization > 0
-        table.insert nomsupath, "#{NOMSU_PACKAGEPATH}/nomsu/?.lua"
-        table.insert nomsupath, "#{NOMSU_PACKAGEPATH}/nomsu/?/init.lua"
-    table.insert nomsupath, "#{NOMSU_PACKAGEPATH}/nomsu/?.nom"
-    table.insert nomsupath, "#{NOMSU_PACKAGEPATH}/nomsu/?/init.nom"
-
-if optimization > 0
-    table.insert nomsupath, "./?.lua"
-    table.insert nomsupath, "./?/init.lua"
-table.insert nomsupath, "./?.nom"
-table.insert nomsupath, "./?/init.nom"
+    add_path "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/lib"
+else
+    add_path "./lib"
+NOMSU_PACKAGEPATH or= "/opt"
+add_path NOMSU_PACKAGEPATH
+add_path "."
 package.nomsupath = table.concat(nomsupath, ";")
 
 nomsu_environment = require('nomsu_environment')
@@ -152,14 +147,16 @@ run = ->
             code = Files.read(filename)
             source = Source(filename, 1, #code)
             code = NomsuCode\from(source, code)
-            tree = nomsu_environment._1_parsed(code)
+            env = nomsu_environment.new_environment!
+            env.MODULE_NAME = filename
+            tree = env._1_parsed(code)
             tree = {tree} unless tree.type == 'FileChunks'
             for chunk_no, chunk in ipairs tree
-                lua = nomsu_environment\compile(chunk)
+                lua = env\compile(chunk)
                 lua\declare_locals!
                 lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
                 if args.verbose then print(lua\text!)
-                nomsu_environment\run(chunk)
+                env\run(chunk)
                 output\write(lua\text!, "\n")
             print ("Compiled %-25s -> %s")\format(filename, filename\gsub("%.nom$", ".lua"))
             output\close!
@@ -167,20 +164,26 @@ run = ->
             code = Files.read(filename)
             source = Source(filename, 1, #code)
             code = NomsuCode\from(source, code)
-            tree = nomsu_environment._1_parsed(code)
+            env = nomsu_environment.new_environment!
+            env.MODULE_NAME = filename
+            env.WAS_RUN_DIRECTLY = true
+            tree = env._1_parsed(code)
             tree = {tree} unless tree.type == 'FileChunks'
             for chunk_no, chunk in ipairs tree
-                lua = nomsu_environment\compile(chunk)
+                lua = env\compile(chunk)
                 lua\declare_locals!
                 lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
                 print(lua\text!)
-                nomsu_environment\run(lua)
+                env\run(lua)
         else
             -- Just run the file
             f = Files.read(filename)
             if filename\match("%.lua$")
                 f = LuaCode\from(Source(filename, 1, #f), f)
-            nomsu_environment\run(f)
+            env = nomsu_environment.new_environment!
+            env.MODULE_NAME = filename
+            env.WAS_RUN_DIRECTLY = true
+            env\run(f)
             --nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
 
 debugger = if args.debugger == "nil" then {}

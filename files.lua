@@ -213,12 +213,4 @@ Files.get_line = function(str, line_no)
   end
   return (str:sub(start, stop - 2))
 end
-local get_lines = re.compile([[    lines <- {| line (%nl line)* |}
-    line <- {[^%nl]*}
-]], {
-  nl = lpeg.P("\r") ^ -1 * lpeg.P("\n")
-})
-Files.get_lines = function(str)
-  return get_lines:match(str)
-end
 return Files

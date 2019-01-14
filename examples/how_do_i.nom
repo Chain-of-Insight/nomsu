@@ -6,11 +6,9 @@
     is considered part of the comment
     (including any deeper-level indented text)
     The comment ends when the indentation ends
-# How do I import a file?
-use "lib/os"
 
-# How do I import all the files in a directory?
-use "lib"
+# How do I import a libarary?
+use "consolecolor"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

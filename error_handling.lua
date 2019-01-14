@@ -1,5 +1,5 @@
-local files = require("files")
 local debug_getinfo = debug.getinfo
+local Files = require("files")
 local RED = "\027[31m"
 local BRIGHT_RED = "\027[31;1m"
 local RESET = "\027[0m"
@@ -119,7 +119,6 @@ print_error = function(error_message, start_fn, stop_fn)
             filename, start = calling_fn.source:match('@([^[]*)%[([0-9]+)]')
           end
           assert(filename)
-          local file = files.read(filename)
           if calling_fn.name then
             do
               local tmp = calling_fn.name:match("^A_([a-zA-Z0-9_]*)$")
@@ -134,8 +133,10 @@ print_error = function(error_message, start_fn, stop_fn)
           else
             name = "main chunk"
           end
+          local file = Files.read(filename)
+          local lines = file and file:lines() or { }
           do
-            local err_line = files.get_line(file, calling_fn.currentline)
+            local err_line = lines[calling_fn.currentline]
             if err_line then
               local offending_statement = tostring(BRIGHT_RED) .. tostring(err_line:match("^[ ]*(.*)")) .. tostring(RESET)
               line = tostring(YELLOW) .. tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement) .. tostring(RESET)
@@ -144,13 +145,6 @@ print_error = function(error_message, start_fn, stop_fn)
             end
           end
         else
-          local file
-          ok, file = pcall(function()
-            return files.read(calling_fn.short_src)
-          end)
-          if not ok then
-            file = nil
-          end
           local line_num
           if name == nil then
             local search_level = level
@@ -189,6 +183,13 @@ print_error = function(error_message, start_fn, stop_fn)
               end
             end
           end
+          local file, lines
+          do
+            file = Files.read(calling_fn.short_src)
+            if file then
+              lines = file:lines()
+            end
+          end
           if file and (calling_fn.short_src:match("%.moon$") or file:match("^#![^\n]*moon\n")) and type(MOON_SOURCE_MAP[file]) == 'table' then
             local char = MOON_SOURCE_MAP[file][calling_fn.currentline]
             line_num = 1
@@ -206,7 +207,7 @@ print_error = function(error_message, start_fn, stop_fn)
           end
           if file then
             do
-              local err_line = files.get_line(file, line_num)
+              local err_line = lines[line_num]
               if err_line then
                 local offending_statement = tostring(BRIGHT_RED) .. tostring(err_line:match("^[ ]*(.*)$")) .. tostring(RESET)
                 line = line .. ("\n        " .. offending_statement)

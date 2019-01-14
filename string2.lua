@@ -130,6 +130,12 @@ local string2 = {
     end
     return table.concat(lines, "\n")
   end,
+  indented = function(self, indent)
+    if indent == nil then
+      indent = "    "
+    end
+    return indent .. (gsub(self, "\n", "\n" .. indent))
+  end,
   as_lua = function(self)
     local escaped = gsub(self, "\\", "\\\\")
     escaped = gsub(escaped, "\n", "\\n")

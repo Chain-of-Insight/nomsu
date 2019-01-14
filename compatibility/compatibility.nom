@@ -3,7 +3,7 @@
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
     
-use "lib/os"
+use "filesystem"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -68,18 +68,33 @@ externally [
     $tree upgraded to $end_version from $start_version
 ] all mean:
     unless ($tree is syntax tree): return $tree
+
     ($ver as list) means (($ as number) for $ in $ver matching "[0-9]+")
+
+    (Ver $) means:
+        [$lib, $ver] = ($, match "(.*)/([0-9.]+)")
+        if $lib:
+            return {.lib = $lib, .version = ($ver as list)}
+        return {.version = ($ as list)}
+
+    $start = (Ver $start_version)
+    $end = (Ver $end_version)
+    assume $start.lib == $end.lib
+
+    $seen = {}
     $versions = {}
-    for $v = $ in $UPGRADES:
-        $versions.$v = (yes)
+    for $v = $ in $UPGRADES: $versions.$v = (yes)
+    for $v = $ in $ACTION_UPGRADES: $versions.$v = (yes)
+    $versions = [
+        :for $v = $ in $versions:
+            if ((Ver $v).lib == $start.lib):
+                add $v
+    ]
     
-    for $v = $ in $ACTION_UPGRADES:
-        $versions.$v = (yes)
-    
-    $versions = ((keys in $versions) sorted by $ -> ($ as list))
+    sort $versions by $ -> ($ as list)
     for $ver in $versions:
-        if (($ver as list) <= ($start_version as list)): do next $ver
-        if (($ver as list) > ($end_version as list)): stop $ver
+        if (($ver as list) <= $start.version): do next $ver
+        if (($ver as list) > $end.version): stop $ver
         if $ACTION_UPGRADES.$ver:
             $tree =
                 $tree with $ ->:
@@ -115,12 +130,3 @@ externally ($tree upgraded to $end_version) means
 
 externally ($tree upgraded) means
     $tree upgraded from ($tree.version or (Nomsu version)) to (Nomsu version)
-
-externally (use $path from version $version) means:
-    for $filename in (files for $path):
-        if (=lua "LOADED[\$filename]"):
-            do next $filename
-        $file = (read file $filename)
-        $tree = (parse $file from $filename)
-        $tree = (upgrade $tree from $version)
-        run tree $tree

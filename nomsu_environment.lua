@@ -64,9 +64,20 @@ do
   compile, compile_error = _obj_0.compile, _obj_0.compile_error
 end
 local _currently_running_files = List({ })
-local nomsu_environment
 local _module_imports = { }
-nomsu_environment = setmetatable({
+local _importer_mt = {
+  __index = function(self, k)
+    return _module_imports[self][k]
+  end
+}
+local Importer
+Importer = function(t, imports)
+  _module_imports[t] = imports or { }
+  t._IMPORTS = _module_imports[t]
+  return setmetatable(t, _importer_mt)
+end
+local nomsu_environment
+nomsu_environment = Importer({
   NOMSU_COMPILER_VERSION = 13,
   NOMSU_SYNTAX_VERSION = max_parser_version,
   next = next,
@@ -230,7 +241,6 @@ nomsu_environment = setmetatable({
     end
     local mod = self:new_environment()
     mod.MODULE_NAME = package_name
-    mod.TESTS = Dict({ })
     local code = Files.read(path)
     if path:match("%.lua$") then
       code = LuaCode:from(Source(path, 1, #code), code)
@@ -250,17 +260,39 @@ nomsu_environment = setmetatable({
     for k, v in pairs(mod) do
       imports[k] = v
     end
+    local cr_imports = assert(_module_imports[self.COMPILE_RULES])
+    for k, v in pairs(mod.COMPILE_RULES) do
+      cr_imports[k] = v
+    end
     return mod
   end,
   export = function(self, package_name)
     local mod = self:load_module(package_name)
     local imports = assert(_module_imports[self])
     for k, v in pairs(_module_imports[mod]) do
-      imports[k] = v
+      if rawget(imports, k) == nil then
+        imports[k] = v
+      end
     end
     for k, v in pairs(mod) do
-      if k ~= "_G" and k ~= "_ENV" then
+      if rawget(self, k) == nil then
         self[k] = v
+      end
+    end
+    local cr_imports = assert(_module_imports[self.COMPILE_RULES])
+    for k, v in pairs(_module_imports[mod.COMPILE_RULES]) do
+      if rawget(cr_imports, k) == nil then
+        cr_imports[k] = v
+      end
+    end
+    for k, v in pairs(mod.COMPILE_RULES) do
+      if rawget(self.COMPILE_RULES, k) == nil then
+        self.COMPILE_RULES[k] = v
+      end
+    end
+    for k, v in pairs(mod.TESTS) do
+      if rawget(self.TESTS, k) == nil then
+        self.TESTS[k] = v
       end
     end
     return mod
@@ -303,7 +335,7 @@ nomsu_environment = setmetatable({
         do
           local _accum_0 = { }
           local _len_0 = 1
-          for i, line in ipairs(Files.get_lines(lua_string)) do
+          for i, line in ipairs(lua_string:lines()) do
             _accum_0[_len_0] = ("%3d|%s"):format(i, line)
             _len_0 = _len_0 + 1
           end
@@ -351,27 +383,29 @@ nomsu_environment = setmetatable({
     end
   end,
   new_environment = function()
-    local env = { }
-    do
+    local env = Importer({ }, (function()
       local _tbl_0 = { }
       for k, v in pairs(nomsu_environment) do
         _tbl_0[k] = v
       end
-      _module_imports[env] = _tbl_0
-    end
+      return _tbl_0
+    end)())
     env._ENV = env
     env._G = env
-    setmetatable(env, getmetatable(nomsu_environment))
+    env.TESTS = Dict({ })
+    env.COMPILE_RULES = Importer({ }, (function()
+      local _tbl_0 = { }
+      for k, v in pairs(nomsu_environment.COMPILE_RULES) do
+        _tbl_0[k] = v
+      end
+      return _tbl_0
+    end)())
     return env
-  end
-}, {
-  __index = function(self, k)
-    return _module_imports[self][k]
   end
 })
 nomsu_environment._ENV = nomsu_environment
 nomsu_environment._G = nomsu_environment
-nomsu_environment.COMPILE_RULES = require('bootstrap')
-_module_imports[nomsu_environment] = { }
+nomsu_environment.COMPILE_RULES = Importer(require('bootstrap'))
+nomsu_environment.MODULE_NAME = "nomsu"
 SOURCE_MAP = nomsu_environment.SOURCE_MAP
 return nomsu_environment

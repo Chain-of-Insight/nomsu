@@ -1,0 +1,86 @@
+#!/usr/bin/env nomsu -V6.14
+#
+    This file defines a Read-Evaluate-Print-Loop (REPL) for Nomsu
+    
+use "consolecolor"
+use "filesystem"
+use "commandline"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+externally (help) means:
+    say ("
+        This is the Nomsu v\(Nomsu version) interactive console.
+        You can type in Nomsu code here and hit 'enter' twice to run it.
+        To exit, type 'exit' or 'quit' and hit enter twice.
+    ")
+
+command line program with $args:
+    say ("
+        
+        \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\
+        ..\(reset color)
+               press 'enter' twice to run a command
+        
+    ")
+
+    repeat:
+        say (bright (yellow ">> ")) inline
+        $buff = []
+        repeat:
+            say (bright) inline
+            $line = ($io.read "*L")
+            say (reset color) inline
+            if (($line == "\n") or (not $line)):
+                if ((size of $buff) > 0):
+                    # clear the line
+                    say "\027[1A\027[2K" inline
+                go to (run buffer)
+            $buff, add ($line, with "\t" -> "    ")
+            say (dim (yellow ".. ")) inline
+        
+        --- (run buffer) ---
+        
+        if ((size of $buff) == 0): stop
+        $buff = ($buff, joined)
+        spoof file $buff
+        try:
+            $tree = ($buff parsed)
+        ..if it fails with $err:
+            say $err
+            do next
+        
+        unless $tree:
+            do next
+        
+        for $chunk in $tree:
+            try:
+                $lua = ($chunk as lua)
+            ..if it fails with $err: say $err
+            
+            unless $lua:
+                do next
+            
+            # TODO: this is a bit hacky, it just defaults variables to global
+                so that stuff mostly works across multiple lines. It would be
+                nicer if local variables actually worked.
+            $lua, remove free vars
+            try:
+                $ret = (run $lua)
+            ..if it fails with $err: say $err
+            ..if it succeeds:
+                if (type of $ret) is:
+                    "nil":
+                        do nothing
+                    
+                    "boolean":
+                        say "= \("yes" if $ret else "no")"
+                    
+                    "table":
+                        if $ret.as_nomsu:
+                            say "= \($ret, as nomsu)"
+                        ..else:
+                            say "= \$ret"
+                    
+                    else:
+                        say "= \$ret"

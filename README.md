@@ -62,8 +62,7 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * [string2.moon](string2.moon) - A library defining some extra functionality for strings.
 * [syntax\_tree.moon](syntax_tree.moon) - Datastructures used for Nomsu Abstract Syntax Trees.
 * [examples/how\_do\_i.nom](examples/how_do_i.nom) - A simple walkthrough of some of the features of Nomsu, written in Nomsu code. **This is a good place to start.**
-* [core/\*.nom](core) - Core language definitions of stuff like control flow, operators, and metaprogramming, broken down into different files.
-* [lib/\*.nom](lib) - Optional language libraries for stuff you might want, like interfacing with the OS, or doing Object Oriented Programming.
+* [lib/\*/\*.nom](lib) - Language libraries, including the core language stuff like control flow, operators, and metaprogramming (in [lib/core](lib/core)) and optional language libraries for stuff you might want.
 * [compatibility/\*.nom](compatibility) - Code for automatically upgrading Nomsu code from old versions to the current version.
 * [tools/\*.nom](tools) - A set of utilities useful for doing code manipulation actions.
 * [Makefile](Makefile) - Rules for building/installing the compiler.
@@ -72,14 +71,14 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 
 ## Versioning
 
-Nomsu uses the following versioning scheme: `[syntax version].[core library API version].[compiler internal API version].[lib/ API version]`. Which means:
+Nomsu uses the following versioning scheme: `[syntax version].[core library API version].[compiler internal API version].[minor version]`. Which means:
 
-* Any code that parses on `Nomsu X.a.b.c.d` will also parse on Nomsu `X.p.w.r.s`
-* Any code that compiles on Nomsu `X.Y.a.b.c` will also compile on Nomsu `X.Y.p.q.r` and run without any differences, as long as it only depends on the behavior of the core library functions (i.e. stuff defined in [core/\*.nom](core)), and doesn't mess with the compiler internals at all.
-* Any code that compiles on Nomsu `X.Y.Z.a.b` will also compile on Nomsu `X.Y.Z.p.q` and run without any differences, even if it messes with the compiler internals, as long as it doesn't use anything from [lib/\*.nom](lib).
-* Any code that compiles on Nomsu `X.Y.Z.W` will also compile on any other Nomsu `X.Y.Z.W` and run without any differences, even if it uses stuff from [lib/\*.nom](lib).
+* Any code that parses on `Nomsu X.a.b.c` will also parse on Nomsu `X.p.w.r`
+* Any code that compiles on Nomsu `X.Y.a.b` will also compile on Nomsu `X.Y.p.q` and run without any differences, as long as it only depends on the behavior of the core library functions (i.e. stuff defined in [lib/core/\*.nom](lib/core)), and doesn't mess with the compiler internals at all.
+* Any code that compiles on Nomsu `X.Y.Z.a` will also compile on Nomsu `X.Y.Z.p` and run without any differences, unless if it messes with the compiler internals.
+* Any code that compiles on Nomsu `X.Y.Z.W` will also compile on any other Nomsu `X.Y.Z.W` and run without any differences.
 
-When Nomsu is istalled via `make install`, all of Nomsu's lua files and [core/\*.nom](core) and [lib/\*.nom](lib) files are stored in `$PREFIX/lib/nomsu/$NOMSU_VERSION` and the Nomsu executable is installed to `$PREFIX/bin/nomsu$NOMSU_VERSION`, along with the file `nomsu` (the version-selection script), which goes to `$PREFIX/bin/nomsu`. When `make uninstall` is run, all those files are deleted (except for `nomsu`, if there are other versions installed).
+When Nomsu is istalled via `make install`, all of Nomsu's lua files and [lib/](lib) files are stored in `$PREFIX/share/nomsu/$NOMSU_VERSION` and the Nomsu executable is installed to `$PREFIX/bin/nomsu$NOMSU_VERSION`, along with the file `nomsu` (the version-selection script), which goes to `$PREFIX/bin/nomsu`. When `make uninstall` is run, all those files are deleted (except for `nomsu`, if there are other versions installed).
 
 To run different versions, use the `-V` flag, which will select the latest version matching the specified pattern. For example, if you have v1.0.0.0, v1.0.2.1, and 1.1.0.0 installed, then `nomsu` will run v1.1.0.0, `nomsu -V 1.0` will run v1.0.2.1, and `nomsu -V 1.0.0.0` will run v1.0.0.0.
 

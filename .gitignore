@@ -1,4 +1,3 @@
-core/*.lua
 lib/*.lua
-tests/*.lua
+lib/*/*.lua
 .pending-post-commit

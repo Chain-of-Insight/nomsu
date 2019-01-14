@@ -1,0 +1,95 @@
+#!/usr/bin/env nomsu -V6.14
+#
+    This is a tool to find syntax trees matching a pattern. "*" is a wildcard
+    that will match any subtree, and "**" is a wildcard that will match any
+    0 or more subtrees. "**" is greedy, so extra arguments after it will
+    not match.
+    
+    nomsu -t find [flags] "* squared" file1 file2...
+    
+    Flags:
+    -l  List only the names of the files with matches
+    --wildcard=<wildcard>  Specify a custom wildcard (in case you need to
+    match an action with a "*" in the name)
+    
+    Output:
+    <filename>:<line number>:
+    <matching lines>
+    
+use "filesystem"
+use "consolecolor"
+use "commandline"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+command line program with $args:
+    $wildcard = ($args.wildcard or "%*")
+    $pattern = $args.extras.1
+    if (any of [not $pattern, $pattern == "*", $pattern == "**"]):
+        usage ("
+            nomsu -t find [-l] [--wildcard=<wildcard>] <pattern>, where <pattern> is valid Nomsu code
+        ")
+    $pattern = ($pattern, with "\$wildcard\$wildcard" -> "$multi_wildcard")
+    $pattern = ($pattern, with $wildcard -> "$wildcard")
+    $pattern_tree = ($pattern parsed)
+    ($tree matches $patt) means:
+        when:
+            (not ($tree is syntax tree)): return (no)
+            (($patt.type == "Var") and ($patt.1 == "wildcard")): return (yes)
+            ($tree.type != $patt.type): return (no)
+            ($tree.type == "Action"):
+                if (($tree, get stub) != ($patt, get stub)): return (no)
+        
+        for $ in 1 to (#$patt):
+            if ($patt.$ is syntax tree):
+                if ($patt.$ == \$multi_wildcard): return (yes)
+                unless ($tree.$ matches $patt.$): return (no)
+            ..else:
+                unless ($tree.$ == $patt.$): return (no)
+        
+        if ((#$tree) != (#$patt)): return (no)
+        return (yes)
+    $filenames = ($args.extras, from 2 to -1)
+    if ((#$filenames) == 0):
+        say ("
+            Warning: searching stdin (ctrl-d to abort). To avoid this message, use nomsu -t find -
+        ")
+        $filenames = ["stdin"]
+
+    for $filename in $filenames:
+        $file = (read file $filename)
+        unless $file:
+            fail "File does not exist: \$filename"
+        $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
+        try:
+            $tree = ($code parsed)
+        ..if it fails $msg:
+            say
+                red ("
+                    \$filename failed to parse:
+                    \$msg
+                ")
+            $tree = (nil)
+        
+        unless $tree:
+            do next $filename
+        
+        $results = []
+        for $t in recursive $tree:
+            if ($t matches $pattern_tree):
+                $line_num = ($file, line number at $t.source.start)
+                $results, add {
+                    .line = $line_num, .text = "\(blue "\$filename:\$line_num:")\n\(source lines of $t)"
+                }
+            
+            for $sub in $t:
+                if ($sub is syntax tree):
+                    recurse $t on $sub
+        
+        if $args.l:
+            if ((#$results) > 0):
+                say $filename
+        ..else:
+            sort $results by $ -> $.line
+            for $ in $results:
+                say $.text

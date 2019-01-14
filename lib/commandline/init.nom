@@ -1,0 +1,11 @@
+#
+    A library defining some command line program functionality
+
+(command line program with $args $body) parses as:
+    externally (run with $args) means $body
+    if (this file was run directly):
+        run with (the command line arguments)
+
+externally (usage $) means:
+    say "Usage: \$"
+    exit 1

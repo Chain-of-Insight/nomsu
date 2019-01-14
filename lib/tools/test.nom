@@ -1,0 +1,65 @@
+#!/usr/bin/env nomsu -V6.14
+#
+    Tool to run all tests in a file (i.e. the code block inside a call to 'test $'). Usage:
+    nomsu tools/test.nom file1 file2 directory1 ...
+    
+use "filesystem"
+use "consolecolor"
+use "commandline"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+command line program with $args:
+    for $filename in $args.extras at $i:
+        $file = (read file $filename)
+        unless $file:
+            fail "Couldn't find \$filename"
+
+        $(test environment) = (new environment)
+        $(test environment), export $filename
+        $version =
+            $file, matching ("
+                #![^
+                ]* nomsu %-V[ ]*([^
+                ]*)
+            ")
+        $file_tests = []
+        for $src = $test in $(test environment).TESTS:
+            if $version:
+                $test = ("
+                    #!/usr/bin/env nomsu -V\$version
+                    \$test
+                ")
+            $file_tests, add {.test = $test, .source = $src}
+        
+        unless ($file_tests is empty):
+            sort $file_tests by $ -> $.source
+            say "[ .. ] \$filename" inline
+            $io.flush()
+            
+            if $args.v: say ""
+            
+            $failures = []
+            for $ in $file_tests:
+                if $args.v:
+                    say "    \(yellow ($.test, with "\n" -> "\n    "))"
+                try:
+                    $(test environment), run $.test
+                ..if it fails with $msg:
+                    $src = ($Source, from string $.source)
+                    $l1 = ($file, line number at $src.start)
+                    $l2 = ($file, line number at $src.stop)
+                    $failures, add "\(yellow "\($src.filename):\($l1)-\$l2:")\n\(bright (red ($msg, indented)))"
+            
+            if ($failures is empty):
+                if $args.v:
+                    say (green "PASS")
+                ..else:
+                    say "\r[\(green "PASS")"
+            ..else:
+                if $args.v:
+                    say (red (bright "FAIL"))
+                ..else:
+                    say "\r[\(red (bright "FAIL"))"
+                say "\($failures, joined with "\n", indented)"
+

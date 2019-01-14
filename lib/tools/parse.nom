@@ -3,7 +3,8 @@
     Tool to print out a parse tree of files in an easy-to-read format. Usage:
     nomsu tools/parse.nom file1 file2 directory1 ...        
     
-use "lib/os"
+use "filesystem"
+use "commandline"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -36,10 +37,11 @@ externally (print tree $t at indent $indent) means:
                     else:
                         say "\$indent  \(quote $arg)"
 
-for $filename in $(COMMAND LINE ARGS).extras:
-    $file = (read file $filename)
-    unless $file:
-        fail "File does not exist: \$filename"
-    $nomsu = (NomsuCode from (Source $filename 1 (size of $file)) $file)
-    $tree = ($nomsu parsed)
-    print tree $tree at indent ""
+command line program with $args:
+    for $filename in $args.extras:
+        $file = (read file $filename)
+        unless $file:
+            fail "File does not exist: \$filename"
+        $nomsu = (NomsuCode from (Source $filename 1 (size of $file)) $file)
+        $tree = ($nomsu parsed)
+        print tree $tree at indent ""

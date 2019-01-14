@@ -36,7 +36,7 @@ test:
         assume (($d, bark) == "Bark!")
     
     a (Corgi) is a thing:
-        $it [set up, gets pissed off] like a (Dog)
+        $it can [set up, gets pissed off] like a (Dog)
         ($it, as text) means "Dogloaf \{: for $k = $v in $it: add $k = $v}"
         ($its, sploot) means "sploooot"
         [($its, bark), ($its, woof)] all mean:

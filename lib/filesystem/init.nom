@@ -1,25 +1,12 @@
 #!/usr/bin/env nomsu -V6.14
 #
-    This file defines some actions that interact with the operating system and filesystem.
+    This file defines some actions that interact with the filesystem.
     
 externally (files for $path) means:
     $files = (=lua "Files.list(\$path)")
     if $files:
         $files = (List $files)
     return $files
-
-externally (=sh $cmd) means:
-    lua> ("
-        local result = io.popen(\$cmd)
-        local contents = result:read("*a")
-        result:close()
-        return contents
-    ")
-
-external $(sh> $) = $os.execute
-
-test:
-    read file "lib/os.nom"
 
 external $(read file $filename) = $Files.read
 externally [

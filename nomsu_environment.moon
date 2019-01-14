@@ -34,9 +34,15 @@ for version=1,999
 {:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
 {:compile, :compile_error} = require('nomsu_compiler')
 _currently_running_files = List{} -- Used to check for circular imports in run_file_1_in
-local nomsu_environment
 _module_imports = {}
-nomsu_environment = setmetatable({
+_importer_mt = {__index: (k)=> _module_imports[@][k]}
+Importer = (t, imports)->
+    _module_imports[t] = imports or {}
+    t._IMPORTS = _module_imports[t]
+    return setmetatable(t, _importer_mt)
+
+local nomsu_environment
+nomsu_environment = Importer{
     NOMSU_COMPILER_VERSION: 13, NOMSU_SYNTAX_VERSION: max_parser_version
     -- Lua stuff:
     :next, unpack: unpack or table.unpack, :setmetatable, :rawequal, :getmetatable, :pcall,
@@ -118,7 +124,6 @@ nomsu_environment = setmetatable({
             error("Circular import detected:\n           "..circle\joined_with("\n..imports  "))
         mod = @new_environment!
         mod.MODULE_NAME = package_name
-        mod.TESTS = Dict{}
         code = Files.read(path)
         if path\match("%.lua$")
             code = LuaCode\from(Source(path, 1, #code), code)
@@ -136,16 +141,31 @@ nomsu_environment = setmetatable({
         imports = assert _module_imports[@]
         for k,v in pairs(mod)
             imports[k] = v
+        cr_imports = assert _module_imports[@COMPILE_RULES]
+        for k,v in pairs(mod.COMPILE_RULES)
+            cr_imports[k] = v
         return mod
 
     export: (package_name)=>
         mod = @load_module(package_name)
         imports = assert _module_imports[@]
         for k,v in pairs(_module_imports[mod])
-            imports[k] = v
+            if rawget(imports, k) == nil
+                imports[k] = v
         for k,v in pairs(mod)
-            if k != "_G" and k != "_ENV"
+            if rawget(@, k) == nil
+                --if k != "_G" and k != "_ENV" and k != "COMPILE_RULES" and k != "MODULE_NAME"
                 @[k] = v
+        cr_imports = assert _module_imports[@COMPILE_RULES]
+        for k,v in pairs(_module_imports[mod.COMPILE_RULES])
+            if rawget(cr_imports, k) == nil
+                cr_imports[k] = v
+        for k,v in pairs(mod.COMPILE_RULES)
+            if rawget(@COMPILE_RULES, k) == nil
+                @COMPILE_RULES[k] = v
+        for k,v in pairs(mod.TESTS)
+            if rawget(@TESTS, k) == nil
+                @TESTS[k] = v
         return mod
 
     run: (to_run)=>
@@ -179,7 +199,7 @@ nomsu_environment = setmetatable({
             -- If you replace tostring(source) with "nil", source mapping won't happen
             run_lua_fn, err = load(lua_string, tostring(source), "t", @)
             if not run_lua_fn
-                lines =[("%3d|%s")\format(i,line) for i, line in ipairs Files.get_lines(lua_string)]
+                lines =[("%3d|%s")\format(i,line) for i, line in ipairs lua_string\lines!]
                 line_numbered_lua = table.concat(lines, "\n")
                 error("Failed to compile generated code:\n\027[1;34m#{line_numbered_lua}\027[0m\n\n#{err}", 0)
             source_key = tostring(source)
@@ -210,19 +230,18 @@ nomsu_environment = setmetatable({
             error("Attempt to run unknown thing: "..tostring(to_run))
 
     new_environment: ->
-        env = {}
-        _module_imports[env] = {k,v for k,v in pairs(nomsu_environment)}
+        env = Importer({}, {k,v for k,v in pairs(nomsu_environment)})
         env._ENV = env
         env._G = env
-        setmetatable(env, getmetatable(nomsu_environment))
+        env.TESTS = Dict{}
+        env.COMPILE_RULES = Importer({}, {k,v for k,v in pairs(nomsu_environment.COMPILE_RULES)})
         return env
-}, {
-    __index: (k)=> _module_imports[@][k]
-})
+}
+
 nomsu_environment._ENV = nomsu_environment
 nomsu_environment._G = nomsu_environment
-nomsu_environment.COMPILE_RULES = require('bootstrap')
-_module_imports[nomsu_environment] = {}
+nomsu_environment.COMPILE_RULES = Importer(require('bootstrap'))
+nomsu_environment.MODULE_NAME = "nomsu"
 
 -- Hacky use of globals:
 export SOURCE_MAP

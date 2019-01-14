@@ -1,6 +1,6 @@
 -- This file contains the logic for making nicer error messages
-files = require "files"
 debug_getinfo = debug.getinfo
+Files = require "files"
 export SOURCE_MAP
 
 RED = "\027[31m"
@@ -78,7 +78,6 @@ print_error = (error_message, start_fn, stop_fn)->
             if not filename
                 filename,start = calling_fn.source\match('@([^[]*)%[([0-9]+)]')
             assert(filename)
-            file = files.read(filename)
             -- TODO: get name properly
             name = if calling_fn.name
                 if tmp = calling_fn.name\match("^A_([a-zA-Z0-9_]*)$")
@@ -86,14 +85,14 @@ print_error = (error_message, start_fn, stop_fn)->
                 else "action '#{calling_fn.name}'"
             else "main chunk"
 
-            if err_line = files.get_line(file, calling_fn.currentline)
+            file = Files.read(filename)
+            lines = file and file\lines! or {}
+            if err_line = lines[calling_fn.currentline]
                 offending_statement = "#{BRIGHT_RED}#{err_line\match("^[ ]*(.*)")}#{RESET}"
                 line = "#{YELLOW}#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}#{RESET}"
             else
                 line = "#{YELLOW}#{filename}:#{calling_fn.currentline} in #{name}#{RESET}"
         else
-            ok, file = pcall ->files.read(calling_fn.short_src)
-            if not ok then file = nil
             local line_num
             if name == nil
                 search_level = level
@@ -117,6 +116,10 @@ print_error = (error_message, start_fn, stop_fn)->
                                 name = "upvalue '#{varname}'"
                                 if not varname\match("%(")
                                     break
+
+            local file, lines
+            if file = Files.read(calling_fn.short_src)
+                lines = file\lines!
             
             if file and (calling_fn.short_src\match("%.moon$") or file\match("^#![^\n]*moon\n")) and type(MOON_SOURCE_MAP[file]) == 'table'
                 char = MOON_SOURCE_MAP[file][calling_fn.currentline]
@@ -131,7 +134,7 @@ print_error = (error_message, start_fn, stop_fn)->
                     line = "#{BLUE}#{calling_fn.short_src}:#{calling_fn.currentline} in #{name or '?'}#{RESET}"
 
             if file
-                if err_line = files.get_line(file, line_num)
+                if err_line = lines[line_num]
                     offending_statement = "#{BRIGHT_RED}#{err_line\match("^[ ]*(.*)$")}#{RESET}"
                     line ..= "\n        "..offending_statement
         io.stderr\write(line,"\n")

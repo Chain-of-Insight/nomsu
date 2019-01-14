@@ -134,11 +134,4 @@ Files.get_line = (str, line_no)->
     return unless stop
     return (str\sub(start, stop - 2))
 
-get_lines = re.compile([[
-    lines <- {| line (%nl line)* |}
-    line <- {[^%nl]*}
-]], nl:lpeg.P("\r")^-1 * lpeg.P("\n"))
-
-Files.get_lines = (str)-> get_lines\match(str)
-
 return Files

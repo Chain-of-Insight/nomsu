@@ -51,6 +51,9 @@ string2 = {
             lines[#lines+1] = line
         return table.concat(lines, "\n")
 
+    indented: (indent="    ")=>
+        indent..(gsub(@, "\n", "\n"..indent))
+
     as_lua: =>
         escaped = gsub(@, "\\", "\\\\")
         escaped = gsub(escaped, "\n", "\\n")
