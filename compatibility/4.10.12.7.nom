@@ -77,8 +77,7 @@ upgrade $tree to "4.10.12.7" as:
             $chunk2.($j - $i + 1) = $first_chunk.$j
         
         $new_tree =
-            SyntaxTree
-                {.source = $tree.source, .type = "FileChunks", .1 = $chunk1, .2 = $chunk2}
+            SyntaxTree {.source = $tree.source, .type = "FileChunks"} $chunk1 $chunk2
         
         for $i in 2 to (size of $tree):
             $new_tree.($i + 1) = $tree.$i

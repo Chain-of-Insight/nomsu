@@ -27,8 +27,7 @@ upgrade action "set" to "4.11" via
             $rhs.$i = $entry.2
         
         return
-            SyntaxTree
-                {.type = "Action", .source = $tree.source, .1 = $lhs, .2 = "=", .3 = $rhs}
+            SyntaxTree {.type = "Action", .source = $tree.source} $lhs "=" $rhs
 
 upgrade action "1 with 2 ~>" to "4.11" via
     for $tree:

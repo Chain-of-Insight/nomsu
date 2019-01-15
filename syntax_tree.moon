@@ -111,10 +111,12 @@ class SyntaxTree
 
 SyntaxTree.__base.__type = "Syntax Tree"
 
-getmetatable(SyntaxTree).__call = (t)=>
+getmetatable(SyntaxTree).__call = (t, ...)=>
     if type(t.source) == 'string'
         t.source = Source\from_string(t.source)
     setmetatable(t, @__base)
+    for i=1,select("#", ...)
+        t[i] = select(i, ...)
     if t.type == 'Action'
         t.stub = t\get_stub!
     return t

@@ -85,7 +85,7 @@ test:
     set global x local y
     unless (($foozle == "inner") and ($y == "outer")): fail "external failed."
 (external $var = $value) compiles to:
-    $lua = ((SyntaxTree {.type = "Action", .source = $var.source, .1 = $var, .2 = "=", .3 = $value}) as lua)
+    $lua = ((SyntaxTree {.type = "Action", .source = $var.source} $var "=" $value) as lua)
     $lua, remove free vars
     return $lua
 test:

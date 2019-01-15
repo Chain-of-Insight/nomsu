@@ -225,11 +225,14 @@ do
   SyntaxTree = _class_0
 end
 SyntaxTree.__base.__type = "Syntax Tree"
-getmetatable(SyntaxTree).__call = function(self, t)
+getmetatable(SyntaxTree).__call = function(self, t, ...)
   if type(t.source) == 'string' then
     t.source = Source:from_string(t.source)
   end
   setmetatable(t, self.__base)
+  for i = 1, select("#", ...) do
+    t[i] = select(i, ...)
+  end
   if t.type == 'Action' then
     t.stub = t:get_stub()
   end

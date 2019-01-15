@@ -1,3 +1,4 @@
+#!/usr/bin/env nomsu -V6.14.13.8
 # Export everything
 export "core/metaprogramming"
 export "core/operators"
