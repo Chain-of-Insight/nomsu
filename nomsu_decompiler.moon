@@ -56,7 +56,7 @@ tree_to_inline_nomsu = (tree)->
                             arg_nomsu\parenthesize!
                     nomsu\add arg_nomsu
             if num_args == 1 and num_words == 0
-                nomsu\append "()"
+                nomsu\add "()"
             return nomsu
 
         when "MethodCall"
@@ -321,8 +321,8 @@ tree_to_nomsu = (tree)->
 
             if num_args == 1 and num_words == 0
                 if next_space != " "
-                    nomsu\append next_space
-                nomsu\append "()"
+                    nomsu\add next_space
+                nomsu\add "()"
             return nomsu
 
         when "MethodCall"
@@ -356,8 +356,7 @@ tree_to_nomsu = (tree)->
                     -- multi-line non-comments, or if a comment comes after a non-comment,
                     -- or if the last line starts with ".."
                     if tree[i-1].type != "Comment"
-                        needs_space[i] = ((line_nomsu\is_multiline! and prev_line\is_multiline!) or
-                            prev_line\text!\match("%.%.[^\n]*$"))
+                        needs_space[i] = (line_nomsu\is_multiline! and prev_line\is_multiline!)
                         if tree[i].type == "Comment" or needs_space[i] or needs_space[i-1]
                             nomsu\add "\n"
                 nomsu\add line_nomsu
@@ -450,7 +449,7 @@ tree_to_nomsu = (tree)->
                     item_nomsu = tree_to_inline_nomsu(item)
                     if nomsu\trailing_line_len! + #item_nomsu\text! > MAX_LINE
                         sep = '\n' if i > 1
-                        item_nomsu = tree_to_nomsu(item)
+                        item_nomsu = item.type == "Action" and tree_to_nomsu(item) or recurse(item)
                 nomsu\add sep
                 nomsu\add item_nomsu
                 if item_nomsu\is_multiline! or item.type == 'Comment' or item.type == "Block" or

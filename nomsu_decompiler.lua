@@ -85,7 +85,7 @@ tree_to_inline_nomsu = function(tree)
       end
     end
     if num_args == 1 and num_words == 0 then
-      nomsu:append("()")
+      nomsu:add("()")
     end
     return nomsu
   elseif "MethodCall" == _exp_0 then
@@ -432,9 +432,9 @@ tree_to_nomsu = function(tree)
     end
     if num_args == 1 and num_words == 0 then
       if next_space ~= " " then
-        nomsu:append(next_space)
+        nomsu:add(next_space)
       end
-      nomsu:append("()")
+      nomsu:add("()")
     end
     return nomsu
   elseif "MethodCall" == _exp_0 then
@@ -469,7 +469,7 @@ tree_to_nomsu = function(tree)
       if i > 1 then
         nomsu:add("\n")
         if tree[i - 1].type ~= "Comment" then
-          needs_space[i] = ((line_nomsu:is_multiline() and prev_line:is_multiline()) or prev_line:text():match("%.%.[^\n]*$"))
+          needs_space[i] = (line_nomsu:is_multiline() and prev_line:is_multiline())
           if tree[i].type == "Comment" or needs_space[i] or needs_space[i - 1] then
             nomsu:add("\n")
           end
@@ -590,7 +590,7 @@ tree_to_nomsu = function(tree)
           if i > 1 then
             sep = '\n'
           end
-          item_nomsu = tree_to_nomsu(item)
+          item_nomsu = item.type == "Action" and tree_to_nomsu(item) or recurse(item)
         end
       end
       nomsu:add(sep)
