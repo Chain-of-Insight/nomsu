@@ -93,7 +93,7 @@ command line program with $args:
         $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
         try:
             $tree = ($code parsed)
-        ..if it fails $msg:
+        ..if it fails with $msg:
             if $args.q:
                 unless $args.i: say $code
             ..else:

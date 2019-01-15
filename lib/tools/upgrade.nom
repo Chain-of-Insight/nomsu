@@ -15,6 +15,11 @@ use "commandline"
 command line program with $args:
     $inplace = ($args.i or $args.inplace)
     $start_version = $args."upgrade-from"
+    if $start_version:
+        try:
+            use $start_version
+        ..if it fails:
+            fail "Could not find upgrade rules for \$start_version"
     $version = ($args."upgrade-to" or (Nomsu version))
     $test = ($args.t or $args.test)
     for $filename in $args.extras:
