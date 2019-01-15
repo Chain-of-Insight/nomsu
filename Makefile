@@ -20,7 +20,9 @@ LUA_FILES= code_obj.lua error_handling.lua files.lua nomsu.lua nomsu_compiler.lu
 CORE_NOM_FILES=$(shell cat lib/core/init.nom | sed -n 's;export "\(.*\)";lib/\1.nom;p') lib/core/init.nom
 CORE_LUA_FILES= $(patsubst %.nom,%.lua, $(CORE_NOM_FILES))
 COMPAT_NOM_FILES=$(wildcard lib/compatibility/*.nom)
+COMPAT_LUA_FILES= $(patsubst %.nom,%.lua, $(COMPAT_NOM_FILES))
 TOOL_NOM_FILES= $(wildcard lib/tools/*.nom)
+TOOL_LUA_FILES= $(patsubst %.nom,%.lua, $(TOOL_NOM_FILES))
 LIB_NOM_FILES= $(wildcard lib/*.nom) $(filter-out $(CORE_NOM_FILES) $(TOOL_NOM_FILES) $(COMPAT_NOM_FILES), $(wildcard lib/*/*.nom))
 LIB_LUA_FILES= $(patsubst %.nom,%.lua, $(LIB_NOM_FILES))
 PEG_FILES= $(wildcard nomsu.*.peg)
@@ -50,13 +52,16 @@ lua: $(LUA_FILES)
 .PHONY: optimize
 optimize: lua $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
+.PHONY: optimize_extra
+optimize_extra: lua $(COMPAT_LUA_FILES) $(TOOL_LUA_FILES)
+
 .PHONY: clean
 clean:
 	@echo "\033[1mDeleting...\033[0m"
 	@rm -rvf version lib/*.lua lib/*/*.lua
 
 .PHONY: install
-install: lua version optimize
+install: lua version optimize optimize_extra
 	@prefix="$(PREFIX)"; \
 	if [[ ! $$prefix ]]; then \
 		read -p $$'\033[1mWhere do you want to install Nomsu? (default: /usr/local) \033[0m' prefix; \
