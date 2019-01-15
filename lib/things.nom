@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     A library for simple object oriented programming.
     
@@ -91,67 +91,70 @@ $METAMETHOD_MAP = {
 }
 
 $($ as text like a dict) = ({}'s metatable).__tostring
-externally (a class named $classname with $members $(initialize $)) means:
-    $class = {.__type = $classname}
-    $class.__index = $class
-    $class.class = $class
-    $class.__tostring = ($ -> "\($.__type) \($ as text like a dict)")
-    $class.__eq = ({}'s metatable).__eq
-    $class.__len = ({}'s metatable).__len
-    if $members:
-        $class.__members = $members
-        $class.__newindex =
-            for ($its $key = $value):
-                if $members.$key:
-                    rawset $its $key $value
-                ..else:
-                    fail "Cannot set \$key, it's not one of the allowed member fields."
+external:
+    (a class named $classname with $members $(initialize $)) means:
+        $class = {.__type = $classname}
+        $class.__index = $class
+        $class.class = $class
+        $class.__tostring = ($ -> "\($.__type) \($ as text like a dict)")
+        $class.__eq = ({}'s metatable).__eq
+        $class.__len = ({}'s metatable).__len
+        if $members:
+            $class.__members = $members
+            $class.__newindex =
+                for ($its $key = $value):
+                    if $members.$key:
+                        rawset $its $key $value
+                    ..else:
+                        fail "Cannot set \$key, it's not one of the allowed member fields."
+        
+        set $class's metatable to {
+            .__tostring = ($class -> $class.__type)
+            .__call =
+                for ($class with $initial_values):
+                    if ($initial_values == (nil)): return $class
+                    set $initial_values's metatable to $class
+                    if $initial_values.set_up:
+                        $initial_values, set up
+                    return $initial_values
+        }
+        
+        if $(initialize $):
+            initialize $class
+            for $stub = $metamethod in $METAMETHOD_MAP:
+                if $class.($stub, as lua id):
+                    $class.$metamethod = $class.($stub, as lua id)
+        
+        return $class
     
-    set $class's metatable to {
-        .__tostring = ($class -> $class.__type)
-        .__call =
-            for ($class with $initial_values):
-                if ($initial_values == (nil)): return $class
-                set $initial_values's metatable to $class
-                if $initial_values.set_up:
-                    $initial_values, set up
-                return $initial_values
-    }
+    [
+        a $classname is a thing with $members $class_body
+        an $classname is a thing with $members $class_body
+    ] all compile to:
+        $class_id = ($classname.stub, as lua id)
+        if $class_body:
+            $body_lua = ($class_body as lua)
+            $body_lua, remove free vars [$class_id]
+            $body_lua, declare locals
+        
+        $lua =
+            Lua ("
+                \$class_id = a_class_named_1_with(\(quote $classname.stub), \($members as lua)\(
+                    (
+                        Lua ("
+                            , function(\$class_id)
+                                local it, its = \$class_id, \$class_id;
+                                \$body_lua
+                            end
+                        ")
+                    ) if $class_body else ""
+                ))
+                a_\$class_id = function(initial_values) return \($classname.stub, as lua id)(initial_values or {}) end
+                an_\$class_id, a_\($class_id)_with, an_\($class_id)_with = a_\$class_id, a_\$class_id, a_\$class_id
+            ")
+        
+        $lua, add free vars [$class_id, "a_\$class_id", "an_\$class_id"]
+        return $lua
     
-    if $(initialize $):
-        initialize $class
-        for $stub = $metamethod in $METAMETHOD_MAP:
-            if $class.($stub, as lua id):
-                $class.$metamethod = $class.($stub, as lua id)
-    
-    return $class
-
-[
-    a $classname is a thing with $members $class_body
-    an $classname is a thing with $members $class_body
-] all compile to:
-    $class_id = ($classname.stub, as lua id)
-    if $class_body:
-        $body_lua = ($class_body as lua)
-        $body_lua, remove free vars [$class_id]
-        $body_lua, declare locals
-    
-    return
-        Lua ("
-            \$class_id = a_class_named_1_with(\(quote $classname.stub), \($members as lua)\(
-                (
-                    Lua ("
-                        , function(\$class_id)
-                            local it, its = \$class_id, \$class_id;
-                            \$body_lua
-                        end
-                    ")
-                ) if $class_body else ""
-            ))
-            a_\$class_id = function(initial_values) return \($classname.stub, as lua id)(initial_values \
-            ..or {}) end
-            an_\$class_id, a_\($class_id)_with, an_\($class_id)_with = a_\$class_id, a_\$class_id, a_\$class_id
-        ")
-
-[a $classname is a thing $class_body, an $classname is a thing] all parse as
-    a $classname is a thing with (nil) $class_body
+    [a $classname is a thing $class_body, an $classname is a thing] all parse as
+        a $classname is a thing with (nil) $class_body

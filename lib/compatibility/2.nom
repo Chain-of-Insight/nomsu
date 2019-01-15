@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file defines upgrades from Nomsu 1 to Nomsu 2
     
@@ -24,8 +24,8 @@ upgrade $tree to "2" as:
     $need_blocks = [
         "if", "unless", "for 1 in", "for 1 = 2 in", "repeat while 1", "repeat 1 times"
         "repeat", "repeat until 1", "for 1 in 2 to 3 by", "for 1 in 2 to 3 via"
-        "for 1 in 2 to", "for 1 2 in", "do", "for 1 in recursive", "test", "with", "result of"
-        "when"
+        "for 1 in 2 to", "for 1 2 in", "do", "for 1 in recursive", "test", "with"
+        "result of", "when"
     ]
     
     for $n in $need_blocks:

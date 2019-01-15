@@ -1,9 +1,9 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
     
-lua> "NOMSU_CORE_VERSION = 14"
+lua> "NOMSU_CORE_VERSION = 15"
 lua> "NOMSU_LIB_VERSION = 8"
 lua> ("
     do
@@ -25,8 +25,7 @@ lua> ("
     COMPILE_RULES["1 ->"] = function(\(nomsu environment), \$args, \$body)
         if \$args and not \$body then \$args, \$body = {}, \$args end
         local body_lua = SyntaxTree:is_instance(\$body) and \(nomsu environment):compile(\$body) or \$body
-        if SyntaxTree:is_instance(\$body) and \$body.type ~= "Block" then body_lua:prepend("\
-    ..return ") end
+        if SyntaxTree:is_instance(\$body) and \$body.type ~= "Block" then body_lua:prepend("return ") end
         local lua = LuaCode("(function(")
         if SyntaxTree:is_instance(\$args) and (\$args.type == "Action" or \$args.type == "MethodCall") then
             \$args = \$args:get_args()
@@ -41,8 +40,7 @@ lua> ("
                 end
             elseif not arg_lua:is_lua_id() then
                 compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
-                    "This does not compile to a Lua identifier, so it can't be used as a function \
-    ..argument.",
+                    "This does not compile to a Lua identifier, so it can't be used as a function argument.",
                     "This should probably be a Nomsu variable instead (like $x).")
             end
             lua:add(i > 1 and ", " or "", arg_lua)
@@ -186,26 +184,40 @@ test:
     ")
 
 test:
-    externally (baz1) means:
-        return "baz1"
-    externally (baz2) means "baz2"
+    $loc = 99
+    external ($glob = 99)
 
 test:
-    assume ((baz1) == "baz1")
-    assume ((baz2) == "baz2")
+    assume $loc == (nil)
+    assume $glob == 99
 
-(externally $action means $body) compiles to:
+(external $body) compiles to:
     lua> ("
-        local lua = \(\($action means $body) as lua)
-        lua:remove_free_vars({\$action:get_stub():as_lua_id()})
+        local lua = \($body as lua)
+        lua:remove_free_vars()
         return lua
     ")
 
-(externally $actions all mean $body) compiles to:
+test:
+    [$x, $y] = ["outer", "outer"]
+    external:
+        (set external x local y) means:
+            with external [$x]:
+                $x = "inner"
+                $y = "inner"
+    set external x local y
+    unless (($x == "inner") and ($y == "outer")):
+        fail "'with external' failed."
+
+(with external $externals $body) compiles to:
     lua> ("
-        local lua = \(\($actions all mean $body) as lua)
-        lua:remove_free_vars(table.map(\$actions, function(a) return a:get_stub():as_lua_id() end))
-        return lua
+        local body_lua = \($body as lua)
+        local varnames = {}
+        for i,\$v in ipairs(\$externals) do
+            varnames[i] = \($v as lua):text()
+        end
+        body_lua:remove_free_vars(varnames)
+        return body_lua
     ")
 
 test:
@@ -239,8 +251,8 @@ test:
                 if replacements[t:as_var()] then
                     return replacements[t:as_var()]
                 else
-                    return "SyntaxTree{mangle("..t:as_var():as_lua().."), type="..t.type:as_lua()..", \
-        ..source="..tostring(t.source):as_lua().."}"
+                    return "SyntaxTree{mangle("..t:as_var():as_lua().."), type="..t.type:as_lua(\
+        ..)..", source="..tostring(t.source):as_lua().."}"
                 end
             elseif SyntaxTree:is_instance(t) then
                 local ret = {}
@@ -274,34 +286,37 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [$action parses as $body] all parse as ([$action] all parse as $body)
-externally (in (nomsu environment) $tree as lua expr) means:
-    lua> ("
-        local tree_lua = \(nomsu environment):compile(\$tree)
-        if \$tree.type == 'Block' then
-            tree_lua = LuaCode:from(\$tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
-        elseif \$tree.type == 'MethodCall' and #\$tree > 2 then
-            compile_error_at(\$tree, "This must be a single value instead of "..(#\$tree - 1).."\
-        .. method calls.",
-                "Replace this with a single method call.")
-        end
-        return tree_lua
-    ")
+external:
+    (in (nomsu environment) $tree as lua expr) means:
+        lua> ("
+            local tree_lua = \(nomsu environment):compile(\$tree)
+            if \$tree.type == 'Block' then
+                tree_lua = LuaCode:from(\$tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
+            elseif \$tree.type == 'MethodCall' and #\$tree > 2 then
+                compile_error_at(\$tree, "This must be a single value instead of "..(#\$tree - 1).."\
+            .. method calls.",
+                    "Replace this with a single method call.")
+            end
+            return tree_lua
+        ")
 
 # Need to make sure the proper environment is used for compilation (i.e. the caller's environment)
-($tree as lua expr) compiles to (\(in \(nomsu environment) $tree as lua expr) as lua)
+($tree as lua expr) compiles to
+    \(in \(nomsu environment) $tree as lua expr) as lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-externally [$var as lua identifier, $var as lua id] all mean:
-    lua> ("
-        local lua = \($var as lua)
-        if not lua:text():is_a_lua_id() then
-            compile_error(\$var,
-                "This is supposed to be something that compiles to a valid Lua identifier.",
-                "This should probably be a variable.")
-        end
-        return lua
-    ")
+external:
+    [$var as lua identifier, $var as lua id] all mean:
+        lua> ("
+            local lua = \($var as lua)
+            if not lua:text():is_a_lua_id() then
+                compile_error(\$var,
+                    "This is supposed to be something that compiles to a valid Lua identifier.",
+                    "This should probably be a variable.")
+            end
+            return lua
+        ")
 
 test:
     (num args (*extra arguments*)) means (select "#" (*extra arguments*))
@@ -312,11 +327,10 @@ test:
     assume (third arg 5 6 7 8) == 7
 
 (*extra arguments*) compiles to "..."
-
 ($ is syntax tree) compiles to "SyntaxTree:is_instance(\($ as lua expr))"
-
-externally ($ is $kind syntax tree) means
-    =lua "SyntaxTree:is_instance(\$) and \$.type == \$kind"
+external:
+    ($ is $kind syntax tree) means
+        =lua "SyntaxTree:is_instance(\$) and \$.type == \$kind"
 
 ($tree with $t -> $replacement) compiles to ("
     \($tree as lua expr):map(function(\($t as lua expr))
@@ -329,14 +343,15 @@ externally ($ is $kind syntax tree) means
     end)
 ")
 
-externally ($tree with vars $replacements) means
-    =lua ("
-        \$tree:map(function(\$t)
-            if \$t.type == "Var" then
-                return \$replacements[\$t:as_var()]
-            end
-        end)
-    ")
+external:
+    ($tree with vars $replacements) means
+        =lua ("
+            \$tree:map(function(\$t)
+                if \$t.type == "Var" then
+                    return \$replacements[\$t:as_var()]
+                end
+            end)
+        ")
 
 (tree $tree with vars $replacements) compiles to ("
     \(=lua "(\$tree):as_lua()"):map(function(t)
@@ -355,24 +370,25 @@ externally ($tree with vars $replacements) means
     end)()
 ")
 
-externally (match $tree with $patt) means:
-    lua> ("
-        if \$patt.type == "Var" then return Dict{[\$patt:as_var()]=\$tree} end
-        if \$patt.type == "Action" and \$patt:get_stub() ~= \$tree:get_stub() then return nil end
-        if #\$patt ~= #\$tree then return nil end
-        local matches = Dict{}
-        for \($i)=1,#\$patt do
-            if SyntaxTree:is_instance(\$tree[\$i]) then
-                local submatch = \(match $tree.$i with $patt.$i)
-                if not submatch then return nil end
-                for k,v in pairs(submatch) do
-                    if matches[k] and matches[k] ~= v then return nil end
-                    matches[k] = v
+external:
+    (match $tree with $patt) means:
+        lua> ("
+            if \$patt.type == "Var" then return Dict{[\$patt:as_var()]=\$tree} end
+            if \$patt.type == "Action" and \$patt:get_stub() ~= \$tree:get_stub() then return nil end
+            if #\$patt ~= #\$tree then return nil end
+            local matches = Dict{}
+            for \($i)=1,#\$patt do
+                if SyntaxTree:is_instance(\$tree[\$i]) then
+                    local submatch = \(match $tree.$i with $patt.$i)
+                    if not submatch then return nil end
+                    for k,v in pairs(submatch) do
+                        if matches[k] and matches[k] ~= v then return nil end
+                        matches[k] = v
+                    end
                 end
             end
-        end
-        return matches
-    ")
+            return matches
+        ")
 
 test:
     assume
@@ -390,20 +406,20 @@ test:
     assume ({} is a "Dict")
     assume ("" is text)
     assume ("" isn't a "Dict")
-externally ($ is text) means (=lua "\(lua type of $) == 'string'")
-externally [$ is not text, $ isn't text] all mean
-    =lua "\(lua type of $) ~= 'string'"
 
-externally (type of $) means:
-    lua> ("
-        local lua_type = \(lua type of $)
-        if lua_type == 'string' then return 'Text'
-        elseif lua_type == 'table' or lua_type == 'userdata' then
-            local mt = getmetatable(\$)
-            if mt and mt.__type then return mt.__type end
-        end
-        return lua_type
-    ")
+external:
+    ($ is text) means (=lua "\(lua type of $) == 'string'")
+    [$ is not text, $ isn't text] all mean (=lua "\(lua type of $) ~= 'string'")
+    (type of $) means:
+        lua> ("
+            local lua_type = \(lua type of $)
+            if lua_type == 'string' then return 'Text'
+            elseif lua_type == 'table' or lua_type == 'userdata' then
+                local mt = getmetatable(\$)
+                if mt and mt.__type then return mt.__type end
+            end
+            return lua_type
+        ")
 
 [$ is a $type, $ is an $type] all parse as ((type of $) == $type)
 [$ isn't a $type, $ isn't an $type, $ is not a $type, $ is not an $type]
@@ -441,19 +457,24 @@ test:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#
-    (with local compile actions $body) compiles to ("
-        do
-            local OLD_RULES = COMPILE_RULES
-            local OLD_ENV = \(nomsu environment)
-            local \(nomsu environment) = setmetatable({
-                COMPILE_RULES=setmetatable({}, {__index=OLD_RULES})
-            }, {__index=OLD_ENV})
-            \($body as lua)
-        end
+test:
+    using compile rules:
+        (yes) compiles to "3"
+        assume $(COMPILE RULES).yes
+    ..do:
+        assume (yes) == 3
+    assume (yes) == (=lua "true")
+
+(using compile rules $rules do $body) compiles to:
+    lua> ("
+        local env = \(new environment)
+        env:run(\$rules)
+        local lua = env:compile(\$body)
+        return lua
     ")
 
-externally (Nomsu version) means:
-    return ("
-        \(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)
-    ")
+external:
+    (Nomsu version) means:
+        return ("
+            \(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)
+        ")

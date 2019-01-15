@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     Tool to run all tests in a file (i.e. the code block inside a call to 'test $'). Usage:
     nomsu tools/test.nom file1 file2 directory1 ...
@@ -14,7 +14,6 @@ command line program with $args:
         $file = (read file $filename)
         unless $file:
             fail "Couldn't find \$filename"
-
         $(test environment) = (new environment)
         $(test environment), export $filename
         $version =
@@ -24,7 +23,7 @@ command line program with $args:
                 ]*)
             ")
         $file_tests = []
-        for $src = $test in $(test environment).TESTS:
+        for $src = $test in (nomsu environment, Module $filename).TESTS:
             if $version:
                 $test = ("
                     #!/usr/bin/env nomsu -V\$version
@@ -36,20 +35,22 @@ command line program with $args:
             sort $file_tests by $ -> $.source
             say "[ .. ] \$filename" inline
             $io.flush()
-            
             if $args.v: say ""
-            
             $failures = []
             for $ in $file_tests:
                 if $args.v:
                     say "    \(yellow ($.test, with "\n" -> "\n    "))"
+                
                 try:
                     $(test environment), run $.test
                 ..if it fails with $msg:
                     $src = ($Source, from string $.source)
                     $l1 = ($file, line number at $src.start)
                     $l2 = ($file, line number at $src.stop)
-                    $failures, add "\(yellow "\($src.filename):\($l1)-\$l2:")\n\(bright (red ($msg, indented)))"
+                    $failures, add ("
+                        \(yellow "\($src.filename):\($l1)-\$l2:")
+                        \(bright (red ($msg, indented)))
+                    ")
             
             if ($failures is empty):
                 if $args.v:
@@ -62,4 +63,3 @@ command line program with $args:
                 ..else:
                     say "\r[\(red (bright "FAIL"))"
                 say "\($failures, joined with "\n", indented)"
-

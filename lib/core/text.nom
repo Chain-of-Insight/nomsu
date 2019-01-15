@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
@@ -34,7 +34,6 @@ test:
             
         "), lines
     ..== ["one", "two", ""]
-    
     ($spec とは $body) parses as ($spec means $body)
 
 test:
@@ -61,16 +60,18 @@ test:
 test:
     assume (0xDEADBEEF as hex) == "0xDEADBEEF"
 
-externally ($num as hex) means:
-    if ($num < 0):
-        return ("-0x%X", formatted with (- $num))
-    ..else:
-        return ("0x%X", formatted with $num)
+external:
+    ($num as hex) means:
+        if ($num < 0):
+            return ("-0x%X", formatted with (- $num))
+        ..else:
+            return ("0x%X", formatted with $num)
 
 # Text literals
 $escapes = {
-    .nl = "\n", .newline = "\n", .tab = "\t", .bell = "\a", .cr = "\r", ."carriage return" = "\r"
-    .backspace = "\b", ."form feed" = "\f", .formfeed = "\f", ."vertical tab" = "\v"
+    .nl = "\n", .newline = "\n", .tab = "\t", .bell = "\a", .cr = "\r"
+    ."carriage return" = "\r", .backspace = "\b", ."form feed" = "\f"
+    .formfeed = "\f", ."vertical tab" = "\v"
 }
 
 for $name = $str in $escapes:

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file contains definitions of operators like "+" and "and".
     
@@ -78,34 +78,6 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    [$foozle, $y] = ["outer", "outer"]
-    externally (set global x local y) means:
-        external $foozle = "inner"
-        $y = "inner"
-    set global x local y
-    unless (($foozle == "inner") and ($y == "outer")): fail "external failed."
-(external $var = $value) compiles to:
-    $lua = ((SyntaxTree {.type = "Action", .source = $var.source} $var "=" $value) as lua)
-    $lua, remove free vars
-    return $lua
-test:
-    [$foozle, $y] = ["outer", "outer"]
-    externally (set global x local y) means:
-        with external [$foozle]:
-            $foozle = "inner"
-            $y = "inner"
-    set global x local y
-    unless (($foozle == "inner") and ($y == "outer")):
-        fail "'with external' failed."
-
-(with external $externs $body) compiles to:
-    $body_lua = ($body as lua)
-    lua> ("
-        \$body_lua:remove_free_vars(table.map(\$externs, function(v) return \(nomsu environment):compile(v):text() end))
-    ")
-    return $body_lua
-
-test:
     [$x, $y] = [1, 2]
     with [$z, $x = 999]:
         assume $z == (nil)
@@ -156,7 +128,8 @@ test:
 test:
     $calls = 0
     (one) means:
-        external $calls = ($calls + 1)
+        external:
+            $calls = ($calls + 1)
         return 1
     
     unless (0 <= (one) <= 2):

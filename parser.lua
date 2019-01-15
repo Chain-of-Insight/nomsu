@@ -96,7 +96,7 @@ make_parser = function(peg, make_tree)
       file = input
     }
     local tree = peg:match(input, nil, userdata)
-    if not tree then
+    if not tree or type(tree) == 'number' then
       error("File " .. tostring(filename) .. " failed to parse:\n" .. tostring(input))
     end
     return tree

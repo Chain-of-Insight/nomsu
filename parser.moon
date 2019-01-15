@@ -74,7 +74,7 @@ make_parser = (peg, make_tree=nil)->
             :filename, file:input
         }
         tree = peg\match(input, nil, userdata)
-        if not tree
+        if not tree or type(tree) == 'number'
             error "File #{filename} failed to parse:\n#{input}"
         return tree
 

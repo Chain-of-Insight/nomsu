@@ -1,12 +1,12 @@
 #
     This file defines some actions for running shell commands.
-
-externally (=sh $cmd) means:
-    lua> ("
-        local result = io.popen(\$cmd)
-        local contents = result:read("*a")
-        result:close()
-        return contents
-    ")
-
-external $(sh> $) = $os.execute
+    
+external:
+    (=sh $cmd) means:
+        lua> ("
+            local result = io.popen(\$cmd)
+            local contents = result:read("*a")
+            result:close()
+            return contents
+        ")
+    $(sh> $) = $os.execute

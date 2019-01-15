@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     Auto-format Nomsu code. Usage:
     nomsu -t format [-i] file1 file2...
@@ -19,7 +19,7 @@ command line program with $args:
             Warning: reading from stdin (ctrl-d to abort). To avoid this message, use nomsu -t format -
         ")
         $filenames = ["stdin"]
-
+    
     for $filename in $filenames:
         $file = (read file $filename)
         unless $file:

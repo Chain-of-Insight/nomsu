@@ -147,7 +147,7 @@ tree_to_inline_nomsu = (tree)->
             target = tree[1]
             target_nomsu = tree_to_inline_nomsu(target)
             switch target.type
-                when "Action", "MethodCall"
+                when "Action", "MethodCall", "EscapedNomsu"
                     target_nomsu\parenthesize!
                 when "Number"
                     target_nomsu\parenthesize! if target_nomsu\text!\match("%.")
@@ -381,9 +381,9 @@ tree_to_nomsu = (tree)->
                             while #line > 0
                                 space = max_line - nomsu\trailing_line_len!
                                 split = find(line, "[%p%s]", space)
-                                if not split or split > space + 10
-                                    split = space + 10
-                                if #line - split < 10
+                                if not split or split > space + 16
+                                    split = space + 16
+                                if #line - split < 16
                                     split = #line
                                 bite, line = sub(line, 1, split), sub(line, split+1, -1)
                                 nomsu\add bite

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -466,6 +466,7 @@ test:
 # Recurion control flow
 (recurse $v on $x) compiles to
     Lua "table.insert(_stack_\($v as lua expr), \($x as lua expr))"
+
 (for $var in recursive $structure $body) compiles to:
     $lua =
         Lua ("

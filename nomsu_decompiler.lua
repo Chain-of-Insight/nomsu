@@ -193,7 +193,7 @@ tree_to_inline_nomsu = function(tree)
     local target = tree[1]
     local target_nomsu = tree_to_inline_nomsu(target)
     local _exp_1 = target.type
-    if "Action" == _exp_1 or "MethodCall" == _exp_1 then
+    if "Action" == _exp_1 or "MethodCall" == _exp_1 or "EscapedNomsu" == _exp_1 then
       target_nomsu:parenthesize()
     elseif "Number" == _exp_1 then
       if target_nomsu:text():match("%.") then
@@ -498,10 +498,10 @@ tree_to_nomsu = function(tree)
             while #line > 0 do
               local space = max_line - nomsu:trailing_line_len()
               local split = find(line, "[%p%s]", space)
-              if not split or split > space + 10 then
-                split = space + 10
+              if not split or split > space + 16 then
+                split = space + 16
               end
-              if #line - split < 10 then
+              if #line - split < 16 then
                 split = #line
               end
               local bite

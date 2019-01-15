@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This is a tool to replace syntax trees with something new.
     
@@ -34,10 +34,10 @@ command line program with $args:
     if $args.literal:
         for $var in ($args.literal, all matches of "$([^ ]*)"):
             $literal_vars.$var = (yes)
-
+    
     if (($pattern_tree.type == "Var") and (not $literal_vars.($pattern_tree.1))):
         fail "Pattern matches every part of the file."
-
+    
     $pattern_vars = {
         : for $ in recursive $pattern_tree:
             if (($.type == "Var") and (not $literal_vars.($.1))): add $.1
@@ -45,7 +45,7 @@ command line program with $args:
                 if ($child is a "Syntax Tree"):
                     recurse $ on $child
     }
-
+    
     # TODO: support wildcards and unpacking
         e.g. nomsu -t replace "test(: $test; *$more_tests)" "*$more_tests; *$test"
     ($tree matches $patt with $substitution_values) means:
@@ -85,7 +85,7 @@ command line program with $args:
             Warning: searching stdin (ctrl-d to abort). To avoid this message, use nomsu -t find -
         ")
         $filenames = ["stdin"]
-
+    
     for $filename in $filenames:
         $file = (read file $filename)
         unless $file:
@@ -95,7 +95,8 @@ command line program with $args:
             $tree = ($code parsed)
         ..if it fails with $msg:
             if $args.q:
-                unless $args.i: say $code
+                unless $args.i:
+                    say $code
             ..else:
                 say $msg
         
@@ -124,13 +125,10 @@ command line program with $args:
                                     ..\(reset color)
                                 ")
                                 say "\(bright)..be replaced with:"
-                                
                                 say ("
                                         \(bright)\(blue)\("\($ret as nomsu)", with "\n" -> "\n    ")\(reset color)
                                 ")
-                                
                                 $user_answers.$t = (ask "\(bright)..? [Y/n]\(reset color) ")
-                            
                             if ($user_answers.$t == "n"): return (nil)
                         $replaced.$t = (yes)
                         return $ret

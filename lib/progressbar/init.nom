@@ -1,16 +1,12 @@
+#!/usr/bin/env nomsu -V6.15.13.8
 # A progress bar
-
-externally ($x / $w progress bar) means:
-    $x = ($x clamped between 0 and $w)
-    $bits = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
-    $middle =
-        "" if ($x == $w) else
-            $bits.(1 + (floor ((#$bits) * ($x mod 1))))
     
-    return ("
-        \027[32;40m\($bits, last, rep (floor $x))\$middle\
-        ..\(" ", rep ($w - ((floor $x) + 1)))\027[0m
-    ")
-    
-externally ($w wide $ progress bar) means
-    ($ * $w) / $w progress bar
+external:
+    ($x / $w progress bar) means:
+        $x = ($x clamped between 0 and $w)
+        $bits = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
+        $middle = ("" if ($x == $w) else $bits.(1 + (floor ((#$bits) * ($x mod 1)))))
+        return ("
+            \027[32;40m\($bits, last, rep (floor $x))\$middle\(" ", rep ($w - ((floor $x) + 1)))\027[0m
+        ")
+    ($w wide $ progress bar) means (($ * $w) / $w progress bar)

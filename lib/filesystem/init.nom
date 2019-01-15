@@ -1,36 +1,36 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file defines some actions that interact with the filesystem.
     
-externally (files for $path) means:
-    $files = (=lua "Files.list(\$path)")
-    if $files:
-        $files = (List $files)
-    return $files
-
-external $(read file $filename) = $Files.read
-externally [
-    write to file $filename $text, to file $filename write $text
-    write $text to file $filename
-] all mean:
-    unless ($filename != "stdin"):
-        fail "Cannot write to stdin"
+external:
+    (files for $path) means:
+        $files = (=lua "Files.list(\$path)")
+        if $files:
+            $files = (List $files)
+        return $files
+    $(read file $filename) = $Files.read
+    [
+        write to file $filename $text, to file $filename write $text
+        write $text to file $filename
+    ] all mean:
+        unless ($filename != "stdin"):
+            fail "Cannot write to stdin"
+        
+        lua> ("
+            local file = io.open(\$filename, 'w')
+            file:write(\$text)
+            file:close()
+        ")
     
-    lua> ("
-        local file = io.open(\$filename, 'w')
-        file:write(\$text)
-        file:close()
-    ")
-
-externally (source lines of $tree) means:
-    $source = ($tree.source if ($tree is syntax tree) else $tree)
-    $file = (read file $source.filename)
-    return
-        [
-            : for $ in ($file, line number at $source.start) to
-                $file, line number at $source.stop
-            ..: add ($file, line $)
-        ], joined with "\n"
-
-external $(spoof file $text) = $Files.spoof
-external $(spoof file $filename = $text) = $Files.spoof
+    (source lines of $tree) means:
+        $source = ($tree.source if ($tree is syntax tree) else $tree)
+        $file = (read file $source.filename)
+        return
+            [
+                : for $ in ($file, line number at $source.start) to
+                    $file, line number at $source.stop
+                ..: add ($file, line $)
+            ], joined with "\n"
+    
+    $(spoof file $text) = $Files.spoof
+    $(spoof file $filename = $text) = $Files.spoof

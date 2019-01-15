@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file contains basic input/output code
     
@@ -6,24 +6,25 @@ use "core/metaprogramming"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(say $message) compiles to:
-    lua> ("
-        if \$message.type == "Text" then
-            return LuaCode("say(", \($message as lua expr), ");");
-        else
-            return LuaCode("say(tostring(", \($message as lua expr), "));");
-        end
-    ")
-
-(say $message inline) compiles to:
-    lua> ("
-        if \$message.type == "Text" then
-            return LuaCode("io.write(", \($message as lua expr), ")");
-        else
-            return LuaCode("io.write(tostring(", \($message as lua expr), "))");
-        end
-    ")
-
-externally (ask $prompt) means:
-    $io.write $prompt
-    return ($io.read())
+external:
+    (say $message) compiles to:
+        lua> ("
+            if \$message.type == "Text" then
+                return LuaCode("say(", \($message as lua expr), ");");
+            else
+                return LuaCode("say(tostring(", \($message as lua expr), "));");
+            end
+        ")
+    
+    (say $message inline) compiles to:
+        lua> ("
+            if \$message.type == "Text" then
+                return LuaCode("io.write(", \($message as lua expr), ")");
+            else
+                return LuaCode("io.write(tostring(", \($message as lua expr), "))");
+            end
+        ")
+    
+    (ask $prompt) means:
+        $io.write $prompt
+        return ($io.read())

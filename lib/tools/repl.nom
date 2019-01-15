@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file defines a Read-Evaluate-Print-Loop (REPL) for Nomsu
     
@@ -8,12 +8,13 @@ use "commandline"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-externally (help) means:
-    say ("
-        This is the Nomsu v\(Nomsu version) interactive console.
-        You can type in Nomsu code here and hit 'enter' twice to run it.
-        To exit, type 'exit' or 'quit' and hit enter twice.
-    ")
+external:
+    (help) means:
+        say ("
+            This is the Nomsu v\(Nomsu version) interactive console.
+            You can type in Nomsu code here and hit 'enter' twice to run it.
+            To exit, type 'exit' or 'quit' and hit enter twice.
+        ")
 
 command line program with $args:
     say ("
@@ -23,7 +24,7 @@ command line program with $args:
                press 'enter' twice to run a command
         
     ")
-
+    
     repeat:
         say (bright (yellow ">> ")) inline
         $buff = []
@@ -38,9 +39,7 @@ command line program with $args:
                 go to (run buffer)
             $buff, add ($line, with "\t" -> "    ")
             say (dim (yellow ".. ")) inline
-        
         --- (run buffer) ---
-        
         if ((size of $buff) == 0): stop
         $buff = ($buff, joined)
         spoof file $buff

@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file defines upgrades from Nomsu <4.11 to Nomsu 4.11
     (overhaul of function literals, deleting (if all of ...), etc. shorthand)
@@ -25,9 +25,7 @@ upgrade action "set" to "4.11" via
         for $entry in $tree.2 at $i:
             $lhs.$i = $entry.1
             $rhs.$i = $entry.2
-        
-        return
-            SyntaxTree {.type = "Action", .source = $tree.source} $lhs "=" $rhs
+        return (SyntaxTree {.type = "Action", .source = $tree.source} $lhs "=" $rhs)
 
 upgrade action "1 with 2 ~>" to "4.11" via
     for $tree:
@@ -93,5 +91,6 @@ upgrade action [
 ] to "4.11" as (if (not (any of $items)) $body else $else)
 
 upgrade action [
-    unless none of $items $body else $else, unless none of $items then $body else $else
+    unless none of $items $body else $else
+    unless none of $items then $body else $else
 ] to "4.11" as (if (any of $items) $body else $else)

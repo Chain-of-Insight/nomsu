@@ -131,6 +131,7 @@ local NOMSU_PACKAGEPATH = NOMSU_PACKAGEPATH or "/opt/nomsu"
 add_path(NOMSU_PACKAGEPATH)
 add_path(".")
 package.nomsupath = table.concat(nomsupath, ";")
+package.nomsuloaded = Dict({ })
 local nomsu_environment = require('nomsu_environment')
 nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
 nomsu_environment.OPTIMIZATION = optimization
@@ -173,6 +174,10 @@ run = function()
       nomsu_environment._1_parsed(NomsuCode:from(source, code))
       print("Parse succeeded: " .. tostring(filename))
     elseif args.compile then
+      local code = Files.read(filename)
+      if not code then
+        error("Could not find file '" .. tostring(filename) .. "'")
+      end
       if filename:match("%.lua$") then
         error("Cannot compile a lua file (expected a nomsu file as input)")
       end
@@ -182,7 +187,6 @@ run = function()
       else
         output = io.open(filename:gsub("%.nom$", ".lua"), "w")
       end
-      local code = Files.read(filename)
       local source = Source(filename, 1, #code)
       code = NomsuCode:from(source, code)
       local env = nomsu_environment.new_environment()

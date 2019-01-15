@@ -48,7 +48,7 @@ nomsu_environment = Importer{
     :next, unpack: unpack or table.unpack, :setmetatable, :rawequal, :getmetatable, :pcall,
     yield:coroutine.yield, resume:coroutine.resume, coroutine_status_of:coroutine.status,
     coroutine_wrap:coroutine.wrap, coroutine_from: coroutine.create,
-    :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall, :module,
+    :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall,
     say:print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
     :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
     :pairs, :ipairs, :jit, :_VERSION
@@ -105,7 +105,7 @@ nomsu_environment = Importer{
         
         return tree
 
-    load_module: (package_name)=>
+    Module: (package_name)=>
         local path
         if package_name\match("%.nom$") or package_name\match("%.lua")
             path = package_name
@@ -114,7 +114,7 @@ nomsu_environment = Importer{
             if not path then error(err)
         path = path\gsub("^%./", "")
 
-        if ret = package.loaded[package_name] or package.loaded[path]
+        if ret = package.nomsuloaded[package_name] or package.nomsuloaded[path]
             return ret
 
         if _currently_running_files\has(path)
@@ -132,12 +132,12 @@ nomsu_environment = Importer{
         _currently_running_files\add path
         mod\run(code)
         _currently_running_files\pop!
-        package.loaded[package_name] = mod
-        package.loaded[path] = mod
+        package.nomsuloaded[package_name] = mod
+        package.nomsuloaded[path] = mod
         return mod
 
     use: (package_name)=>
-        mod = @load_module(package_name)
+        mod = @Module(package_name)
         imports = assert _module_imports[@]
         for k,v in pairs(mod)
             imports[k] = v
@@ -147,7 +147,7 @@ nomsu_environment = Importer{
         return mod
 
     export: (package_name)=>
-        mod = @load_module(package_name)
+        mod = @Module(package_name)
         imports = assert _module_imports[@]
         for k,v in pairs(_module_imports[mod])
             if rawget(imports, k) == nil
@@ -163,9 +163,9 @@ nomsu_environment = Importer{
         for k,v in pairs(mod.COMPILE_RULES)
             if rawget(@COMPILE_RULES, k) == nil
                 @COMPILE_RULES[k] = v
-        for k,v in pairs(mod.TESTS)
-            if rawget(@TESTS, k) == nil
-                @TESTS[k] = v
+        --for k,v in pairs(mod.TESTS)
+        --    if rawget(@TESTS, k) == nil
+        --        @TESTS[k] = v
         return mod
 
     run: (to_run)=>

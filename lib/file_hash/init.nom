@@ -1,4 +1,4 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file defines some actions for hashing files and looking up files by hash.
     
@@ -32,9 +32,10 @@ test:
         assume ((hash "hello world") == "Kq5sNclPz7QV2+lfQIuc6R7oRu0=")
 
 if $use_sha1:
-    externally (hash $) means:
-        $hash = (=lua "\$hashlib.new('sha1'):final(\$)")
-        return (base64 $hash)
+    external:
+        (hash $) means:
+            $hash = (=lua "\$hashlib.new('sha1'):final(\$)")
+            return (base64 $hash)
 ..else:
     # TODO: remove warning?
     say ("
@@ -42,19 +43,20 @@ if $use_sha1:
         ..hash function.\027[0m
     ")
     
-    externally (hash $) means:
-        $bytes = ($, bytes)
-        $hash = ($bytes.1 << 7)
-        for $i in 2 to (size of $bytes):
-            $hash = ((1000003 * $hash) ~ $bytes.$i)
-        $hash = ($hash ~ (size of $bytes))
-        return "\$hash"
+    external:
+        (hash $) means:
+            $bytes = ($, bytes)
+            $hash = ($bytes.1 << 7)
+            for $i in 2 to (size of $bytes):
+                $hash = ((1000003 * $hash) ~ $bytes.$i)
+            $hash = ($hash ~ (size of $bytes))
+            return "\$hash"
 
-externally (file with hash $hash) means:
-    for $filename in (files for "."):
-        $contents = (read file $filename)
-        $file_hash = (hash $contents)
-        if ($file_hash == $hash):
-            return $filename
-
-(hash of file $filename) parses as (hash (read file $filename))
+external:
+    (file with hash $hash) means:
+        for $filename in (files for "."):
+            $contents = (read file $filename)
+            $file_hash = (hash $contents)
+            if ($file_hash == $hash):
+                return $filename
+    (hash of file $filename) parses as (hash (read file $filename))

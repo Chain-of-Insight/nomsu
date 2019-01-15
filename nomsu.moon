@@ -108,6 +108,7 @@ NOMSU_PACKAGEPATH or= "/opt/nomsu"
 add_path NOMSU_PACKAGEPATH
 add_path "."
 package.nomsupath = table.concat(nomsupath, ";")
+package.nomsuloaded = Dict{}
 
 nomsu_environment = require('nomsu_environment')
 nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
@@ -141,12 +142,14 @@ run = ->
             nomsu_environment._1_parsed(NomsuCode\from(source, code))
             print("Parse succeeded: #{filename}")
         elseif args.compile
+            code = Files.read(filename)
+            if not code
+                error("Could not find file '#{filename}'")
             -- Compile .nom files into .lua
             if filename\match("%.lua$")
                 error("Cannot compile a lua file (expected a nomsu file as input)")
             output = if filename == 'stdin' then io.output()
             else io.open(filename\gsub("%.nom$", ".lua"), "w")
-            code = Files.read(filename)
             source = Source(filename, 1, #code)
             code = NomsuCode\from(source, code)
             env = nomsu_environment.new_environment!

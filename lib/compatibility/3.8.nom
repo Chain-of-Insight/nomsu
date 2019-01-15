@@ -1,11 +1,11 @@
-#!/usr/bin/env nomsu -V6.14
+#!/usr/bin/env nomsu -V6.15.13.8
 #
     This file defines upgrades from Nomsu <3.8 to 3.8 (Text method changes)
-
+    
 use "compatibility/compatibility"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    
+
 upgrade action [$texts joined with $glue] to "3.8" as ($texts, joined with $glue)
 upgrade action [$texts joined, joined $texts] to "3.8" as ($texts, joined)
 upgrade action [byte $i of $text] to "3.8" as ($text, byte $i)

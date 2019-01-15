@@ -99,7 +99,6 @@ nomsu_environment = Importer({
   tostring = tostring,
   string = string,
   xpcall = xpcall,
-  module = module,
   say = print,
   loadfile = loadfile,
   rawset = rawset,
@@ -215,7 +214,7 @@ nomsu_environment = Importer({
     end
     return tree
   end,
-  load_module = function(self, package_name)
+  Module = function(self, package_name)
     local path
     if package_name:match("%.nom$") or package_name:match("%.lua") then
       path = package_name
@@ -228,7 +227,7 @@ nomsu_environment = Importer({
     end
     path = path:gsub("^%./", "")
     do
-      local ret = package.loaded[package_name] or package.loaded[path]
+      local ret = package.nomsuloaded[package_name] or package.nomsuloaded[path]
       if ret then
         return ret
       end
@@ -250,12 +249,12 @@ nomsu_environment = Importer({
     _currently_running_files:add(path)
     mod:run(code)
     _currently_running_files:pop()
-    package.loaded[package_name] = mod
-    package.loaded[path] = mod
+    package.nomsuloaded[package_name] = mod
+    package.nomsuloaded[path] = mod
     return mod
   end,
   use = function(self, package_name)
-    local mod = self:load_module(package_name)
+    local mod = self:Module(package_name)
     local imports = assert(_module_imports[self])
     for k, v in pairs(mod) do
       imports[k] = v
@@ -267,7 +266,7 @@ nomsu_environment = Importer({
     return mod
   end,
   export = function(self, package_name)
-    local mod = self:load_module(package_name)
+    local mod = self:Module(package_name)
     local imports = assert(_module_imports[self])
     for k, v in pairs(_module_imports[mod]) do
       if rawget(imports, k) == nil then
@@ -288,11 +287,6 @@ nomsu_environment = Importer({
     for k, v in pairs(mod.COMPILE_RULES) do
       if rawget(self.COMPILE_RULES, k) == nil then
         self.COMPILE_RULES[k] = v
-      end
-    end
-    for k, v in pairs(mod.TESTS) do
-      if rawget(self.TESTS, k) == nil then
-        self.TESTS[k] = v
       end
     end
     return mod
