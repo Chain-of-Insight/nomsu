@@ -104,7 +104,7 @@ if NOMSU_VERSION and NOMSU_PREFIX
     add_path "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/lib"
 else
     add_path "./lib"
-NOMSU_PACKAGEPATH or= "/opt"
+NOMSU_PACKAGEPATH or= "/opt/nomsu"
 add_path NOMSU_PACKAGEPATH
 add_path "."
 package.nomsupath = table.concat(nomsupath, ";")
@@ -161,20 +161,25 @@ run = ->
             print ("Compiled %-25s -> %s")\format(filename, filename\gsub("%.nom$", ".lua"))
             output\close!
         elseif args.verbose
-            code = Files.read(filename)
-            source = Source(filename, 1, #code)
-            code = NomsuCode\from(source, code)
             env = nomsu_environment.new_environment!
             env.MODULE_NAME = filename
             env.WAS_RUN_DIRECTLY = true
-            tree = env._1_parsed(code)
-            tree = {tree} unless tree.type == 'FileChunks'
-            for chunk_no, chunk in ipairs tree
-                lua = env\compile(chunk)
-                lua\declare_locals!
-                lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
-                print(lua\text!)
-                env\run(lua)
+            code = Files.read(filename)
+            source = Source(filename, 1, #code)
+            if filename\match("%.lua$")
+                code = LuaCode\from(Source(filename, 1, #code), code)
+                print(code\text!)
+                env\run(code)
+            else
+                code = NomsuCode\from(source, code)
+                tree = env._1_parsed(code)
+                tree = {tree} unless tree.type == 'FileChunks'
+                for chunk_no, chunk in ipairs tree
+                    lua = env\compile(chunk)
+                    lua\declare_locals!
+                    lua\prepend((chunk_no > 1) and '\n' or '', "-- File #{filename} chunk ##{chunk_no}\n")
+                    print(lua\text!)
+                    env\run(lua)
         else
             -- Just run the file
             f = Files.read(filename)
