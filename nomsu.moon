@@ -142,6 +142,8 @@ run = ->
             print("Parse succeeded: #{filename}")
         elseif args.compile
             -- Compile .nom files into .lua
+            if filename\match("%.lua$")
+                error("Cannot compile a lua file (expected a nomsu file as input)")
             output = if filename == 'stdin' then io.output()
             else io.open(filename\gsub("%.nom$", ".lua"), "w")
             code = Files.read(filename)

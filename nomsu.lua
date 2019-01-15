@@ -173,6 +173,9 @@ run = function()
       nomsu_environment._1_parsed(NomsuCode:from(source, code))
       print("Parse succeeded: " .. tostring(filename))
     elseif args.compile then
+      if filename:match("%.lua$") then
+        error("Cannot compile a lua file (expected a nomsu file as input)")
+      end
       local output
       if filename == 'stdin' then
         output = io.output()
