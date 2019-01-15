@@ -18,8 +18,11 @@ LUA_FILES= code_obj.lua error_handling.lua files.lua nomsu.lua nomsu_compiler.lu
 		   syntax_tree.lua containers.lua bitops.lua parser.lua pretty_errors.lua \
 		   string2.lua nomsu_decompiler.lua nomsu_environment.lua bootstrap.lua
 CORE_NOM_FILES=$(shell cat lib/core/init.nom | sed -n 's;export "\(.*\)";lib/\1.nom;p') lib/core/init.nom
-LIB_NOM_FILES= $(CORE_NOM_FILES) $(wildcard lib/*.nom) $(filter-out $(CORE_NOM_FILES),$(wildcard lib/*/*.nom))
-LIB_LUA_FILES= $(patsubst %.nom,%.lua,$(LIB_NOM_FILES))
+CORE_LUA_FILES= $(patsubst %.nom,%.lua, $(CORE_NOM_FILES))
+COMPAT_NOM_FILES=$(wildcard lib/compatibility/*.nom)
+TOOL_NOM_FILES= $(wildcard lib/tools/*.nom)
+LIB_NOM_FILES= $(wildcard lib/*.nom) $(filter-out $(CORE_NOM_FILES) $(TOOL_NOM_FILES) $(COMPAT_NOM_FILES), $(wildcard lib/*/*.nom))
+LIB_LUA_FILES= $(patsubst %.nom,%.lua, $(LIB_NOM_FILES))
 PEG_FILES= $(wildcard nomsu.*.peg)
 GET_VERSION= $(LUA_BIN) nomsu.lua --version
 
@@ -28,9 +31,9 @@ all: lua optimize
 .PHONY: test
 test: lua optimize
 	@echo "\033[1;4mRunning unoptimized tests...\033[0m"
-	@$(LUA_BIN) nomsu.lua -O0 -t test $(LIB_NOM_FILES)
+	@$(LUA_BIN) nomsu.lua -O0 -t test $(CORE_NOM_FILES) $(LIB_NOM_FILES)
 	@echo "\n\033[1;4mRunning optimized tests...\033[0m"
-	@$(LUA_BIN) nomsu.lua -O1 -t test $(LIB_LUA_FILES)
+	@$(LUA_BIN) nomsu.lua -O1 -t test $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
 %.lua: %.moon
 	@moonc $<
@@ -39,13 +42,13 @@ test: lua optimize
 	@$(LUA_BIN) nomsu.lua -c $<
 
 .DELETE_ON_ERROR: version
-version: $(LUA_FILES) $(LIB_NOM_FILES)
+version: $(LUA_FILES) $(CORE_NOM_FILES) $(LIB_NOM_FILES)
 	@$(LUA_BIN) nomsu.lua --version > version || exit
 
 lua: $(LUA_FILES)
 
 .PHONY: optimize
-optimize: lua $(LIB_LUA_FILES)
+optimize: lua $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
 .PHONY: clean
 clean:
