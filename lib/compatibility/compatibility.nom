@@ -79,6 +79,7 @@ externally [
 
     $start = (Ver $start_version)
     $end = (Ver $end_version)
+    $end.lib or= $start.lib
     assume $start.lib == $end.lib
 
     $seen = {}
