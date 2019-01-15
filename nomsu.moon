@@ -191,7 +191,6 @@ run = ->
             env.MODULE_NAME = filename
             env.WAS_RUN_DIRECTLY = true
             env\run(f)
-            --nomsu_environment.run_file_1_in(filename, nomsu_environment, 0)
 
 debugger = if args.debugger == "nil" then {}
 else require(args.debugger or 'error_handling')
