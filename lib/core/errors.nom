@@ -68,7 +68,7 @@ test:
             $fallback_lua, prepend "\n\$msg_lua = _result[2]\n"
             if ($msg_lua, text, is lua id):
                 $fallback_lua, add free vars [($msg_lua, text)]
-    $fallback_lua, prepend "-- Failure:"
+    $fallback_lua, prepend "-- Failure:\n"
     return
         Lua ("
             do
