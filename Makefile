@@ -50,7 +50,7 @@ optimize: lua $(LIB_LUA_FILES)
 .PHONY: clean
 clean:
 	@echo "\033[1mDeleting...\033[0m"
-	@rm -rvf version lib/*.lua lib/*/*.lua compatibility/*.lua
+	@rm -rvf version lib/*.lua lib/*/*.lua
 
 .PHONY: install
 install: lua version optimize
@@ -78,7 +78,7 @@ install: lua version optimize
 	&& chmod +x $$prefix/bin/nomsu$$version \
 	&& cp -v nomsu $$prefix/bin \
 	&& cp -v doc/nomsu.1 $$prefix/share/man/man1 \
-	&& cp -rv $(LUA_FILES) $(PEG_FILES) lib compatibility $$prefix/share/nomsu/$$version;
+	&& cp -rv $(LUA_FILES) $(PEG_FILES) lib $$prefix/share/nomsu/$$version;
 
 .PHONY: uninstall
 uninstall: version

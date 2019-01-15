@@ -20,7 +20,7 @@ max_parser_version = 0
 for version=1,999
     local peg_file
     if package.nomsupath
-        pegpath = package.nomsupath\gsub("%.nom", ".peg")
+        pegpath = package.nomsupath\gsub("lib/%?%.nom", "?.peg")\gsub("lib/%?%.lua", "?.peg")
         if path = package.searchpath("nomsu.#{version}", pegpath, "/")
             peg_file = io.open(path)
     else

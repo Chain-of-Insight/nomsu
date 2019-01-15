@@ -35,7 +35,7 @@ local max_parser_version = 0
 for version = 1, 999 do
   local peg_file
   if package.nomsupath then
-    local pegpath = package.nomsupath:gsub("%.nom", ".peg")
+    local pegpath = package.nomsupath:gsub("lib/%?%.nom", "?.peg"):gsub("lib/%?%.lua", "?.peg")
     do
       local path = package.searchpath("nomsu." .. tostring(version), pegpath, "/")
       if path then
