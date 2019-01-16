@@ -1,20 +1,19 @@
--- Nomsu version 5
+-- Nomsu version 6
 file <-
     {:curr_indent: ' '* :}
     (((methodchain / action / expression / inline_block) eol !.)
      / file_chunks / comment? blank_lines?)
     {:curr_indent: %nil :}
+    (unexpected_code .+)?
     !.
 
 shebang <- "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* [0-9.]+ [^%nl]* (%nl / !.)
 
 file_chunks (FileChunks) <-
-    {:curr_indent: ' '* :}
     {:shebang: shebang :}?
     (top_block (nl_nodent section_division top_block)*)
     blank_lines?
     ws* unexpected_chunk?
-    {:curr_indent: %nil :}
 
 section_division <- ("~")^+3 eol
 
@@ -32,9 +31,7 @@ comment (Comment) <-
 
 
 top_block (Block) <-
-    {:curr_indent: ' '* :}
     comment? blank_lines? statement (nl_nodent statement)*
-    {:curr_indent: %nil :}
 
 inline_block (Block) <-
     ":" ws* (inline_statement (ws* ";" ws* inline_statement)*)?

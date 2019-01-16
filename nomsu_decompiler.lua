@@ -352,9 +352,6 @@ tree_to_nomsu = function(tree)
         nomsu:add(tree_to_nomsu(chunk))
       end
     end
-    if not (nomsu:match("\n$")) then
-      nomsu:add('\n')
-    end
     return nomsu
   elseif "Action" == _exp_0 then
     local next_space = ""

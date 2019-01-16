@@ -251,7 +251,6 @@ tree_to_nomsu = (tree)->
                 else
                     nomsu\add tree_to_nomsu(chunk)
 
-            nomsu\add('\n') unless nomsu\match("\n$")
             return nomsu
 
         when "Action"

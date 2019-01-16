@@ -24,19 +24,19 @@ command line program with $args:
         $file = (read file $filename)
         unless $file:
             fail "File does not exist: \$filename"
-        $leading_indent = ($file, matching "\n*([ ]*)")
+        $leading_indent = ($file, matching "^\n*([ ]*)")
         $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
         try:
             $tree = ($code parsed)
         ..if it fails with $msg:
+            $tree = (nil)
             if $args.q:
                 $formatted = $file
             ..else:
                 say $msg
         
-        if ($tree and (not $formatted)):
-            $formatted =
-                "\$leading_indent\($tree as nomsu, text, with "\n" -> "\n\$leading_indent")"
+        if $tree:
+            $formatted = ($tree as nomsu, text, indented $leading_indent)
         
         if $formatted:
             if $args.i:

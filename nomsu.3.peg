@@ -9,22 +9,16 @@ file <-
 shebang <- "#!" (!"nomsu" [^%nl])* "nomsu" ws+ "-V" ws* {:version: [0-9.]+ :} [^%nl]*
 
 file_chunks (FileChunks) <-
-    {:curr_indent: ' '* :}
     shebang? comment? blank_lines?
     (top_block (nl_nodent section_division top_block)*)
     blank_lines?
     ws* unexpected_chunk?
-    {:curr_indent: %nil :}
 
 top_block (Block) <-
-    {:curr_indent: ' '* :}
     comment? blank_lines? statement (nl_nodent statement)*
-    {:curr_indent: %nil :}
 
 empty_block (Block) <-
-    {:curr_indent: ' '* :}
     comment? blank_lines?
-    {:curr_indent: %nil :}
 
 nodent <- (unexpected_indent [^%nl]* / =curr_indent)
 indent <- =curr_indent "    "
