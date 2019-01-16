@@ -68,8 +68,6 @@ compile = (tree)=>
                     return ret
                 if ret != tree
                     return @compile(ret)
-            elseif tree.stub == "1 if 2 else"
-                require('ldt').breakpoint!
 
             lua = LuaCode\from(tree.source)
             lua\add((stub)\as_lua_id!,"(")

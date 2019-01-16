@@ -97,8 +97,6 @@ compile = function(self, tree)
       if ret ~= tree then
         return self:compile(ret)
       end
-    elseif tree.stub == "1 if 2 else" then
-      require('ldt').breakpoint()
     end
     local lua = LuaCode:from(tree.source)
     lua:add((stub):as_lua_id(), "(")

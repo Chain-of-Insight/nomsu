@@ -98,8 +98,6 @@ class Code
         for i=1,n
             b = select(i, ...)
             assert(b, "code bit is nil")
-            if b.Dict
-                require('ldt').breakpoint()
             assert(not Source\is_instance(b), "code bit is a Source")
             if b == '' then continue
             bits[#bits+1] = b
