@@ -4,59 +4,41 @@
     
 test:
     an (Empty) is a thing
-    a (Dog) is a thing:
+    a (Buffer) is a thing:
+        $its.is_a_buffer = (yes)
         ($its, set up) means:
-            $its.barks or= 0
-        
-        [($its, bark), ($its, woof)] all mean:
-            $barks = [: for $ in 1 to $its.barks: add "Bark!"]
-            return ($barks, joined with " ")
-        
-        ($its, get pissed off) means: $its.barks += 1
-    (Dog).genus = "Canus"
-    $d = (a Dog with {.barks = 2})
-    assume "\$d" == "Dog {barks: 2}"
-    assume (type of $d) == "Dog"
-    assume ($d is a "Dog")
-    assume $d.barks == 2
-    assume (($d, bark) == "Bark! Bark!")
-    assume (($d, woof) == "Bark! Bark!")
-    $d, get pissed off
-    assume ($d.barks == 3)
-    assume (($d, bark) == "Bark! Bark! Bark!")
-    assume ($d.genus == "Canus")
-    assume ("\($d.class)" == "Dog")
-    assume ($d.genus == "Canus")
-    assume ($d.barks == 3)
-    $d2 = (a Dog)
-    unless ($d2.barks == 0):
-        fail "Default initializer failed"
+            $its.bits or= []
+        ($it, as text) means
+            $it.bits, joined
+        [($its, add $bit), ($its, append $bit)] all mean:
+            $its.bits, add $bit
+
+    assume (Buffer).is_a_buffer
+    $b = (a Buffer)
+    assume (type of $b) == "Buffer"
+    assume $b.is_a_buffer
+    assume "\$b" == ""
+    assume ($b, as text) == ""
+    $b = (a Buffer with {.bits = ["x"]})
+    $b,
+        add "y"
+        append "z"
+    assume "\$b" == "xyz"
+    assume $b == (a Buffer with {.bits = ["x", "y", "z"]})
+    assume $b != (a Buffer with {.bits = []})
     
-    with [$d = (a Dog with {.barks = 1})]:
-        assume (($d, bark) == "Bark!")
+    a (Comma Buffer) is a (Buffer):
+        ($it, as text) means ($it.bits, joined with ",")
+        ($its, number of commas) means ((#$its.bits) - 1)
     
-    a (Corgi) is a (Dog):
-        ($it, as text) means "Dogloaf \{: for $k = $v in $it: add $k = $v}"
-        ($its, sploot) means "sploooot"
-        [($its, bark), ($its, woof)] all mean:
-            $barks = [: for $ in 1 to $its.barks: add "Yip!"]
-            return ($barks, joined with " ")
-    
-    $corg = (a Corgi)
-    assume ($corg.barks == 0)
-    assume "\$corg" == "Dogloaf {barks: 0}"
-    with [$d = (a Corgi with {.barks = 1})]:
-        unless (($d, sploot) == "sploooot"):
-            fail "subclass method failed"
-        
-        unless (($d, bark) == "Yip!"):
-            fail "inheritance failed"
-        
-        assume (($d, woof) == "Yip!")
-    
-    with [$d = (a Dog with {.barks = 2})]:
-        assume (($d, bark) == "Bark! Bark!")
-    
+    $csv = (a Comma Buffer)
+    assume $csv.is_a_buffer
+    assume "\$csv" == ""
+    $csv, add "x"
+    $csv, add "y"
+    assume "\$csv" == "x,y"
+    assume ($csv, number of commas) == 1
+
     a (Vec) is a thing with {.x, .y}:
         ($its, + $other) means (Vec {.x = ($its.x + $other.x), .y = ($its.y + $other.y)})
     
