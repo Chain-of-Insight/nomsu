@@ -54,6 +54,7 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * [nomsu\_decompiler.moon](nomsu_compiler.moon) - This file defines functions that transform Nomsu syntax trees back into Nomsu code. This can be used for auto-formatting.
 * [nomsu\_environment.moon](nomsu_environment.moon) - This file defines the environment in which Nomsu code runs, including some basic built-in functions.
 * [bitops.moon](bitops.moon) - This is a shim for Lua 5.2 and LuaJIT that defines bitwise operations that respect metamethods.
+* [bootstrap.moon](bootstrap.moon) - This file defines some bootstrapping compile rules.
 * [code\_obj.moon](code_obj.moon) - Datastructures used for incrementally building generated code, while preserving code source information.
 * [containers.moon](containers.moon) - A library that defines some custom containers (List and Dict) used by nomsu.
 * [error\_handling.moon](error_handling.moon) - The logic for producing good error messages within Lua that reference the Nomsu source code that led to them.
@@ -63,8 +64,8 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * [syntax\_tree.moon](syntax_tree.moon) - Datastructures used for Nomsu Abstract Syntax Trees.
 * [examples/how\_do\_i.nom](examples/how_do_i.nom) - A simple walkthrough of some of the features of Nomsu, written in Nomsu code. **This is a good place to start.**
 * [lib/\*/\*.nom](lib) - Language libraries, including the core language stuff like control flow, operators, and metaprogramming (in [lib/core](lib/core)) and optional language libraries for stuff you might want.
-* [compatibility/\*.nom](compatibility) - Code for automatically upgrading Nomsu code from old versions to the current version.
-* [tools/\*.nom](tools) - A set of utilities useful for doing code manipulation actions.
+* [lib/compatibility/\*.nom](compatibility) - Code for automatically upgrading Nomsu code from old versions to the current version.
+* [lib/tools/\*.nom](tools) - A set of utilities useful for doing code manipulation actions.
 * [Makefile](Makefile) - Rules for building/installing the compiler.
 * [LICENSE](LICENSE) - The software license (MIT).
 * [README.md](README.md) - This file.

@@ -252,6 +252,17 @@ say both "Very very very very long first argument that needs its own line"
 # This can be nested:
 say both (my favorite number) and also "foo"
 
+# Object-oriented programming:
+# How do I define a class?
+a (Vec) is a thing:
+    ($its, + $other) means (Vec {.x = ($its.x + $other.x), .y = ($its.y + $other.y)})
+    ($its, length) means
+        sqrt ($its.x * $its.x + $its.y * $its.y)
+
+$v1 = (Vec {.x = 1, .y = 2})
+assume ($v1 + $v1) == (Vec {.x = 2, .y = 4})
+say $v1
+
 # Macros: 
 # The "lua>" and "=lua" macros can be used to write raw lua code: 
 (say the time) means:
