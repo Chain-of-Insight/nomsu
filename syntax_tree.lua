@@ -85,7 +85,7 @@ do
       return self.__class.source_code_for_tree[self]
     end,
     get_source_code = function(self)
-      return self.__class.source_code_for_tree[self]:sub(self.source.start, self.source.stop)
+      return self.__class.source_code_for_tree[self]:sub(self.source.start, self.source.stop - 1)
     end,
     map = function(self, fn)
       local replacement = fn(self)

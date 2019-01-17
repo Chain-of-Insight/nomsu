@@ -32,7 +32,7 @@ for version=1,999
     Parsers[version] = make_parser(peg_contents, make_tree)
 
 {:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
-{:compile, :compile_error} = require('nomsu_compiler')
+{:compile, :fail_at} = require('nomsu_compiler')
 _currently_running_files = List{} -- Used to check for circular imports in run_file_1_in
 _module_imports = {}
 _importer_mt = {__index: (k)=> _module_imports[@][k]}
@@ -66,7 +66,7 @@ nomsu_environment = Importer{
 
     -- Nomsu functions:
     _1_as_nomsu:tree_to_nomsu, _1_as_inline_nomsu:tree_to_inline_nomsu,
-    compile: compile, compile_error_at:compile_error,
+    compile: compile, at_1_fail:fail_at,
     exit:os.exit, quit:os.exit,
 
     _1_parsed: (nomsu_code, syntax_version)->

@@ -8,4 +8,4 @@ use "compatibility/compatibility"
 
 upgrade action "traceback" to "3.5.5.6" via
     for $tree:
-        compile error at $tree "'traceback' has been deprecated."
+        at $tree fail "Upgrade error: 'traceback' has been deprecated."

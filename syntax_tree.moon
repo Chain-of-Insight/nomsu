@@ -14,8 +14,6 @@ as_lua = =>
     return @as_lua! if @as_lua
     error("Not supported: #{@}")
 
---types = {"Number", "Var", "Block", "EscapedNomsu", "Text", "List", "Dict", "DictEntry",
---    "IndexChain", "Action", "FileChunks", "Error", "Comment"}
 class SyntaxTree
     __tostring: =>
         bits = [type(b) == 'string' and b\as_lua! or tostring(b) for b in *@]
@@ -45,7 +43,7 @@ class SyntaxTree
         __mode: "k"
     })
     get_source_file: => @@source_code_for_tree[@]
-    get_source_code: => @@source_code_for_tree[@]\sub(@source.start, @source.stop)
+    get_source_code: => @@source_code_for_tree[@]\sub(@source.start, @source.stop-1)
     map: (fn)=>
         replacement = fn(@)
         if replacement == false then return nil

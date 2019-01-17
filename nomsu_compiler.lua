@@ -17,11 +17,8 @@ end
 local SyntaxTree = require("syntax_tree")
 local Files = require("files")
 local pretty_error = require("pretty_errors")
-local compile_error
-compile_error = function(source, err_msg, hint)
-  if hint == nil then
-    hint = nil
-  end
+local fail_at
+fail_at = function(source, msg)
   local file
   if SyntaxTree:is_instance(source) then
     file = source:get_source_file()
@@ -32,8 +29,20 @@ compile_error = function(source, err_msg, hint)
   if source and not file then
     file = Files.read(source.filename)
   end
+  local title, err_msg, hint = msg:match("([^:]*):[ \n]+(.*)[ \n]+Hint: (.*)")
+  if not err_msg then
+    err_msg, hint = msg:match("*(.*)[ \n]+Hint:[ \n]+(.*)")
+    title = "Error"
+  end
+  if not err_msg then
+    title, err_msg = msg:match("([^:]*):[ \n]+(.*)")
+  end
+  if not err_msg then
+    err_msg = msg
+    title = "Error"
+  end
   local err_str = pretty_error({
-    title = "Compile error",
+    title = title,
     error = err_msg,
     hint = hint,
     source = file,
@@ -88,7 +97,7 @@ compile = function(self, tree)
       if ret == nil then
         local info = debug.getinfo(compile_action, "S")
         local filename = Source:from_string(info.source).filename
-        compile_error(tree, "The compile-time action here (" .. tostring(stub) .. ") failed to return any value.", "Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something.")
+        fail_at(tree, ("Compile error: The compile-time action here (" .. tostring(stub) .. ") failed to return any value. " .. "Hint: Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " and make sure it's returning something."))
       end
       if not (SyntaxTree:is_instance(ret)) then
         ret.source = ret.source or tree.source
@@ -353,5 +362,5 @@ compile = function(self, tree)
 end
 return {
   compile = compile,
-  compile_error = compile_error
+  fail_at = fail_at
 }

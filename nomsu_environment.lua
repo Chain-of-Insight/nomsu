@@ -58,10 +58,10 @@ do
   local _obj_0 = require("nomsu_decompiler")
   tree_to_nomsu, tree_to_inline_nomsu = _obj_0.tree_to_nomsu, _obj_0.tree_to_inline_nomsu
 end
-local compile, compile_error
+local compile, fail_at
 do
   local _obj_0 = require('nomsu_compiler')
-  compile, compile_error = _obj_0.compile, _obj_0.compile_error
+  compile, fail_at = _obj_0.compile, _obj_0.fail_at
 end
 local _currently_running_files = List({ })
 local _module_imports = { }
@@ -142,7 +142,7 @@ nomsu_environment = Importer({
   _1_as_nomsu = tree_to_nomsu,
   _1_as_inline_nomsu = tree_to_inline_nomsu,
   compile = compile,
-  compile_error_at = compile_error,
+  at_1_fail = fail_at,
   exit = os.exit,
   quit = os.exit,
   _1_parsed = function(nomsu_code, syntax_version)

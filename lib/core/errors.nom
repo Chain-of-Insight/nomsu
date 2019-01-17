@@ -8,32 +8,36 @@ use "core/control_flow"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(fail $msg) compiles to "error(\(($msg as lua expr) if $msg else "nil"), 0);"
-(assume $condition) compiles to:
-    lua> ("
-        local \$assumption = 'Assumption failed: '..tostring((\$condition):get_source_code())
-    ")
-    
-    return
-        Lua ("
-            if not \($condition as lua expr) then
-                error(\(quote "\$assumption"), 0)
-            end
-        ")
+(fail $msg) compiles to
+    LuaCode
+        "at_1_fail(\(quote $msg.source), 'Failure: '..\($msg as lua expr))"
+        ..if $msg else "error('Failure', 0)"
 
-(assume $a == $b) compiles to:
-    lua> "local \$assumption = 'Assumption failed: '..tostring(\(\($a == $b) as nomsu))"
-    define mangler
-    return
-        Lua ("
-            do
-                local \(mangle "a"), \(mangle "b") = \($a as lua expr), \($b as lua expr)
-                if \(mangle "a") ~= \(mangle "b") then
-                    error(\(quote "\$assumption").."\\n"..tostring(\(mangle "a")).." != "..tostring(\
-            ..\(mangle "b")), 0)
-                end
-            end
-        ")
+(assume $condition) compiles to ("
+    if not \($condition as lua expr) then
+        at_1_fail(\(quote "\($condition.source)"), "Assumption failed: This is not true.")
+    end
+")
+
+(assume $a == $b) compiles to ("
+    do
+        local _a, _b = \($a as lua expr), \($b as lua expr)
+        if _a ~= _b then
+            at_1_fail(\(quote "\($a.source)"),
+                "Assumption failed: This value is "..tostring(_a)..", but it was supposed to be "..tostring(_b)..".")
+        end
+    end
+")
+
+(assume $a != $b) compiles to ("
+    do
+        local _a, _b = \($a as lua expr), \($b as lua expr)
+        if _a == _b then
+            at_1_fail(\(quote "\($a.source)"),
+                "Assumption failed: This value is "..tostring(_a)..", but it wasn't supposed to be.")
+        end
+    end
+")
 
 test:
     try: fail
@@ -44,7 +48,7 @@ test:
         $worked = (yes)
     ..if it succeeds:
         fail "'try' incorrectly ran success case."
-    assume $failure == "xx"
+    assume ($failure, matches "xx")
     unless $worked:
         fail "'try' failed to recover from failure"
 

@@ -9,10 +9,14 @@ use "compatibility/compatibility"
 
 upgrade action "do next repeat" to "4.12" via
     for $tree:
-        compile error at $tree "This method has been deprecated."
-            "Use either (do next) or (go to (label)) instead."
+        at $tree fail ("
+            Upgrade error: This method has been deprecated.
+            Hint: Use either (do next) or (go to (label)) instead.
+        ")
 
 upgrade action "stop repeating" to "4.12" via
     for $tree:
-        compile error at $tree "This method has been deprecated."
-            "Use either (stop) or (go to (label)) instead."
+        at $tree fail ("
+            Upgrade error: This method has been deprecated.
+            Hint: Use either (stop) or (go to (label)) instead.
+        ")

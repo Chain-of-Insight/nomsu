@@ -4,24 +4,7 @@
 SyntaxTree = require "syntax_tree"
 Files = require "files"
 
--- TODO: de-duplicate this
-pretty_error = require("pretty_errors")
-compile_error = (source, err_msg, hint=nil)->
-    local file
-    if SyntaxTree\is_instance(source)
-        file = source\get_source_file!
-        source = source.source
-    elseif type(source) == 'string'
-        source = Source\from_string(source)
-    if source and not file
-        file = Files.read(source.filename)
-
-    err_str = pretty_error{
-        title: "Compile error"
-        error:err_msg, hint:hint, source:file
-        start:source.start, stop:source.stop, filename:source.filename
-    }
-    error(err_str, 0)
+{:fail_at} = require('nomsu_compiler')
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 compile_actions = {
@@ -107,7 +90,7 @@ compile_actions = {
 
     ["test"]: (body)=>
         unless body.type == 'Block'
-            compile_error(body, "This should be a Block")
+            fail_at(body, "Compile error: This should be a Block")
         test_nomsu = body\get_source_code!\match(":[ ]*(.*)")
         if indent = test_nomsu\match("\n([ ]*)")
             test_nomsu = test_nomsu\gsub("\n"..indent, "\n")

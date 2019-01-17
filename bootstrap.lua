@@ -10,33 +10,8 @@ do
 end
 local SyntaxTree = require("syntax_tree")
 local Files = require("files")
-local pretty_error = require("pretty_errors")
-local compile_error
-compile_error = function(source, err_msg, hint)
-  if hint == nil then
-    hint = nil
-  end
-  local file
-  if SyntaxTree:is_instance(source) then
-    file = source:get_source_file()
-    source = source.source
-  elseif type(source) == 'string' then
-    source = Source:from_string(source)
-  end
-  if source and not file then
-    file = Files.read(source.filename)
-  end
-  local err_str = pretty_error({
-    title = "Compile error",
-    error = err_msg,
-    hint = hint,
-    source = file,
-    start = source.start,
-    stop = source.stop,
-    filename = source.filename
-  })
-  return error(err_str, 0)
-end
+local fail_at
+fail_at = require('nomsu_compiler').fail_at
 local MAX_LINE = 80
 local compile_actions = {
   [""] = function(self, fn, ...)
@@ -130,7 +105,7 @@ local compile_actions = {
   end,
   ["test"] = function(self, body)
     if not (body.type == 'Block') then
-      compile_error(body, "This should be a Block")
+      fail_at(body, "Compile error: This should be a Block")
     end
     local test_nomsu = body:get_source_code():match(":[ ]*(.*)")
     do

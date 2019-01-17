@@ -11,5 +11,7 @@ upgrade action (me) to "3" as $me
 upgrade action (@) to "3" as $me
 upgrade action "as" to "3" via
     for $tree:
-        compile error at $tree "Object API has changed and 'as' is no longer supported."
-            "Use ($obj, action ...) instead of (as $obj: action ...)"
+        at $tree fail ("
+            Upgrade error: Object API has changed and 'as' is no longer supported.
+            Hint: Use ($obj, action ...) instead of (as $obj: action ...)
+        ")

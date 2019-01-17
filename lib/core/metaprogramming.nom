@@ -34,14 +34,15 @@ lua> ("
             local arg_lua = SyntaxTree:is_instance(arg) and \(nomsu environment):compile(arg):text() or arg
             if arg_lua == "..." then
                 if i < #\$args then
-                    compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
-                        "Extra arguments must come last.", "Try removing any arguments after \
-    ..(*extra arguments*)")
+                    at_1_fail(SyntaxTree:is_instance(arg) and arg or nil,
+                        "Compile error: Extra arguments must come last. "..
+                        "Hint: Try removing any arguments after (*extra arguments*)")
                 end
             elseif not arg_lua:is_lua_id() then
-                compile_error_at(SyntaxTree:is_instance(arg) and arg or nil,
-                    "This does not compile to a Lua identifier, so it can't be used as a function argument.",
-                    "This should probably be a Nomsu variable instead (like $x).")
+                at_1_fail(SyntaxTree:is_instance(arg) and arg or nil,
+                    "Compile error: This does not compile to a Lua identifier, so it "..
+                    "can't be used as a function argument."..
+                    "Hint: This should probably be a Nomsu variable instead (like $x).")
             end
             lua:add(i > 1 and ", " or "", arg_lua)
             body_lua:remove_free_vars({arg_lua})
@@ -98,7 +99,7 @@ lua> ("
 ($actions all compile to $body) compiles to:
     lua> ("
         if \$actions.type ~= "List" then
-            compile_error(\$actions, "This should be a list of actions.")
+            at_1_fail(\$actions, "Compile error: This should be a list of actions.")
         end
         local lua = \(\($actions.1 compiles to $body) as lua)
         local \$args = List{"\(nomsu environment)", unpack(\$actions[1]:get_args())}
@@ -151,7 +152,7 @@ test:
             lua:add(\$action:get_stub():as_lua_id())
             lua:add_free_vars({\$action:get_stub():as_lua_id()})
         else
-            compile_error_at(\$action, "Expected an action or method call here")
+            at_1_fail(\$action, "Compile error: Expected an action or method call here")
         end
         lua:add(" = ", \(\($action -> $body) as lua), ";")
         return lua
@@ -241,7 +242,7 @@ test:
     lua> ("
         local replacements = {}
         if \$actions.type ~= "List" then
-            compile_error(\$actions, "This should be a list.")
+            at_1_fail(\$actions, "Compile error: This should be a list.")
         end
         for i,arg in ipairs(\$actions[1]:get_args()) do
             replacements[arg[1]] = \(nomsu environment):compile(arg):text()
@@ -293,9 +294,8 @@ external:
             if \$tree.type == 'Block' then
                 tree_lua = LuaCode:from(\$tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
             elseif \$tree.type == 'MethodCall' and #\$tree > 2 then
-                compile_error_at(\$tree, "This must be a single value instead of "..(#\$tree - 1).."\
-            .. method calls.",
-                    "Replace this with a single method call.")
+                at_1_fail(\$tree, "Compile error: This must be a single value instead of "..
+                (#\$tree - 1).." method calls. Hint: Replace this with a single method call.")
             end
             return tree_lua
         ")
@@ -311,9 +311,9 @@ external:
         lua> ("
             local lua = \($var as lua)
             if not lua:text():is_a_lua_id() then
-                compile_error(\$var,
-                    "This is supposed to be something that compiles to a valid Lua identifier.",
-                    "This should probably be a variable.")
+                at_1_fail(\$var, "Compile error: "..
+                    "This is supposed to be something that compiles to a valid Lua identifier. "..
+                    "Hint: This should probably be a variable.")
             end
             return lua
         ")

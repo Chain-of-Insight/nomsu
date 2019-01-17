@@ -8,9 +8,8 @@ unpack or= table.unpack
 SyntaxTree = require "syntax_tree"
 Files = require "files"
 
--- TODO: de-duplicate this
 pretty_error = require("pretty_errors")
-compile_error = (source, err_msg, hint=nil)->
+fail_at = (source, msg)->
     local file
     if SyntaxTree\is_instance(source)
         file = source\get_source_file!
@@ -20,10 +19,20 @@ compile_error = (source, err_msg, hint=nil)->
     if source and not file
         file = Files.read(source.filename)
 
+    title, err_msg, hint = msg\match("([^:]*):[ \n]+(.*)[ \n]+Hint: (.*)")
+    if not err_msg
+        err_msg, hint = msg\match("*(.*)[ \n]+Hint:[ \n]+(.*)")
+        title = "Error"
+    if not err_msg
+        title, err_msg = msg\match("([^:]*):[ \n]+(.*)")
+    if not err_msg
+        err_msg = msg
+        title = "Error"
+
     err_str = pretty_error{
-        title: "Compile error"
-        error:err_msg, hint:hint, source:file
-        start:source.start, stop:source.stop, filename:source.filename
+        title: title,
+        error: err_msg, hint: hint, source: file,
+        start:source.start, stop:source.stop, filename:source.filename,
     }
     error(err_str, 0)
 
@@ -60,9 +69,9 @@ compile = (tree)=>
                 if ret == nil
                     info = debug.getinfo(compile_action, "S")
                     filename = Source\from_string(info.source).filename
-                    compile_error tree,
-                        "The compile-time action here (#{stub}) failed to return any value.",
-                        "Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's returning something."
+                    fail_at tree,
+                        ("Compile error: The compile-time action here (#{stub}) failed to return any value. "..
+                        "Hint: Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} and make sure it's returning something.")
                 unless SyntaxTree\is_instance(ret)
                     ret.source or= tree.source
                     return ret
@@ -282,4 +291,4 @@ compile = (tree)=>
         else
             error("Unknown type: #{tree.type}")
 
-return {:compile, :compile_error}
+return {:compile, :fail_at}
