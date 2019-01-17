@@ -281,7 +281,7 @@ local _dict_mt = {
       local _accum_0 = { }
       local _len_0 = 1
       for k, v in pairs(self) do
-        _accum_0[_len_0] = tostring(as_nomsu(k)) .. ": " .. tostring(as_nomsu(v))
+        _accum_0[_len_0] = "." .. tostring(k) .. " = " .. tostring(v)
         _len_0 = _len_0 + 1
       end
       return _accum_0
@@ -292,7 +292,7 @@ local _dict_mt = {
       local _accum_0 = { }
       local _len_0 = 1
       for k, v in pairs(self) do
-        _accum_0[_len_0] = tostring(as_nomsu(k)) .. ": " .. tostring(as_nomsu(v))
+        _accum_0[_len_0] = "." .. tostring(as_nomsu(k)) .. " = " .. tostring(as_nomsu(v))
         _len_0 = _len_0 + 1
       end
       return _accum_0

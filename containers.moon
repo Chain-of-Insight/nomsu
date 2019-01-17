@@ -121,9 +121,9 @@ _dict_mt =
         for _ in pairs(@) do n += 1
         return n
     __tostring: =>
-        "{"..concat(["#{as_nomsu(k)}: #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
+        "{"..concat([".#{k} = #{v}" for k,v in pairs @], ", ").."}"
     as_nomsu: =>
-        "{"..concat(["#{as_nomsu(k)}: #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
+        "{"..concat([".#{as_nomsu(k)} = #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_lua: =>
         "Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
     __band: (other)=>
