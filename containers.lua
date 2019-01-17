@@ -45,7 +45,7 @@ nth_to_last = function(self, n)
   return self[#self - n + 1]
 end
 local _list_mt = {
-  __type = "List",
+  __type = "a List",
   __eq = function(self, other)
     if not (type(other) == 'table' and getmetatable(other) == getmetatable(self) and #other == #self) then
       return false
@@ -252,7 +252,7 @@ List = function(t)
   end
 end
 local _dict_mt = {
-  __type = "Dict",
+  __type = "a Dict",
   __eq = function(self, other)
     if not (type(other) == 'table' and getmetatable(other) == getmetatable(self)) then
       return false

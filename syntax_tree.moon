@@ -107,7 +107,7 @@ class SyntaxTree
     @is_instance: (t)=>
         type(t) == 'table' and getmetatable(t) == @__base
 
-SyntaxTree.__base.__type = "Syntax Tree"
+SyntaxTree.__base.__type = "a Syntax Tree"
 
 getmetatable(SyntaxTree).__call = (t, ...)=>
     if type(t.source) == 'string'

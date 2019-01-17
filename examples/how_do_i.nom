@@ -254,13 +254,13 @@ say both (my favorite number) and also "foo"
 
 # Object-oriented programming:
 # How do I define a class?
-a (Vec) is a thing:
-    ($its, + $other) means (Vec {.x = ($its.x + $other.x), .y = ($its.y + $other.y)})
-    ($its, length) means
-        sqrt ($its.x * $its.x + $its.y * $its.y)
-
-$v1 = (Vec {.x = 1, .y = 2})
-assume ($v1 + $v1) == (Vec {.x = 2, .y = 4})
+(a Vec) is (a thing) with [$x, $y]:
+    ($self, + $other) means (Vec ($x + $other.x) ($y + $other.y))
+    ($self, length) means (sqrt ($x * $x + $y * $y))
+    $(a Vec).is_a_vec = (yes)
+(Vec $x $y) means (a Vec {.x = $x, .y = $y})
+$v1 = (Vec 1 2)
+assume ($v1 + $v1) == (Vec 2 4)
 say $v1
 
 # Macros: 
@@ -313,7 +313,7 @@ debug only:
     [$best, $best_key] = [nil, nil]
     for $item in $items:
         $key = ($key_fn $item)
-        if (($best is (nil)) or ($key > $best_key)):
+        if (($best == (nil)) or ($key > $best_key)):
             [$best, $best_key] = [$item, $key]
     return $best
 
@@ -333,7 +333,7 @@ say (best of [2, -3, 4, -8] according to $($ squared))
         [$best, $best_key] = [nil, nil]
         for $item in $items:
             $key = $key_expr
-            if (($best is (nil)) or ($key > $best_key)):
+            if (($best == (nil)) or ($key > $best_key)):
                 [$best, $best_key] = [$item, $key]
         return $best
 
@@ -347,6 +347,6 @@ say
         [$best, $best_key] = [nil, nil]
         for $x in [2, -3, 4, -8]:
             $key = ($x * $x)
-            if (($best is (nil)) or ($key > $best_key)):
+            if (($best == (nil)) or ($key > $best_key)):
                 [$best, $best_key] = [$x, $key]
         return $best

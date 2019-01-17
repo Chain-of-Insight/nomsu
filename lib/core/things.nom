@@ -11,29 +11,30 @@ use "core/errors"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    an (Empty) is a thing
-    a (Buffer) is a thing:
-        $its.is_a_buffer = (yes)
-        ($its, set up) means:
-            $its.bits or= []
-        ($it, as text) means ($it.bits, joined)
-        [($its, add $bit), ($its, append $bit)] all mean: $its.bits, add $bit
-    assume (Buffer).is_a_buffer
+    (an Empty) is (a thing) with []
+    (a Buffer) is (a thing) with [$bits]:
+        $self.is_a_buffer = (yes)
+        ($self, set up) means:
+            $bits or= []
+        ($self, as text) means ($bits, joined)
+        [($self, add $bit), ($self, append $bit)] all mean: $bits, add $bit
+    assume $(a Buffer).is_a_buffer
     $b = (a Buffer)
-    assume (type of $b) == "Buffer"
+    assume (type of $b) == "a Buffer"
+    assume ($b is "a Buffer")
     assume $b.is_a_buffer
     assume "\$b" == ""
     assume ($b, as text) == ""
-    $b = (a Buffer with {.bits = ["x"]})
+    $b = (a Buffer {.bits = ["x"]})
     $b, 
         add "y"
         append "z"
     assume "\$b" == "xyz"
-    assume $b == (a Buffer with {.bits = ["x", "y", "z"]})
-    assume $b != (a Buffer with {.bits = []})
-    a (Comma Buffer) is a (Buffer):
-        ($it, as text) means ($it.bits, joined with ",")
-        ($its, number of commas) means ((#$its.bits) - 1)
+    assume $b == (a Buffer {.bits = ["x", "y", "z"]})
+    assume $b != (a Buffer {.bits = []})
+    (a Comma Buffer) is (a Buffer) with [$bits]:
+        ($self, as text) means ($bits, joined with ",")
+        ($self, number of commas) means ((#$bits) - 1)
     $csv = (a Comma Buffer)
     assume $csv.is_a_buffer
     assume "\$csv" == ""
@@ -41,14 +42,13 @@ test:
     $csv, add "y"
     assume "\$csv" == "x,y"
     assume ($csv, number of commas) == 1
-    a (Vec) is a thing with {.x, .y}:
-        ($its, + $other) means (Vec {.x = ($its.x + $other.x), .y = ($its.y + $other.y)})
-    
-    assume ((Vec {.x = 1, .y = 2}) + (Vec {.x = 10, .y = 10})) ==
-        Vec {.x = 11, .y = 12}
-    
-    assume
-        ((Vec {.x = 1, .y = 2}) + (Vec {.x = 10, .y = 10})) != (Vec {.x = 0, .y = 0})
+    (a Vec) is (a thing) with [$x, $y]:
+        ($self, + $other) means (Vec ($x + $other.x) ($y + $other.y))
+        ($self, length) means (sqrt ($x * $x + $y * $y))
+    (Vec $x $y) means (a Vec {.x = $x, .y = $y})
+    assume ((Vec 1 2) + (Vec 10 10)) == (Vec 11 12)
+    assume (((Vec 1 2) + (Vec 10 10)) != (Vec 0 0))
+    assume (Vec 3 4, length) == 5
 
 $METAMETHOD_MAP = {
     ."as text" = "__tostring", ."clean up" = "__gc", ."+" = "__add", ."-" = "__sub"
@@ -61,30 +61,19 @@ $METAMETHOD_MAP = {
 
 $($ as text like a dict) = ({}'s metatable).__tostring
 external:
-    [
-        a $parent class named $classname with $members $(initialize $)
-        an $parent class named $classname with $members $(initialize $)
-    ] all mean:
+    ($parent class named $classname $(initialize $)) means:
         $class = {.__type = $classname}
         $class.__index = $class
         $class.class = $class
         $class.__tostring = ($ -> "\($.__type) \($ as text like a dict)")
         $class.__eq = ({}'s metatable).__eq
         $class.__len = ({}'s metatable).__len
-        if $members:
-            $class.__members = $members
-            $class.__newindex =
-                for ($its $key = $value):
-                    if $members.$key:
-                        rawset $its $key $value
-                    ..else:
-                        fail "Cannot set \$key, it's not one of the allowed member fields."
         
         set $class's metatable to {
             .__index = $parent, .__tostring = ($class -> $class.__type)
             .__call =
                 for ($class with $initial_values):
-                    if ($initial_values == (nil)): return $class
+                    $initial_values or= {}
                     set $initial_values's metatable to $class
                     if $initial_values.set_up:
                         $initial_values, set up
@@ -98,44 +87,35 @@ external:
                     $class.$metamethod = $class.($stub, as lua id)
         
         return $class
-    
-    [
-        a $classname is a $parent with $members $class_body
-        an $classname is a $parent with $members $class_body
-        a $classname is an $parent with $members $class_body
-        an $classname is an $parent with $members $class_body
-    ] all compile to:
+
+    $(a thing) = ((nil) class named "thing")
+
+    ($classname is $parent with $vars $class_body) compiles to:
+        unless ($vars.type == "List"):
+            at $vars fail ("
+                Compile error: This is not a list of variables.
+            ")
         $class_id = ($classname.stub, as lua id)
+        if $class_body:
+            $class_body =
+                $class_body with vars {
+                    : for $v in $vars:
+                        add ($v as lua expr, text) =
+                            SyntaxTree {.type = "IndexChain"} (SyntaxTree {.type = "Var"} "self")
+                                SyntaxTree {.type = "Index"} (SyntaxTree {.type = "Text"} $v.1)
+                }
         $lua =
             Lua ("
-                \$class_id = a_1_class_named_2_with(\($parent as lua), \(quote $classname.stub), \
-                ..\($members as lua)\(
+                \$class_id = _1_class_named(\($parent as lua), \(quote $classname.stub)\(
                     (
                         Lua ("
                             , function(\$class_id)
-                                local it, its = \$class_id, \$class_id;
+                                local self = \$class_id
                                 \($class_body as lua)
                             end
                         ")
                     ) if $class_body else ""
                 ))
-                a_\$class_id = function(initial_values) return \$class_id(initial_values or {}) end
-                an_\$class_id, a_\($class_id)_with, an_\($class_id)_with = a_\$class_id, a_\$class_id, a_\$class_id
             ")
-        $lua, add free vars [$class_id, "a_\$class_id", "an_\$class_id"]
+        $lua, add free vars [$class_id]
         return $lua
-    
-    [
-        a $classname is a thing with $members $class_body
-        an $classname is a thing with $members $class_body
-        a $classname is an thing with $members $class_body
-        an $classname is an thing with $members $class_body
-    ] all parse as (a $classname is a (nil) with $members $class_body)
-    
-    [a $classname is a thing $class_body, an $classname is a thing $class_body]
-    ..all parse as (a $classname is a (nil) with (nil) $class_body)
-    
-    [
-        a $classname is a $parent $class_body, an $classname is a $parent $class_body
-        a $classname is an $parent $class_body, an $classname is an $parent $class_body
-    ] all parse as (a $classname is a $parent with (nil) $class_body)

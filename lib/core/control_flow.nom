@@ -327,7 +327,7 @@ test:
     $code = (Lua "")
     $clause = "if"
     $else_allowed = (yes)
-    unless ($body.type is "Block"):
+    unless ($body.type == "Block"):
         at $body fail ("
             Compile error: 'if' expected a Block, but got a \($body.type).
             Hint: Perhaps you forgot to put a ':' after 'if'?
@@ -335,7 +335,7 @@ test:
     
     for $line in $body:
         unless
-            (($line.type is "Action") and ((size of $line) >= 2)) and
+            (($line.type == "Action") and ((size of $line) >= 2)) and
                 $line.(size of $line) is "Block" syntax tree
         ..:
             at $line fail ("
@@ -344,7 +344,7 @@ test:
                 ..by a block, or "else" followed by a block.
             ")
         $action = $line.(size of $line)
-        if (($line.1 is "else") and ((size of $line) == 2)):
+        if (($line.1 == "else") and ((size of $line) == 2)):
             unless $else_allowed:
                 at $line fail ("
                     Compile error: You can't have two 'else' blocks.
@@ -398,7 +398,7 @@ test:
     $clause = "if"
     $else_allowed = (yes)
     define mangler
-    unless ($body.type is "Block"):
+    unless ($body.type == "Block"):
         at $body fail ("
             Compile error: 'if' expected a Block, but got a \($body.type).
             Hint: Perhaps you forgot to put a ':' after the 'is'?
@@ -406,7 +406,7 @@ test:
     
     for $line in $body:
         unless
-            (($line.type is "Action") and ((size of $line) >= 2)) and
+            (($line.type == "Action") and ((size of $line) >= 2)) and
                 $line.(size of $line) is "Block" syntax tree
         ..:
             at $line fail ("
@@ -414,7 +414,7 @@ test:
                 Hint: Each line should contain expressions followed by a block, or "else" followed by a block.
             ")
         $action = $line.(size of $line)
-        if (($line.1 is "else") and ((size of $line) == 2)):
+        if (($line.1 == "else") and ((size of $line) == 2)):
             unless $else_allowed:
                 at $line fail ("
                     Compile error: You can't have two 'else' blocks.
@@ -470,7 +470,7 @@ test:
     $t = [1, [2, [[3], 4], 5, [[[6]]]]]
     $flat = []
     for $ in recursive $t:
-        if ((lua type of $) is "table"):
+        if ((lua type of $) == "table"):
             for $2 in $:
                 recurse $ on $2
         ..else:

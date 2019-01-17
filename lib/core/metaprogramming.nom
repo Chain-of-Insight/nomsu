@@ -68,10 +68,10 @@ test:
 test:
     lua> "do"
     loc x
-    unless ($x is 99):
+    unless ($x == 99):
         fail "Compile to statements with locals failed."
     lua> "end"
-    unless ($x is (nil)):
+    unless ($x == (nil)):
         fail "Failed to properly localize a variable."
     
     (asdf) compiles to:
@@ -80,7 +80,7 @@ test:
 
 test:
     asdf
-    unless ($tmp is (nil)):
+    unless ($tmp == (nil)):
         fail "compile to is leaking variables"
 
 lua> ("
@@ -136,7 +136,7 @@ test:
         unless ((foo 10) == 11):
             fail "Action didn't work."
         
-        unless ($y is (nil)):
+        unless ($y == (nil)):
             fail "Action leaked a local into globals."
         
         (baz $) parses as (foo $)
@@ -402,10 +402,11 @@ test:
 (quote $s) compiles to "tostring(\($s as lua expr)):as_lua()"
 test:
     assume (lua type of {}) == "table"
-    assume (type of {}) == "Dict"
-    assume ({} is a "Dict")
+    assume (type of {}) == "a Dict"
+    assume ({} is "a Dict")
     assume ("" is text)
-    assume ("" isn't a "Dict")
+    assume ("" is "Text")
+    assume ("" isn't "a Dict")
 
 external:
     ($ is text) means (=lua "\(lua type of $) == 'string'")
@@ -418,12 +419,11 @@ external:
                 local mt = getmetatable(\$)
                 if mt and mt.__type then return mt.__type end
             end
-            return lua_type
+            return 'a '..lua_type
         ")
 
-[$ is a $type, $ is an $type] all parse as ((type of $) == $type)
-[$ isn't a $type, $ isn't an $type, $ is not a $type, $ is not an $type]
-..all parse as ((type of $) != $type)
+($ is $type) parses as ((type of $) == $type)
+[$ isn't $type, $ is not $type] all parse as ((type of $) != $type)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

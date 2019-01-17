@@ -224,7 +224,7 @@ do
   end
   SyntaxTree = _class_0
 end
-SyntaxTree.__base.__type = "Syntax Tree"
+SyntaxTree.__base.__type = "a Syntax Tree"
 getmetatable(SyntaxTree).__call = function(self, t, ...)
   if type(t.source) == 'string' then
     t.source = Source:from_string(t.source)

@@ -29,7 +29,7 @@ upgrade $tree to "2" as:
     ]
     
     for $n in $need_blocks:
-        if ($tree.stub is $n):
+        if ($tree.stub == $n):
             $bits = [: for $ in $tree: add (($ upgraded) if ($ is syntax tree) else $)]
             unless (($bits, last) is "Block" syntax tree):
                 $body = ($bits, last)

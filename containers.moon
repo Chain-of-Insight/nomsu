@@ -24,7 +24,7 @@ nth_to_last = (n)=> @[#@-n+1]
 -- used in Nomsu. This way, they retain a notion of whether they were originally lists or dicts.
 
 _list_mt =
-    __type: "List"
+    __type: "a List"
     __eq: (other)=>
         unless type(other) == 'table' and getmetatable(other) == getmetatable(@) and #other == #@
             return false
@@ -107,7 +107,7 @@ List = (t)->
     else error("Unsupported List type: "..type(t))
 
 _dict_mt =
-    __type: "Dict"
+    __type: "a Dict"
     __eq: (other)=>
         unless type(other) == 'table' and getmetatable(other) == getmetatable(@)
             return false

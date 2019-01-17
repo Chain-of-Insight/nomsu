@@ -42,7 +42,7 @@ command line program with $args:
         : for $ in recursive $pattern_tree:
             if (($.type == "Var") and (not $literal_vars.($.1))): add $.1
             for $child in $:
-                if ($child is a "Syntax Tree"):
+                if ($child is "a Syntax Tree"):
                     recurse $ on $child
     }
     

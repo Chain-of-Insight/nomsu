@@ -13,7 +13,7 @@ upgrade action (externally $x all mean $y) to "6.15" as
 
 upgrade action ($lists flattened) to "6.15" as [
     : for $ in recursive $lists:
-        if ($ is a "List"):
+        if ($ is "a List"):
             for $child in $:
                 recurse $ on $child
         ..else: add $
@@ -24,3 +24,9 @@ upgrade action (compile error at $pos $msg $hint) to "6.15" as
         Compile error: \$msg
         Hint: \$hint
     ")
+
+upgrade action ($x is $y) to "6.15" as ($x == $y)
+upgrade action [$a isn't $b, $a is not $b, $a not= $b] to "6.15" as ($a != $b)
+upgrade action [$a is a $b, $a is an $b] to "6.15" as ($a is $b)
+upgrade action [$a isn't a $b, $a isn't an $b, $a is not a $b, $a is not an $b]
+..to "6.15" as ($a isn't $b)

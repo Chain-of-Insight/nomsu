@@ -21,7 +21,7 @@ upgrade $tree to "2.4" as:
                     (not ($line is "Action" syntax tree)):
                         $new_lines, add $line
                     
-                    ($line.stub is "*"):
+                    ($line.stub == "*"):
                         if ((size of $line) == 2):
                             $conditions, add $line.2
                         ..else:
@@ -59,7 +59,7 @@ upgrade $tree to "2.4" as:
                     (not ($line is "Action" syntax tree)):
                         $new_lines, add $line
                     
-                    ($line.stub is "*"):
+                    ($line.stub == "*"):
                         if ((size of $line) == 2):
                             $values, add $line.2
                         ..else:
