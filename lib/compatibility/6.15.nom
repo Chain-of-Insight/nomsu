@@ -18,3 +18,9 @@ upgrade action ($lists flattened) to "6.15" as [
                 recurse $ on $child
         ..else: add $
 ]
+
+upgrade action (compile error at $pos $msg $hint) to "6.15" as
+    at $pos fail ("
+        Compile error: \$msg
+        Hint: \$hint
+    ")
