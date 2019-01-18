@@ -566,6 +566,7 @@ tree_to_nomsu = function(tree)
       return nomsu
     end
     local sep = ''
+    local prev_item, needs_space = nil, { }
     for i, item in ipairs(tree) do
       local item_nomsu
       if item.type == 'MethodCall' then
@@ -591,7 +592,16 @@ tree_to_nomsu = function(tree)
         end
       end
       nomsu:add(sep)
+      if sep == '\n' then
+        if tree[i - 1].type ~= "Comment" then
+          needs_space[i] = (item_nomsu:is_multiline() and prev_item:is_multiline())
+          if tree[i].type == "Comment" or needs_space[i] or needs_space[i - 1] then
+            nomsu:add("\n")
+          end
+        end
+      end
       nomsu:add(item_nomsu)
+      prev_item = item_nomsu
       if item_nomsu:is_multiline() or item.type == 'Comment' or item.type == "Block" or nomsu:trailing_line_len() + #tostring(item_nomsu) >= MAX_LINE then
         sep = '\n'
       else

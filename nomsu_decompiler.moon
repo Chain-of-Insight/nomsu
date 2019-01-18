@@ -427,11 +427,16 @@ tree_to_nomsu = (tree)->
                 nomsu\add "\\;"
             return NomsuCode\from(tree.source, '("\n    ', nomsu, '\n")')
 
+
+
+
+
         when "List", "Dict"
             if #tree == 0
                 nomsu\add(tree.type == "List" and "[]" or "{}")
                 return nomsu
             sep = ''
+            prev_item, needs_space = nil, {}
             for i, item in ipairs tree
                 local item_nomsu
                 if item.type == 'MethodCall'
@@ -450,7 +455,16 @@ tree_to_nomsu = (tree)->
                         sep = '\n' if i > 1
                         item_nomsu = item.type == "Action" and tree_to_nomsu(item) or recurse(item)
                 nomsu\add sep
+                if sep == '\n'
+                    -- Rule of thumb: add a blank line between two lines if both are
+                    -- multi-line non-comments, or if a comment comes after a non-comment,
+                    -- or if the last line starts with ".."
+                    if tree[i-1].type != "Comment"
+                        needs_space[i] = (item_nomsu\is_multiline! and prev_item\is_multiline!)
+                        if tree[i].type == "Comment" or needs_space[i] or needs_space[i-1]
+                            nomsu\add "\n"
                 nomsu\add item_nomsu
+                prev_item = item_nomsu
                 if item_nomsu\is_multiline! or item.type == 'Comment' or item.type == "Block" or
                     nomsu\trailing_line_len! + #tostring(item_nomsu) >= MAX_LINE
                     sep = '\n'
