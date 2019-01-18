@@ -1,0 +1,176 @@
+#!/usr/bin/env nomsu -V6.13.12.8
+#
+    This is a Nomsu tutorial.
+    
+use "filesystem"
+use "consolecolor"
+use "commandline"
+use "progressbar"
+use "shell"
+(lesson $name $lesson) compiles to ("
+    {name=\($name as lua expr), lesson=\(
+        quote ((SyntaxTree {.type = "FileChunks"} $lesson) as nomsu, text)
+    )}
+")
+
+[<your code here>, ???] all compile to:
+    at (this tree) fail "Incomplete code: This needs to be filled in."
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+$lessons = [
+    lesson "Actions":
+        # Fix this action so the tests pass, then save and quit.
+        # If the tests don't pass, you can come back to this file later.
+        ($x doubled) means ((???) * $x)
+        
+        # Tests:
+        for $ in 1 to 10:
+            assume ($ doubled) == (2 * $)
+    
+    lesson "Conditionals":
+        # Make this action return (yes) if its argument
+        # is bigger than 99, otherwise return (no)
+        ($n is a big number) means:
+            if (<your code here>):
+                <your code here>
+            ..else:
+                <your code here>
+        
+        # Tests:
+        for $small_number in [0, 1, -5, -999, 99]:
+            assume ($small_number is a big number) == (no)
+        
+        for $big_number in [9999, 100]:
+            assume ($big_number is a big number) == (yes)
+    
+    lesson "Loops":
+        # Fix this action so the tests pass:
+        (the sum of $numbers) means:
+            $sum = 0
+            for $number in $numbers:
+                # Hint: math expressions may need parentheses
+                <your code here>
+            return $sum
+        
+        # Tests:
+        assume (the sum of [1, 2, 3, 4, 5]) == 15
+        assume (the sum of [100, 200]) == 300
+]
+
+command line program with $args:
+    say
+        bold ("
+            
+                +------------------------------------+
+                |   Welcome to the Nomsu tutorial!   |
+                +------------------------------------+
+            
+        ")
+    
+    if ($args.extras is empty):
+        say (bold (red "Please specify a directory where the tutorial files will go."))
+        say "For example: nomsu -t tutorial ~/nomsu_tutorial"
+        exit 1
+    
+    if (not ($Files.exists $args.extras.1)):
+        sh> "mkdir \($args.extras.1)"
+    
+    say "The tutorial files are located in \($args.extras.1)"
+    $EDITOR = (($os.getenv "EDITOR") or "nano")
+    (filename of $i) means "\($args.extras.1)/lesson\$i.nom"
+    for $lesson in $lessons at $i:
+        $filename = (filename of $i)
+        unless ($Files.exists $filename):
+            write $lesson.lesson to file $filename
+    $prev_pass = (nil)
+    repeat:
+        say ""
+        say (bold "Lessons:")
+        $failures = [
+            : for $lesson in $lessons at $i:
+                $filename = (filename of $i)
+                $file = (read file $filename)
+                $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
+                try:
+                    run $file
+                ..if it fails with $msg: add $msg
+                ..if it succeeds:
+                    add (no)
+        ]
+        $first_failure = (nil)
+        $pass = 0
+        for $lesson in $lessons at $i:
+            $filename = (filename of $i)
+            if $failures.$i:
+                say (bold (red "    \$i. \($lesson.name) [incomplete]"))
+                $first_failure or= $i
+            ..else:
+                say (bold (green "    \$i. \($lesson.name) [passed]"))
+                $pass += 1
+        say ""
+        when:
+            ($pass == $prev_pass):
+                say "\(bold "Your progress:") \(20 wide ($pass / (#$lessons)) progress bar)"
+                say "\n\(bold (red "Sorry, that didn't work :("))"
+            
+            ($prev_pass and ($prev_pass != $pass)):
+                $N = 100
+                for $ in 0 to $N:
+                    $k = (($ / $N) smoothed by 2)
+                    $progress = (($prev_pass to $pass mixed by $k) / (#$lessons))
+                    say "\r\(bold "Your progress:") \(20 wide $progress progress bar)" inline
+                    $io.flush()
+                    sh> "sleep \(1 / $N)"
+                say "\n\n\(bold (green "Nice job!"))"
+            
+            else:
+                say "\(bold "Your progress:") \(20 wide ($pass / (#$lessons)) progress bar)"
+        $prev_pass = $pass
+        if $first_failure:
+            say ("
+                
+                \(bold "Next thing to fix:") \(
+                    bold (red "Lesson \$first_failure: \($lessons.$first_failure.name)")
+                )
+                
+                \($failures.$first_failure, indented)
+                
+            ")
+            
+            $confirm =
+                ask
+                    bold "Do you want to edit \(filename of $first_failure) to get it to pass? [Y/n] "
+            
+            unless {.n, .no, .q}.$confirm:
+                $filename = (filename of $first_failure)
+                $f = (read file $filename)
+                $pos = (($f, find "<your code here>" 1 (yes)) or ($f, find "???" 1 (yes)))
+                if $pos:
+                    [$line, $col] = [($f, line number at $pos), ($f, line position at $pos)]
+                    when:
+                        ($EDITOR, matches "vim$"):
+                            sh> "\$EDITOR \$filename '+call cursor(\$line,\$col)'"
+                        
+                        ($EDITOR, matches "nano$"):
+                            sh> "\$EDITOR +\$line,\$col \$filename"
+                        
+                        ($EDITOR, matches "emacs$"):
+                            sh> "\$EDITOR +\$line:\$col \$filename"
+                        
+                        else:
+                            sh> "\$EDITOR \$filename"
+                ..else:
+                    sh> "\$EDITOR \$filename"
+            ..else: stop
+        ..else:
+            say ("
+                
+                        \(bold "\(slow blink "Congratulations!")")
+                        Everything works!
+                
+                            \\(^ᴗ^)/
+                
+                
+            ")
+            stop
