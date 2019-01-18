@@ -43,7 +43,7 @@ external:
                     ($t is syntax tree):
                         $args = []
                         for $k = $v in $t:
-                            if ((type of $k) == "number"):
+                            if ((type of $k) == "a number"):
                                 $args, add (make tree $v)
                             ..else:
                                 $args, add "\($k)=\(make tree $v)"

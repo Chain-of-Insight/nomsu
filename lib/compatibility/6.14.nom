@@ -28,11 +28,11 @@ upgrade action (assume $assumption or barf $err) to "6.14" as
 
 upgrade action (barf $msg) to "6.14" as (fail $msg)
 upgrade action (\(1's meaning)).stub to "6.14" via
-    $tree -> (SyntaxTree {.source = $tree.source, .type = "Var", $tree.1})
+    $tree -> ("Var" tree from $tree.source with $tree.1)
 upgrade action (log base $b of $n) to "6.14" as (log $n base $b)
 upgrade action "use" to "6.14" via
     for $tree:
         $path = $tree.2.1
         $path = ($path, with "%.nom$" -> "")
         $path = ($path, with "^lib/" -> "")
-        return \(use (SyntaxTree {.source = $tree.2.source, .type = "Text"} $path))
+        return \(use ("Text" tree from $tree.2.source with $path))

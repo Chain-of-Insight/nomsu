@@ -63,10 +63,8 @@ upgrade $tree to "4.10.12.7" as:
             $i += 1
         return
         --- (insert chunk) ---
-        [$chunk1, $chunk2] = [
-            SyntaxTree {.type = "Block", .source = $first_chunk.source}
-            SyntaxTree {.type = "Block", .source = $first_chunk.source}
-        ]
+        [$chunk1, $chunk2] =
+            ["Block" tree from $first_chunk.source, "Block" tree from $first_chunk.source]
         
         for $j in 1 to ($i - 1):
             $chunk1.$j = $first_chunk.$j
@@ -74,8 +72,7 @@ upgrade $tree to "4.10.12.7" as:
         for $j in $i to (size of $first_chunk):
             $chunk2.($j - $i + 1) = $first_chunk.$j
         
-        $new_tree =
-            SyntaxTree {.source = $tree.source, .type = "FileChunks"} $chunk1 $chunk2
+        $new_tree = ("FileChunks" tree from $tree.source with $chunk1 $chunk2)
         
         for $i in 2 to (size of $tree):
             $new_tree.($i + 1) = $tree.$i

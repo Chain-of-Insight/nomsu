@@ -18,9 +18,8 @@ $colors = {
 
 for $name = $colornum in $colors:
     $colornum = "\$colornum"
-    $(COMPILE RULES).$name =
-        for ($compile $text):
-            if $text:
-                return (Lua "('\\027[\($colornum)m'..\($text as lua expr)..'\\027[0m')")
-            ..else:
-                return (Lua "'\\027[\($colornum)m'")
+    \($name \$text) compiles to:
+        if $text:
+            return (Lua "('\\027[\($colornum)m'..\($text as lua expr)..'\\027[0m')")
+        ..else:
+            return (Lua "'\\027[\($colornum)m'")

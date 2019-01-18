@@ -68,7 +68,7 @@ command line program with $args:
                 $ret = (run $lua)
             ..if it fails with $err: say $err
             ..if it succeeds:
-                if (type of $ret) is:
+                if (lua type of $ret) is:
                     "nil":
                         do nothing
                     

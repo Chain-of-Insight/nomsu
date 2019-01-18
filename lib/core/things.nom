@@ -101,8 +101,8 @@ external:
                 $class_body with vars {
                     : for $v in $vars:
                         add ($v as lua expr, text) =
-                            SyntaxTree {.type = "IndexChain"} (SyntaxTree {.type = "Var"} "self")
-                                SyntaxTree {.type = "Index"} (SyntaxTree {.type = "Text"} $v.1)
+                            "IndexChain" tree with ("Var" tree with "self")
+                                "Index" tree with ("Text" tree with $v.1)
                 }
         $lua =
             Lua ("

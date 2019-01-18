@@ -14,7 +14,7 @@ local fail_at
 fail_at = require('nomsu_compiler').fail_at
 local MAX_LINE = 80
 local compile_actions = {
-  [""] = function(self, fn, ...)
+  [""] = function(self, _t, fn, ...)
     local lua = LuaCode()
     local fn_lua = self:compile(fn)
     lua:add(fn_lua)
@@ -31,7 +31,7 @@ local compile_actions = {
     lua:add(")")
     return lua
   end,
-  ["Lua"] = function(self, code)
+  ["Lua"] = function(self, _t, code)
     if not code then
       return LuaCode("LuaCode()")
     end
@@ -62,7 +62,7 @@ local compile_actions = {
     end
     return operate_on_text(code)
   end,
-  ["lua >"] = function(self, code)
+  ["lua >"] = function(self, _t, code)
     if code.type ~= "Text" then
       return code
     end
@@ -83,7 +83,7 @@ local compile_actions = {
     end
     return operate_on_text(code)
   end,
-  ["= lua"] = function(self, code)
+  ["= lua"] = function(self, _t, code)
     return self:compile(SyntaxTree({
       type = "Action",
       "lua",
@@ -91,19 +91,19 @@ local compile_actions = {
       code
     }))
   end,
-  ["1 as lua"] = function(self, code)
+  ["1 as lua"] = function(self, _t, code)
     return LuaCode("_ENV:compile(", self:compile(code), ")")
   end,
-  ["use"] = function(self, path)
+  ["use"] = function(self, _t, path)
     return LuaCode("_ENV:use(" .. tostring(self:compile(path)) .. ")")
   end,
-  ["export"] = function(self, path)
+  ["export"] = function(self, _t, path)
     return LuaCode("_ENV:export(" .. tostring(self:compile(path)) .. ")")
   end,
-  ["run"] = function(self, path)
+  ["run"] = function(self, _t, path)
     return LuaCode("_ENV:run(" .. tostring(self:compile(path)) .. ")")
   end,
-  ["test"] = function(self, body)
+  ["test"] = function(self, _t, body)
     if not (body.type == 'Block') then
       fail_at(body, "Compile error: This should be a Block")
     end
@@ -121,22 +121,22 @@ local compile_actions = {
     }))
     return LuaCode("TESTS[" .. tostring(tostring(body.source):as_lua()) .. "] = ", test_text)
   end,
-  ["is jit"] = function(self, code)
+  ["is jit"] = function(self, _t, code)
     return LuaCode("jit")
   end,
-  ["Lua version"] = function(self, code)
+  ["Lua version"] = function(self, _t, code)
     return LuaCode("_VERSION")
   end,
-  ["nomsu environment"] = function(self)
+  ["nomsu environment"] = function(self, _t)
     return LuaCode("_ENV")
   end,
-  ["nomsu environment name"] = function(self)
+  ["nomsu environment name"] = function(self, _t)
     return LuaCode('"_ENV"')
   end,
-  ["this file was run directly"] = function(self)
+  ["this file was run directly"] = function(self, _t)
     return LuaCode('WAS_RUN_DIRECTLY')
   end,
-  ["the command line arguments"] = function(self)
+  ["the command line arguments"] = function(self, _t)
     return LuaCode('COMMAND_LINE_ARGS')
   end
 }

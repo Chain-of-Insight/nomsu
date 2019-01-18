@@ -65,7 +65,7 @@ compile = (tree)=>
                 args = [arg for arg in *tree when type(arg) != "string"]
                 -- Force Lua to avoid tail call optimization for debugging purposes
                 -- TODO: use tail call?
-                ret = compile_action(@, unpack(args))
+                ret = compile_action(@, tree, unpack(args))
                 if ret == nil
                     info = debug.getinfo(compile_action, "S")
                     filename = Source\from_string(info.source).filename

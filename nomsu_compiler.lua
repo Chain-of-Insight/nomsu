@@ -93,7 +93,7 @@ compile = function(self, tree)
         end
         args = _accum_0
       end
-      local ret = compile_action(self, unpack(args))
+      local ret = compile_action(self, tree, unpack(args))
       if ret == nil then
         local info = debug.getinfo(compile_action, "S")
         local filename = Source:from_string(info.source).filename

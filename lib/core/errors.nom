@@ -8,14 +8,15 @@ use "core/control_flow"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-(fail $msg) compiles to
-    LuaCode
-        "at_1_fail(\(quote $msg.source), 'Failure: '..\($msg as lua expr))"
-        ..if $msg else "error('Failure', 0)"
+(fail $msg) compiles to ("
+    at_1_fail(\(quote (this tree).source), 'Failure: \(
+        "'..\($msg as lua expr)" if $msg else "A failure was triggered here'"
+    ))
+")
 
 (assume $condition) compiles to ("
     if not \($condition as lua expr) then
-        at_1_fail(\(quote "\($condition.source)"), "Assumption failed: This is not true.")
+        at_1_fail(\(quote "\($condition.source)"), "Assumption failed: This was not true.")
     end
 ")
 
@@ -24,7 +25,7 @@ use "core/control_flow"
         local _a, _b = \($a as lua expr), \($b as lua expr)
         if _a ~= _b then
             at_1_fail(\(quote "\($a.source)"),
-                "Assumption failed: This value is "..tostring(_a)..", but it was supposed to be "..tostring(_b)..".")
+                "Assumption failed: This value was "..tostring(_a).." when it was supposed to be "..tostring(_b)..".")
         end
     end
 ")
@@ -34,7 +35,7 @@ use "core/control_flow"
         local _a, _b = \($a as lua expr), \($b as lua expr)
         if _a == _b then
             at_1_fail(\(quote "\($a.source)"),
-                "Assumption failed: This value is "..tostring(_a)..", but it wasn't supposed to be.")
+                "Assumption failed: This value was "..tostring(_a).." when it wasn't supposed to be.")
         end
     end
 ")

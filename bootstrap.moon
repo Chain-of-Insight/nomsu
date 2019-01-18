@@ -8,7 +8,7 @@ Files = require "files"
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 compile_actions = {
-    [""]: (fn, ...)=>
+    [""]: (_t, fn, ...)=>
         lua = LuaCode!
         fn_lua = @compile(fn)
         lua\add fn_lua
@@ -21,7 +21,7 @@ compile_actions = {
         lua\add ")"
         return lua
 
-    ["Lua"]: (code)=>
+    ["Lua"]: (_t, code)=>
         if not code
             return LuaCode("LuaCode()")
         if code.type != "Text"
@@ -58,7 +58,7 @@ compile_actions = {
 
         return operate_on_text code
 
-    ["lua >"]: (code)=>
+    ["lua >"]: (_t, code)=>
         if code.type != "Text"
             return code
         operate_on_text = (text)->
@@ -73,22 +73,22 @@ compile_actions = {
             return lua
         return operate_on_text code
 
-    ["= lua"]: (code)=>
+    ["= lua"]: (_t, code)=>
         @compile(SyntaxTree{type:"Action", "lua", ">", code})
 
-    ["1 as lua"]: (code)=>
+    ["1 as lua"]: (_t, code)=>
         LuaCode("_ENV:compile(", @compile(code), ")")
 
-    ["use"]: (path)=>
+    ["use"]: (_t, path)=>
         LuaCode("_ENV:use(#{@compile(path)})")
 
-    ["export"]: (path)=>
+    ["export"]: (_t, path)=>
         LuaCode("_ENV:export(#{@compile(path)})")
 
-    ["run"]: (path)=>
+    ["run"]: (_t, path)=>
         LuaCode("_ENV:run(#{@compile(path)})")
 
-    ["test"]: (body)=>
+    ["test"]: (_t, body)=>
         unless body.type == 'Block'
             fail_at(body, "Compile error: This should be a Block")
         test_nomsu = body\get_source_code!\match(":[ ]*(.*)")
@@ -97,12 +97,12 @@ compile_actions = {
         test_text = @compile(SyntaxTree{type:"Text", source:body.source, test_nomsu})
         return LuaCode "TESTS[#{tostring(body.source)\as_lua!}] = ", test_text
 
-    ["is jit"]: (code)=> LuaCode("jit")
-    ["Lua version"]: (code)=> LuaCode("_VERSION")
-    ["nomsu environment"]: ()=> LuaCode("_ENV")
-    ["nomsu environment name"]: ()=> LuaCode('"_ENV"')
-    ["this file was run directly"]: => LuaCode('WAS_RUN_DIRECTLY')
-    ["the command line arguments"]: => LuaCode('COMMAND_LINE_ARGS')
+    ["is jit"]: (_t, code)=> LuaCode("jit")
+    ["Lua version"]: (_t, code)=> LuaCode("_VERSION")
+    ["nomsu environment"]: (_t)=> LuaCode("_ENV")
+    ["nomsu environment name"]: (_t)=> LuaCode('"_ENV"')
+    ["this file was run directly"]: (_t)=> LuaCode('WAS_RUN_DIRECTLY')
+    ["the command line arguments"]: (_t)=> LuaCode('COMMAND_LINE_ARGS')
 }
 
 return compile_actions
