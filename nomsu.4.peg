@@ -17,7 +17,7 @@ file_chunks (FileChunks) <-
     ws* unexpected_chunk?
 
 top_block (Block) <-
-    comment? blank_lines? statement (nl_nodent statement)*
+    (comment nl_nodent)? statement (nl_nodent statement)*
 
 empty_block (Block) <-
     comment? blank_lines?
