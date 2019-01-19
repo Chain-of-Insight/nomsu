@@ -2,7 +2,7 @@
 file <-
     {:curr_indent: ' '* :}
     (((methodchain / action / expression / inline_block) eol !.)
-     / file_chunks / comment? (blank_lines ws*)?)
+     / file_chunks / comment? blank_lines?)
     {:curr_indent: %nil :}
     !.
 
@@ -19,7 +19,7 @@ section_division <- ("~")^+3 eol
 eof <- !.
 eol <- ws* (&%nl / !.)
 nodent <- (unexpected_indent [^%nl]* / =curr_indent)
-indent <- {=curr_indent "    "}
+indent <- { =curr_indent "    " }
 blank_lines <- %nl ((nodent comment / ws*) %nl)*
 nl_nodent <- blank_lines nodent
 nl_indent <- blank_lines tab_error? {:curr_indent: indent :} (comment nl_nodent)*
@@ -30,7 +30,7 @@ comment (Comment) <-
 
 
 top_block (Block) <-
-    (comment nl_nodent)? statement (nl_nodent statement)*
+    ((blank_lines nodent) / (comment nl_nodent))? statement (nl_nodent statement)*
 
 inline_block (Block) <-
     ":" ws* (inline_statement (ws* ";" ws* inline_statement)*)?
@@ -243,9 +243,6 @@ _unexpected_code (Error) <-
     {:error: {~ [^%nl]+ -> "Couldn't parse this code" ~} :}
 unexpected_chunk (Error) <-
     {:error: {~ .+ -> "Couldn't parse this code" ~} :}
-unexpected_space (Error) <-
-    {:error: {~ ws+ -> "Messed up indentation" ~} :}
-    {:hint: {~ '' -> 'Either make sure this line is aligned with the one above it, or make sure the previous line ends with something that uses indentation, like ":" or "(..)"' ~} :}
 unexpected_indent (Error) <-
     {:error: {~ (=curr_indent ws+) -> "Messed up indentation" ~} :}
     {:hint: {~ '' -> 'Either make sure this line is aligned with the one above it, or make sure the previous line ends with something that uses indentation, like ":" or "(..)"' ~} :}
