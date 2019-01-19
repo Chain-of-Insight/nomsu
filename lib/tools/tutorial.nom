@@ -56,121 +56,253 @@ $lessons = [
         # Tests:
         assume (the sum of [1, 2, 3, 4, 5]) == 15
         assume (the sum of [100, 200]) == 300
+    
+    lesson "Variable Scopes":
+        # A nomsu variable that has not yet been assigned to is (nil)
+        assume $never_assigned == (nil)
+        
+        # Nomsu's variables are local by default, and actions have their own scopes:
+        $x = 1
+        $y = 2
+        
+        # Define an action that sets a variable:
+        (do something) means:
+            # The variable $y is never set in this action, so it has the same value
+                it has outside this action.
+            assume $y == (???)
+            
+            # $x is set inside this action, and actions have their own scopes.
+            $x = $y
+            
+            # What number should $x be here?
+            assume $x == (???)
+        
+        # After running the action, what value should $x have?
+        do something
+        assume $x == (???)
+        
+    lesson "More Variable Scopes":
+        # Loops and conditionals do *not* have their own scopes:
+        $z = 1
+        if (1 == 1):
+            # Set $z inside a conditional:
+            $z = 2
+        
+        # After assigning in a conditional, what should $z be?
+        assume $z == (???)
+        for $ in 1 to 1:
+            # Set $z inside a loop:
+            $z = 3
+        
+        # After assigning in a loop, what should $z be?
+        assume $z == (???)
+    
+    lesson "Externals":
+        # The 'external' block lets you modify variables outside an action:
+        $x = 1
+        (do something) means:
+            external: $x = 2
+        do something
+
+        # After running the action that sets $x in an 'external' block, what should $x be?
+        assume $x == (???)
+
+    lesson "Locals":
+        # The 'with' block lets you create a local scope for the variables you list:
+        $y = 1
+        $z = 1
+        with [$y]:
+            $y = 2
+            $z = 2
+        
+        # After setting $y and $z in the 'with [$y]' block, what should $y and $z be?
+        assume $y == (???)
+        assume $z == (???)
+
+    lesson "Failure and Recovery":
+        $what_happened = "nothing"
+        # In Nomsu, sometimes things fail, but you can recover from failures with 'try':
+        try:
+            # The 'fail' action triggers failure
+            fail "Oh no!"
+        ..if it fails:
+            $what_happened = "failure"
+        ..if it succeeds:
+            $what_happened = "success"
+
+        # What do you think happened?
+        assume $what_happened == (???)
+
+        # Note: a 'try' block will silence failures, so this has no effect:
+        try: fail
 ]
 
 command line program with $args:
+    if ($args.help or $args.h):
+        say "Nomsu tutorial usage: nomsu -t tutorial [-x] [<location to put tutorial files>]"
+        exit
+
     say
         bold ("
             
                 +------------------------------------+
                 |   Welcome to the Nomsu tutorial!   |
                 +------------------------------------+
-            
+
         ")
     
     if ($args.extras is empty):
-        say (bold (red "Please specify a directory where the tutorial files will go."))
-        say "For example: nomsu -t tutorial ~/nomsu_tutorial"
-        exit 1
+        $tutorial_dir = "./nomsu_tutorial"
+        if (not ($Files.exists $tutorial_dir)):
+            when (ask "The Nomsu tutorial files will be in \(bold $tutorial_dir) is that okay? [Y/n] ") is:
+                "n" "N" "no":
+                    say "Okay. If you want to specify another file location, run `nomsu -t tutorial <your location>`"
+                    exit
+    ..else:
+        $tutorial_dir = $args.extras.1
     
-    if (not ($Files.exists $args.extras.1)):
-        sh> "mkdir \($args.extras.1)"
+    if (not ($Files.exists $tutorial_dir)):
+        sh> "mkdir \$tutorial_dir"
     
-    say "The tutorial files are located in \($args.extras.1)"
-    $EDITOR = (($os.getenv "EDITOR") or "nano")
-    (filename of $i) means "\($args.extras.1)/lesson\$i.nom"
+    if ($args.x):
+        say ("
+            The tutorial files are located in \$tutorial_dir.
+            You're in charge of editing them yourself.
+        ")
+    ..else:
+        $EDITOR = (($os.getenv "EDITOR") or "nano")
+        say ("
+            The tutorial will use \(yellow $EDITOR) for editing files.
+            If you'd rather edit the files in another window, use the \(yellow "-x") flag.
+                e.g. \(yellow "nomsu -t tutorial -x tutorials/")
+        ")
+    (filename of $i) means ("\$tutorial_dir/lesson\$i.nom", with "//" -> "/")
     for $lesson in $lessons at $i:
         $filename = (filename of $i)
         unless ($Files.exists $filename):
             write $lesson.lesson to file $filename
-    $prev_pass = (nil)
-    repeat:
-        say ""
-        say (bold "Lessons:")
-        $failures = [
-            : for $lesson in $lessons at $i:
-                $filename = (filename of $i)
-                $file = (read file $filename)
-                $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
-                try:
-                    run $file
-                ..if it fails with $msg: add $msg
-                ..if it succeeds:
-                    add (no)
-        ]
-        $first_failure = (nil)
-        $pass = 0
-        for $lesson in $lessons at $i:
+
+    (get failures) means [
+        : for $lesson in $lessons at $i:
             $filename = (filename of $i)
-            if $failures.$i:
+            $file = (read file $filename)
+            $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
+            try:
+                run $file
+            ..if it fails with $msg:
+                $msg = ($msg, with "\n *stack traceback:.*" -> "")
+                add {.lesson_number = $i, .failure = $msg}
+    ]
+
+    say ""
+    say (bold "Lessons:")
+
+    (show first failure from $failures) means:
+        say ("
+            
+            \(bold "Next thing to fix:") \(
+                bold (yellow "Lesson \($failures.1.lesson_number): \($lessons.($failures.1.lesson_number).name)")
+            )
+            
+            \($failures.1.failure, indented)
+            
+        ")
+
+    $failures = (get failures)
+    for $lesson in $lessons at $i:
+        for $f in $failures:
+            if ($f.lesson_number == $i):
                 say (bold (red "    \$i. \($lesson.name) [incomplete]"))
-                $first_failure or= $i
-            ..else:
-                say (bold (green "    \$i. \($lesson.name) [passed]"))
-                $pass += 1
-        say ""
-        when:
-            ($pass == $prev_pass):
-                say "\(bold "Your progress:") \(20 wide ($pass / (#$lessons)) progress bar)"
-                say "\n\(bold (red "Sorry, that didn't work :("))"
-            
-            ($prev_pass and ($prev_pass != $pass)):
-                $N = 100
-                for $ in 0 to $N:
-                    $k = (($ / $N) smoothed by 2)
-                    $progress = (($prev_pass to $pass mixed by $k) / (#$lessons))
-                    say "\r\(bold "Your progress:") \(20 wide $progress progress bar)" inline
-                    $io.flush()
-                    sh> "sleep \(1 / $N)"
-                say "\n\n\(bold (green "Nice job!"))"
-            
-            else:
-                say "\(bold "Your progress:") \(20 wide ($pass / (#$lessons)) progress bar)"
-        $prev_pass = $pass
-        if $first_failure:
-            say ("
-                
-                \(bold "Next thing to fix:") \(
-                    bold (red "Lesson \$first_failure: \($lessons.$first_failure.name)")
-                )
-                
-                \($failures.$first_failure, indented)
-                
-            ")
-            
-            $confirm =
-                ask
-                    bold "Do you want to edit \(filename of $first_failure) to get it to pass? [Y/n] "
-            
-            unless {.n, .no, .q}.$confirm:
-                $filename = (filename of $first_failure)
-                $f = (read file $filename)
-                $pos = (($f, find "<your code here>" 1 (yes)) or ($f, find "???" 1 (yes)))
-                if $pos:
-                    [$line, $col] = [($f, line number at $pos), ($f, line position at $pos)]
-                    when:
-                        ($EDITOR, matches "vim$"):
-                            sh> "\$EDITOR \$filename '+call cursor(\$line,\$col)'"
-                        
-                        ($EDITOR, matches "nano$"):
-                            sh> "\$EDITOR +\$line,\$col \$filename"
-                        
-                        ($EDITOR, matches "emacs$"):
-                            sh> "\$EDITOR +\$line:\$col \$filename"
-                        
-                        else:
-                            sh> "\$EDITOR \$filename"
-                ..else:
-                    sh> "\$EDITOR \$filename"
-            ..else: stop
+                do next $lesson
+        say (bold (green "    \$i. \($lesson.name) [passed]"))
+    say "\n\(bold "Your progress:") \(20 wide (((#$lessons) - (#$failures)) / (#$lessons)) progress bar)"
+
+    repeat while (not ($failures is empty)):
+        show first failure from $failures
+        if ($args.x):
+            $filename = (filename of $failures.1.lesson_number)
+            say "\(yellow "Waiting for you to fix ")\(bold $filename) \(yellow "(press ctrl+c to exit)...")"
+            try:
+                $files = [: for $ in 1 to (#$lessons): add (read file (filename of $))]
+                repeat:
+                    sh> "sleep 0.5"
+                    $new_files = [: for $ in 1 to (#$lessons): add (read file (filename of $))]
+                    if ($new_files != $files):
+                        $files = $new_files
+                        stop
+            ..if it fails:
+                say "\nGoodbye."
+                exit
         ..else:
-            say ("
-                
-                        \(bold "\(slow blink "Congratulations!")")
-                        Everything works!
-                
-                            \\(^ᴗ^)/
-                
-                
-            ")
-            stop
+            $filename = (filename of $failures.1.lesson_number)
+            --- (retry file) ---
+            when
+                ask (bold (cyan "Edit \$filename to get it to pass? [Y/n/exit] "))
+            ..is:
+                "q" "quit" "exit" "n" "N" "no":
+                    exit
+
+                "y" "Y" "yes" "":
+                    $f = (read file $filename)
+                    $cursor_positions = []
+                    $cursor_positions, add ($f, position of "<your code here>" 1 (yes))
+                    $cursor_positions, add ($f, position of "???" 1 (yes))
+                    unless ($cursor_positions is empty):
+                        $pos = (min of $cursor_positions)
+                        [$line, $col] = [($f, line number at $pos), ($f, line position at $pos)]
+                        when:
+                            ($EDITOR, matches "vim$"):
+                                sh> "\$EDITOR \$filename '+call cursor(\$line,\$col)'"
+                            
+                            ($EDITOR, matches "nano$"):
+                                sh> "\$EDITOR +\$line,\$col \$filename"
+                            
+                            ($EDITOR, matches "emacs$"):
+                                sh> "\$EDITOR +\$line:\$col \$filename"
+                            
+                            else:
+                                sh> "\$EDITOR \$filename"
+                    ..else:
+                        sh> "\$EDITOR \$filename"
+                else:
+                    say "Sorry, I don't understand that."
+                    go to (retry file)
+
+            $file = (read file $filename)
+            $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
+            try:
+                run $file
+            ..if it fails with $msg:
+                say (bold (red "\n There's a bit more to fix:"))
+                $msg = ($msg, with "\n *stack traceback:.*" -> "")
+                say ($msg, indented)
+                say ""
+                go to (retry file)
+
+        $prev_progress = (((#$lessons) - (#$failures)) / (#$lessons))
+        $failures = (get failures)
+        $progress = (((#$lessons) - (#$failures)) / (#$lessons))
+        if ($progress != $prev_progress):
+            if ($progress > $prev_progress):
+                say (bold (green "\nSuccess!\n"))
+            ..else:
+                say (bold (red "\nUh oh, that broke something.\n"))
+            $N = 100
+            for $ in 0 to $N:
+                $k = (($ / $N) smoothed by 2)
+                $p = ($prev_progress to $progress mixed by $k)
+                say "\r\(bold "Your progress:") \(20 wide $p progress bar)" inline
+                $io.flush()
+                sh> "sleep \(1 / $N)"
+            say ""
+
+    say ("
+        
+                    \(bold "\(slow blink "Congratulations!")")
+
+               You've passed the tutorial!
+        
+                        \\(^ᴗ^)/
+        
+        
+    ")
