@@ -1,6 +1,7 @@
 -- This file contains the logic for making nicer error messages
 debug_getinfo = debug.getinfo
 Files = require "files"
+pretty_error = require("pretty_errors")
 export SOURCE_MAP
 
 RED = "\027[31m"
@@ -31,7 +32,7 @@ debug.getinfo = (thread,f,what)->
     else debug_getinfo(thread,f,what)
     if not info or not info.func then return info
     if info.short_src or info.source or info.linedefine or info.currentline
-        -- TODO: get name properly
+        -- TODO: reduce duplicate code
         if map = SOURCE_MAP[info.source]
             if info.currentline
                 info.currentline = assert(map[info.currentline])
@@ -40,31 +41,71 @@ debug.getinfo = (thread,f,what)->
             if info.lastlinedefined
                 info.lastlinedefined = assert(map[info.lastlinedefined])
             info.short_src = info.source\match('@([^[]*)') or info.short_src
-            -- TODO: get name properly
             info.name = if info.name
-                if tmp = info.name\match("^A_([a-zA-Z0-9_]*)$")
-                    tmp\gsub("_"," ")\gsub("x([0-9A-F][0-9A-F])", => string.char(tonumber(@, 16)))
-                else info.name
+                "action '#{calling_fn.name\from_lua_id!}'"
             else "main chunk"
     return info
 
-print_error = (error_message, start_fn, stop_fn)->
-    io.stderr\write("#{RED}ERROR: #{BRIGHT_RED}#{error_message or ""}#{RESET}\n")
-    io.stderr\write("stack traceback:\n")
+enhance_error = (error_message, start_fn, stop_fn)->
+    unless error_message and error_message\match("\x1b")
+        error_message or= ""
+        if fn = error_message\match("attempt to call a nil value %(global '(.*)'%)")
+            if fn\match "x[0-9A-F][0-9A-F]"
+                error_message = "The action '#{fn\from_lua_id!}' is not defined."
+        level = 2
+        while true
+            -- TODO: reduce duplicate code
+            calling_fn = debug_getinfo(level)
+            if not calling_fn then break
+            level += 1
+            local filename, file, line_num
+            if map = SOURCE_MAP and SOURCE_MAP[calling_fn.source]
+                if calling_fn.currentline
+                    line_num = assert(map[calling_fn.currentline])
+                filename,start,stop = calling_fn.source\match('@([^[]*)%[([0-9]+):([0-9]+)]')
+                if not filename
+                    filename,start = calling_fn.source\match('@([^[]*)%[([0-9]+)]')
+                assert(filename)
+                file = Files.read(filename)
+            else
+                filename = calling_fn.short_src
+                file = Files.read(filename)
+                if calling_fn.short_src\match("%.moon$") and type(MOON_SOURCE_MAP[file]) == 'table'
+                    char = MOON_SOURCE_MAP[file][calling_fn.currentline]
+                    line_num = file\line_number_at(char)
+                else
+                    line_num = calling_fn.currentline
 
-    level = 1
-    found_start = false
+            if file and filename and line_num
+                start = 1
+                lines = file\lines!
+                for i=1,line_num-1 do start += #lines[i] + 1
+                stop = start + #lines[line_num]
+                start += #lines[line_num]\match("^ *")
+                error_message = pretty_error{
+                    title:"Error"
+                    error:error_message, source:file
+                    start:start, stop:stop, filename:filename
+                }
+                break
+            if calling_fn.func == xpcall then break
+
+
+    ret = {
+        "#{RED}ERROR: #{BRIGHT_RED}#{error_message or ""}#{RESET}"
+        "stack traceback:"
+    }
+
+    level = 2
     while true
         -- TODO: reduce duplicate code
         calling_fn = debug_getinfo(level)
         if not calling_fn then break
+        if calling_fn.func == xpcall then break
         level += 1
-        unless found_start
-            if calling_fn.func == start_fn then found_start = true
-            continue
         name = calling_fn.name and "function '#{calling_fn.name}'" or nil
         if calling_fn.linedefined == 0 then name = "main chunk"
-        if name == "run_lua_fn" then continue
+        if name == "function 'run_lua_fn'" then continue
         line = nil
         if map = SOURCE_MAP and SOURCE_MAP[calling_fn.source]
             if calling_fn.currentline
@@ -78,11 +119,8 @@ print_error = (error_message, start_fn, stop_fn)->
             if not filename
                 filename,start = calling_fn.source\match('@([^[]*)%[([0-9]+)]')
             assert(filename)
-            -- TODO: get name properly
             name = if calling_fn.name
-                if tmp = calling_fn.name\match("^A_([a-zA-Z0-9_]*)$")
-                    "action '#{tmp\gsub("_"," ")\gsub("x([0-9A-F][0-9A-F])", => string.char(tonumber(@, 16)))}'"
-                else "action '#{calling_fn.name}'"
+                "action '#{calling_fn.name\from_lua_id!}'"
             else "main chunk"
 
             file = Files.read(filename)
@@ -123,8 +161,7 @@ print_error = (error_message, start_fn, stop_fn)->
             
             if file and (calling_fn.short_src\match("%.moon$") or file\match("^#![^\n]*moon\n")) and type(MOON_SOURCE_MAP[file]) == 'table'
                 char = MOON_SOURCE_MAP[file][calling_fn.currentline]
-                line_num = 1
-                for _ in file\sub(1,char)\gmatch("\n") do line_num += 1
+                line_num = file\line_number_at(char)
                 line = "#{CYAN}#{calling_fn.short_src}:#{line_num} in #{name or '?'}#{RESET}"
             else
                 line_num = calling_fn.currentline
@@ -137,18 +174,17 @@ print_error = (error_message, start_fn, stop_fn)->
                 if err_line = lines[line_num]
                     offending_statement = "#{BRIGHT_RED}#{err_line\match("^[ ]*(.*)$")}#{RESET}"
                     line ..= "\n        "..offending_statement
-        io.stderr\write(line,"\n")
+        table.insert ret, line
         if calling_fn.istailcall
-            io.stderr\write("      #{DIM}(...tail calls...)#{RESET}\n")
-        if calling_fn.func == stop_fn then break
+            table.insert ret, "      #{DIM}(...tail calls...)#{RESET}"
 
-    io.stderr\flush!
+    return table.concat(ret, "\n")
 
 guard = (fn)->
-    error_handler = (error_message)->
-        print_error error_message, error_handler, fn
-        EXIT_FAILURE = 1
-        os.exit(EXIT_FAILURE)
-    xpcall(fn, error_handler)
+    ok, err = xpcall(fn, enhance_error)
+    if not ok
+        io.stderr\write err
+        io.stderr\flush!
+        os.exit 1
 
-return {:guard, :print_error}
+return {:guard, :enhance_error, :print_error}

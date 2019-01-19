@@ -4,6 +4,7 @@
 {:List, :Dict, :Text} = require 'containers'
 SyntaxTree = require "syntax_tree"
 Files = require "files"
+Errhand = require "error_handling"
 make_parser = require("parser")
 pretty_error = require("pretty_errors")
 
@@ -61,6 +62,7 @@ nomsu_environment = Importer{
     :LuaCode, :NomsuCode, :Source
     LuaCode_from: ((src, ...)-> LuaCode\from(src, ...)),
     NomsuCode_from: ((src, ...)-> NomsuCode\from(src, ...)),
+    enhance_error: Errhand.enhance_error
     SOURCE_MAP: {},
     getfenv:getfenv,
 

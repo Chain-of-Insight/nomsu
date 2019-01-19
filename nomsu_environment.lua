@@ -10,6 +10,7 @@ do
 end
 local SyntaxTree = require("syntax_tree")
 local Files = require("files")
+local Errhand = require("error_handling")
 local make_parser = require("parser")
 local pretty_error = require("pretty_errors")
 local make_tree
@@ -137,6 +138,7 @@ nomsu_environment = Importer({
   NomsuCode_from = (function(src, ...)
     return NomsuCode:from(src, ...)
   end),
+  enhance_error = Errhand.enhance_error,
   SOURCE_MAP = { },
   getfenv = getfenv,
   _1_as_nomsu = tree_to_nomsu,
