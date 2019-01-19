@@ -169,7 +169,8 @@ do
     string2 = require 'string2'
     {:lines, :line, :line_at, :as_lua_id, :is_lua_id} = string2
     text_methods =
-        formatted_with:format, byte:byte, position_of:find, position_of_1_after:find,
+        formatted_with:format, byte:byte,
+        position_of:((...)->(find(...))), position_of_1_after:((...)->(find(...))),
         as_a_lua_identifier: as_lua_id, is_a_lua_identifier: is_lua_id,
         as_a_lua_id: as_lua_id, is_a_lua_id: is_lua_id,
         bytes_1_to: (start, stop)=> List{byte(tostring(@), start, stop)}

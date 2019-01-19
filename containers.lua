@@ -420,8 +420,12 @@ do
   local text_methods = {
     formatted_with = format,
     byte = byte,
-    position_of = find,
-    position_of_1_after = find,
+    position_of = (function(...)
+      return (find(...))
+    end),
+    position_of_1_after = (function(...)
+      return (find(...))
+    end),
     as_a_lua_identifier = as_lua_id,
     is_a_lua_identifier = is_lua_id,
     as_a_lua_id = as_lua_id,
