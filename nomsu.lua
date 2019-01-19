@@ -34,7 +34,6 @@ if not ok then
   os.exit(EXIT_FAILURE)
 end
 local Files = require("files")
-local Errhand = require("error_handling")
 local NomsuCode, LuaCode, Source
 do
   local _obj_0 = require("code_obj")

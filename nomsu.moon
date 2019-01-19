@@ -40,7 +40,6 @@ if not ok
     print("Error: unable to find the 'lpeg' Lua module. Please install LPEG either from http://www.inf.puc-rio.br/~roberto/lpeg/re.html or, if you use luarocks: `luarocks install lpeg`")
     os.exit(EXIT_FAILURE)
 Files = require "files"
-Errhand = require "error_handling"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 {:List, :Dict, :Text} = require 'containers'
 
