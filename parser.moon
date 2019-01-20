@@ -11,7 +11,7 @@ foldr = (...)->
         assert inner.type
         outer = select(i,...)
         table.insert(outer, 1, inner)
-        inner.start = outer.start
+        outer.source.start = inner.source.start
         inner = outer
     assert inner.type
     return inner
