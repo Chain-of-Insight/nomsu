@@ -1,7 +1,7 @@
 #!/usr/bin/env nomsu -V6.13.12.8
 #
     This is a Nomsu tutorial.
-    
+
 use "filesystem"
 use "consolecolor"
 use "commandline"
@@ -19,19 +19,53 @@ use "shell"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 $lessons = [
+    lesson "Variables":
+        # In Nomsu, variables have a "$" prefix, and you can just assign to them
+            without declaring them first:
+        $x = 10
+        assume $x == 10
+        
+        # Variables which have not yet been set have the value (nil)
+        assume $foobar == (nil)
+
+        # Variables can be nameless:
+        $ = 99
+
+        # Or have spaces, if surrounded with parentheses:
+        $(my favorite number) = 23
+
+        # Figure out what value $my_var should have:
+        $my_var = 100
+        $my_var = ($my_var + $x + $(my favorite number))
+        assume $my_var == (???)
+
     lesson "Actions":
         # Fix this action so the tests pass, then save and quit.
         # If the tests don't pass, you can come back to this file later.
         ($x doubled) means ((???) * $x)
         
         # Tests:
-        for $ in 1 to 10:
-            assume ($ doubled) == (2 * $)
+        assume (2 doubled) == 4
+        assume (-5 doubled) == -10
+
+    lesson "Blocks":
+        # When you need to do multiple things inside an action, use a block.
+        # Blocks are written with a colon followed by some indented code:
+        ($x doubled then squared) means:
+            $x = (2 * $x)
+            $x = (???)
+            return $x
+
+        # Blocks are also used for loops and conditionals:
+        for $num in [0, -1, 10, 4]:
+            $correct_answer = (4 * ($num * $num))
+            if (($num doubled then squared) != $correct_answer):
+                fail "Wrong answer for \$num!"
     
     lesson "Conditionals":
-        # Make this action return (yes) if its argument
-        # is bigger than 99, otherwise return (no)
-        ($n is a big number) means:
+        # Make this action return "big" if its argument
+        # is bigger than 99, otherwise return "small"
+        (the size of $n) means:
             if (<your code here>):
                 <your code here>
             ..else:
@@ -39,15 +73,16 @@ $lessons = [
         
         # Tests:
         for $small_number in [0, 1, -5, -999, 99]:
-            assume ($small_number is a big number) == (no)
+            assume (the size of $small_number) == "small"
         
         for $big_number in [9999, 100]:
-            assume ($big_number is a big number) == (yes)
+            assume (the size of $big_number) == "big"
     
     lesson "Loops":
         # Fix this action so the tests pass:
         (the sum of $numbers) means:
             $sum = 0
+            # You can loop over the values in a list like this:
             for $number in $numbers:
                 # Hint: math expressions may need parentheses
                 <your code here>
@@ -56,6 +91,12 @@ $lessons = [
         # Tests:
         assume (the sum of [1, 2, 3, 4, 5]) == 15
         assume (the sum of [100, 200]) == 300
+
+        # You can also loop over a number range like this:
+        $total = 0
+        for $i in 1 to 3:
+            $total = ($total + $i)
+        assume $total == (???)
     
     lesson "Variable Scopes":
         # A nomsu variable that has not yet been assigned to is (nil)
@@ -135,6 +176,85 @@ $lessons = [
 
         # Note: a 'try' block will silence failures, so this has no effect:
         try: fail
+
+    lesson "Indexing":
+        # Nomsu uses the "." operator to access things inside an object:
+        $dictionary = {.dog = "A lovable doofus", .cat = "An internet superstar"}
+        assume $dictionary.dog == "A lovable doofus"
+        assume $dictionary.cat == (???)
+
+        # If you try to access a key that's not in an object, the result is (nil):
+        assume $dictionary.mimsy == (???)
+        
+        # $dictionary.dog is just a shorthand for $dictionary."dog".
+            You may need to use the longer form for strings with spaces:
+        $dictionary."guinea pig" = "A real-life tribble"
+
+        # Dictionaries are created with curly braces ({}) and can have
+            anything as a key or value, including numbers or other dictionaries:
+        $dictionary.5 = "The number five"
+        $dictionary.five = 5
+        $dictionary.myself = $dictionary
+        assume $dictionary.myself == (???)
+
+        # Lists are similar, but use square brackets ([])
+            and can only have numbers as keys, starting at 1:
+        $list = ["first", "second", 999]
+        assume $list.1 == "first"
+        assume $list.2 == (???)
+        assume $list.3 == (???)
+
+        # Hint: 4 should be a missing key
+        assume $list.4 == (???)
+        assume $list.foobar == (???)
+
+        # The "#" action gets the number of items inside something:
+        assume (#$list) == (???)
+        assume (#{.x = 10, .y = 20}) == (???)
+
+    lesson "Methods":
+        # The "," is used for method calls, which means calling an action
+            that's stored on an object (with the object as the first argument).
+        # Lists have an "add" method that puts new items at the end:
+        $list = [-4, -6, 5]
+        $list, add 3
+        assume $list == [-4, -6, 5, 3]
+        $list, add 7
+        assume $list == [???]
+
+        # Text also has some methods like:
+        $name = "Harry Tuttle"
+        assume ($name, character 7) == "T"
+        assume ($name, with "Tuttle" -> "Buttle") == (???)
+
+        # Methods can be chained too:
+        assume ($name, with "Tuttle" -> "Buttle", character 7) == (???)
+
+    lesson "Object Oriented Programming":
+        # Object Oriented Programming deals with things that have
+            associated values and behaviors.
+        # Here, we define a Buffer to be a thing that has a .bits value:
+        (a Buffer) is (a thing) with [$bits]:
+            # And some methods:
+            ($self, set up) means:
+                # This method runs when a new buffer is created
+                $bits = []
+            
+            # This method is used to add to a buffer
+            ($self, add $bit) means:
+                $bits, add $bit
+
+            ($self, length) means:
+                # Write some code that returns the total length of all
+                    the bits on this buffer.
+                # Hint: the length operator (#$foo) works on text
+                <your code here>
+
+        $b = (a Buffer)
+        $b, add "xx"
+        $b, add "yyy"
+        assume ($b, length) == 5
+        assume ($b, joined) == "xxyyy"
 ]
 
 command line program with $args:
