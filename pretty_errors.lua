@@ -25,7 +25,7 @@ format_error = function(err)
   else
     pointer = (" "):rep(err_linepos + #fmt_str:format(0) - 1) .. "⬆"
   end
-  local err_msg = "\027[33;41;1m" .. tostring(err.title or "Error") .. " at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "\027[0m"
+  local err_msg = "\027[33;41;1m" .. tostring(err.title or "Error") .. " at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "," .. tostring(err_linepos) .. "\027[0m"
   for i = err_linenum - context, err_linenum - 1 do
     do
       local line = string2.line(err.source, i)
