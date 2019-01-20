@@ -55,7 +55,7 @@ debug.getinfo = function(thread, f, what)
         end
         info.short_src = info.source:match('@([^[]*)') or info.short_src
         if info.name then
-          info.name = "action '" .. tostring(calling_fn.name:from_lua_id()) .. "'"
+          info.name = "action '" .. tostring(info.name:from_lua_id()) .. "'"
         else
           info.name = "main chunk"
         end

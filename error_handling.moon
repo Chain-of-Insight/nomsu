@@ -42,7 +42,7 @@ debug.getinfo = (thread,f,what)->
                 info.lastlinedefined = assert(map[info.lastlinedefined])
             info.short_src = info.source\match('@([^[]*)') or info.short_src
             info.name = if info.name
-                "action '#{calling_fn.name\from_lua_id!}'"
+                "action '#{info.name\from_lua_id!}'"
             else "main chunk"
     return info
 
