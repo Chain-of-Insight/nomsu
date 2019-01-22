@@ -41,7 +41,7 @@ download [
         sh> $cmd
     ..if it fails:
         say ("
-            Sorry, the uninstall failed. You may need to re-run as root with `sudo` in front of the command.
+            Sorry, the install failed. You may need to re-run as root with `sudo` in front of the command.
         ")
         exit 1
 

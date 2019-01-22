@@ -1,3 +1,4 @@
+#!/usr/bin/env nomsu
 #
     A tool to uninstall third party Nomsu packages (the inverse of the install tool)
     

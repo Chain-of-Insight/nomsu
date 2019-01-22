@@ -1,0 +1,20 @@
+#!/usr/bin/env nomsu
+#
+    A tool to list installed third party Nomsu packages
+    
+    Usage:
+        nomsu -t list
+    
+use "filesystem"
+use "commandline"
+use "shell"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+command line program with $args:
+    $packages = (=sh "ls \$(NOMSU PACKAGEPATH)")
+    say "Installed packages:"
+    for $f in ($packages, lines):
+        if ($f != ""):
+            $f = ($f, with "%.nom$" -> "")
+            say "  * \$f"
