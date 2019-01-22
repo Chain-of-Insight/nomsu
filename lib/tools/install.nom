@@ -1,0 +1,60 @@
+#!/usr/bin/env nomsu
+#
+    A tool to install third party Nomsu packages
+    
+    Usage:
+        nomsu -t install /path/to/package
+        nomsu -t install github.com/user/repo
+    
+use "filesystem"
+use "commandline"
+use "shell"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+$(NOMSU PACKAGEPATH) or= "/opt/nomsu"
+$actions = []
+(download $patts with $cmd) means:
+    $actions, add {.patterns = $patts, .cmd = $cmd}
+download ["^.*/([^/]+)%.git$"] with "git clone %0 \$(NOMSU PACKAGEPATH)/%1"
+download ["^.*/([^/]+)%.zip"] with ("
+    curl %0 > \($(NOMSU PACKAGEPATH))/%1.zip && unzip \($(NOMSU PACKAGEPATH))/%1.zip -d \$(NOMSU PACKAGEPATH) && rm \($(NOMSU PACKAGEPATH))\
+    ../%1.zip
+")
+
+download ["^.*/([^/]+)%.tar%.gz"] with ("
+    curl %0 > \($(NOMSU PACKAGEPATH))/%1.tar.gz && tar xf \($(NOMSU PACKAGEPATH))/%1.tar.gz --directory \$(NOMSU PACKAGEPATH)\
+    .. && rm \($(NOMSU PACKAGEPATH))/%1.tar.gz
+")
+
+download ["^https://github%.com/([^/]+)/([^/]+)$", "^github%.com/([^/]+)/([^/]+)$"]
+..with "git clone https://github.com/%1/%2.git \$(NOMSU PACKAGEPATH)/%2"
+
+download [
+    "^https://bitbucket%.org/([^/]+)/([^/]+)$"
+    "^bitbucket%.org/([^/]+)/([^/]+)$"
+] with "git clone git@bitbucket.org:%1.git \$(NOMSU PACKAGEPATH)/%2"
+
+(run command $cmd) means:
+    say $cmd
+    try:
+        sh> $cmd
+    ..if it fails:
+        say ("
+            Sorry, the uninstall failed. You may need to re-run as root with `sudo` in front of the command.
+        ")
+        exit 1
+
+command line program with $args:
+    for $filename in $args.extras:
+        if ($Files.exists $filename):
+            run command "cp -rv \$filename \$(NOMSU PACKAGEPATH)"
+            do next $filename
+        ..else:
+            for $action in $actions:
+                for $patt in $action.patterns:
+                    if ($filename, match $patt):
+                        $cmd = ($filename, with $patt -> $action.cmd)
+                        run command $cmd
+                        do next $filename
+        fail "Not sure what to do with \$filename"

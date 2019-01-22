@@ -1,0 +1,38 @@
+#
+    A tool to uninstall third party Nomsu packages (the inverse of the install tool)
+    
+    Usage:
+        nomsu -t uninstall <package_names...>
+    
+use "filesystem"
+use "commandline"
+use "shell"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(run command $cmd) means:
+    say $cmd
+    try:
+        sh> $cmd
+    ..if it fails:
+        say ("
+            Sorry, the uninstall failed. You may need to re-run as root with `sudo` in front of the command.
+        ")
+        exit 1
+
+command line program with $args:
+    $(NOMSU PACKAGEPATH) or= "/opt/nomsu"
+    $searchpath =
+        [
+            : for $ in ["?.lua", "?/init.lua", "?.nom", "?/init.nom"]:
+                add "\$(NOMSU PACKAGEPATH)\$"
+        ], joined with ";"
+
+    for $package_name in $args.extras:
+        $path = ($package.searchpath $package_name $package.nomsupath "/")
+        unless $path:
+            say "Sorry, couldn't find \$package_name in \$(NOMSU PACKAGEPATH)"
+            exit 1
+        $path = ($path, with "/init%.nom" -> "")
+        unless ((ask "Do you want to delete \$path? [Y/n] ") == "n"):
+            run command "rm -rv \$path"
