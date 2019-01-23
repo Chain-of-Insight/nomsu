@@ -22,7 +22,6 @@ use "shell"
         exit 1
 
 command line program with $args:
-    $(NOMSU PACKAGEPATH) or= "/opt/nomsu"
     $searchpath =
         [
             : for $ in ["?.lua", "?/init.lua", "?.nom", "?/init.nom"]:
