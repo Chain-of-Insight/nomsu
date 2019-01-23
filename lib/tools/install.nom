@@ -12,7 +12,6 @@ use "shell"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-$(NOMSU PACKAGEPATH) or= "/opt/nomsu"
 $actions = []
 (download $patts with $cmd) means:
     $actions, add {.patterns = $patts, .cmd = $cmd}
