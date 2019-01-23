@@ -43,6 +43,11 @@ Importer = (t, imports)->
     t._IMPORTS = _module_imports[t]
     return setmetatable(t, _importer_mt)
 
+_1_as_text = (x)->
+    if x == true then return "yes"
+    if x == false then return "no"
+    return tostring(x)
+
 local nomsu_environment
 nomsu_environment = Importer{
     NOMSU_COMPILER_VERSION: 13, NOMSU_SYNTAX_VERSION: max_parser_version
@@ -51,7 +56,7 @@ nomsu_environment = Importer{
     yield:coroutine.yield, resume:coroutine.resume, coroutine_status_of:coroutine.status,
     coroutine_wrap:coroutine.wrap, coroutine_from: coroutine.create,
     :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall,
-    say:print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
+    :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
     :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
     :pairs, :ipairs, :jit, :_VERSION
     bit: (jit or _VERSION == "Lua 5.2") and require('bitops') or nil
@@ -69,7 +74,7 @@ nomsu_environment = Importer{
 
     -- Nomsu functions:
     _1_as_nomsu:tree_to_nomsu, _1_as_inline_nomsu:tree_to_inline_nomsu,
-    compile: compile, at_1_fail:fail_at,
+    compile: compile, at_1_fail:fail_at, _1_as_text:_1_as_text,
     exit:os.exit, quit:os.exit,
 
     _1_parsed: (nomsu_code, syntax_version)->
@@ -133,7 +138,9 @@ nomsu_environment = Importer{
         else
             code = NomsuCode\from(Source(path, 1, #code), code)
         _currently_running_files\add path
-        mod\run(code)
+        ret = mod\run(code)
+        if ret != nil
+            mod = ret
         _currently_running_files\pop!
         package.nomsuloaded[package_name] = mod
         package.nomsuloaded[path] = mod
@@ -145,8 +152,9 @@ nomsu_environment = Importer{
         for k,v in pairs(mod)
             imports[k] = v
         cr_imports = assert _module_imports[@COMPILE_RULES]
-        for k,v in pairs(mod.COMPILE_RULES)
-            cr_imports[k] = v
+        if mod.COMPILE_RULES
+            for k,v in pairs(mod.COMPILE_RULES)
+                cr_imports[k] = v
         return mod
 
     export: (package_name)=>
@@ -160,15 +168,13 @@ nomsu_environment = Importer{
                 --if k != "_G" and k != "_ENV" and k != "COMPILE_RULES" and k != "MODULE_NAME"
                 @[k] = v
         cr_imports = assert _module_imports[@COMPILE_RULES]
-        for k,v in pairs(_module_imports[mod.COMPILE_RULES])
-            if rawget(cr_imports, k) == nil
-                cr_imports[k] = v
-        for k,v in pairs(mod.COMPILE_RULES)
-            if rawget(@COMPILE_RULES, k) == nil
-                @COMPILE_RULES[k] = v
-        --for k,v in pairs(mod.TESTS)
-        --    if rawget(@TESTS, k) == nil
-        --        @TESTS[k] = v
+        if mod.COMPILE_RULES
+            for k,v in pairs(_module_imports[mod.COMPILE_RULES])
+                if rawget(cr_imports, k) == nil
+                    cr_imports[k] = v
+            for k,v in pairs(mod.COMPILE_RULES)
+                if rawget(@COMPILE_RULES, k) == nil
+                    @COMPILE_RULES[k] = v
         return mod
 
     run: (to_run)=>
@@ -230,7 +236,7 @@ nomsu_environment = Importer{
                 @SOURCE_MAP[source_key] = map
             return run_lua_fn!
         else
-            error("Attempt to run unknown thing: "..tostring(to_run))
+            error("Attempt to run unknown thing: ".._1_as_lua(to_run))
 
     new_environment: ->
         env = Importer({}, {k,v for k,v in pairs(nomsu_environment)})

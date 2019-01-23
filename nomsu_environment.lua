@@ -78,6 +78,16 @@ Importer = function(t, imports)
   t._IMPORTS = _module_imports[t]
   return setmetatable(t, _importer_mt)
 end
+local _1_as_text
+_1_as_text = function(x)
+  if x == true then
+    return "yes"
+  end
+  if x == false then
+    return "no"
+  end
+  return tostring(x)
+end
 local nomsu_environment
 nomsu_environment = Importer({
   NOMSU_COMPILER_VERSION = 13,
@@ -101,7 +111,7 @@ nomsu_environment = Importer({
   tostring = tostring,
   string = string,
   xpcall = xpcall,
-  say = print,
+  print = print,
   loadfile = loadfile,
   rawset = rawset,
   _VERSION = _VERSION,
@@ -147,6 +157,7 @@ nomsu_environment = Importer({
   _1_as_inline_nomsu = tree_to_inline_nomsu,
   compile = compile,
   at_1_fail = fail_at,
+  _1_as_text = _1_as_text,
   exit = os.exit,
   quit = os.exit,
   _1_parsed = function(nomsu_code, syntax_version)
@@ -251,7 +262,10 @@ nomsu_environment = Importer({
       code = NomsuCode:from(Source(path, 1, #code), code)
     end
     _currently_running_files:add(path)
-    mod:run(code)
+    local ret = mod:run(code)
+    if ret ~= nil then
+      mod = ret
+    end
     _currently_running_files:pop()
     package.nomsuloaded[package_name] = mod
     package.nomsuloaded[path] = mod
@@ -264,8 +278,10 @@ nomsu_environment = Importer({
       imports[k] = v
     end
     local cr_imports = assert(_module_imports[self.COMPILE_RULES])
-    for k, v in pairs(mod.COMPILE_RULES) do
-      cr_imports[k] = v
+    if mod.COMPILE_RULES then
+      for k, v in pairs(mod.COMPILE_RULES) do
+        cr_imports[k] = v
+      end
     end
     return mod
   end,
@@ -283,14 +299,16 @@ nomsu_environment = Importer({
       end
     end
     local cr_imports = assert(_module_imports[self.COMPILE_RULES])
-    for k, v in pairs(_module_imports[mod.COMPILE_RULES]) do
-      if rawget(cr_imports, k) == nil then
-        cr_imports[k] = v
+    if mod.COMPILE_RULES then
+      for k, v in pairs(_module_imports[mod.COMPILE_RULES]) do
+        if rawget(cr_imports, k) == nil then
+          cr_imports[k] = v
+        end
       end
-    end
-    for k, v in pairs(mod.COMPILE_RULES) do
-      if rawget(self.COMPILE_RULES, k) == nil then
-        self.COMPILE_RULES[k] = v
+      for k, v in pairs(mod.COMPILE_RULES) do
+        if rawget(self.COMPILE_RULES, k) == nil then
+          self.COMPILE_RULES[k] = v
+        end
       end
     end
     return mod
@@ -377,7 +395,7 @@ nomsu_environment = Importer({
       end
       return run_lua_fn()
     else
-      return error("Attempt to run unknown thing: " .. tostring(to_run))
+      return error("Attempt to run unknown thing: " .. _1_as_lua(to_run))
     end
   end,
   new_environment = function()

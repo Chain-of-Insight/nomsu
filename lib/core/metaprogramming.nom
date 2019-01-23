@@ -273,7 +273,7 @@ test:
                     return replacements[t:as_var()]
                 else
                     return "SyntaxTree{mangle("..t:as_var():as_lua().."), type="..t.type:as_lua(\
-        ..)..", source="..tostring(t.source):as_lua().."}"
+        ..)..", source=".._1_as_text(t.source):as_lua().."}"
                 end
             elseif SyntaxTree:is_instance(t) then
                 local ret = {}
@@ -283,7 +283,7 @@ test:
                         ret[#ret+1] = make_tree(t[i])
                         i = i + 1
                     elseif k == "source" then
-                        ret[#ret+1] = k.."= "..tostring(v):as_lua()
+                        ret[#ret+1] = k.."= ".._1_as_text(v):as_lua()
                     elseif lua_type_of(k) == 'string' and k:is_a_lua_id() then
                         ret[#ret+1] = k.."= "..make_tree(v)
                     else
@@ -292,7 +292,7 @@ test:
                 end
                 return "SyntaxTree{"..table.concat(ret, ", ").."}"
             elseif lua_type_of(t) == 'number' then
-                return tostring(t)
+                return _1_as_text(t)
             else
                 return t:as_lua()
             end
@@ -419,7 +419,9 @@ test:
             ")
         ) == "\"one\\n\\\"two\\\"\""
 
-(quote $s) compiles to "tostring(\($s as lua expr)):as_lua()"
+external:
+    (quote $) means ($ as text, as lua)
+
 test:
     assume (lua type of {}) == "table"
     assume (type of {}) == "a Dict"
