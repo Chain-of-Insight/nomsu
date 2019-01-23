@@ -39,6 +39,13 @@ test:
     end
 ")
 
+(else $) compiles to:
+    at (this tree) fail ("
+        Compile error: This 'else' is not connected to any 'if' or 'unless' condition.
+        Hint: You should probably have a ".." in front of the "else", to indicate \
+        ..that it's attached to the previous condition.
+    ")
+
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # Conditional expression (ternary operator)
