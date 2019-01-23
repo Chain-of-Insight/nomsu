@@ -3,27 +3,20 @@
     This file contains basic input/output code
     
 use "core/metaprogramming"
+use "core/operators"
+use "core/control_flow"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 external:
-    (say $message) compiles to:
-        lua> ("
-            if \$message.type == "Text" then
-                return LuaCode("say(", \($message as lua expr), ");");
-            else
-                return LuaCode("say(tostring(", \($message as lua expr), "));");
-            end
-        ")
+    (say (*extra arguments*)) means:
+        for $ in 1 to (select "#" (*extra arguments*)):
+            $arg = (select $ (*extra arguments*))
+            $io.write ($arg as text)
+        $io.write "\n"
+        $io.flush()
     
-    (say $message inline) compiles to:
-        lua> ("
-            if \$message.type == "Text" then
-                return LuaCode("io.write(", \($message as lua expr), ")");
-            else
-                return LuaCode("io.write(tostring(", \($message as lua expr), "))");
-            end
-        ")
+    (say $message inline) means ($io.write $message)
     
     (ask $prompt) means:
         $io.write $prompt
