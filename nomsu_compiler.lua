@@ -194,16 +194,23 @@ compile = function(self, tree)
     end
     return lua
   elseif "Text" == _exp_0 then
-    local lua = LuaCode:from(tree.source)
+    if #tree == 0 then
+      return LuaCode:from(tree.source, '""')
+    end
+    if #tree == 1 and type(tree[1]) == 'string' then
+      return LuaCode:from(tree.source, tree[1]:as_lua())
+    end
+    local lua = LuaCode:from(tree.source, "Text(")
     local added = 0
     local string_buffer = ""
     local add_bit
     add_bit = function(bit)
       if added > 0 then
         if lua:trailing_line_len() + #bit > MAX_LINE then
-          lua:add("\n  ")
+          lua:add(",\n  ")
+        else
+          lua:add(", ")
         end
-        lua:add("..")
       end
       lua:add(bit)
       added = added + 1
@@ -223,13 +230,8 @@ compile = function(self, tree)
           string_buffer = ""
         end
         local bit_lua = self:compile(bit)
-        if bit.type == "Block" and #bit == 1 then
-          bit = bit[1]
-        end
         if bit.type == "Block" then
           bit_lua = LuaCode:from(bit.source, "a_List(function(add)", "\n    ", bit_lua, "\nend):joined()")
-        elseif bit.type ~= "Text" then
-          bit_lua = LuaCode:from(bit.source, "tostring(", bit_lua, ")")
         end
         add_bit(bit_lua)
         _continue_0 = true
@@ -245,11 +247,9 @@ compile = function(self, tree)
       string_buffer = ""
     end
     if added == 0 then
-      add_bit('""')
+      return LuaCode:from(tree.source, '""')
     end
-    if added > 1 then
-      lua:parenthesize()
-    end
+    lua:add(")")
     return lua
   elseif "List" == _exp_0 or "Dict" == _exp_0 then
     local typename = "a_" .. tree.type

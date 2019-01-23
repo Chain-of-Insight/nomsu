@@ -155,14 +155,19 @@ compile = (tree)=>
             return lua
 
         when "Text"
-            lua = LuaCode\from(tree.source)
+            if #tree == 0
+                return LuaCode\from(tree.source, '""')
+            if #tree == 1 and type(tree[1]) == 'string'
+                return LuaCode\from(tree.source, tree[1]\as_lua!)
+            lua = LuaCode\from(tree.source, "Text(")
             added = 0
             string_buffer = ""
             add_bit = (bit)->
                 if added > 0
                     if lua\trailing_line_len! + #bit > MAX_LINE
-                        lua\add "\n  "
-                    lua\add ".."
+                        lua\add ",\n  "
+                    else
+                        lua\add ", "
                 lua\add bit
                 added += 1
 
@@ -176,14 +181,10 @@ compile = (tree)=>
                     string_buffer = ""
 
                 bit_lua = @compile(bit)
-                if bit.type == "Block" and #bit == 1
-                    bit = bit[1]
                 if bit.type == "Block"
                     bit_lua = LuaCode\from bit.source, "a_List(function(add)",
                         "\n    ", bit_lua,
                         "\nend):joined()"
-                elseif bit.type != "Text"
-                    bit_lua = LuaCode\from(bit.source, "tostring(",bit_lua,")")
                 add_bit bit_lua
 
             if string_buffer != ""
@@ -192,9 +193,8 @@ compile = (tree)=>
                 string_buffer = ""
 
             if added == 0
-                add_bit '""'
-            if added > 1
-                lua\parenthesize!
+                return LuaCode\from(tree.source, '""')
+            lua\add ")"
             return lua
 
         when "List", "Dict"
