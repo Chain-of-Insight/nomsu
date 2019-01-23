@@ -26,7 +26,8 @@ lua> ("
 
 lua> ("
     COMPILE_RULES["1 ->"] = function(\(nomsu environment), _tree, \$args, \$body)
-        if \$args and not \$body then \$args, \$body = {}, \$args end
+        if not \$args and not \$body then \$args, \$body = {}, SyntaxTree{type='Action', "do", "nothing"}
+        elseif \$args and not \$body then \$args, \$body = {}, \$args end
         local body_lua = SyntaxTree:is_instance(\$body) and \(nomsu environment):compile(\$body) or \$body
         if SyntaxTree:is_instance(\$body) and \$body.type ~= "Block" then body_lua:prepend("return ") end
         local lua = LuaCode("(function(")
@@ -88,7 +89,7 @@ test:
 
 lua> ("
     COMPILE_RULES["1 compiles to"] = function(\(nomsu environment), \(this tree), \$action, \$body)
-        local \$args = List{"\(nomsu environment)", "\(this tree)"}
+        local \$args = a_List{"\(nomsu environment)", "\(this tree)"}
         if \$body.type == "Text" then
             \$body = SyntaxTree{source=\$body.source, type="Action", "Lua", \$body}
         end
@@ -121,18 +122,18 @@ lua> ("
             at_1_fail(\$actions, "Compile error: This should be a list of actions.")
         end
         local lua = \(\($actions.1 compiles to $body) as lua)
-        local \$args = List{"\(nomsu environment)", "\(this tree)", unpack(\$actions[1]:get_args())}
-        local \$compiled_args = List{"\(nomsu environment)", "\(this tree)"};
+        local \$args = a_List{"\(nomsu environment)", "\(this tree)", unpack(\$actions[1]:get_args())}
+        local \$compiled_args = a_List{"\(nomsu environment)", "\(this tree)"};
         for i=3,#\$args do \$compiled_args[i] = \(nomsu environment):compile(\$args[i]) end
         for i=2,#\$actions do
             local alias = \$actions[i]
-            local \$alias_args = List{"\(nomsu environment)", "\(this tree)", unpack(alias:get_args())}
+            local \$alias_args = a_List{"\(nomsu environment)", "\(this tree)", unpack(alias:get_args())}
             lua:add("\\nCOMPILE_RULES[", alias:get_stub():as_lua(), "] = ")
             if \$alias_args == \$args then
                 lua:add("COMPILE_RULES[", \$actions[1]:get_stub():as_lua(), "]")
             else
                 lua:add("function(")
-                local \$compiled_alias_args = List{"\(nomsu environment)", "\(this tree)"};
+                local \$compiled_alias_args = a_List{"\(nomsu environment)", "\(this tree)"};
                 for i=3,#\$alias_args do \$compiled_alias_args[i] = \(nomsu environment):compile(\$alias_args[i]) end
                 lua:concat_add(\$compiled_alias_args, ", ")
                 lua:add(") return COMPILE_RULES[", \$actions[1]:get_stub():as_lua(), "](")
@@ -183,10 +184,10 @@ test:
         local first_def = (\$actions[1].type == "MethodCall"
             and LuaCode(\(nomsu environment):compile(\$actions[1][1]), ".", \$actions[1]:get_stub():as_lua_id())
             or LuaCode(\$actions[1]:get_stub():as_lua_id()))
-        local \$args = List(\$actions[1]:get_args())
+        local \$args = a_List(\$actions[1]:get_args())
         for i=2,#\$actions do
             local alias = \$actions[i]
-            local \$alias_args = List(alias:get_args())
+            local \$alias_args = a_List(alias:get_args())
             lua:add("\\n")
             if alias.type == "MethodCall" then
                 lua:add(\(nomsu environment):compile(alias[1]), ".", alias:get_stub():as_lua_id())
@@ -392,10 +393,10 @@ external:
 external:
     (match $tree with $patt) means:
         lua> ("
-            if \$patt.type == "Var" then return Dict{[\$patt:as_var()]=\$tree} end
+            if \$patt.type == "Var" then return a_Dict{[\$patt:as_var()]=\$tree} end
             if \$patt.type == "Action" and \$patt:get_stub() ~= \$tree:get_stub() then return nil end
             if #\$patt ~= #\$tree then return nil end
-            local matches = Dict{}
+            local matches = a_Dict{}
             for \($i)=1,#\$patt do
                 if SyntaxTree:is_instance(\$tree[\$i]) then
                     local submatch = \(match $tree.$i with $patt.$i)
@@ -425,6 +426,9 @@ test:
     assume ({} is "a Dict")
     assume ("" is text)
     assume ("" is "Text")
+    assume (5 is "a Number")
+    assume ((->) is "an Action")
+    assume ((yes) is "a Boolean")
     assume ("" isn't "a Dict")
 
 external:
@@ -432,14 +436,12 @@ external:
     [$ is not text, $ isn't text] all mean (=lua "\(lua type of $) ~= 'string'")
     (type of $) means:
         lua> ("
+            local mt = getmetatable(\$)
+            if mt and mt.__type then return mt.__type end
+            if \$ == nil then return 'nil' end
             local lua_type = \(lua type of $)
-            if lua_type == 'string' then return 'Text'
-            elseif lua_type == 'nil' then return 'nil'
-            elseif lua_type == 'table' or lua_type == 'userdata' then
-                local mt = getmetatable(\$)
-                if mt and mt.__type then return mt.__type end
-            end
-            return 'a '..lua_type
+            if lua_type == 'function' then return "an Action" end
+            return 'a '..lua_type:capitalized()
         ")
 
 ($ is $type) parses as ((type of $) == $type)

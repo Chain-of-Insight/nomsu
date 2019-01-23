@@ -37,7 +37,7 @@ _list_mt =
     as_nomsu: =>
         "["..concat([as_nomsu(b) for b in *@], ", ").."]"
     as_lua: =>
-        "List{"..concat([as_lua(b) for b in *@], ", ").."}"
+        "a_List{"..concat([as_lua(b) for b in *@], ", ").."}"
     __lt: (other)=>
         assert type(@) == 'table' and type(other) == 'table', "Incompatible types for comparison"
         for i=1,math.max(#@, #other)
@@ -125,7 +125,7 @@ _dict_mt =
     as_nomsu: =>
         "{"..concat([".#{as_nomsu(k)} = #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_lua: =>
-        "Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
+        "a_Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
     __band: (other)=>
         Dict{k,v for k,v in pairs(@) when other[k] != nil}
     __bor: (other)=>
@@ -162,56 +162,5 @@ Dict = (t)->
         t(add, add_1_eq_2)
         return d
     else error("Unsupported Dict type: "..type(t))
-
-
-do
-    {:reverse, :upper, :lower, :find, :byte, :match, :gmatch, :gsub, :sub, :format, :rep} = string
-    string2 = require 'string2'
-    {:lines, :line, :line_at, :as_lua_id, :is_lua_id} = string2
-    text_methods =
-        formatted_with:format, byte:byte,
-        position_of:((...)->(find(...))), position_of_1_after:((...)->(find(...))),
-        as_a_lua_identifier: as_lua_id, is_a_lua_identifier: is_lua_id,
-        as_a_lua_id: as_lua_id, is_a_lua_id: is_lua_id,
-        bytes_1_to: (start, stop)=> List{byte(tostring(@), start, stop)}
-        [as_lua_id "with 1 ->"]: (...)-> (gsub(...))
-        bytes: => List{byte(tostring(@), 1, -1)},
-        lines: => List(lines(@))
-        line: line
-        wrapped_to: (maxlen)=>
-            _lines = {}
-            for line in *@lines!
-                while #line > maxlen
-                    chunk = line\sub(1, maxlen)
-                    split = chunk\find(' ', maxlen-8) or maxlen
-                    chunk = line\sub(1, split)
-                    line = line\sub(split+1, -1)
-                    _lines[#_lines+1] = chunk
-                _lines[#_lines+1] = line
-            return table.concat(_lines, "\n")
-                                
-        line_at: (i)=> (line_at(@, i))
-        line_number_at: (i)=> select(2, line_at(@, i))
-        line_position_at: (i)=> select(3, line_at(@, i))
-        matches: (patt)=> match(@, patt) and true or false
-        matching: (patt)=> (match(@, patt))
-        matching_groups: (patt)=> List{match(@, patt)}
-        [as_lua_id "* 1"]: (n)=> rep(@, n)
-        all_matches_of: (patt)=>
-            result = {}
-            stepper,x,i = gmatch(@, patt)
-            while true
-                tmp = List{stepper(x,i)}
-                break if #tmp == 0
-                i = tmp[1]
-                result[#result+1] = (#tmp == 1) and tmp[1] or tmp
-            return List(result)
-        from_1_to: sub, from: sub,
-        character: (i)=> sub(@, i, i)
-    
-    setmetatable(text_methods, {__index:string2})
-    getmetatable("").__methods = text_methods
-    getmetatable("").__index = text_methods
-    getmetatable("").__add = (x)=> tostring(@)..tostring(x)
 
 return {:List, :Dict}

@@ -46,7 +46,7 @@ test:
     return
         Lua ("
             (function()
-                local \(mangle "comprehension") = List{}
+                local \(mangle "comprehension") = a_List{}
                 for \($match as lua expr) in (\($text as lua expr)):gmatch(\($patt as lua expr)) do
                     \(mangle "comprehension")[#\(mangle "comprehension")+1] = \($expr as lua)
                 end

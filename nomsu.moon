@@ -41,7 +41,8 @@ if not ok
     os.exit(EXIT_FAILURE)
 Files = require "files"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-{:List, :Dict, :Text} = require 'containers'
+{:List, :Dict} = require 'containers'
+Text = require 'text'
 
 sep = "\3"
 parser = re.compile([[

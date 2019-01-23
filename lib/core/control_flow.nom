@@ -485,7 +485,7 @@ test:
     $lua =
         Lua ("
             do
-                local _stack_\($var as lua expr) = List{\($structure as lua expr)}
+                local _stack_\($var as lua expr) = a_List{\($structure as lua expr)}
                 while #_stack_\($var as lua expr) > 0 do
                     \($var as lua expr) = table.remove(_stack_\($var as lua expr), 1)
                     \($body as lua)

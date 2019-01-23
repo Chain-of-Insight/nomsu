@@ -39,11 +39,12 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local List, Dict, Text
+local List, Dict
 do
   local _obj_0 = require('containers')
-  List, Dict, Text = _obj_0.List, _obj_0.Dict, _obj_0.Text
+  List, Dict = _obj_0.List, _obj_0.Dict
 end
+local Text = require('text')
 local sep = "\3"
 local parser = re.compile([[    args <- {| (flag %sep)*
          {:files: {|

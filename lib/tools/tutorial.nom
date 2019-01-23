@@ -26,10 +26,10 @@ $lessons = [
         # In Nomsu, variables have a "$" prefix, and you can just assign to them
             without declaring them first:
         $x = 10
-        assume $x == 10
+        assume ($x == 10)
         
         # Variables which have not yet been set have the value (nil)
-        assume $foobar == (nil)
+        assume ($foobar == (nil))
 
         # Variables can be nameless:
         $ = 99
@@ -40,7 +40,7 @@ $lessons = [
         # Figure out what value $my_var should have:
         $my_var = 100
         $my_var = ($my_var + $x + $(my favorite number))
-        assume (???) == $my_var
+        assume ($my_var == (???))
 
     lesson "Actions":
         # Fix this action so the tests pass, then save and quit.
@@ -48,8 +48,8 @@ $lessons = [
         ($x doubled) means ((???) * $x)
         
         # Tests:
-        assume (2 doubled) == 4
-        assume (-5 doubled) == -10
+        assume ((2 doubled) == 4)
+        assume ((-5 doubled) == -10)
 
     lesson "Blocks":
         # When you need to do multiple things inside an action, use a block.
@@ -69,17 +69,17 @@ $lessons = [
         # Make this action return "big" if its argument
         # is bigger than 99, otherwise return "small"
         (the size of $n) means:
-            if (<your code here>):
+            if (???):
                 <your code here>
             ..else:
                 <your code here>
         
         # Tests:
         for $small_number in [0, 1, -5, -999, 99]:
-            assume (the size of $small_number) == "small"
+            assume ((the size of $small_number) == "small")
         
         for $big_number in [9999, 100]:
-            assume (the size of $big_number) == "big"
+            assume ((the size of $big_number) == "big")
     
     lesson "Loops":
         # Fix this action so the tests pass:
@@ -92,14 +92,14 @@ $lessons = [
             return $sum
         
         # Tests:
-        assume (the sum of [1, 2, 3, 4, 5]) == 15
-        assume (the sum of [100, 200]) == 300
+        assume ((the sum of [1, 2, 3, 4, 5]) == 15)
+        assume ((the sum of [100, 200]) == 300)
 
         # You can also loop over a number range like this:
         $total = 0
         for $i in 1 to 3:
             $total = ($total + $i)
-        assume (???) == $total
+        assume ($total == (???))
     
     lesson "Variable Scopes":
         # Nomsu's variables are local by default, and actions have their own scopes:
@@ -110,17 +110,17 @@ $lessons = [
         (do something) means:
             # The variable $y is never set in this action, so it has the same value
                 it has outside this action.
-            assume (???) == $y
+            assume ($y == (???))
             
             # $x is set inside this action, and actions have their own scopes.
             $x = $y
             
             # What number should $x be here?
-            assume (???) == $x
+            assume ($x == (???))
         
         # After running the action, what value should $x have?
         do something
-        assume (???) == $x
+        assume ($x == (???))
         
     lesson "More Variable Scopes":
         # Loops and conditionals do *not* have their own scopes:
@@ -130,13 +130,13 @@ $lessons = [
             $z = 2
         
         # After assigning in a conditional, what should $z be?
-        assume (???) == $z
+        assume ($z == (???))
         for $ in 1 to 1:
             # Set $z inside a loop:
             $z = 3
         
         # After assigning in a loop, what should $z be?
-        assume (???) == $z
+        assume ($z == (???))
     
     lesson "Externals":
         # The 'external' block lets you modify variables outside an action:
@@ -146,7 +146,7 @@ $lessons = [
         do something
 
         # After running the action that sets $x in an 'external' block, what should $x be?
-        assume (???) == $x
+        assume ($x == (???))
 
     lesson "Locals":
         # The 'with' block lets you create a local scope for the variables you list:
@@ -157,8 +157,8 @@ $lessons = [
             $z = 2
         
         # After setting $y and $z in the 'with [$y]' block, what should $y and $z be?
-        assume (???) == $y
-        assume (???) == $z
+        assume ($y == (???))
+        assume ($z == (???))
 
     lesson "Failure and Recovery":
         $what_happened = "nothing"
@@ -172,7 +172,7 @@ $lessons = [
             $what_happened = "success"
 
         # What do you think happened?
-        assume (???) == $what_happened
+        assume ($what_happened == (???))
 
         # Note: a 'try' block will silence failures, so this has no effect:
         try: fail
@@ -180,11 +180,11 @@ $lessons = [
     lesson "Indexing":
         # Nomsu uses the "." operator to access things inside an object:
         $dictionary = {.dog = "A lovable doofus", .cat = "An internet superstar"}
-        assume $dictionary.dog == "A lovable doofus"
-        assume (???) == $dictionary.cat
+        assume ($dictionary.dog == "A lovable doofus")
+        assume ($dictionary.cat == (???))
 
         # If you try to access a key that's not in an object, the result is (nil):
-        assume (???) == $dictionary.mimsy
+        assume ($dictionary.mimsy == (???))
         
         # $dictionary.dog is just a shorthand for $dictionary."dog".
             You may need to use the longer form for strings with spaces:
@@ -195,22 +195,22 @@ $lessons = [
         $dictionary.5 = "The number five"
         $dictionary.five = 5
         $dictionary.myself = $dictionary
-        assume (???) == $dictionary.myself
+        assume ($dictionary.myself == (???))
 
         # Lists are similar, but use square brackets ([])
             and can only have numbers as keys, starting at 1:
         $list = ["first", "second", 999]
-        assume $list.1 == "first"
-        assume (???) == $list.2
-        assume (???) == $list.3
+        assume ($list.1 == "first")
+        assume ($list.2 == (???))
+        assume ($list.3 == (???))
 
         # Hint: 4 should be a missing key
-        assume (???) == $list.4
-        assume (???) == $list.foobar
+        assume ($list.4 == (???))
+        assume ($list.foobar == (???))
 
         # The "#" action gets the number of items inside something:
-        assume (???) == (#$list)
-        assume (???) == (#{.x = 10, .y = 20})
+        assume ((#$list) == (???))
+        assume ((#{.x = 10, .y = 20}) == (???))
 
     lesson "Methods":
         # The "," is used for method calls, which means calling an action
@@ -218,17 +218,17 @@ $lessons = [
         # Lists have an "add" method that puts new items at the end:
         $list = [-4, -6, 5]
         $list, add 3
-        assume $list == [-4, -6, 5, 3]
+        assume ($list == [-4, -6, 5, 3])
         $list, add 7
-        assume $list == [???]
+        assume ($list == [???])
 
         # Text also has some methods like:
         $name = "Harry Tuttle"
-        assume ($name, character 7) == "T"
-        assume (???) == ($name, with "Tuttle" -> "Buttle")
+        assume (($name, character 7) == "T")
+        assume (($name, with "Tuttle" -> "Buttle") == (???))
 
         # Methods can be chained too:
-        assume (???) == ($name, with "Tuttle" -> "Buttle", character 7)
+        assume (($name, with "Tuttle" -> "Buttle", character 7) == (???))
 
     lesson "Object Oriented Programming":
         # Object Oriented Programming deals with things that have
@@ -244,17 +244,14 @@ $lessons = [
             ($self, add $bit) means:
                 $bits, add $bit
 
-            ($self, length) means:
-                # Write some code that returns the total length of all
-                    the bits on this buffer.
-                # Hint: the length operator (#$foo) works on text
-                <your code here>
+            # Write a method called ($self, length) that returns the total
+                length of all the bits in the buffer:
+            <your code here>
 
         $b = (a Buffer)
         $b, add "xx"
         $b, add "yyy"
-        assume ($b, length) == 5
-        assume ($b, joined) == "xxyyy"
+        assume (($b, length) == 5)
 ]
 
 command line program with $args:

@@ -14,31 +14,67 @@ use "core/control_flow"
     ))
 ")
 
-(assume $condition) compiles to ("
-    if not \($condition as lua expr) then
-        at_1_fail(\(quote "\($condition.source)"), "Assumption failed: This was not true.")
-    end
-")
+(assume $condition) compiles to:
+    if ($condition.type == "Action"):
+        when $condition.stub is:
+            "1 ==":
+                return
+                    LuaCode ("
+                        do
+                            local _a, _b = \($condition.1 as lua expr), \($condition.3 as lua expr)
+                            if _a ~= _b then
+                                _a = type_of(_a) == 'Text' and _a:as_lua() or tostring(_a)
+                                _b = type_of(_b) == 'Text' and _b:as_lua() or tostring(_b)
+                                at_1_fail(\(quote "\($condition.1.source)"),
+                                    "Assumption failed: This value was ".._a.." but it was expected to be ".._b..".")
+                            end
+                        end
+                    ")
+            "1 !=":
+                return
+                    LuaCode ("
+                        do
+                            local _a, _b = \($condition.1 as lua expr), \($condition.3 as lua expr)
+                            if _a == _b then
+                                _a = type_of(_a) == 'Text' and _a:as_lua() or tostring(_a)
+                                at_1_fail(\(quote "\($condition.1.source)"),
+                                    "Assumption failed: This value was ".._a.." but it wasn't expected to be.")
+                            end
+                        end
+                    ")
+            "1 >" "1 <" "1 >=" "1 <=":
+                return
+                    LuaCode ("
+                        do
+                            local _a, _b = \($condition.1 as lua expr), \($condition.3 as lua expr)
+                            if _a ~= _b then
+                                _a = type_of(_a) == 'Text' and _a:as_lua() or tostring(_a)
+                                _b = type_of(_b) == 'Text' and _b:as_lua() or tostring(_b)
+                                at_1_fail(\(quote "\($condition.1.source)"),
+                                    "Assumption failed: This value was ".._a..", but it was expected to be \($condition.3)".._b..".")
+                            end
+                        end
+                    ")
+            "1 is":
+                return
+                    LuaCode ("
+                        do
+                            local _ta, _tb = type_of(\($condition.1 as lua expr)), \($condition.3 as lua expr)
+                            if _ta ~= _tb then
+                                at_1_fail(\(quote "\($condition.1.source)"),
+                                    "Assumption failed: This value was ".._ta.." but it was expected to be ".._tb..".")
+                            end
+                        end
+                    ")
+    return
+        LuaCode ("
+            if not \($condition as lua expr) then
+                at_1_fail(\(quote "\($condition.source)"), "Assumption failed: This assumption did not hold.")
+            end
+        ")
 
-(assume $a == $b) compiles to ("
-    do
-        local _a, _b = \($a as lua expr), \($b as lua expr)
-        if _a ~= _b then
-            at_1_fail(\(quote "\($a.source)"),
-                "Assumption failed: This value was "..tostring(_a).." but it was expected to be "..tostring(_b)..".")
-        end
-    end
-")
-
-(assume $a != $b) compiles to ("
-    do
-        local _a, _b = \($a as lua expr), \($b as lua expr)
-        if _a == _b then
-            at_1_fail(\(quote "\($a.source)"),
-                "Assumption failed: This value was "..tostring(_a).." but it wasn't expected to be.")
-        end
-    end
-")
+(assume $a == $b) parses as (assume ($a == $b))
+(assume $a != $b) parses as (assume ($a != $b))
 
 test:
     try: fail

@@ -3,11 +3,12 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local List, Dict, Text
+local List, Dict
 do
   local _obj_0 = require('containers')
-  List, Dict, Text = _obj_0.List, _obj_0.Dict, _obj_0.Text
+  List, Dict = _obj_0.List, _obj_0.Dict
 end
+local Text = require('text')
 local SyntaxTree = require("syntax_tree")
 local Files = require("files")
 local Errhand = require("error_handling")
@@ -121,8 +122,9 @@ nomsu_environment = Importer({
   jit = jit,
   _VERSION = _VERSION,
   bit = (jit or _VERSION == "Lua 5.2") and require('bitops') or nil,
-  List = List,
-  Dict = Dict,
+  a_List = List,
+  a_Dict = Dict,
+  Text = Text,
   lpeg = lpeg,
   re = re,
   Files = Files,

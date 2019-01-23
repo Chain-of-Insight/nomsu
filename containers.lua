@@ -82,7 +82,7 @@ local _list_mt = {
     end)(), ", ") .. "]"
   end,
   as_lua = function(self)
-    return "List{" .. concat((function()
+    return "a_List{" .. concat((function()
       local _accum_0 = { }
       local _len_0 = 1
       for _index_0 = 1, #self do
@@ -299,7 +299,7 @@ local _dict_mt = {
     end)(), ", ") .. "}"
   end,
   as_lua = function(self)
-    return "Dict{" .. concat((function()
+    return "a_Dict{" .. concat((function()
       local _accum_0 = { }
       local _len_0 = 1
       for k, v in pairs(self) do
@@ -406,114 +406,6 @@ Dict = function(t)
     return d
   else
     return error("Unsupported Dict type: " .. type(t))
-  end
-end
-do
-  local reverse, upper, lower, find, byte, match, gmatch, gsub, sub, format, rep
-  do
-    local _obj_0 = string
-    reverse, upper, lower, find, byte, match, gmatch, gsub, sub, format, rep = _obj_0.reverse, _obj_0.upper, _obj_0.lower, _obj_0.find, _obj_0.byte, _obj_0.match, _obj_0.gmatch, _obj_0.gsub, _obj_0.sub, _obj_0.format, _obj_0.rep
-  end
-  local string2 = require('string2')
-  local lines, line, line_at, as_lua_id, is_lua_id
-  lines, line, line_at, as_lua_id, is_lua_id = string2.lines, string2.line, string2.line_at, string2.as_lua_id, string2.is_lua_id
-  local text_methods = {
-    formatted_with = format,
-    byte = byte,
-    position_of = (function(...)
-      return (find(...))
-    end),
-    position_of_1_after = (function(...)
-      return (find(...))
-    end),
-    as_a_lua_identifier = as_lua_id,
-    is_a_lua_identifier = is_lua_id,
-    as_a_lua_id = as_lua_id,
-    is_a_lua_id = is_lua_id,
-    bytes_1_to = function(self, start, stop)
-      return List({
-        byte(tostring(self), start, stop)
-      })
-    end,
-    [as_lua_id("with 1 ->")] = function(...)
-      return (gsub(...))
-    end,
-    bytes = function(self)
-      return List({
-        byte(tostring(self), 1, -1)
-      })
-    end,
-    lines = function(self)
-      return List(lines(self))
-    end,
-    line = line,
-    wrapped_to = function(self, maxlen)
-      local _lines = { }
-      local _list_0 = self:lines()
-      for _index_0 = 1, #_list_0 do
-        local line = _list_0[_index_0]
-        while #line > maxlen do
-          local chunk = line:sub(1, maxlen)
-          local split = chunk:find(' ', maxlen - 8) or maxlen
-          chunk = line:sub(1, split)
-          line = line:sub(split + 1, -1)
-          _lines[#_lines + 1] = chunk
-        end
-        _lines[#_lines + 1] = line
-      end
-      return table.concat(_lines, "\n")
-    end,
-    line_at = function(self, i)
-      return (line_at(self, i))
-    end,
-    line_number_at = function(self, i)
-      return select(2, line_at(self, i))
-    end,
-    line_position_at = function(self, i)
-      return select(3, line_at(self, i))
-    end,
-    matches = function(self, patt)
-      return match(self, patt) and true or false
-    end,
-    matching = function(self, patt)
-      return (match(self, patt))
-    end,
-    matching_groups = function(self, patt)
-      return List({
-        match(self, patt)
-      })
-    end,
-    [as_lua_id("* 1")] = function(self, n)
-      return rep(self, n)
-    end,
-    all_matches_of = function(self, patt)
-      local result = { }
-      local stepper, x, i = gmatch(self, patt)
-      while true do
-        local tmp = List({
-          stepper(x, i)
-        })
-        if #tmp == 0 then
-          break
-        end
-        i = tmp[1]
-        result[#result + 1] = (#tmp == 1) and tmp[1] or tmp
-      end
-      return List(result)
-    end,
-    from_1_to = sub,
-    from = sub,
-    character = function(self, i)
-      return sub(self, i, i)
-    end
-  }
-  setmetatable(text_methods, {
-    __index = string2
-  })
-  getmetatable("").__methods = text_methods
-  getmetatable("").__index = text_methods
-  getmetatable("").__add = function(self, x)
-    return tostring(self) .. tostring(x)
   end
 end
 return {

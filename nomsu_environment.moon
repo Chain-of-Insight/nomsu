@@ -1,7 +1,8 @@
 -- This file defines the environment in which Nomsu code runs, including some
 -- basic bootstrapping functionality.
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-{:List, :Dict, :Text} = require 'containers'
+{:List, :Dict} = require 'containers'
+Text = require 'text'
 SyntaxTree = require "syntax_tree"
 Files = require "files"
 Errhand = require "error_handling"
@@ -55,7 +56,7 @@ nomsu_environment = Importer{
     :pairs, :ipairs, :jit, :_VERSION
     bit: (jit or _VERSION == "Lua 5.2") and require('bitops') or nil
     -- Nomsu types:
-    List:List, Dict:Dict,
+    a_List:List, a_Dict:Dict, Text:Text,
     -- Utilities and misc.
     lpeg:lpeg, re:re, Files:Files,
     :SyntaxTree, TESTS: Dict({}), globals: Dict({}),

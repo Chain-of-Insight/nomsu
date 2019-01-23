@@ -1,5 +1,5 @@
 require("containers")
-local string2 = require('string2')
+local Text = require('text')
 local box
 box = function(text)
   local max_line = 0
@@ -15,7 +15,7 @@ end
 local format_error
 format_error = function(err)
   local context = err.context or 2
-  local err_line, err_linenum, err_linepos = string2.line_at(err.source, err.start)
+  local err_line, err_linenum, err_linepos = err.source:line_info_at(err.start)
   local err_size = math.min((err.stop - err.start), (#err_line - err_linepos) + 1)
   local nl_indicator = (err_linepos > #err_line) and " " or ""
   local fmt_str = " %" .. tostring(#tostring(err_linenum + context)) .. "d|"
@@ -26,9 +26,10 @@ format_error = function(err)
     pointer = (" "):rep(err_linepos + #fmt_str:format(0) - 1) .. "⬆"
   end
   local err_msg = "\027[33;41;1m" .. tostring(err.title or "Error") .. " at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "," .. tostring(err_linepos) .. "\027[0m"
+  local lines = err.source:lines()
   for i = err_linenum - context, err_linenum - 1 do
     do
-      local line = string2.line(err.source, i)
+      local line = lines[i]
       if line then
         err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0m" .. tostring(line) .. "\027[0m"
       end
@@ -41,14 +42,14 @@ format_error = function(err)
     err_line = "\027[0m" .. tostring(before) .. "\027[41;30m" .. tostring(during) .. tostring(nl_indicator) .. "\027[0m" .. tostring(after)
     err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(err_linenum)) .. tostring(err_line) .. "\027[0m"
   end
-  local _, err_linenum_end, err_linepos_end = string2.line_at(err.source, err.stop)
+  local _, err_linenum_end, err_linepos_end = err.source:line_info_at(err.stop)
   err_linenum_end = err_linenum_end or err_linenum
   if err_linenum_end == err_linenum then
     err_msg = err_msg .. "\n" .. tostring(pointer)
   else
     for i = err_linenum + 1, err_linenum_end do
       do
-        local line = string2.line(err.source, i)
+        local line = lines[i]
         if line then
           if i == err_linenum_end then
             local during, after = line:sub(1, err_linepos_end - 1), line:sub(err_linepos_end, -1)
@@ -65,14 +66,14 @@ format_error = function(err)
     end
   end
   local box_width = 70
-  local err_text = "\027[47;31;1m" .. tostring(string2.wrap(" " .. err.error, box_width, 16):gsub("\n", "\n\027[47;31;1m "))
+  local err_text = "\027[47;31;1m" .. tostring(" " .. err.error:wrapped_to(box_width, 16):gsub("\n", "\n\027[47;31;1m "))
   if err.hint then
-    err_text = err_text .. "\n\027[47;30m" .. tostring(string2.wrap(" Suggestion: " .. tostring(err.hint), box_width, 16):gsub("\n", "\n\027[47;30m "))
+    err_text = err_text .. "\n\027[47;30m" .. tostring((" Suggestion: " .. tostring(err.hint)):wrapped_to(box_width, 16):gsub("\n", "\n\027[47;30m "))
   end
   err_msg = err_msg .. ("\n\027[33;1m " .. box(err_text):gsub("\n", "\n "))
   for i = err_linenum_end + 1, err_linenum_end + context do
     do
-      local line = string2.line(err.source, i)
+      local line = lines[i]
       if line then
         err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0m" .. tostring(line) .. "\027[0m"
       end

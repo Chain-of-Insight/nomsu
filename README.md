@@ -60,8 +60,8 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 * [error\_handling.moon](error_handling.moon) - The logic for producing good error messages within Lua that reference the Nomsu source code that led to them.
 * [files.moon](files.moon) - A library for interacting with the filesystem.
 * [pretty_errors.moon](pretty_errors.moon) - A simple library for displaying errors in a more visually pleasing/readable way.
-* [string2.moon](string2.moon) - A library defining some extra functionality for strings.
 * [syntax\_tree.moon](syntax_tree.moon) - Datastructures used for Nomsu Abstract Syntax Trees.
+* [text.moon](text.moon) - A library defining some extra functionality for strings.
 * [examples/how\_do\_i.nom](examples/how_do_i.nom) - A simple walkthrough of some of the features of Nomsu, written in Nomsu code. **This is a good place to start.**
 * [lib/\*/\*.nom](lib) - Language libraries, including the core language stuff like control flow, operators, and metaprogramming (in [lib/core](lib/core)) and optional language libraries for stuff you might want.
 * [lib/compatibility/\*.nom](compatibility) - Code for automatically upgrading Nomsu code from old versions to the current version.

@@ -1,7 +1,6 @@
 -- 
 -- This file contains the source code of the Nomsu compiler.
 --
-{:List, :Dict, :Text} = require 'containers'
 unpack or= table.unpack
 {:match, :sub, :gsub, :format, :byte, :find} = string
 {:LuaCode, :Source} = require "code_obj"
@@ -180,7 +179,7 @@ compile = (tree)=>
                 if bit.type == "Block" and #bit == 1
                     bit = bit[1]
                 if bit.type == "Block"
-                    bit_lua = LuaCode\from bit.source, "List(function(add)",
+                    bit_lua = LuaCode\from bit.source, "a_List(function(add)",
                         "\n    ", bit_lua,
                         "\nend):joined()"
                 elseif bit.type != "Text"
@@ -199,8 +198,9 @@ compile = (tree)=>
             return lua
 
         when "List", "Dict"
+            typename = "a_"..tree.type
             if #tree == 0
-                return LuaCode\from tree.source, tree.type, "{}"
+                return LuaCode\from tree.source, typename, "{}"
 
             lua = LuaCode\from tree.source
             chunks = 0
@@ -208,7 +208,7 @@ compile = (tree)=>
             while tree[i]
                 if tree[i].type == 'Block'
                     lua\add " + " if chunks > 0
-                    lua\add tree.type, "(function(", (tree.type == 'List' and "add" or ("add, "..("add 1 =")\as_lua_id!)), ")"
+                    lua\add typename, "(function(", (tree.type == 'List' and "add" or ("add, "..("add 1 =")\as_lua_id!)), ")"
                     lua\add "\n    ", @compile(tree[i]), "\nend)"
                     chunks += 1
                     i += 1
@@ -234,9 +234,9 @@ compile = (tree)=>
                             sep = ', '
                         i += 1
                     if items_lua\is_multiline!
-                        lua\add LuaCode\from items_lua.source, tree.type, "{\n    ", items_lua, "\n}"
+                        lua\add LuaCode\from items_lua.source, typename, "{\n    ", items_lua, "\n}"
                     else
-                        lua\add LuaCode\from items_lua.source, tree.type, "{", items_lua, "}"
+                        lua\add LuaCode\from items_lua.source, typename, "{", items_lua, "}"
                     chunks += 1
             
             return lua

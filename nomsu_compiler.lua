@@ -1,8 +1,3 @@
-local List, Dict, Text
-do
-  local _obj_0 = require('containers')
-  List, Dict, Text = _obj_0.List, _obj_0.Dict, _obj_0.Text
-end
 local unpack = unpack or table.unpack
 local match, sub, gsub, format, byte, find
 do
@@ -232,7 +227,7 @@ compile = function(self, tree)
           bit = bit[1]
         end
         if bit.type == "Block" then
-          bit_lua = LuaCode:from(bit.source, "List(function(add)", "\n    ", bit_lua, "\nend):joined()")
+          bit_lua = LuaCode:from(bit.source, "a_List(function(add)", "\n    ", bit_lua, "\nend):joined()")
         elseif bit.type ~= "Text" then
           bit_lua = LuaCode:from(bit.source, "tostring(", bit_lua, ")")
         end
@@ -257,8 +252,9 @@ compile = function(self, tree)
     end
     return lua
   elseif "List" == _exp_0 or "Dict" == _exp_0 then
+    local typename = "a_" .. tree.type
     if #tree == 0 then
-      return LuaCode:from(tree.source, tree.type, "{}")
+      return LuaCode:from(tree.source, typename, "{}")
     end
     local lua = LuaCode:from(tree.source)
     local chunks = 0
@@ -268,7 +264,7 @@ compile = function(self, tree)
         if chunks > 0 then
           lua:add(" + ")
         end
-        lua:add(tree.type, "(function(", (tree.type == 'List' and "add" or ("add, " .. ("add 1 ="):as_lua_id())), ")")
+        lua:add(typename, "(function(", (tree.type == 'List' and "add" or ("add, " .. ("add 1 ="):as_lua_id())), ")")
         lua:add("\n    ", self:compile(tree[i]), "\nend)")
         chunks = chunks + 1
         i = i + 1
@@ -301,9 +297,9 @@ compile = function(self, tree)
           i = i + 1
         end
         if items_lua:is_multiline() then
-          lua:add(LuaCode:from(items_lua.source, tree.type, "{\n    ", items_lua, "\n}"))
+          lua:add(LuaCode:from(items_lua.source, typename, "{\n    ", items_lua, "\n}"))
         else
-          lua:add(LuaCode:from(items_lua.source, tree.type, "{", items_lua, "}"))
+          lua:add(LuaCode:from(items_lua.source, typename, "{", items_lua, "}"))
         end
         chunks = chunks + 1
       end
