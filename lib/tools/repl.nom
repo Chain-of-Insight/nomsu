@@ -16,15 +16,32 @@ external:
             To exit, type 'exit' or 'quit' and hit enter twice.
         ")
 
+    (tutorial) means:
+        (use "tools/tutorial").run_with {.extras = []}
+        exit
+
 command line program with $args:
     say ("
         
         \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\
         ..\(reset color)
                press 'enter' twice to run a command
+               type 'tutorial' to run the tutorial
         
     ")
-    
+
+    # Best way I know of to detect the number of return values and only
+        print if it's >0:
+    (say results of (*extra arguments*)) means:
+        $N = (select "#" (*extra arguments*))
+        if ($N == 0):
+            return
+        for $ in 1 to $N:
+            $ret = (select $ (*extra arguments*))
+            if ($ret is "Text"):
+                $ret = (quote $ret)
+            say "\$ret"
+
     repeat:
         say (bright (yellow ">> ")) inline
         $buff = []
@@ -51,7 +68,7 @@ command line program with $args:
         
         unless $tree:
             do next
-        
+
         for $chunk in $tree:
             try:
                 $lua = ($chunk as lua)
@@ -64,22 +81,9 @@ command line program with $args:
                 so that stuff mostly works across multiple lines. It would be
                 nicer if local variables actually worked.
             $lua, remove free vars
+            if (load "return \($lua, text)"):
+                $lua, prepend "return "
+
             try:
-                $ret = (run $lua)
+                say results of (run $lua)
             ..if it fails with $err: say $err
-            ..if it succeeds:
-                if (lua type of $ret) is:
-                    "nil":
-                        do nothing
-                    
-                    "boolean":
-                        say "= \("yes" if $ret else "no")"
-                    
-                    "table":
-                        if $ret.as_nomsu:
-                            say "= \($ret, as nomsu)"
-                        ..else:
-                            say "= \$ret"
-                    
-                    else:
-                        say "= \$ret"
