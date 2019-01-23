@@ -12,7 +12,7 @@ file_chunks (FileChunks) <-
     {:shebang: shebang :}?
     (top_block (nl_nodent section_division top_block)*)
     blank_lines?
-    ws* unexpected_chunk?
+    unexpected_indent? unexpected_chunk?
 
 section_division <- ("~")^+3 eol
 
@@ -240,14 +240,14 @@ escaped_char <-
 -- Errors
 unexpected_code <- ws* _unexpected_code
 _unexpected_code (Error) <-
-    {:error: {~ [^%nl]+ -> "Couldn't parse this code" ~} :}
+    {:error: {~ [^%nl]+ -> "Couldn't parse this code." ~} :}
 unexpected_chunk (Error) <-
-    {:error: {~ .+ -> "Couldn't parse this code" ~} :}
+    {:error: {~ .+ -> "Couldn't parse this chunk of code." ~} :}
 unexpected_indent (Error) <-
-    {:error: {~ (=curr_indent ws+) -> "Messed up indentation" ~} :}
-    {:hint: {~ '' -> 'Either make sure this line is aligned with the one above it, or make sure the previous line ends with something that uses indentation, like ":" or "(..)"' ~} :}
+    {:error: {~ (=curr_indent ws+) -> "This indentation is messed up." ~} :}
+    {:hint: {~ '' -> 'This line should either have the same indentation as the line above it, or exactly 4 spaces more.' ~} :}
 missing_paren_err (Error) <-
-    {:error: {~ eol -> 'This expression is missing a closing )-parenthesis' ~} :}
+    {:error: {~ eol -> 'This expression is missing a closing )-parenthesis.' ~} :}
     {:hint: {~ '' -> 'Put a ")" here' ~} :}
 missing_quote_err (Error) <-
     {:error: {~ eol -> "This text is missing a closing quotation mark." ~} :}
