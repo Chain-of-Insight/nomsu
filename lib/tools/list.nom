@@ -13,7 +13,7 @@ use "shell"
 
 command line program with $args:
     $packages = (=sh "ls \$(NOMSU PACKAGEPATH)")
-    say "Installed packages:"
+    say "Currently Installed:"
     for $f in ($packages, lines):
         if ($f != ""):
             $f = ($f, with "%.nom$" -> "")
