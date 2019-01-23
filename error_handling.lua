@@ -71,9 +71,7 @@ enhance_error = function(error_message, start_fn, stop_fn)
     do
       local fn = error_message:match("attempt to call a nil value %(global '(.*)'%)")
       if fn then
-        if fn:match("x[0-9A-F][0-9A-F]") then
-          error_message = "The action '" .. tostring(fn:from_lua_id()) .. "' is not defined."
-        end
+        error_message = "The action '" .. tostring(fn:from_lua_id()) .. "' is not defined."
       end
     end
     local level = 2

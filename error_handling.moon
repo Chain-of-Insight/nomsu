@@ -50,8 +50,7 @@ enhance_error = (error_message, start_fn, stop_fn)->
     unless error_message and error_message\match("\x1b")
         error_message or= ""
         if fn = error_message\match("attempt to call a nil value %(global '(.*)'%)")
-            if fn\match "x[0-9A-F][0-9A-F]"
-                error_message = "The action '#{fn\from_lua_id!}' is not defined."
+            error_message = "The action '#{fn\from_lua_id!}' is not defined."
         level = 2
         while true
             -- TODO: reduce duplicate code
