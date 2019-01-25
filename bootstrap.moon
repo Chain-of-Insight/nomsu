@@ -100,6 +100,7 @@ compile_actions = {
     ["is jit"]: (_t, code)=> LuaCode("jit")
     ["nomsu environment"]: (_t)=> LuaCode("_ENV")
     ["nomsu environment name"]: (_t)=> LuaCode('"_ENV"')
+    ["Lua version"]: (_t)=> LuaCode("LUA_API")
     ["this file was run directly"]: (_t)=> LuaCode('WAS_RUN_DIRECTLY')
     ["the command line arguments"]: (_t)=> LuaCode('COMMAND_LINE_ARGS')
 }

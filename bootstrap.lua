@@ -130,6 +130,9 @@ local compile_actions = {
   ["nomsu environment name"] = function(self, _t)
     return LuaCode('"_ENV"')
   end,
+  ["Lua version"] = function(self, _t)
+    return LuaCode("LUA_API")
+  end,
   ["this file was run directly"] = function(self, _t)
     return LuaCode('WAS_RUN_DIRECTLY')
   end,
