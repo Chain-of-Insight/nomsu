@@ -43,6 +43,7 @@ Files = require "files"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
 {:List, :Dict} = require 'containers'
 Text = require 'text'
+require 'builtin_metatables'
 
 sep = "\3"
 parser = re.compile([[

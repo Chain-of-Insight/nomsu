@@ -124,9 +124,6 @@ local compile_actions = {
   ["is jit"] = function(self, _t, code)
     return LuaCode("jit")
   end,
-  ["Lua version"] = function(self, _t, code)
-    return LuaCode("_VERSION")
-  end,
   ["nomsu environment"] = function(self, _t)
     return LuaCode("_ENV")
   end,

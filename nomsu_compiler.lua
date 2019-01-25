@@ -52,6 +52,14 @@ local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
 local MAX_LINE = 80
 local compile
 compile = function(self, tree)
+  if not (SyntaxTree:is_instance(tree)) then
+    do
+      local as_lua = tree.as_lua
+      if as_lua then
+        return as_lua(tree)
+      end
+    end
+  end
   local _exp_0 = tree.type
   if "Action" == _exp_0 then
     local stub = tree.stub
@@ -119,6 +127,24 @@ compile = function(self, tree)
     lua:add(")")
     return lua
   elseif "MethodCall" == _exp_0 then
+    local stub = tree:get_stub()
+    local compile_action = self.COMPILE_RULES[stub]
+    if compile_action then
+      local args = tree:get_args()
+      local ret = compile_action(self, tree, unpack(args))
+      if ret == nil then
+        local info = debug.getinfo(compile_action, "S")
+        local filename = Source:from_string(info.source).filename
+        fail_at(tree, ("Compile error: The compile-time method here (" .. tostring(stub) .. ") failed to return any value. " .. "Hint: Look at the implementation of (" .. tostring(stub) .. ") in " .. tostring(filename) .. ":" .. tostring(info.linedefined) .. " " .. "and make sure it's returning something."))
+      end
+      if not (SyntaxTree:is_instance(ret)) then
+        ret.source = ret.source or tree.source
+        return ret
+      end
+      if ret ~= tree then
+        return self:compile(ret)
+      end
+    end
     local lua = LuaCode:from(tree.source)
     local target_lua = self:compile(tree[1])
     local target_text = target_lua:text()

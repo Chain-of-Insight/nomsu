@@ -4,7 +4,7 @@
     functions to make that easier.
     
 lua> "NOMSU_CORE_VERSION = 15"
-lua> "NOMSU_LIB_VERSION = 8"
+lua> "NOMSU_LIB_VERSION = 9"
 lua> ("
     do
         local mangle_index = 0
@@ -93,8 +93,9 @@ lua> ("
         if \$body.type == "Text" then
             \$body = SyntaxTree{source=\$body.source, type="Action", "Lua", \$body}
         end
-        if not (\$action.type == "Action" or (\$action.type == "EscapedNomsu" and \$action[1]\
-    ...type == "Action")) then
+        if not (\$action.type == "Action" or
+                (\$action.type == "EscapedNomsu" and \$action[1].type == "Action") or
+                \$action.type == "MethodCall") then
             at_1_fail(\$action.source, "Compile error: "..
                 "This is neither an action nor an escaped action. "..
                 "Hint: This should probably be an action like:\\n"
@@ -182,7 +183,7 @@ test:
     lua> ("
         local lua = \(\($actions.1 means $body) as lua)
         local first_def = (\$actions[1].type == "MethodCall"
-            and LuaCode(\(nomsu environment):compile(\$actions[1][1]), ".", \$actions[1]:get_stub():as_lua_id())
+            and LuaCode(\(nomsu environment):compile(\$actions[1][1]), ".", \$actions[1][2]:get_stub():as_lua_id())
             or LuaCode(\$actions[1]:get_stub():as_lua_id()))
         local \$args = a_List(\$actions[1]:get_args())
         for i=2,#\$actions do
@@ -190,7 +191,7 @@ test:
             local \$alias_args = a_List(alias:get_args())
             lua:add("\\n")
             if alias.type == "MethodCall" then
-                lua:add(\(nomsu environment):compile(alias[1]), ".", alias:get_stub():as_lua_id())
+                lua:add(\(nomsu environment):compile(alias[1]), ".", alias[2]:get_stub():as_lua_id())
             else
                 lua:add(alias:get_stub():as_lua_id())
                 lua:add_free_vars({alias_name})
@@ -481,9 +482,9 @@ test:
     ")
 
 # Literals
-(yes) compiles to "true"
-(no) compiles to "false"
-[nothing, nil, null] all compile to "nil"
+(yes) compiles to "(true)"
+(no) compiles to "(false)"
+[nothing, nil, null] all compile to "(nil)"
 (Nomsu syntax version) compiles to "NOMSU_SYNTAX_VERSION"
 (Nomsu compiler version) compiles to "NOMSU_COMPILER_VERSION"
 (core version) compiles to "NOMSU_CORE_VERSION"
@@ -491,6 +492,16 @@ test:
 (command line args) compiles to "COMMAND_LINE_ARGS"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(at compilation $expr) compiles to:
+    lua> ("
+        local value = \(nomsu environment):run(\(\(return $expr)))
+        if lua_type_of(value) == 'table' or lua_type_of(value) == 'string' and value.as_lua then
+            return LuaCode(value:as_lua())
+        else
+            return LuaCode(tostring(value))
+        end
+    ")
 
 test:
     using compile rules:

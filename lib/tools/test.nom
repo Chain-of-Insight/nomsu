@@ -41,16 +41,19 @@ command line program with $args:
                 if $args.v:
                     say "    \(yellow ($.test, with "\n" -> "\n    "))"
                 
-                try:
+                if $args.e:
                     $(test environment), run $.test
-                ..if it fails with $msg:
-                    $src = ($Source, from string $.source)
-                    $l1 = ($file, line number at $src.start)
-                    $l2 = ($file, line number at $src.stop)
-                    $failures, add ("
-                        \(yellow "\($src.filename):\($l1)-\$l2:")
-                        \(bright (red ($msg, indented)))
-                    ")
+                ..else:
+                    try:
+                        $(test environment), run $.test
+                    ..if it fails with $msg:
+                        $src = ($Source, from string $.source)
+                        $l1 = ($file, line number at $src.start)
+                        $l2 = ($file, line number at $src.stop)
+                        $failures, add ("
+                            \(yellow "\($src.filename):\($l1)-\$l2:")
+                            \(bright (red ($msg, indented)))
+                        ")
             
             if ($failures is empty):
                 if $args.v:

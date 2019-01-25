@@ -147,13 +147,14 @@ do
       assert(self.type == "Action" or self.type == "MethodCall", "Only actions and method calls have arguments")
       local args = { }
       if self.type == "MethodCall" then
-        assert(#self == 2, "Can't get arguments for multiple method calls at once.")
         args[1] = self[1]
-        local _list_0 = self[2]
-        for _index_0 = 1, #_list_0 do
-          local tok = _list_0[_index_0]
-          if type(tok) ~= 'string' then
-            args[#args + 1] = tok
+        for i = 2, #self do
+          local _list_0 = self[i]
+          for _index_0 = 1, #_list_0 do
+            local tok = _list_0[_index_0]
+            if type(tok) ~= 'string' then
+              args[#args + 1] = tok
+            end
           end
         end
       else
@@ -168,8 +169,15 @@ do
     end,
     get_stub = function(self)
       if self.type == "MethodCall" then
-        assert(#self == 2, "Can't get the stubs of multiple method calls at once.")
-        return self[2]:get_stub()
+        return "0, " .. table.concat((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          for i = 2, #self do
+            _accum_0[_len_0] = self[i]:get_stub()
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)(), "; ")
       end
       local stub_bits = { }
       local arg_i = 1

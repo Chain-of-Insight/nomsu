@@ -58,8 +58,8 @@ nomsu_environment = Importer{
     :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall,
     :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
     :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
-    :pairs, :ipairs, :jit, :_VERSION
-    bit: (jit or _VERSION == "Lua 5.2") and require('bitops') or nil
+    :pairs, :ipairs, :jit, :_VERSION, LUA_VERSION: (jit and jit.version or _VERSION),
+    LUA_API: _VERSION, Bit: (jit or _VERSION == "Lua 5.2") and require('bitops') or nil
     -- Nomsu types:
     a_List:List, a_Dict:Dict, Text:Text,
     -- Utilities and misc.

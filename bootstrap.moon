@@ -98,7 +98,6 @@ compile_actions = {
         return LuaCode "TESTS[#{tostring(body.source)\as_lua!}] = ", test_text
 
     ["is jit"]: (_t, code)=> LuaCode("jit")
-    ["Lua version"]: (_t, code)=> LuaCode("_VERSION")
     ["nomsu environment"]: (_t)=> LuaCode("_ENV")
     ["nomsu environment name"]: (_t)=> LuaCode('"_ENV"')
     ["this file was run directly"]: (_t)=> LuaCode('WAS_RUN_DIRECTLY')

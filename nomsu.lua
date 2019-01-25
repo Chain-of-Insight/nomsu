@@ -45,6 +45,7 @@ do
   List, Dict = _obj_0.List, _obj_0.Dict
 end
 local Text = require('text')
+require('builtin_metatables')
 local sep = "\3"
 local parser = re.compile([[    args <- {| (flag %sep)*
          {:files: {|

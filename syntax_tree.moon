@@ -72,10 +72,10 @@ class SyntaxTree
         assert(@type == "Action" or @type == "MethodCall", "Only actions and method calls have arguments")
         args = {}
         if @type == "MethodCall"
-            assert(#@ == 2, "Can't get arguments for multiple method calls at once.")
             args[1] = @[1]
-            for tok in *@[2]
-                if type(tok) != 'string' then args[#args+1] = tok
+            for i=2,#@
+                for tok in *@[i]
+                    if type(tok) != 'string' then args[#args+1] = tok
         else
             for tok in *@
                 if type(tok) != 'string' then args[#args+1] = tok
@@ -83,8 +83,7 @@ class SyntaxTree
 
     get_stub: =>
         if @type == "MethodCall"
-            assert(#@ == 2, "Can't get the stubs of multiple method calls at once.")
-            return @[2]\get_stub!
+            return "0, "..table.concat([@[i]\get_stub! for i=2,#@], "; ")
         stub_bits = {}
         arg_i = 1
         for a in *@

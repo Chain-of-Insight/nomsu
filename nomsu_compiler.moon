@@ -62,8 +62,6 @@ compile = (tree)=>
 
             if compile_action
                 args = [arg for arg in *tree when type(arg) != "string"]
-                -- Force Lua to avoid tail call optimization for debugging purposes
-                -- TODO: use tail call?
                 ret = compile_action(@, tree, unpack(args))
                 if ret == nil
                     info = debug.getinfo(compile_action, "S")
@@ -92,6 +90,24 @@ compile = (tree)=>
             return lua
 
         when "MethodCall"
+            stub = tree\get_stub!
+            compile_action = @COMPILE_RULES[stub]
+            if compile_action
+                args = tree\get_args!
+                ret = compile_action(@, tree, unpack(args))
+                if ret == nil
+                    info = debug.getinfo(compile_action, "S")
+                    filename = Source\from_string(info.source).filename
+                    fail_at tree,
+                        ("Compile error: The compile-time method here (#{stub}) failed to return any value. "..
+                        "Hint: Look at the implementation of (#{stub}) in #{filename}:#{info.linedefined} "..
+                        "and make sure it's returning something.")
+                unless SyntaxTree\is_instance(ret)
+                    ret.source or= tree.source
+                    return ret
+                if ret != tree
+                    return @compile(ret)
+
             lua = LuaCode\from tree.source
             target_lua = @compile tree[1]
             target_text = target_lua\text!
