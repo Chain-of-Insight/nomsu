@@ -52,14 +52,6 @@ local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
 local MAX_LINE = 80
 local compile
 compile = function(self, tree)
-  if not (SyntaxTree:is_instance(tree)) then
-    do
-      local as_lua = tree.as_lua
-      if as_lua then
-        return as_lua(tree)
-      end
-    end
-  end
   local _exp_0 = tree.type
   if "Action" == _exp_0 then
     local stub = tree.stub
