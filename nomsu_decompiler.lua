@@ -94,11 +94,17 @@ tree_to_inline_nomsu = function(tree)
       target_nomsu:parenthesize()
     end
     local nomsu = NomsuCode:from(tree.source, target_nomsu, ", ")
+    if #tree > 2 then
+      nomsu:add("(")
+    end
     for i = 2, #tree do
       if i > 2 then
         nomsu:add("; ")
       end
       nomsu:add(tree_to_inline_nomsu(tree[i]))
+    end
+    if #tree > 2 then
+      nomsu:add(")")
     end
     return nomsu
   elseif "EscapedNomsu" == _exp_0 then

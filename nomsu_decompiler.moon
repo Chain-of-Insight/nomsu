@@ -64,9 +64,11 @@ tree_to_inline_nomsu = (tree)->
             if tree[1].type == "Block"
                 target_nomsu\parenthesize!
             nomsu = NomsuCode\from(tree.source, target_nomsu, ", ")
+            if #tree > 2 then nomsu\add "("
             for i=2,#tree
                 nomsu\add "; " if i > 2
                 nomsu\add tree_to_inline_nomsu(tree[i])
+            if #tree > 2 then nomsu\add ")"
             return nomsu
 
         when "EscapedNomsu"
