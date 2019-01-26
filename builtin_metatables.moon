@@ -1,4 +1,4 @@
--- This file defines some methods on Lua numbers
+-- This file defines some methods on Lua numbers, bools, actions, nil, and coroutines
 require "text"
 
 number_mt =
