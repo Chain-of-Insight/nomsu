@@ -426,6 +426,7 @@ external:
 test:
     assume (lua type of {}) == "table"
     assume (type of {}) == "a Dict"
+    assume ((type of 5) == "a Number")
     assume ({} is "a Dict")
     assume ("" is text)
     assume ("" is "Text")
