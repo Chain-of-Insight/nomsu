@@ -27,6 +27,7 @@ TOOL_NOM_FILES= $(wildcard lib/tools/*.nom)
 TOOL_LUA_FILES= $(patsubst %.nom,%.lua, $(TOOL_NOM_FILES))
 LIB_NOM_FILES= $(wildcard lib/*.nom) $(filter-out $(CORE_NOM_FILES) $(TOOL_NOM_FILES) $(COMPAT_NOM_FILES), $(wildcard lib/*/*.nom))
 LIB_LUA_FILES= $(patsubst %.nom,%.lua, $(LIB_NOM_FILES))
+NOM_FILES=$(CORE_NOM_FILES) $(COMPAT_NOM_FILES) $(TOOL_NOM_FILES) $(LIB_NOM_FILES)
 PEG_FILES= $(wildcard nomsu.*.peg)
 GET_VERSION= $(LUA_BIN) nomsu.lua --version
 
