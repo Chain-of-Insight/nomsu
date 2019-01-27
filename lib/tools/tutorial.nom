@@ -1,7 +1,7 @@
 #!/usr/bin/env nomsu -V6.13.12.8
 #
     This is a Nomsu tutorial.
-
+    
 use "filesystem"
 use "consolecolor"
 use "commandline"
@@ -30,18 +30,18 @@ $lessons = [
         
         # Variables which have not yet been set have the value (nil)
         assume ($foobar == (nil))
-
+        
         # Variables can be nameless:
         $ = 99
-
+        
         # Or have spaces, if surrounded with parentheses:
         $(my favorite number) = 23
-
+        
         # Figure out what value $my_var should have:
         $my_var = 100
         $my_var = ($my_var + $x + $(my favorite number))
         assume ($my_var == (???))
-
+    
     lesson "Actions":
         # Fix this action so the tests pass, then save and quit.
         # If the tests don't pass, you can come back to this file later.
@@ -50,7 +50,7 @@ $lessons = [
         # Tests:
         assume ((2 doubled) == 4)
         assume ((-5 doubled) == -10)
-
+    
     lesson "Blocks":
         # When you need to do multiple things inside an action, use a block.
         # Blocks are written with a colon followed by some indented code:
@@ -58,12 +58,12 @@ $lessons = [
             $x = (2 * $x)
             $x = (???)
             return $x
-
+        
         # Blocks are also used for loops and conditionals:
         for $num in [0, -1, 10, 4]:
             $correct_answer = (4 * ($num * $num))
             if (($num doubled then squared) != $correct_answer):
-                fail "Wrong answer for \$num!"
+                fail "Wrong answer for \($num)!"
     
     lesson "Conditionals":
         # Make this action return "big" if its argument
@@ -85,6 +85,7 @@ $lessons = [
         # Fix this action so the tests pass:
         (the sum of $numbers) means:
             $sum = 0
+            
             # You can loop over the values in a list like this:
             for $number in $numbers:
                 # Hint: math expressions may need parentheses
@@ -94,7 +95,7 @@ $lessons = [
         # Tests:
         assume ((the sum of [1, 2, 3, 4, 5]) == 15)
         assume ((the sum of [100, 200]) == 300)
-
+        
         # You can also loop over a number range like this:
         $total = 0
         for $i in 1 to 3:
@@ -121,7 +122,7 @@ $lessons = [
         # After running the action, what value should $x have?
         do something
         assume ($x == (???))
-        
+    
     lesson "More Variable Scopes":
         # Loops and conditionals do *not* have their own scopes:
         $z = 1
@@ -144,10 +145,10 @@ $lessons = [
         (do something) means:
             external: $x = 2
         do something
-
+        
         # After running the action that sets $x in an 'external' block, what should $x be?
         assume ($x == (???))
-
+    
     lesson "Locals":
         # The 'with' block lets you create a local scope for the variables you list:
         $y = 1
@@ -159,9 +160,10 @@ $lessons = [
         # After setting $y and $z in the 'with [$y]' block, what should $y and $z be?
         assume ($y == (???))
         assume ($z == (???))
-
+    
     lesson "Failure and Recovery":
         $what_happened = "nothing"
+        
         # In Nomsu, sometimes things fail, but you can recover from failures with 'try':
         try:
             # The 'fail' action triggers failure
@@ -170,48 +172,48 @@ $lessons = [
             $what_happened = "failure"
         ..if it succeeds:
             $what_happened = "success"
-
+        
         # What do you think happened?
         assume ($what_happened == (???))
-
+        
         # Note: a 'try' block will silence failures, so this has no effect:
         try: fail
-
+    
     lesson "Indexing":
         # Nomsu uses the "." operator to access things inside an object:
         $dictionary = {.dog = "A lovable doofus", .cat = "An internet superstar"}
         assume ($dictionary.dog == "A lovable doofus")
         assume ($dictionary.cat == (???))
-
+        
         # If you try to access a key that's not in an object, the result is (nil):
         assume ($dictionary.mimsy == (???))
         
         # $dictionary.dog is just a shorthand for $dictionary."dog".
             You may need to use the longer form for strings with spaces:
         $dictionary."guinea pig" = "A real-life tribble"
-
+        
         # Dictionaries are created with curly braces ({}) and can have
             anything as a key or value, including numbers or other dictionaries:
         $dictionary.5 = "The number five"
         $dictionary.five = 5
         $dictionary.myself = $dictionary
         assume ($dictionary.myself == (???))
-
+        
         # Lists are similar, but use square brackets ([])
             and can only have numbers as keys, starting at 1:
         $list = ["first", "second", 999]
         assume ($list.1 == "first")
         assume ($list.2 == (???))
         assume ($list.3 == (???))
-
+        
         # Hint: 4 should be a missing key
         assume ($list.4 == (???))
         assume ($list.foobar == (???))
-
+        
         # The "#" action gets the number of items inside something:
         assume ((#$list) == (???))
         assume ((#{.x = 10, .y = 20}) == (???))
-
+    
     lesson "Methods":
         # The "," is used for method calls, which means calling an action
             that's stored on an object (with the object as the first argument).
@@ -221,15 +223,15 @@ $lessons = [
         assume ($list == [-4, -6, 5, 3])
         $list, add 7
         assume ($list == [???])
-
+        
         # Text also has some methods like:
         $name = "Harry Tuttle"
         assume (($name, character 7) == "T")
         assume (($name, with "Tuttle" -> "Buttle") == (???))
-
+        
         # Methods can be chained too:
         assume (($name, with "Tuttle" -> "Buttle", character 7) == (???))
-
+    
     lesson "Object Oriented Programming":
         # Object Oriented Programming deals with things that have
             associated values and behaviors.
@@ -243,62 +245,90 @@ $lessons = [
             # This method is used to add to a buffer
             ($self, add $bit) means:
                 $bits, add $bit
-
+            
             # Write a method called ($self, length) that returns the total
                 length of all the bits in the buffer:
             <your code here>
-
         $b = (a Buffer)
         $b, add "xx"
         $b, add "yyy"
         assume (($b, length) == 5)
 ]
 
+$(ask normally) = $(ask)
+
 command line program with $args:
     if ($args.help or $args.h):
-        say "Nomsu tutorial usage: nomsu -t tutorial [-x] [<location to put tutorial files>]"
+        say ("
+            Nomsu tutorial usage: nomsu -t tutorial [-x] [<location to put tutorial files>]
+        ")
         exit
-
+    
     say
         bold ("
             
                 +------------------------------------+
                 |   Welcome to the Nomsu tutorial!   |
                 +------------------------------------+
-
+            
         ")
+
+    # For this tutorial questions are hilighted in bold cyan:
+    (ask $q) means (ask normally (bold (cyan $q)))
     
+    # Find the tutorial file directory:
     if ($args.extras is empty):
         $tutorial_dir = "./nomsu_tutorial"
-        if (not ($Files.exists $tutorial_dir)):
-            when (ask "The Nomsu tutorial files will be in \(bold $tutorial_dir) is that okay? [Y/n] ") is:
+        unless ($Files.exists $tutorial_dir):
+            when
+                ask ("
+                    The Nomsu tutorial files will be in \$tutorial_dir is that okay? [Y/n] \;
+                ")
+            ..is:
                 "n" "N" "no":
-                    say "Okay. If you want to specify another file location, run `nomsu -t tutorial <your location>`"
+                    say ("
+                        Okay. If you want to specify another file location, run `nomsu -t tutorial <your location>`
+                    ")
                     exit
     ..else:
         $tutorial_dir = $args.extras.1
     
+    # Set up the tutorial file directory:
     if (not ($Files.exists $tutorial_dir)):
-        sh> "mkdir \$tutorial_dir"
+        make directory $tutorial_dir
+    (filename of $i) means ("\($tutorial_dir)/lesson\$i.nom", with "//" -> "/")
+    for $lesson in $lessons at $i:
+        $filename = (filename of $i)
+        unless ($Files.exists $filename):
+            write $lesson.lesson to file $filename
     
-    if ($args.x):
+    # Display info about editing the tutorial files:
+    if $args.x:
         say ("
             The tutorial files are located in \$tutorial_dir.
             You're in charge of editing them yourself.
         ")
     ..else:
-        $EDITOR = (($os.getenv "EDITOR") or "nano")
-        say ("
-            The tutorial will use \(yellow $EDITOR) for editing files.
-            If you'd rather edit the files in another window, use the \(yellow "-x") flag.
-                e.g. \(yellow "nomsu -t tutorial -x tutorials/")
-        ")
-    (filename of $i) means ("\$tutorial_dir/lesson\$i.nom", with "//" -> "/")
-    for $lesson in $lessons at $i:
-        $filename = (filename of $i)
-        unless ($Files.exists $filename):
-            write $lesson.lesson to file $filename
+        $EDITOR = ($os.getenv "EDITOR")
+        if $EDITOR:
+            when
+                ask ("
+                    \$EDITOR is your system editor, would you like this tutorial to use it? [Y/n] \;
+                ")
+            ..is:
+                "n" "N" "no":
+                    $EDITOR = (nil)
 
+        unless $EDITOR:
+            say
+            $EDITOR =
+                ask ("
+                    What program would you like to use to edit tutorial files?
+                    (leave blank if you want to edit on your own in a different window)
+                    > \;
+                ")
+            if ($EDITOR == ""): $EDITOR = (nil)
+    
     (get failures) means [
         : for $lesson in $lessons at $i:
             $filename = (filename of $i)
@@ -310,21 +340,22 @@ command line program with $args:
                 $msg = ($msg, with "\n *stack traceback:.*" -> "")
                 add {.lesson_number = $i, .failure = $msg}
     ]
-
-    say ""
+    
+    say
     say (bold "Lessons:")
-
     (show first failure from $failures) means:
         say ("
             
             \(bold "Next thing to fix:") \(
-                bold (yellow "Lesson \($failures.1.lesson_number): \($lessons.($failures.1.lesson_number).name)")
+                bold
+                    yellow ("
+                        Lesson \($failures.1.lesson_number): \($lessons.($failures.1.lesson_number).name)
+                    ")
             )
             
             \($failures.1.failure, indented)
             
         ")
-
     $failures = (get failures)
     for $lesson in $lessons at $i:
         for $f in $failures:
@@ -332,17 +363,30 @@ command line program with $args:
                 say (bold (red "    \$i. \($lesson.name) [incomplete]"))
                 do next $lesson
         say (bold (green "    \$i. \($lesson.name) [passed]"))
-    say "\n\(bold "Your progress:") \(20 wide (((#$lessons) - (#$failures)) / (#$lessons)) progress bar)"
-
-    repeat while (not ($failures is empty)):
+    
+    say ("
+        
+        \(bold "Your progress:") \(
+            20 wide (((#$lessons) - (#$failures)) / (#$lessons)) progress bar
+        )
+    ")
+    
+    repeat until ($failures is empty):
         show first failure from $failures
-        if ($args.x):
+        
+        # Have the user fix the first failure:
+        unless $EDITOR:
+            # If the user is using an external editor, wait for the file to change
             $filename = (filename of $failures.1.lesson_number)
-            say "\(yellow "Waiting for you to fix ")\(bold $filename) \(yellow "(press ctrl+c to exit)...")"
+            say ("
+                \(yellow "Waiting for you to fix ")\(bold $filename) \
+                ..\(yellow "(press ctrl+c to exit)...")
+            ")
+            
             try:
                 $files = [: for $ in 1 to (#$lessons): add (read file (filename of $))]
                 repeat:
-                    sh> "sleep 0.5"
+                    sleep for 0.5 seconds
                     $new_files = [: for $ in 1 to (#$lessons): add (read file (filename of $))]
                     if ($new_files != $files):
                         $files = $new_files
@@ -351,14 +395,11 @@ command line program with $args:
                 say "\nGoodbye."
                 exit
         ..else:
+            # If the user is using $EDITOR, launch it so they can edit the file:
             $filename = (filename of $failures.1.lesson_number)
             --- (retry file) ---
-            when
-                ask (bold (cyan "Edit \$filename to get it to pass? [Y/n/exit] "))
-            ..is:
-                "q" "quit" "exit" "n" "N" "no":
-                    exit
-
+            when (ask "Edit \$filename to get it to pass? [Y/n/exit] ") is:
+                "q" "quit" "exit" "n" "N" "no": exit
                 "y" "Y" "yes" "":
                     $f = (read file $filename)
                     [$line, $col] = ($failures.1.failure, match ":(%d+),(%d+)")
@@ -377,10 +418,10 @@ command line program with $args:
                                 sh> "\$EDITOR \$filename"
                     ..else:
                         sh> "\$EDITOR \$filename"
+                
                 else:
                     say "Sorry, I don't understand that."
                     go to (retry file)
-
             $file = (read file $filename)
             $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
             try:
@@ -390,12 +431,13 @@ command line program with $args:
                 say (bold (red "\n There's a bit more to fix:"))
                 $msg = ($msg, with "\n *stack traceback:.*" -> "")
                 say ($msg, indented)
-                say ""
+                say
                 go to (retry file)
-
         $prev_progress = (((#$lessons) - (#$failures)) / (#$lessons))
         $failures = (get failures)
         $progress = (((#$lessons) - (#$failures)) / (#$lessons))
+        
+        # Update the progressbar if progess has changed:
         if ($progress != $prev_progress):
             if ($progress > $prev_progress):
                 say (bold (green "\nSuccess!\n"))
@@ -407,13 +449,14 @@ command line program with $args:
                 $p = ($prev_progress to $progress mixed by $k)
                 say "\r\(bold "Your progress:") \(20 wide $p progress bar)" inline
                 $io.flush()
-                sh> "sleep \(1 / $N)"
-            say ""
-
+                sleep for (1 / $N) seconds
+            say
+    
+    # All done, no more failures:
     say ("
         
                     \(bold "\(slow blink "Congratulations!")")
-
+        
                You've passed the tutorial!
         
                         \\(^ᴗ^)/
