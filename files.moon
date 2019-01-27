@@ -60,6 +60,9 @@ Files.list = (path)->
         else run_cmd('find -L "'..path..'" -not -path "*/\\.*" -type f') or false
     return _BROWSE_CACHE[path]
 
+Files.make_directory = (path)->
+    run_cmd('mkdir '..path)
+
 ok, lfs = pcall(require, "lfs")
 if ok
     raw_file_exists = (filename)->
@@ -92,12 +95,14 @@ if ok
                 for i,f in ipairs(_BROWSE_CACHE[path])
                     if f\match("^%./") then _BROWSE_CACHE[path][i] = f\sub(3)
         return _BROWSE_CACHE[path]
+
+    Files.make_directory = lfs.mkdir
 else
     unless run_cmd('find . -maxdepth 0')
         url = if jit
             'https://github.com/spacewander/luafilesystem'
         else 'https://github.com/keplerproject/luafilesystem'
-        error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: #{url} or `luarocks install luafilesystem`)", 0
+        error "Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: #{url} or `luarocks install luafilesystem`)\n#{lfs}\npackage.cpath: #{package.cpath}", 0
 
 line_counter = re.compile([[
     lines <- {| line (%nl line)* |}

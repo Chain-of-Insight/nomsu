@@ -89,6 +89,9 @@ Files.list = function(path)
   end
   return _BROWSE_CACHE[path]
 end
+Files.make_directory = function(path)
+  return run_cmd('mkdir ' .. path)
+end
 local ok, lfs = pcall(require, "lfs")
 if ok then
   local raw_file_exists
@@ -157,6 +160,7 @@ if ok then
     end
     return _BROWSE_CACHE[path]
   end
+  Files.make_directory = lfs.mkdir
 else
   if not (run_cmd('find . -maxdepth 0')) then
     local url
@@ -165,7 +169,7 @@ else
     else
       url = 'https://github.com/keplerproject/luafilesystem'
     end
-    error("Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: " .. tostring(url) .. " or `luarocks install luafilesystem`)", 0)
+    error("Could not find 'luafilesystem' module and couldn't run system command `find` (this might happen on Windows). Please install `luafilesystem` (which can be found at: " .. tostring(url) .. " or `luarocks install luafilesystem`)\n" .. tostring(lfs) .. "\npackage.cpath: " .. tostring(package.cpath), 0)
   end
 end
 local line_counter = re.compile([[    lines <- {| line (%nl line)* |}
