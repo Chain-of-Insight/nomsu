@@ -1,9 +1,14 @@
 #!/usr/bin/env moon
 -- This file contains the command-line Nomsu runner.
 
+clibtype = package.cpath\match("?%.(so)") or package.cpath\match("?%.(dll)")
+if clibtype == "dll"
+    -- Special hack to enable utf8 for windows console applications:
+    os.execute("chcp 65001>nul")
+
 if NOMSU_VERSION and NOMSU_PREFIX
     package.path = "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?.lua;"..package.path
-    package.cpath = "#{NOMSU_PREFIX}/lib/nomsu/#{NOMSU_VERSION}/?.so;"..package.cpath
+    package.cpath = "#{NOMSU_PREFIX}/lib/nomsu/#{NOMSU_VERSION}/?.#{clibtype};"..package.cpath
 
 EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 

@@ -1,6 +1,10 @@
+local clibtype = package.cpath:match("?%.(so)") or package.cpath:match("?%.(dll)")
+if clibtype == "dll" then
+  os.execute("chcp 65001>nul")
+end
 if NOMSU_VERSION and NOMSU_PREFIX then
   package.path = tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/?.lua;" .. package.path
-  package.cpath = tostring(NOMSU_PREFIX) .. "/lib/nomsu/" .. tostring(NOMSU_VERSION) .. "/?.so;" .. package.cpath
+  package.cpath = tostring(NOMSU_PREFIX) .. "/lib/nomsu/" .. tostring(NOMSU_VERSION) .. "/?." .. tostring(clibtype) .. ";" .. package.cpath
 end
 local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
 if _VERSION == "Lua 5.1" and not jit then
