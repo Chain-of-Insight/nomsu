@@ -19,13 +19,8 @@ format_error = function(err)
   local err_size = math.min((err.stop - err.start), (#err_line - err_linepos) + 1)
   local nl_indicator = (err_linepos > #err_line) and " " or ""
   local fmt_str = " %" .. tostring(#tostring(err_linenum + context)) .. "d|"
-  local pointer
-  if err_size >= 2 then
-    pointer = (" "):rep(err_linepos + #fmt_str:format(0) - 1) .. "╚" .. tostring(("═"):rep(err_size - 2)) .. "╝"
-  else
-    pointer = (" "):rep(err_linepos + #fmt_str:format(0) - 1) .. "⬆"
-  end
-  local err_msg = "\027[33;41;1m" .. tostring(err.title or "Error") .. " at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "," .. tostring(err_linepos) .. "\027[0m"
+  local pointer = (" "):rep(err_linepos + #fmt_str:format(0) - 1) .. ("^"):rep(err_size)
+  local err_msg = "\027[31;1m" .. tostring(err.title or "Error") .. " at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "," .. tostring(err_linepos) .. "\027[0m"
   local lines = err.source:lines()
   for i = err_linenum - context, err_linenum - 1 do
     do
@@ -66,9 +61,9 @@ format_error = function(err)
     end
   end
   local box_width = 70
-  local err_text = "\027[47;31;1m" .. tostring(" " .. err.error:wrapped_to(box_width, 16):gsub("\n", "\n\027[47;31;1m "))
+  local err_text = "\027[47;30;1m" .. tostring(" " .. err.error:wrapped_to(box_width, 16):gsub("\n", "\n\027[47;30;1m "))
   if err.hint then
-    err_text = err_text .. "\n\027[47;30m" .. tostring((" Suggestion: " .. tostring(err.hint)):wrapped_to(box_width, 16):gsub("\n", "\n\027[47;30m "))
+    err_text = err_text .. "\n\027[47;30;3m" .. tostring((" Suggestion: " .. tostring(err.hint)):wrapped_to(box_width, 16):gsub("\n", "\n\027[47;30;3m "))
   end
   err_msg = err_msg .. ("\n\027[33;1m " .. box(err_text):gsub("\n", "\n "))
   for i = err_linenum_end + 1, err_linenum_end + context do

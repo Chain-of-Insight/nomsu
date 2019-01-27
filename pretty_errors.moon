@@ -19,11 +19,14 @@ format_error = (err)->
     err_size = math.min((err.stop - err.start), (#err_line-err_linepos) + 1)
     nl_indicator = (err_linepos > #err_line) and " " or ""
     fmt_str = " %#{#tostring(err_linenum+context)}d|"
-    pointer = if err_size >= 2
-        (" ")\rep(err_linepos+#fmt_str\format(0)-1).."╚#{("═")\rep(err_size-2)}╝"
-    else
-        (" ")\rep(err_linepos+#fmt_str\format(0)-1).."⬆"
-    err_msg = "\027[33;41;1m#{err.title or "Error"} at #{err.filename or '???'}:#{err_linenum},#{err_linepos}\027[0m"
+
+    pointer = (" ")\rep(err_linepos+#fmt_str\format(0)-1)..("^")\rep(err_size)
+    --pointer = if err_size >= 2
+    --    (" ")\rep(err_linepos+#fmt_str\format(0)-1).."╚#{("═")\rep(err_size-2)}╝"
+    --else
+    --    (" ")\rep(err_linepos+#fmt_str\format(0)-1).."⬆"
+
+    err_msg = "\027[31;1m#{err.title or "Error"} at #{err.filename or '???'}:#{err_linenum},#{err_linepos}\027[0m"
     lines = err.source\lines!
     for i=err_linenum-context,err_linenum-1
         if line = lines[i]
@@ -51,9 +54,9 @@ format_error = (err)->
                 break
 
     box_width = 70
-    err_text = "\027[47;31;1m#{" "..err.error\wrapped_to(box_width, 16)\gsub("\n", "\n\027[47;31;1m ")}"
+    err_text = "\027[47;30;1m#{" "..err.error\wrapped_to(box_width, 16)\gsub("\n", "\n\027[47;30;1m ")}"
     if err.hint
-        err_text ..= "\n\027[47;30m#{(" Suggestion: #{err.hint}")\wrapped_to(box_width, 16)\gsub("\n", "\n\027[47;30m ")}"
+        err_text ..= "\n\027[47;30;3m#{(" Suggestion: #{err.hint}")\wrapped_to(box_width, 16)\gsub("\n", "\n\027[47;30;3m ")}"
     err_msg ..= "\n\027[33;1m "..box(err_text)\gsub("\n", "\n ")
 
     for i=err_linenum_end+1,err_linenum_end+context
