@@ -20,13 +20,13 @@ fail_at = (source, msg)->
 
     title, err_msg, hint = msg\match("([^:]*):[ \n]+(.*)[ \n]+Hint: (.*)")
     if not err_msg
-        err_msg, hint = msg\match("*(.*)[ \n]+Hint:[ \n]+(.*)")
-        title = "Error"
+        err_msg, hint = msg\match("(.*)[ \n]+Hint:[ \n]+(.*)")
+        title = "Failure"
     if not err_msg
         title, err_msg = msg\match("([^:]*):[ \n]+(.*)")
     if not err_msg
         err_msg = msg
-        title = "Error"
+        title = "Failure"
 
     err_str = pretty_error{
         title: title,

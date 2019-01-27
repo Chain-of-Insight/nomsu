@@ -26,15 +26,15 @@ fail_at = function(source, msg)
   end
   local title, err_msg, hint = msg:match("([^:]*):[ \n]+(.*)[ \n]+Hint: (.*)")
   if not err_msg then
-    err_msg, hint = msg:match("*(.*)[ \n]+Hint:[ \n]+(.*)")
-    title = "Error"
+    err_msg, hint = msg:match("(.*)[ \n]+Hint:[ \n]+(.*)")
+    title = "Failure"
   end
   if not err_msg then
     title, err_msg = msg:match("([^:]*):[ \n]+(.*)")
   end
   if not err_msg then
     err_msg = msg
-    title = "Error"
+    title = "Failure"
   end
   local err_str = pretty_error({
     title = title,

@@ -9,9 +9,9 @@ use "core/control_flow"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 (fail $msg) compiles to ("
-    at_1_fail(\(quote (this tree).source), 'Failure: \(
-        "'..\($msg as lua expr)" if $msg else "A failure was triggered here'"
-    ))
+    at_1_fail(\(quote (this tree).source),
+        \(($msg as lua expr) if $msg else (quote "A failure was triggered here'"))
+    )
 ")
 
 (assume $condition) compiles to:
