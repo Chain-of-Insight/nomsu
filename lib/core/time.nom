@@ -1,0 +1,51 @@
+#!/usr/bin/env nomsu
+#
+    This file defines time-related actions.
+    
+use "core/metaprogramming"
+use "core/operators"
+use "core/control_flow"
+use "core/io"
+use "core/things"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+external:
+    (a Time) is (a thing) with [
+        $year, $month, $day, $hour, $min, $sec, $wday, $yday, $isdst
+    ]:
+        ($self, + $other) means:
+            if (($self is "a Time") and ($other is "a Time")):
+                fail ("
+                    Type error: Cannot add two times together.
+                    Hint: One of these two should be a number, not a time.
+                ")
+            
+            if ($other is not "a Number"):
+                $other = ($os.time $other)
+            
+            if ($self is not "a Number"):
+                $self = ($os.time $self)
+            
+            return (a Time ($os.date "*t" ($self + $other, rounded)))
+        
+        ($self, - $other) means:
+            if ($self is not "a Time"):
+                fail "Type error: Cannot subtract a Time from something that isn't a Time."
+            $self = ($os.time $self)
+            if ($other is "a Time"):
+                return ($os.difftime $self ($os.time $other))
+            return (a Time ($os.date "*t" ($self - $other, rounded)))
+        
+        ($self, as text) means ($os.date "%I:%M%p %a %b %e %Y" ($os.time $self))
+        ($self, as text in format $format) means ($os.date $format ($os.time $self))
+        ($self, since epoch) means ($os.time $self)
+    
+    (now) means:
+        return (a Time ($os.date "*t"))
+    
+    [sleep for $t seconds, sleep for $t second] all mean:
+        # Lua does not come with a sleep() function, only an os.clock() function,
+            so this busy-loop is necessary for cross-platform compatibility.
+        $deadline = (($os.clock()) + $t)
+        repeat while (($os.clock()) < $deadline): do nothing
