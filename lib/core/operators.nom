@@ -15,7 +15,7 @@ test:
 ($x <= $y) compiles to "(\($x as lua expr) <= \($y as lua expr))"
 ($x >= $y) compiles to "(\($x as lua expr) >= \($y as lua expr))"
 ($a == $b) compiles to "(\($a as lua expr) == \($b as lua expr))"
-[$a isn't $b, $a is not $b, $a not= $b, $a != $b] all compile to
+[$a not= $b, $a != $b] all compile to
     "(\($a as lua expr) ~= \($b as lua expr))"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
