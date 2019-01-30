@@ -1,15 +1,16 @@
 local clibtype = package.cpath:match("?%.(so)") or package.cpath:match("?%.(dll)")
+COLOR_ENABLED = true
 if clibtype == "dll" then
+  local enable_colors = require('wincolors')
+  local ok, _ = pcall(enable_colors)
+  if not ok then
+    COLOR_ENABLED = false
+  end
   os.execute("chcp 65001>nul")
 end
 if NOMSU_VERSION and NOMSU_PREFIX then
   package.path = tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/?.lua;" .. package.path
   package.cpath = tostring(NOMSU_PREFIX) .. "/lib/nomsu/" .. tostring(NOMSU_VERSION) .. "/?." .. tostring(clibtype) .. ";" .. package.cpath
-end
-local EXIT_SUCCESS, EXIT_FAILURE = 0, 1
-if _VERSION == "Lua 5.1" and not jit then
-  print("Sorry, Nomsu does not run on Lua 5.1. Please use LuaJIT 2+ or Lua 5.2+")
-  os.exit(EXIT_FAILURE)
 end
 local usage = [=[Nomsu Compiler
 
@@ -92,7 +93,7 @@ local arg_string = table.concat(arg, sep) .. sep
 local args, err = parser:match(arg_string)
 if not args or err or args.help then
   if err then
-    print("Didn't understand: \x1b[31;1m" .. tostring(err) .. "\x1b[0m")
+    print("Didn't understand: " .. tostring(err))
   end
   print(usage)
   os.exit(EXIT_FAILURE)
@@ -142,6 +143,7 @@ nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
 nomsu_environment.OPTIMIZATION = optimization
 nomsu_environment.NOMSU_PACKAGEPATH = NOMSU_PACKAGEPATH
 nomsu_environment.NOMSU_PREFIX = NOMSU_PREFIX
+nomsu_environment.COLOR_ENABLED = COLOR_ENABLED
 local run
 run = function()
   if not (args.no_core) then

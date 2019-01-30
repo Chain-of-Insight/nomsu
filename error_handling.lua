@@ -1,14 +1,7 @@
 local debug_getinfo = debug.getinfo
 local Files = require("files")
+local C = require("colors")
 local pretty_error = require("pretty_errors")
-local RED = "\027[31m"
-local BRIGHT_RED = "\027[31;1m"
-local RESET = "\027[0m"
-local YELLOW = "\027[33m"
-local CYAN = "\027[36m"
-local GREEN = "\027[32m"
-local BLUE = "\027[34m"
-local DIM = "\027[37;2m"
 local ok, to_lua = pcall(function()
   return require('moonscript.base').to_lua
 end)
@@ -66,10 +59,10 @@ debug.getinfo = function(thread, f, what)
 end
 local enhance_error
 enhance_error = function(error_message, start_fn, stop_fn)
-  if not (error_message and error_message:match("\x1b")) then
+  if not (error_message and error_message:match("%d|")) then
     error_message = error_message or ""
     do
-      local fn = error_message:match("attempt to call a nil value %(global '(.*)'%)")
+      local fn = (error_message:match("attempt to call a nil value %(global '(.*)'%)") or error_message:match("attempt to call global '(.*)' %(a nil value%)"))
       if fn then
         error_message = "The action '" .. tostring(fn:from_lua_id()) .. "' is not defined."
       end
@@ -130,7 +123,7 @@ enhance_error = function(error_message, start_fn, stop_fn)
     end
   end
   local ret = {
-    tostring(RED) .. "ERROR: " .. tostring(BRIGHT_RED) .. tostring(error_message or "") .. tostring(RESET),
+    C('bold red', error_message or "Error"),
     "stack traceback:"
   }
   local level = 2
@@ -181,10 +174,10 @@ enhance_error = function(error_message, start_fn, stop_fn)
           do
             local err_line = lines[calling_fn.currentline]
             if err_line then
-              local offending_statement = tostring(BRIGHT_RED) .. tostring(err_line:match("^[ ]*(.*)")) .. tostring(RESET)
-              line = tostring(YELLOW) .. tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement) .. tostring(RESET)
+              local offending_statement = C('bright red', err_line:match("^[ ]*(.*)"))
+              line = C('yellow', tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. "\n        " .. tostring(offending_statement))
             else
-              line = tostring(YELLOW) .. tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name) .. tostring(RESET)
+              line = C('yellow', tostring(filename) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name))
             end
           end
         else
@@ -236,20 +229,20 @@ enhance_error = function(error_message, start_fn, stop_fn)
           if file and (calling_fn.short_src:match("%.moon$") or file:match("^#![^\n]*moon\n")) and type(MOON_SOURCE_MAP[file]) == 'table' then
             local char = MOON_SOURCE_MAP[file][calling_fn.currentline]
             line_num = file:line_number_at(char)
-            line = tostring(CYAN) .. tostring(calling_fn.short_src) .. ":" .. tostring(line_num) .. " in " .. tostring(name or '?') .. tostring(RESET)
+            line = C('cyan', tostring(calling_fn.short_src) .. ":" .. tostring(line_num) .. " in " .. tostring(name or '?'))
           else
             line_num = calling_fn.currentline
             if calling_fn.short_src == '[C]' then
-              line = tostring(GREEN) .. tostring(calling_fn.short_src) .. " in " .. tostring(name or '?') .. tostring(RESET)
+              line = C('green', tostring(calling_fn.short_src) .. " in " .. tostring(name or '?'))
             else
-              line = tostring(BLUE) .. tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name or '?') .. tostring(RESET)
+              line = C('blue', tostring(calling_fn.short_src) .. ":" .. tostring(calling_fn.currentline) .. " in " .. tostring(name or '?'))
             end
           end
           if file then
             do
               local err_line = lines[line_num]
               if err_line then
-                local offending_statement = tostring(BRIGHT_RED) .. tostring(err_line:match("^[ ]*(.*)$")) .. tostring(RESET)
+                local offending_statement = C('bright red', tostring(err_line:match("^[ ]*(.*)$")))
                 line = line .. ("\n        " .. offending_statement)
               end
             end
@@ -258,7 +251,7 @@ enhance_error = function(error_message, start_fn, stop_fn)
       end
       table.insert(ret, line)
       if calling_fn.istailcall then
-        table.insert(ret, "      " .. tostring(DIM) .. "(...tail calls...)" .. tostring(RESET))
+        table.insert(ret, C('dim', "      (...tail calls...)"))
       end
       _continue_0 = true
     until true

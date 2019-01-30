@@ -6,6 +6,7 @@ Text = require 'text'
 SyntaxTree = require "syntax_tree"
 Files = require "files"
 Errhand = require "error_handling"
+C = require "colors"
 make_parser = require("parser")
 pretty_error = require("pretty_errors")
 
@@ -35,7 +36,6 @@ for version=1,999
 
 {:tree_to_nomsu, :tree_to_inline_nomsu} = require "nomsu_decompiler"
 {:compile, :fail_at} = require('nomsu_compiler')
-_currently_running_files = List{} -- Used to check for circular imports in run_file_1_in
 _module_imports = {}
 _importer_mt = {__index: (k)=> _module_imports[@][k]}
 Importer = (t, imports)->
@@ -108,12 +108,13 @@ nomsu_environment = Importer{
                     start:e.source.start, stop:e.source.stop, filename:e.source.filename
                 } for i, e in ipairs(errs) when i <= 3]
             if num_errs > #err_strings
-                table.insert(err_strings, "\027[31;1m +#{num_errs-#err_strings} additional errors...\027[0m\n")
+                table.insert(err_strings, C("bright red", " +#{num_errs-#err_strings} additional errors...\n"))
             error(table.concat(err_strings, '\n\n'), 0)
         
         return tree
 
     Module: (package_name)=>
+        -- This *must* be the first local
         local path
         if package_name\match("%.nom$") or package_name\match("%.lua")
             path = package_name
@@ -125,11 +126,26 @@ nomsu_environment = Importer{
         if ret = package.nomsuloaded[package_name] or package.nomsuloaded[path]
             return ret
 
-        if _currently_running_files\has(path)
-            i = _currently_running_files\index_of(path)
-            _currently_running_files\add path
-            circle = _currently_running_files\from_1_to(i, -1)
-            error("Circular import detected:\n           "..circle\joined_with("\n..imports  "))
+        -- Traverse up the callstack to look for import loops
+        -- This is more reliable than keeping a list of running files, since
+        -- that gets messed up when errors occur.
+        currently_running = {}
+        for i=2,999
+            info = debug.getinfo(i, 'f')
+            break unless info.func
+            if info.func == @Module
+                n, upper_path = debug.getlocal(i, 3) -- 3 means "path"
+                table.insert(currently_running, upper_path)
+                assert(n == "path")
+                if upper_path == path
+                    --circle = "\n           "..table.concat(currently_running, "\n..imports  ")
+                    circle = table.concat(currently_running, "', which imports '")
+                    err_i = 2
+                    info = debug.getinfo(err_i)
+                    while info and (info.func == @Module or info.func == @use or info.func == @export)
+                        err_i += 1
+                        info = debug.getinfo(err_i)
+                    fail_at (info or debug.getinfo(2)), "Circular import: File '#{path}' imports '"..circle.."'"
         mod = @new_environment!
         mod.MODULE_NAME = package_name
         code = Files.read(path)
@@ -137,11 +153,9 @@ nomsu_environment = Importer{
             code = LuaCode\from(Source(path, 1, #code), code)
         else
             code = NomsuCode\from(Source(path, 1, #code), code)
-        _currently_running_files\add path
         ret = mod\run(code)
         if ret != nil
             mod = ret
-        _currently_running_files\pop!
         package.nomsuloaded[package_name] = mod
         package.nomsuloaded[path] = mod
         return mod
@@ -165,7 +179,6 @@ nomsu_environment = Importer{
                 imports[k] = v
         for k,v in pairs(mod)
             if rawget(@, k) == nil
-                --if k != "_G" and k != "_ENV" and k != "COMPILE_RULES" and k != "MODULE_NAME"
                 @[k] = v
         cr_imports = assert _module_imports[@COMPILE_RULES]
         if mod.COMPILE_RULES
@@ -210,7 +223,7 @@ nomsu_environment = Importer{
             if not run_lua_fn
                 lines =[("%3d|%s")\format(i,line) for i, line in ipairs lua_string\lines!]
                 line_numbered_lua = table.concat(lines, "\n")
-                error("Failed to compile generated code:\n\027[1;34m#{line_numbered_lua}\027[0m\n\n#{err}", 0)
+                error("Failed to compile generated code:\n#{C("bright blue", line_numbered_lua)}\n\n#{err}", 0)
             source_key = tostring(source)
             unless @SOURCE_MAP[source_key] or @OPTIMIZATION >= 2
                 map = {}

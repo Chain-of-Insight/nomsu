@@ -1,17 +1,9 @@
 -- This file contains the logic for making nicer error messages
 debug_getinfo = debug.getinfo
 Files = require "files"
+C = require "colors"
 pretty_error = require("pretty_errors")
 export SOURCE_MAP
-
-RED = "\027[31m"
-BRIGHT_RED = "\027[31;1m"
-RESET = "\027[0m"
-YELLOW = "\027[33m"
-CYAN = "\027[36m"
-GREEN = "\027[32m"
-BLUE = "\027[34m"
-DIM = "\027[37;2m"
 
 ok, to_lua = pcall -> require('moonscript.base').to_lua
 if not ok then to_lua = -> nil
@@ -47,9 +39,11 @@ debug.getinfo = (thread,f,what)->
     return info
 
 enhance_error = (error_message, start_fn, stop_fn)->
-    unless error_message and error_message\match("\x1b")
+    -- Hacky: detect the line numbering
+    unless error_message and error_message\match("%d|")
         error_message or= ""
-        if fn = error_message\match("attempt to call a nil value %(global '(.*)'%)")
+        if fn = (error_message\match("attempt to call a nil value %(global '(.*)'%)") or
+            error_message\match("attempt to call global '(.*)' %(a nil value%)"))
             error_message = "The action '#{fn\from_lua_id!}' is not defined."
         level = 2
         while true
@@ -91,7 +85,7 @@ enhance_error = (error_message, start_fn, stop_fn)->
 
 
     ret = {
-        "#{RED}ERROR: #{BRIGHT_RED}#{error_message or ""}#{RESET}"
+        C('bold red', error_message or "Error")
         "stack traceback:"
     }
 
@@ -125,10 +119,10 @@ enhance_error = (error_message, start_fn, stop_fn)->
             file = Files.read(filename)
             lines = file and file\lines! or {}
             if err_line = lines[calling_fn.currentline]
-                offending_statement = "#{BRIGHT_RED}#{err_line\match("^[ ]*(.*)")}#{RESET}"
-                line = "#{YELLOW}#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}#{RESET}"
+                offending_statement = C('bright red', err_line\match("^[ ]*(.*)"))
+                line = C('yellow', "#{filename}:#{calling_fn.currentline} in #{name}\n        #{offending_statement}")
             else
-                line = "#{YELLOW}#{filename}:#{calling_fn.currentline} in #{name}#{RESET}"
+                line = C('yellow', "#{filename}:#{calling_fn.currentline} in #{name}")
         else
             local line_num
             if name == nil
@@ -161,21 +155,21 @@ enhance_error = (error_message, start_fn, stop_fn)->
             if file and (calling_fn.short_src\match("%.moon$") or file\match("^#![^\n]*moon\n")) and type(MOON_SOURCE_MAP[file]) == 'table'
                 char = MOON_SOURCE_MAP[file][calling_fn.currentline]
                 line_num = file\line_number_at(char)
-                line = "#{CYAN}#{calling_fn.short_src}:#{line_num} in #{name or '?'}#{RESET}"
+                line = C('cyan', "#{calling_fn.short_src}:#{line_num} in #{name or '?'}")
             else
                 line_num = calling_fn.currentline
                 if calling_fn.short_src == '[C]'
-                    line = "#{GREEN}#{calling_fn.short_src} in #{name or '?'}#{RESET}"
+                    line = C('green', "#{calling_fn.short_src} in #{name or '?'}")
                 else
-                    line = "#{BLUE}#{calling_fn.short_src}:#{calling_fn.currentline} in #{name or '?'}#{RESET}"
+                    line = C('blue', "#{calling_fn.short_src}:#{calling_fn.currentline} in #{name or '?'}")
 
             if file
                 if err_line = lines[line_num]
-                    offending_statement = "#{BRIGHT_RED}#{err_line\match("^[ ]*(.*)$")}#{RESET}"
+                    offending_statement = C('bright red', "#{err_line\match("^[ ]*(.*)$")}")
                     line ..= "\n        "..offending_statement
         table.insert ret, line
         if calling_fn.istailcall
-            table.insert ret, "      #{DIM}(...tail calls...)#{RESET}"
+            table.insert ret, C('dim', "      (...tail calls...)")
 
     return table.concat(ret, "\n")
 

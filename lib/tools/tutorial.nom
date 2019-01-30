@@ -25,11 +25,11 @@ $lessons = [
     lesson "Variables":
         # In Nomsu, variables have a "$" prefix, and you can just assign to them
             without declaring them first:
-        $x = 10
-        assume ($x == 10)
+        $x = 1
+        test that ($x == 1)
         
         # Variables which have not yet been set have the value (nil)
-        assume ($foobar == (nil))
+        test that ($foobar == (nil))
         
         # Variables can be nameless:
         $ = 99
@@ -40,16 +40,15 @@ $lessons = [
         # Figure out what value $my_var should have:
         $my_var = 100
         $my_var = ($my_var + $x + $(my favorite number))
-        assume ($my_var == (???))
+        test that ($my_var == (???))
     
     lesson "Actions":
-        # Fix this action so the tests pass, then save and quit.
-        # If the tests don't pass, you can come back to this file later.
+        # Fix this action so the tests pass:
         ($x doubled) means ((???) * $x)
         
         # Tests:
-        assume ((2 doubled) == 4)
-        assume ((-5 doubled) == -10)
+        test that ((2 doubled) == 4)
+        test that ((-5 doubled) == -10)
     
     lesson "Blocks":
         # When you need to do multiple things inside an action, use a block.
@@ -64,6 +63,32 @@ $lessons = [
             $correct_answer = (4 * ($num * $num))
             if (($num doubled then squared) != $correct_answer):
                 fail "Wrong answer for \($num)!"
+
+    lesson "Text":
+        # Nomsu text is enclosed in double quotation marks:
+        $text = "Hello"
+        
+        # You can insert values into text using a backslash:
+        test that ("two plus three is \(2 + 3)" == (???))
+        
+        # Variables don't require parentheses, but other expressions do:
+        $x = 99
+        test that ("$x is \$x" == (???))
+        
+        # This can be used to convert values to text:
+        test that ("\$x" == (???))
+        
+        # Longer strings use '("' followed by an indented region:
+        $long = ("
+            line one
+              line two with spaces at the front
+        ")
+        
+        test that
+            $long == ("
+                \(<your code here>)
+                \(<your code here>)
+            ")
     
     lesson "Conditionals":
         # Make this action return "big" if its argument
@@ -75,11 +100,11 @@ $lessons = [
                 <your code here>
         
         # Tests:
-        for $small_number in [0, 1, -5, -999, 99]:
-            assume ((the size of $small_number) == "small")
-        
         for $big_number in [9999, 100]:
-            assume ((the size of $big_number) == "big")
+            test that ((the size of $big_number) == "big")
+
+        for $small_number in [0, 1, -5, -999, 99]:
+            test that ((the size of $small_number) == "small")
     
     lesson "Loops":
         # Fix this action so the tests pass:
@@ -93,14 +118,14 @@ $lessons = [
             return $sum
         
         # Tests:
-        assume ((the sum of [1, 2, 3, 4, 5]) == 15)
-        assume ((the sum of [100, 200]) == 300)
+        test that ((the sum of [1, 2, 3, 4, 5]) == 15)
+        test that ((the sum of [100, 200]) == 300)
         
         # You can also loop over a number range like this:
         $total = 0
         for $i in 1 to 3:
             $total = ($total + $i)
-        assume ($total == (???))
+        test that ($total == (???))
     
     lesson "Variable Scopes":
         # Nomsu's variables are local by default, and actions have their own scopes:
@@ -111,17 +136,17 @@ $lessons = [
         (do something) means:
             # The variable $y is never set in this action, so it has the same value
                 it has outside this action.
-            assume ($y == (???))
+            test that ($y == (???))
             
             # $x is set inside this action, and actions have their own scopes.
             $x = $y
             
             # What number should $x be here?
-            assume ($x == (???))
+            test that ($x == (???))
         
         # After running the action, what value should $x have?
         do something
-        assume ($x == (???))
+        test that ($x == (???))
     
     lesson "More Variable Scopes":
         # Loops and conditionals do *not* have their own scopes:
@@ -131,13 +156,13 @@ $lessons = [
             $z = 2
         
         # After assigning in a conditional, what should $z be?
-        assume ($z == (???))
+        test that ($z == (???))
         for $ in 1 to 1:
             # Set $z inside a loop:
             $z = 3
         
         # After assigning in a loop, what should $z be?
-        assume ($z == (???))
+        test that ($z == (???))
     
     lesson "Externals":
         # The 'external' block lets you modify variables outside an action:
@@ -147,7 +172,7 @@ $lessons = [
         do something
         
         # After running the action that sets $x in an 'external' block, what should $x be?
-        assume ($x == (???))
+        test that ($x == (???))
     
     lesson "Locals":
         # The 'with' block lets you create a local scope for the variables you list:
@@ -158,8 +183,8 @@ $lessons = [
             $z = 2
         
         # After setting $y and $z in the 'with [$y]' block, what should $y and $z be?
-        assume ($y == (???))
-        assume ($z == (???))
+        test that ($y == (???))
+        test that ($z == (???))
     
     lesson "Failure and Recovery":
         $what_happened = "nothing"
@@ -174,7 +199,7 @@ $lessons = [
             $what_happened = "success"
         
         # What do you think happened?
-        assume ($what_happened == (???))
+        test that ($what_happened == (???))
         
         # Note: a 'try' block will silence failures, so this has no effect:
         try: fail
@@ -182,11 +207,11 @@ $lessons = [
     lesson "Indexing":
         # Nomsu uses the "." operator to access things inside an object:
         $dictionary = {.dog = "A lovable doofus", .cat = "An internet superstar"}
-        assume ($dictionary.dog == "A lovable doofus")
-        assume ($dictionary.cat == (???))
+        test that ($dictionary.dog == "A lovable doofus")
+        test that ($dictionary.cat == (???))
         
         # If you try to access a key that's not in an object, the result is (nil):
-        assume ($dictionary.mimsy == (???))
+        test that ($dictionary.mimsy == (???))
         
         # $dictionary.dog is just a shorthand for $dictionary."dog".
             You may need to use the longer form for strings with spaces:
@@ -197,22 +222,22 @@ $lessons = [
         $dictionary.5 = "The number five"
         $dictionary.five = 5
         $dictionary.myself = $dictionary
-        assume ($dictionary.myself == (???))
+        test that ($dictionary.myself == (???))
         
         # Lists are similar, but use square brackets ([])
             and can only have numbers as keys, starting at 1:
         $list = ["first", "second", 999]
-        assume ($list.1 == "first")
-        assume ($list.2 == (???))
-        assume ($list.3 == (???))
+        test that ($list.1 == "first")
+        test that ($list.2 == (???))
+        test that ($list.3 == (???))
         
         # Hint: 4 should be a missing key
-        assume ($list.4 == (???))
-        assume ($list.foobar == (???))
+        test that ($list.4 == (???))
+        test that ($list.foobar == (???))
         
         # The "#" action gets the number of items inside something:
-        assume ((#$list) == (???))
-        assume ((#{.x = 10, .y = 20}) == (???))
+        test that ((#$list) == (???))
+        test that ((#{.x = 10, .y = 20}) == (???))
     
     lesson "Methods":
         # The "," is used for method calls, which means calling an action
@@ -220,17 +245,17 @@ $lessons = [
         # Lists have an "add" method that puts new items at the end:
         $list = [-4, -6, 5]
         $list, add 3
-        assume ($list == [-4, -6, 5, 3])
+        test that ($list == [-4, -6, 5, 3])
         $list, add 7
-        assume ($list == [???])
+        test that ($list == [???])
         
         # Text also has some methods like:
         $name = "Harry Tuttle"
-        assume (($name, character 7) == "T")
-        assume (($name, with "Tuttle" -> "Buttle") == (???))
+        test that (($name, from 7 to 12) == "Tuttle")
+        test that (($name, with "Tuttle" -> "Buttle") == (???))
         
         # Methods can be chained too:
-        assume (($name, with "Tuttle" -> "Buttle", character 7) == (???))
+        test that (($name, with "Tuttle" -> "Buttle", from 7 to 12) == (???))
     
     lesson "Object Oriented Programming":
         # Object Oriented Programming deals with things that have
@@ -246,13 +271,30 @@ $lessons = [
             ($self, add $bit) means:
                 $bits, add $bit
             
-            # Write a method called ($self, length) that returns the total
-                length of all the bits in the buffer:
+            # Write a method called ($self, length) that returns the sum
+                of the lengths of each bit in the buffer:
             <your code here>
         $b = (a Buffer)
         $b, add "xx"
         $b, add "yyy"
-        assume (($b, length) == 5)
+        test that (($b, length) == 5)
+
+    lesson "Files Part 1":
+        # Define an external action here:
+        external:
+            # These will be used in the next lesson
+            $foobar = 23
+            ($x tripled) means:
+                <your code here>
+        test that ((5 tripled) == 15)
+        test that ((2 tripled) == 6)
+
+    lesson "Files Part 2":
+        # 'use' is the action for importing from other files
+        # It takes the path to the file (without the .nom extension):
+        use (<prev lesson>)
+        test that ((10 tripled) == (???))
+        test that ($foobar == (???))
 ]
 
 $(ask normally) = $(ask)
@@ -282,14 +324,12 @@ command line program with $args:
         unless ($Files.exists $tutorial_dir):
             when
                 ask ("
-                    The Nomsu tutorial files will be in \$tutorial_dir is that okay? [Y/n] \;
+                    The Nomsu tutorial files will be in \$tutorial_dir is that okay? [Y/n/exit] \;
                 ")
             ..is:
                 "n" "N" "no":
-                    say ("
-                        Okay. If you want to specify another file location, run `nomsu -t tutorial <your location>`
-                    ")
-                    exit
+                    $tutorial_dir = (ask "Where do you want to put the tutorial? ")
+                "exit" "quit" "q" "e": exit
     ..else:
         $tutorial_dir = $args.extras.1
     
@@ -300,7 +340,10 @@ command line program with $args:
     for $lesson in $lessons at $i:
         $filename = (filename of $i)
         unless ($Files.exists $filename):
-            write $lesson.lesson to file $filename
+            $lesson_text =
+                $lesson.lesson, with "%(<prev lesson>%)" ->
+                    "\"\(filename of ($i - 1), with "%.nom$" -> "", with "^%./" -> "")\""
+            write $lesson_text to file $filename
     
     # Display info about editing the tutorial files:
     if $args.x:
@@ -328,14 +371,23 @@ command line program with $args:
                     > \;
                 ")
             if ($EDITOR == ""): $EDITOR = (nil)
+
+    (run lesson $i) means:
+        $filename = (filename of $i)
+        $file = (read file $filename)
+        $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
+        $tree = ($file parsed)
+        $tree =
+            $tree with $ ->:
+                if ($ == \(<prev lesson>)):
+                    return ("Text" tree with (filename of ($i - 1), with "%.nom$" -> ""))
+        run $tree
+
     
     (get failures) means [
         : for $lesson in $lessons at $i:
-            $filename = (filename of $i)
-            $file = (read file $filename)
-            $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
             try:
-                run $file
+                run lesson $i
             ..if it fails with $msg:
                 $msg = ($msg, with "\n *stack traceback:.*" -> "")
                 add {.lesson_number = $i, .failure = $msg}
@@ -360,17 +412,21 @@ command line program with $args:
     for $lesson in $lessons at $i:
         for $f in $failures:
             if ($f.lesson_number == $i):
-                say (bold (red "    \$i. \($lesson.name) [incomplete]"))
+                say "\(red "  - ")\(bold (red "\$i. \($lesson.name) [incomplete]"))"
                 do next $lesson
-        say (bold (green "    \$i. \($lesson.name) [passed]"))
+        say "\(green "  + ")\(bold (green "\$i. \($lesson.name) [passed]"))"
     
-    say ("
+    if $(COLOR ENABLED):
+        say ("
+            
+            \(bold "Your progress:") \(
+                20 wide (((#$lessons) - (#$failures)) / (#$lessons)) progress bar
+            )
+        ")
+    ..else:
+        say
+        say (((#$lessons) - (#$failures)) / (#$lessons) progress bar)
         
-        \(bold "Your progress:") \(
-            20 wide (((#$lessons) - (#$failures)) / (#$lessons)) progress bar
-        )
-    ")
-    
     repeat until ($failures is empty):
         show first failure from $failures
         
@@ -400,6 +456,8 @@ command line program with $args:
             --- (retry file) ---
             when (ask "Edit \$filename to get it to pass? [Y/n/exit] ") is:
                 "q" "quit" "exit" "n" "N" "no": exit
+                "c":
+                    write "# cheater!\n" to file $filename
                 "y" "Y" "yes" "":
                     $f = (read file $filename)
                     [$line, $col] = ($failures.1.failure, match ":(%d+),(%d+)")
@@ -422,10 +480,8 @@ command line program with $args:
                 else:
                     say "Sorry, I don't understand that."
                     go to (retry file)
-            $file = (read file $filename)
-            $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
             try:
-                run $file
+                run lesson $failures.1.lesson_number
             ..if it fails with $msg:
                 $failures.1.failure = $msg
                 say (bold (red "\n There's a bit more to fix:"))
@@ -443,13 +499,16 @@ command line program with $args:
                 say (bold (green "\nSuccess!\n"))
             ..else:
                 say (bold (red "\nUh oh, that broke something.\n"))
-            $N = 100
-            for $ in 0 to $N:
-                $k = (($ / $N) smoothed by 2)
-                $p = ($prev_progress to $progress mixed by $k)
-                say "\r\(bold "Your progress:") \(20 wide $p progress bar)" inline
-                $io.flush()
-                sleep for (1 / $N) seconds
+            if $(COLOR ENABLED):
+                $N = 100
+                for $ in 0 to $N:
+                    $k = (($ / $N) smoothed by 2)
+                    $p = ($prev_progress to $progress mixed by $k)
+                    say "\r\(bold "Your progress:") \(20 wide $p progress bar)" inline
+                    $io.flush()
+                    sleep for (1 / $N) seconds
+            ..else:
+                say (((#$lessons) - (#$failures)) / (#$lessons) progress bar)
             say
     
     # All done, no more failures:
@@ -459,7 +518,7 @@ command line program with $args:
         
                You've passed the tutorial!
         
-                        \\(^ᴗ^)/
+                        \\(^\("ᴗ" if $(COLOR ENABLED) else "_")^)/
         
         
     ")

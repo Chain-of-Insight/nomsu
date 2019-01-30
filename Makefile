@@ -14,11 +14,11 @@ UNINSTALL_VERSION=
 MOON_FILES= code_obj.moon error_handling.moon files.moon nomsu.moon nomsu_compiler.moon \
 			syntax_tree.moon containers.moon bitops.moon parser.moon pretty_errors.moon \
 			text.moon nomsu_decompiler.moon nomsu_environment.moon bootstrap.moon \
-			builtin_metatables.moon
+			builtin_metatables.moon colors.moon
 LUA_FILES= code_obj.lua error_handling.lua files.lua nomsu.lua nomsu_compiler.lua \
 		   syntax_tree.lua containers.lua bitops.lua parser.lua pretty_errors.lua \
 		   text.lua nomsu_decompiler.lua nomsu_environment.lua bootstrap.lua \
-		   builtin_metatables.lua
+		   builtin_metatables.lua colors.lua
 CORE_NOM_FILES=$(shell cat lib/core/init.nom | sed -n 's;export "\(.*\)";lib/\1.nom;p') lib/core/init.nom
 CORE_LUA_FILES= $(patsubst %.nom,%.lua, $(CORE_NOM_FILES))
 COMPAT_NOM_FILES=$(wildcard lib/compatibility/*.nom)

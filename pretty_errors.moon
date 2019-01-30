@@ -2,6 +2,7 @@
 -- line numbers, code excerpts, and so on.
 require "containers"
 Text = require 'text'
+C = require 'colors'
 
 box = (text)->
     max_line = 0
@@ -9,7 +10,7 @@ box = (text)->
         max_line = math.max(max_line, #(line\gsub("\027%[[0-9;]*m","")))
     ret = ("\n"..text)\gsub "\n([^\n]*)", (line)->
         line_len = #(line\gsub("\027%[[0-9;]*m",""))
-        return "\n#{line}#{(" ")\rep(max_line-line_len)} \027[0m"
+        return "\n#{line}#{(" ")\rep(max_line-line_len)} "..C('reset')
     return ret\sub(2,-1), max_line
 
 format_error = (err)->
@@ -26,17 +27,18 @@ format_error = (err)->
     --else
     --    (" ")\rep(err_linepos+#fmt_str\format(0)-1).."⬆"
 
-    err_msg = "\027[31;1m#{err.title or "Error"} at #{err.filename or '???'}:#{err_linenum},#{err_linepos}\027[0m"
+    err_msg = C('bold red', err.title or "Error")..C('red', " at #{err.filename or '???'}:#{err_linenum},#{err_linepos}")
+    err_msg ..= "\n" unless COLOR_ENABLED
     lines = err.source\lines!
     for i=err_linenum-context,err_linenum-1
         if line = lines[i]
-            err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0m#{line}\027[0m"
+            err_msg ..= "\n"..C('dim', fmt_str\format(i))..line
     if err_line
         before = err_line\sub(1, err_linepos-1)
         during = err_line\sub(err_linepos,err_linepos+err_size-1)
         after = err_line\sub(err_linepos+err_size, -1)
-        err_line = "\027[0m#{before}\027[41;30m#{during}#{nl_indicator}\027[0m#{after}"
-        err_msg ..= "\n\027[2m#{fmt_str\format(err_linenum)}#{err_line}\027[0m"
+        err_line = before..C('black on red', during..nl_indicator)..after
+        err_msg ..= "\n"..C('dim', fmt_str\format(err_linenum))..err_line
     _, err_linenum_end, err_linepos_end = err.source\line_info_at(err.stop)
     err_linenum_end or= err_linenum
     if err_linenum_end == err_linenum
@@ -46,22 +48,24 @@ format_error = (err)->
             if line = lines[i]
                 if i == err_linenum_end
                     during, after = line\sub(1,err_linepos_end-1), line\sub(err_linepos_end,-1)
-                    err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0;41;30m#{during}\027[0m#{after}"
+                    err_msg ..= "\n"..C('dim', fmt_str\format(i))..C('black on red', during)..after
                 else
-                    err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0;41;30m#{line}\027[0m"
+                    err_msg ..= "\n"..C('dim', fmt_str\format(i))..C('black on red', line)
             if i > err_linenum+1 + 5
                 err_msg ..= "\n       ...\n"
                 break
 
     box_width = 70
-    err_text = "\027[47;30;1m#{" "..err.error\wrapped_to(box_width, 16)\gsub("\n", "\n\027[47;30;1m ")}"
+    err_text = C('black on white', " "..err.error\wrapped_to(box_width, 16)\gsub("\n", "\n"..C('black on white').." "))
     if err.hint
-        err_text ..= "\n\027[47;30;3m#{(" Suggestion: #{err.hint}")\wrapped_to(box_width, 16)\gsub("\n", "\n\027[47;30;3m ")}"
-    err_msg ..= "\n\027[33;1m "..box(err_text)\gsub("\n", "\n ")
+        err_text ..= "\n"..C('italic black on white', (" Suggestion: #{err.hint}")\wrapped_to(box_width, 16)\gsub("\n", "\n"..C('italic black on white').." "))
+    err_msg ..= "\n "..box(err_text)\gsub("\n", "\n ")
+    err_msg ..= "\n" unless COLOR_ENABLED
 
     for i=err_linenum_end+1,err_linenum_end+context
         if line = lines[i]
-            err_msg ..= "\n\027[2m#{fmt_str\format(i)}\027[0m#{line}\027[0m"
+            err_msg ..= "\n"..C('dim', fmt_str\format(i))..line
+    err_msg ..= "\n" unless COLOR_ENABLED
     return err_msg
 
 return format_error

@@ -75,6 +75,7 @@ use "core/control_flow"
 
 (assume $a == $b) parses as (assume ($a == $b))
 (assume $a != $b) parses as (assume ($a != $b))
+(test that $condition) parses as (assume $condition)
 
 test:
     try: fail

@@ -4,6 +4,7 @@
 unpack or= table.unpack
 {:match, :sub, :gsub, :format, :byte, :find} = string
 {:LuaCode, :Source} = require "code_obj"
+require "text"
 SyntaxTree = require "syntax_tree"
 Files = require "files"
 
@@ -15,6 +16,18 @@ fail_at = (source, msg)->
         source = source.source
     elseif type(source) == 'string'
         source = Source\from_string(source)
+    else
+        -- debug.getinfo() output:
+        assert(source.short_src and source.currentline)
+        file = Files.read(source.short_src)
+        assert file, "Could not find #{source.short_src}"
+        lines = file\lines!
+        start = 1
+        for i=1,source.currentline-1
+            start += #lines[i]
+        stop = start + #lines[source.currentline]
+        source = Source(source.short_src, start, stop)
+
     if source and not file
         file = Files.read(source.filename)
 

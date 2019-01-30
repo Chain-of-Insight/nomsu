@@ -52,7 +52,8 @@ command line program with $args:
             if (($line == "\n") or (not $line)):
                 if ((size of $buff) > 0):
                     # clear the line
-                    say "\027[1A\027[2K" inline
+                    if $(COLOR ENABLED):
+                        say "\027[1A\027[2K" inline
                 go to (run buffer)
             $buff, add ($line, with "\t" -> "    ")
             say (dim (yellow ".. ")) inline

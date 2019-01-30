@@ -12,6 +12,7 @@ local Text = require('text')
 local SyntaxTree = require("syntax_tree")
 local Files = require("files")
 local Errhand = require("error_handling")
+local C = require("colors")
 local make_parser = require("parser")
 local pretty_error = require("pretty_errors")
 local make_tree
@@ -65,7 +66,6 @@ do
   local _obj_0 = require('nomsu_compiler')
   compile, fail_at = _obj_0.compile, _obj_0.fail_at
 end
-local _currently_running_files = List({ })
 local _module_imports = { }
 local _importer_mt = {
   __index = function(self, k)
@@ -225,7 +225,7 @@ nomsu_environment = Importer({
         err_strings = _accum_0
       end
       if num_errs > #err_strings then
-        table.insert(err_strings, "\027[31;1m +" .. tostring(num_errs - #err_strings) .. " additional errors...\027[0m\n")
+        table.insert(err_strings, C("bright red", " +" .. tostring(num_errs - #err_strings) .. " additional errors...\n"))
       end
       error(table.concat(err_strings, '\n\n'), 0)
     end
@@ -249,11 +249,27 @@ nomsu_environment = Importer({
         return ret
       end
     end
-    if _currently_running_files:has(path) then
-      local i = _currently_running_files:index_of(path)
-      _currently_running_files:add(path)
-      local circle = _currently_running_files:from_1_to(i, -1)
-      error("Circular import detected:\n           " .. circle:joined_with("\n..imports  "))
+    local currently_running = { }
+    for i = 2, 999 do
+      local info = debug.getinfo(i, 'f')
+      if not (info.func) then
+        break
+      end
+      if info.func == self.Module then
+        local n, upper_path = debug.getlocal(i, 3)
+        table.insert(currently_running, upper_path)
+        assert(n == "path")
+        if upper_path == path then
+          local circle = table.concat(currently_running, "', which imports '")
+          local err_i = 2
+          info = debug.getinfo(err_i)
+          while info and (info.func == self.Module or info.func == self.use or info.func == self.export) do
+            err_i = err_i + 1
+            info = debug.getinfo(err_i)
+          end
+          fail_at((info or debug.getinfo(2)), "Circular import: File '" .. tostring(path) .. "' imports '" .. circle .. "'")
+        end
+      end
     end
     local mod = self:new_environment()
     mod.MODULE_NAME = package_name
@@ -263,12 +279,10 @@ nomsu_environment = Importer({
     else
       code = NomsuCode:from(Source(path, 1, #code), code)
     end
-    _currently_running_files:add(path)
     local ret = mod:run(code)
     if ret ~= nil then
       mod = ret
     end
-    _currently_running_files:pop()
     package.nomsuloaded[package_name] = mod
     package.nomsuloaded[path] = mod
     return mod
@@ -360,7 +374,7 @@ nomsu_environment = Importer({
           lines = _accum_0
         end
         local line_numbered_lua = table.concat(lines, "\n")
-        error("Failed to compile generated code:\n\027[1;34m" .. tostring(line_numbered_lua) .. "\027[0m\n\n" .. tostring(err), 0)
+        error("Failed to compile generated code:\n" .. tostring(C("bright blue", line_numbered_lua)) .. "\n\n" .. tostring(err), 0)
       end
       local source_key = tostring(source)
       if not (self.SOURCE_MAP[source_key] or self.OPTIMIZATION >= 2) then

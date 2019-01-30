@@ -2,20 +2,20 @@
 -- This file contains the command-line Nomsu runner.
 
 clibtype = package.cpath\match("?%.(so)") or package.cpath\match("?%.(dll)")
+export COLOR_ENABLED
+COLOR_ENABLED = true
 if clibtype == "dll"
+    -- Enable colors:
+    enable_colors = require('wincolors')
+    ok,_ = pcall(enable_colors)
+    if not ok
+        COLOR_ENABLED = false
     -- Special hack to enable utf8 for windows console applications:
     os.execute("chcp 65001>nul")
 
 if NOMSU_VERSION and NOMSU_PREFIX
     package.path = "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?.lua;"..package.path
     package.cpath = "#{NOMSU_PREFIX}/lib/nomsu/#{NOMSU_VERSION}/?.#{clibtype};"..package.cpath
-
-EXIT_SUCCESS, EXIT_FAILURE = 0, 1
-
-if _VERSION == "Lua 5.1" and not jit
-    -- Cannot run on Lua5.1 because it doesn't have gotos.
-    print("Sorry, Nomsu does not run on Lua 5.1. Please use LuaJIT 2+ or Lua 5.2+")
-    os.exit(EXIT_FAILURE)
 
 usage = [=[
 Nomsu Compiler
@@ -91,7 +91,7 @@ arg_string = table.concat(arg, sep)..sep
 args, err = parser\match(arg_string)
 if not args or err or args.help
     if err
-        print("Didn't understand: \x1b[31;1m#{err}\x1b[0m")
+        print("Didn't understand: #{err}")
     print usage
     os.exit(EXIT_FAILURE)
 nomsu_args = Dict{}
@@ -121,6 +121,7 @@ nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
 nomsu_environment.OPTIMIZATION = optimization
 nomsu_environment.NOMSU_PACKAGEPATH = NOMSU_PACKAGEPATH
 nomsu_environment.NOMSU_PREFIX = NOMSU_PREFIX
+nomsu_environment.COLOR_ENABLED = COLOR_ENABLED
 
 run = ->
     unless args.no_core

@@ -9,6 +9,7 @@ do
   local _obj_0 = require("code_obj")
   LuaCode, Source = _obj_0.LuaCode, _obj_0.Source
 end
+require("text")
 local SyntaxTree = require("syntax_tree")
 local Files = require("files")
 local pretty_error = require("pretty_errors")
@@ -20,6 +21,17 @@ fail_at = function(source, msg)
     source = source.source
   elseif type(source) == 'string' then
     source = Source:from_string(source)
+  else
+    assert(source.short_src and source.currentline)
+    file = Files.read(source.short_src)
+    assert(file, "Could not find " .. tostring(source.short_src))
+    local lines = file:lines()
+    local start = 1
+    for i = 1, source.currentline - 1 do
+      start = start + #lines[i]
+    end
+    local stop = start + #lines[source.currentline]
+    source = Source(source.short_src, start, stop)
   end
   if source and not file then
     file = Files.read(source.filename)

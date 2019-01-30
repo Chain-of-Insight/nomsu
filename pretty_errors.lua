@@ -1,5 +1,6 @@
 require("containers")
 local Text = require('text')
+local C = require('colors')
 local box
 box = function(text)
   local max_line = 0
@@ -8,7 +9,7 @@ box = function(text)
   end
   local ret = ("\n" .. text):gsub("\n([^\n]*)", function(line)
     local line_len = #(line:gsub("\027%[[0-9;]*m", ""))
-    return "\n" .. tostring(line) .. tostring((" "):rep(max_line - line_len)) .. " \027[0m"
+    return "\n" .. tostring(line) .. tostring((" "):rep(max_line - line_len)) .. " " .. C('reset')
   end)
   return ret:sub(2, -1), max_line
 end
@@ -20,13 +21,16 @@ format_error = function(err)
   local nl_indicator = (err_linepos > #err_line) and " " or ""
   local fmt_str = " %" .. tostring(#tostring(err_linenum + context)) .. "d|"
   local pointer = (" "):rep(err_linepos + #fmt_str:format(0) - 1) .. ("^"):rep(err_size)
-  local err_msg = "\027[31;1m" .. tostring(err.title or "Error") .. " at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "," .. tostring(err_linepos) .. "\027[0m"
+  local err_msg = C('bold red', err.title or "Error") .. C('red', " at " .. tostring(err.filename or '???') .. ":" .. tostring(err_linenum) .. "," .. tostring(err_linepos))
+  if not (COLOR_ENABLED) then
+    err_msg = err_msg .. "\n"
+  end
   local lines = err.source:lines()
   for i = err_linenum - context, err_linenum - 1 do
     do
       local line = lines[i]
       if line then
-        err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0m" .. tostring(line) .. "\027[0m"
+        err_msg = err_msg .. ("\n" .. C('dim', fmt_str:format(i)) .. line)
       end
     end
   end
@@ -34,8 +38,8 @@ format_error = function(err)
     local before = err_line:sub(1, err_linepos - 1)
     local during = err_line:sub(err_linepos, err_linepos + err_size - 1)
     local after = err_line:sub(err_linepos + err_size, -1)
-    err_line = "\027[0m" .. tostring(before) .. "\027[41;30m" .. tostring(during) .. tostring(nl_indicator) .. "\027[0m" .. tostring(after)
-    err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(err_linenum)) .. tostring(err_line) .. "\027[0m"
+    err_line = before .. C('black on red', during .. nl_indicator) .. after
+    err_msg = err_msg .. ("\n" .. C('dim', fmt_str:format(err_linenum)) .. err_line)
   end
   local _, err_linenum_end, err_linepos_end = err.source:line_info_at(err.stop)
   err_linenum_end = err_linenum_end or err_linenum
@@ -48,9 +52,9 @@ format_error = function(err)
         if line then
           if i == err_linenum_end then
             local during, after = line:sub(1, err_linepos_end - 1), line:sub(err_linepos_end, -1)
-            err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0;41;30m" .. tostring(during) .. "\027[0m" .. tostring(after)
+            err_msg = err_msg .. ("\n" .. C('dim', fmt_str:format(i)) .. C('black on red', during) .. after)
           else
-            err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0;41;30m" .. tostring(line) .. "\027[0m"
+            err_msg = err_msg .. ("\n" .. C('dim', fmt_str:format(i)) .. C('black on red', line))
           end
         end
       end
@@ -61,18 +65,24 @@ format_error = function(err)
     end
   end
   local box_width = 70
-  local err_text = "\027[47;30;1m" .. tostring(" " .. err.error:wrapped_to(box_width, 16):gsub("\n", "\n\027[47;30;1m "))
+  local err_text = C('black on white', " " .. err.error:wrapped_to(box_width, 16):gsub("\n", "\n" .. C('black on white') .. " "))
   if err.hint then
-    err_text = err_text .. "\n\027[47;30;3m" .. tostring((" Suggestion: " .. tostring(err.hint)):wrapped_to(box_width, 16):gsub("\n", "\n\027[47;30;3m "))
+    err_text = err_text .. ("\n" .. C('italic black on white', (" Suggestion: " .. tostring(err.hint)):wrapped_to(box_width, 16):gsub("\n", "\n" .. C('italic black on white') .. " ")))
   end
-  err_msg = err_msg .. ("\n\027[33;1m " .. box(err_text):gsub("\n", "\n "))
+  err_msg = err_msg .. ("\n " .. box(err_text):gsub("\n", "\n "))
+  if not (COLOR_ENABLED) then
+    err_msg = err_msg .. "\n"
+  end
   for i = err_linenum_end + 1, err_linenum_end + context do
     do
       local line = lines[i]
       if line then
-        err_msg = err_msg .. "\n\027[2m" .. tostring(fmt_str:format(i)) .. "\027[0m" .. tostring(line) .. "\027[0m"
+        err_msg = err_msg .. ("\n" .. C('dim', fmt_str:format(i)) .. line)
       end
     end
+  end
+  if not (COLOR_ENABLED) then
+    err_msg = err_msg .. "\n"
   end
   return err_msg
 end
