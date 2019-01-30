@@ -225,6 +225,17 @@ local _list_mt = {
         end
         return _accum_0
       end)())
+    end,
+    reversed = function(self)
+      return List((function()
+        local _accum_0 = { }
+        local _len_0 = 1
+        for i = #self, 1, -1 do
+          _accum_0[_len_0] = self[i]
+          _len_0 = _len_0 + 1
+        end
+        return _accum_0
+      end)())
     end
   },
   __newindex = function(self, k, v)
