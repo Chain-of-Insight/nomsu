@@ -8,7 +8,7 @@ use "compatibility/compatibility"
 
 upgrade $tree to "2" as:
     unless ($tree is "Action" syntax tree): return
-    if ($tree.stub is "if 1 2 else"):
+    if ($tree.stub == "if 1 2 else"):
         $true_body = ($tree.3 upgraded)
         unless ($true_body is "Block" syntax tree):
             $true_body = \(: $true_body)
