@@ -217,14 +217,14 @@ I think "chihuahuas" are worse than "corgis"
 "Howdy pardner" is what she said
 
 # The language only reserves []{}().,:;$\ as special characters, so actions
-    can have really funky names!
-(>> $foo_bar @&' -->< $ @&_~-^-~_~-^ $1 !) means:
-    say $foo_bar
+    and variables can use symbols freely:
+(>> $(∐) @&' -->< $ @&_~-^ ⊗⊞∰ $1 !) means:
+    say $(∐)
     say $
     say $1
->> "wow" @&' -->< "so flexible!" @&_~-^-~_~-^ "even numbers can be variables!" !
+>> "wow" @&' -->< "so flexible!" @&_~-^ ⊗⊞∰ "even numbers can be variables!" !
 
-# There's also full unicode support
+# You can also use unicode in variable and action names:
 $こんにちは = "こんにちは"
 ($ と言う) means "\($)世界"
 say ($こんにちは と言う)
