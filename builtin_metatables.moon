@@ -3,6 +3,7 @@ require "text"
 
 number_mt =
     __type: "a Number"
+    __len: => @
     as_lua: tostring
     as_nomsu: tostring
     as_text: tostring
@@ -17,15 +18,59 @@ debug.setmetatable 0, number_mt
 
 bool_mt =
     __type: "a Boolean"
+    __len: => @ and 1 or 0
     as_lua: tostring
     as_nomsu: => @ and "yes" or "no"
     as_text: => @ and "yes" or "no"
+    _and: (cond)=> @ and cond
+    _or: (cond)=> @ or cond
+    xor: (cond)=> @ == (not cond)
 bool_mt.__index = bool_mt
 debug.setmetatable true, bool_mt
 
 fn_mt =
     __type: "an Action"
     as_text: => (tostring(@)\gsub("function", "Action"))
+    __add: (other)=>
+        if type(@) == 'function' and type(other) == 'function'
+            (...)-> (@(...) + other(...))
+        elseif type(@) == 'function' then (...)-> (@(...) + other)
+        else (...)-> (@ + other(...))
+    __sub: (other)=>
+        if type(@) == 'function' and type(other) == 'function'
+            (...)-> (@(...) - other(...))
+        elseif type(@) == 'function' then (...)-> (@(...) - other)
+        else (...)-> (@ - other(...))
+    __mul: (other)=>
+        if type(@) == 'function' and type(other) == 'function'
+            (...)-> (@(...) * other(...))
+        elseif type(@) == 'function' then (...)-> (@(...) * other)
+        else (...)-> (@ * other(...))
+    __div: (other)=>
+        if type(@) == 'function' and type(other) == 'function'
+            (...)-> (@(...)  other(...))
+        elseif type(@) == 'function' then (...)-> (@(...)  other)
+        else (...)-> (@  other(...))
+    __mod: (other)=>
+        if type(@) == 'function' and type(other) == 'function'
+            (...)-> (@(...) % other(...))
+        elseif type(@) == 'function' then (...)-> (@(...) % other)
+        else (...)-> (@ % other(...))
+    __band: (other)=>
+        if type(@) == 'function' and type(other) == 'function'
+            (...)-> (@(...) and other(...))
+        elseif type(@) == 'function' then (...)-> (@(...) and other)
+        else (...)-> (@ and other(...))
+    __bor: (other)=>
+        if type(@) == 'function' and type(other) == 'function'
+            (...)-> (@(...) or other(...))
+        elseif type(@) == 'function' then (...)-> (@(...) or other)
+        else (...)-> (@ or other(...))
+    __bxor: (other)=>
+        if type(@) == 'function' and type(other) == 'function'
+            (...)-> (@(...) != other(...))
+        elseif type(@) == 'function' then (...)-> (@(...) != other)
+        else (...)-> (@ != other(...))
 fn_mt.__index = fn_mt
 debug.setmetatable (->), fn_mt
 
