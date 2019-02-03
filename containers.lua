@@ -326,6 +326,7 @@ local compliments = setmetatable({ }, {
   __mode = 'k'
 })
 _undict_mt = {
+  __type = "an Inverse Dict",
   __index = function(self, k)
     return not compliments[self][k] and true or nil
   end,
