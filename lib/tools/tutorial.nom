@@ -270,14 +270,34 @@ $lessons = [
             # This method is used to add to a buffer
             ($self, add $bit) means:
                 $bits, add $bit
+
+            # ($list, joined) is a list method that concatenates the list items:
+            ($self, as text) means ($bits, joined)
             
             # Write a method called ($self, length) that returns the sum
                 of the lengths of each bit in the buffer:
             <your code here>
+
+        # Create an instance of a Buffer:
         $b = (a Buffer)
+        test that ($b is "a Buffer")
+        test that ((type of $b) == "a Buffer")
         $b, add "xx"
         $b, add "yyy"
+        test that (($b, as text) == "xxyy")
         test that (($b, length) == 5)
+
+        # You can define a thing that inherits the behaviors of another thing like this:
+        (a Backwards Buffer) is (a Buffer) with [$bits]:
+            # ($list, reversed) is a method that returns a copy of $list with
+                the order of the items reversed.
+            ($self, as text) means ($bits, reversed, joined)
+
+        $bb = (a Backwards Buffer)
+        $bb, add "one"
+        $bb, add "two"
+        test that (($bb, length) == (???))
+        test that (($bb, as text) == (???))
 
     lesson "Files Part 1":
         # Define an external action here:
