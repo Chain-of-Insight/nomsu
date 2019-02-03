@@ -38,13 +38,84 @@ debug.getinfo = (thread,f,what)->
             else "main chunk"
     return info
 
-enhance_error = (error_message, start_fn, stop_fn)->
+-- This uses a slightly modified Damerau-Levenshtein distance:
+strdist = (a,b,cache={})->
+    if a == b then return 0
+    if #a < #b then a,b = b,a
+    if b == "" then return #a
+    k = a..'\003'..b
+    unless cache[k]
+        -- Insert, delete, substitute (given weight 1.1 as a heuristic)
+        cache[k] = math.min(
+            strdist(a\sub(1,-2),b,cache) + 1,
+            strdist(a,b\sub(1,-2),cache) + 1,
+            strdist(a\sub(1,-2),b\sub(1,-2),cache) + (a\sub(-1) ~= b\sub(-1) and 1.1 or 0)
+        )
+        -- Transposition:
+        if #a >= 2 and #b >= 2 and a\sub(-1,-1) == b\sub(-2,-2) and a\sub(-2,-2) == b\sub(-1,-1)
+            cache[k] = math.min(cache[k], strdist(a\sub(1,-3),b\sub(1,-3),cache) + 1)
+    return cache[k]
+
+enhance_error = (error_message)->
     -- Hacky: detect the line numbering
     unless error_message and error_message\match("%d|")
         error_message or= ""
-        if fn = (error_message\match("attempt to call a nil value %(global '(.*)'%)") or
+        if fn_name = (error_message\match("attempt to call a nil value %(global '(.*)'%)") or
             error_message\match("attempt to call global '(.*)' %(a nil value%)"))
-            error_message = "The action '#{fn\from_lua_id!}' is not defined."
+
+            action_name = fn_name\from_lua_id!
+            error_message = "The action '#{action_name}' is not defined."
+
+            -- This check is necessary for handling both top-level code and code inside a fn
+            func = debug.getinfo(2,'f').func
+            ename,env = debug.getupvalue(func, 1)
+            unless ename == "_ENV" or ename == "_G"
+                func = debug.getinfo(3,'f').func
+                ename,env = debug.getupvalue(func, 1)
+
+            THRESHOLD = math.min(4.5, .9*#action_name) -- Ignore matches with strdist > THRESHOLD
+            candidates = {}
+            cache = {}
+
+            -- Locals:
+            for i=1,99
+                k, v = debug.getlocal(2, i)
+                break if k == nil
+                unless k\sub(1,1) == "(" or type(v) != 'function'
+                    k = k\from_lua_id!
+                    if strdist(k, action_name, cache) <= THRESHOLD and k != ""
+                        table.insert candidates, k
+
+            -- Upvalues:
+            for i=1,debug.getinfo(func, 'u').nups
+                k, v = debug.getupvalue(func, i)
+                unless k\sub(1,1) == "(" or type(v) != 'function'
+                    k = k\from_lua_id!
+                    if strdist(k, action_name, cache) <= THRESHOLD and k != ""
+                        table.insert candidates, k
+
+            -- Globals and global compile rules:
+            scan = (t, is_lua_id)->
+                for k,v in pairs(t)
+                    if type(k) == 'string' and type(v) == 'function'
+                        k = k\from_lua_id! unless is_lua_id
+                        if strdist(k, action_name, cache) <= THRESHOLD and k != ""
+                            table.insert candidates, k
+            scan env.COMPILE_RULES, true
+            scan env.COMPILE_RULES._IMPORTS, true
+            scan env
+            scan env._IMPORTS
+
+            if #candidates > 0
+                for c in *candidates do THRESHOLD = math.min(THRESHOLD, strdist(c, action_name, cache))
+                candidates = [c for c in *candidates when strdist(c, action_name, cache) <= THRESHOLD]
+                --candidates = ["#{c}[#{strdist(c,action_name,cache)}/#{THRESHOLD}]" for c in *candidates]
+                if #candidates == 1
+                    error_message ..= "\n\x1b[3mSuggestion: Maybe you meant '#{candidates[1]}'? "
+                elseif #candidates > 0
+                    last = table.remove(candidates)
+                    error_message ..= "\n"..C('italic', "Suggestion: Maybe you meant '#{table.concat candidates, "', '"}'#{#candidates > 1 and ',' or ''} or '#{last}'? ")
+
         level = 2
         while true
             -- TODO: reduce duplicate code
