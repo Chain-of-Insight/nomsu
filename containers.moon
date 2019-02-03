@@ -1,5 +1,5 @@
 -- This file contains container classes, i.e. Lists and Dicts, plus some extended string functionality
-local List, Dict
+local List, Dict, Undict, _undict_mt, _dict_mt
 {:insert,:remove,:concat} = table
 
 as_nomsu = =>
@@ -88,8 +88,42 @@ _list_mt =
             start = (n+1-start) if start < 0
             stop = (n+1-stop) if stop < 0
             return List[@[i] for i=start,stop]
-
+        copy: => List[@[i] for i=1,#@]
+        reverse: =>
+            n = #@
+            for i=1,math.floor(n/2)
+                @[i], @[n-i+1] = @[n-i+1], @[i]
         reversed: => List[@[i] for i=#@,1,-1]
+        sort: => table.sort(@)
+        sort_by: (fn)=>
+            keys = setmetatable {},
+                __index: (k)=>
+                    key = fn(k)
+                    @[k] = key
+                    return key
+            table.sort(@, (a,b)->keys[a] <= keys[b])
+        sorted: =>
+            c = @copy!
+            c\sort!
+            return c
+        sorted_by: (fn)=>
+            c = @copy!
+            c\sort_by(fn)
+            return c
+        filter_by: (keep)=>
+            deleted = 0
+            for i=1,#@
+                unless keep(@[i])
+                    deleted += 1
+                elseif deleted > 0
+                    @[i-deleted] = @[i]
+            for i=#@-deleted+1,#@
+                @[i] = nil
+
+        filtered_by: (keep)=>
+            c = @copy!
+            c\filter_by(keep)
+            return c
 
     -- TODO: remove this safety check to get better performance?
     __newindex: (k,v)=>
@@ -109,6 +143,52 @@ List = (t)->
         return l
     else error("Unsupported List type: "..type(t))
 
+
+compliments = setmetatable({}, {__mode:'k'})
+_undict_mt =
+    __type: "an Inverse Dict"
+    __index: (k)=> not compliments[@][k] and true or nil
+    __newindex: (k,v)=>
+        if k
+            compliments[@][k] = nil
+        else
+            compliments[@][k] = true
+    __eq: (other)=>
+        unless type(other) == 'table' and getmetatable(other) == getmetatable(@)
+            return false
+        return compliments[@] == compliments[other]
+    __len: => math.huge
+    __tostring: => "~".._dict_mt.__tostring(compliments[@])
+    as_nomsu: => "~".._dict_mt.as_nomsu(compliments[@])
+    as_lua: => "~"..__dict_mt.as_lua(compliments[@])
+    __band: (other)=>
+        if getmetatable(other) == _undict_mt
+            -- ~{x,y} & ~{y,z} == ~{x,y,z} == ~({x,y} | {y,z})
+            Undict(_dict_mt.__bor(compliments[@], compliments[other]))
+        else
+            -- ~{x,y} & {y,z} == {z} == {y,z} & ~{x,y}
+            _dict_mt.__band(other, @)
+    __bor: (other)=>
+        if getmetatable(other) == _undict_mt
+            -- ~{x,y} | ~{y,z} == ~{y} = ~({x,y} & {y,z})
+            Undict(_dict_mt.__band(compliments[@], compliments[other]))
+        else
+            -- ~{x,y} | {y,z} == ~{z} = ~({y,z} & ~{x,y})
+            Undict{k,v for k,v in pairs(compliments[@]) when not other[k]}
+    __bxor: (other)=>
+        if getmetatable(other) == _undict_mt
+            -- ~{x,y} ^ ~{y,z} == {x,z} = {x,y} ^ {y,z}
+            _dict_mt.__bxor(compliments[@], compliments[other])
+        else
+            -- ~{x,y} ^ {y,z} == ~{x} = ~({x,y} & ~{y,z})
+            Undict(_dict_mt.__band(other, @))
+    __bnot: => Dict{k,v for k,v in pairs(compliments[@])}
+
+Undict = (d)->
+    u = setmetatable({}, _undict_mt)
+    compliments[u] = Dict{k,true for k,v in pairs(d) when v}
+    return u
+
 _dict_mt =
     __type: "a Dict"
     __eq: (other)=>
@@ -124,24 +204,31 @@ _dict_mt =
         for _ in pairs(@) do n += 1
         return n
     __tostring: =>
-        "{"..concat([".#{k} = #{v}" for k,v in pairs @], ", ").."}"
+        "{"..concat([v == true and "."..as_nomsu(k) or ".#{k} = #{v}" for k,v in pairs @], ", ").."}"
     as_nomsu: =>
-        "{"..concat([".#{as_nomsu(k)} = #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
+        "{"..concat([v == true and "."..as_nomsu(k) or ".#{as_nomsu(k)} = #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_lua: =>
         "a_Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
+    as_list: => List[k for k,v in pairs(@)]
     __band: (other)=>
-        Dict{k,v for k,v in pairs(@) when other[k] != nil}
+        Dict{k,v for k,v in pairs(@) when other[k]}
     __bor: (other)=>
+        if getmetatable(other) == _undict_mt
+            return _undict_mt.__bor(other, @)
         ret = Dict{k,v for k,v in pairs(@)}
         for k,v in pairs(other)
             if ret[k] == nil then ret[k] = v
         return ret
     __bxor: (other)=>
+        if getmetatable(other) == _undict_mt
+            return _undict_mt.__bxor(other, @)
         ret = Dict{k,v for k,v in pairs(@)}
         for k,v in pairs(other)
             if ret[k] == nil then ret[k] = v
             else ret[k] = nil
         return ret
+    __bnot: Undict
+
     __add: (other)=>
         ret = Dict{k,v for k,v in pairs(@)}
         for k,v in pairs(other)
@@ -154,6 +241,7 @@ _dict_mt =
             if ret[k] == nil then ret[k] = -v
             else ret[k] -= v
         return ret
+
 Dict = (t)->
     if type(t) == 'table'
         return setmetatable(t, _dict_mt)
