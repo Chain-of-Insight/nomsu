@@ -19,8 +19,7 @@ command line program with $args:
         $version =
             $file, matching ("
                 #![^
-                ]* nomsu %-V[ ]*([^
-                ]*)
+                ]* nomsu %-V[ ]*([%d.]*)
             ")
         $file_tests = []
         for $src = $test in (nomsu environment, Module $filename).TESTS:
