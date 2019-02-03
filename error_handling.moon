@@ -60,11 +60,14 @@ enhance_error = (error_message)->
     -- Hacky: detect the line numbering
     unless error_message and error_message\match("%d|")
         error_message or= ""
+        -- When calling 'nil' actions, make a better error message
         if fn_name = (error_message\match("attempt to call a nil value %(global '(.*)'%)") or
             error_message\match("attempt to call global '(.*)' %(a nil value%)"))
 
             action_name = fn_name\from_lua_id!
             error_message = "The action '#{action_name}' is not defined."
+
+            -- Look for simple misspellings:
 
             -- This check is necessary for handling both top-level code and code inside a fn
             func = debug.getinfo(2,'f').func
