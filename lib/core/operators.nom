@@ -70,7 +70,7 @@ test:
             if \$var.type == 'Var' then
                 lua:add_free_vars({var_lua:text()})
             end
-            lua:add(' = ', \($value as lua expr))
+            lua:add(' = ', \($value as lua expr), ';')
         end
         return lua
     ")
@@ -107,20 +107,19 @@ test:
         end
     ")
     
-    return
-        Lua ("
-            do
-                \$defs
-                \($body as lua)
-            end -- 'with' block
-        ")
+    return Lua ("
+        do
+            \$defs
+            \($body as lua)
+        end -- 'with' block
+    ")
 
 # Math Operators
 test:
     unless ((5 wrapped around 2) == 1):
         fail "mod not working"
 
-[$x wrapped around $y, $x mod $y] all compile to
+[$x wrapped around $y, $x mod $y, $x % $y] all compile to
     "((\($x as lua expr)) % (\($y as lua expr)))"
 
 # 3-part chained comparisons
@@ -200,7 +199,7 @@ lua> "if \((is jit) or ($(LUA API) == "Lua 5.2")) then"
     "Bit.rshift(\($x as lua expr), \($shift as lua expr))"
 
 lua> "else"
-[NOT $, ~ $] all compile to "~(\($ as lua expr))"
+[NOT $, ~ $] all compile to "(~(\($ as lua expr)))"
 [$x OR $y, $x | $y] all compile to "(\($x as lua expr) | \($y as lua expr))"
 [$x XOR $y, $x ~ $y] all compile to "(\($x as lua expr) ~ \($y as lua expr))"
 [$x AND $y, $x & $y] all compile to "(\($x as lua expr) & \($y as lua expr))"
@@ -216,13 +215,21 @@ lua> "end"
 test:
     assume ((- 5) == -5)
     assume ((not (yes)) == (no))
-(- $) compiles to "(- \($ as lua expr))"
+(- $) compiles to "(-(\($ as lua expr)))"
 (not $) compiles to "(not \($ as lua expr))"
 test:
     assume ((size of [1, 2, 3]) == 3)
     assume ((#[1, 2, 3]) == 3)
-[#$list, size of $list] all compile to "(#\($list as lua expr))"
-($list is empty) compiles to "(#\($list as lua expr) == 0)"
+# Length
+[#$list, size of $list] all compile to:
+    lua> ("
+        local list_lua = \($list as lua expr)
+        if list_lua:text() == "..." then
+            return LuaCode("select('#', ...)")
+        end
+        return LuaCode("(#", list_lua, ")")
+    ")
+($list is empty) parses as ((#$list) == 0)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
