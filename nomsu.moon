@@ -162,6 +162,8 @@ run = ->
             env = nomsu_environment.new_environment!
             env.MODULE_NAME = filename
             tree = env._1_parsed(code)
+            if tree.shebang
+                output\write tree.shebang
             tree = {tree} unless tree.type == 'FileChunks'
             for chunk_no, chunk in ipairs tree
                 lua = env\compile(chunk)

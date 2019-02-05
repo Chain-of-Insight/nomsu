@@ -21,7 +21,7 @@ fail_at = function(source, msg)
     source = source.source
   elseif type(source) == 'string' then
     source = Source:from_string(source)
-  else
+  elseif not Source:is_instance(source) then
     assert(source.short_src and source.currentline)
     file = Files.read(source.short_src)
     assert(file, "Could not find " .. tostring(source.short_src))
@@ -86,6 +86,26 @@ compile = function(self, tree)
       end
       return lua
     end
+    if not compile_action then
+      local seen_words = { }
+      local words = { }
+      for word in stub:gmatch("[^0-9 ][^ ]*") do
+        if not (seen_words[word]) then
+          seen_words[word] = true
+          table.insert(words, word)
+        end
+      end
+      table.sort(words)
+      local stub2 = table.concat(words, " ")
+      compile_action = self.COMPILE_RULES[stub2]
+      if compile_action then
+        if debug.getinfo(compile_action, 'u').isvararg then
+          stub = stub2
+        else
+          compile_action = nil
+        end
+      end
+    end
     if compile_action then
       local args
       do
@@ -118,7 +138,7 @@ compile = function(self, tree)
     lua:add((stub):as_lua_id(), "(")
     for argnum, arg in ipairs(tree:get_args()) do
       local arg_lua = self:compile(arg)
-      if arg.type == "Block" then
+      if arg.type == "Block" and #arg > 1 then
         arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
       end
       if lua:trailing_line_len() + #arg_lua:text() > MAX_LINE then
@@ -155,15 +175,22 @@ compile = function(self, tree)
     if not (target_text:match("^%(.*%)$") or target_text:match("^[_a-zA-Z][_a-zA-Z0-9.]*$") or tree[1].type == "IndexChain") then
       target_lua:parenthesize()
     end
+    local self_lua = #tree > 2 and "_self" or target_lua
+    if #tree > 2 then
+      lua:add("(function(", self_lua, ")\n    ")
+    end
     for i = 2, #tree do
       if i > 2 then
-        lua:add("\n")
+        lua:add("\n    ")
       end
-      lua:add(target_lua, ":")
+      if i > 2 and i == #tree then
+        lua:add("return ")
+      end
+      lua:add(self_lua, ":")
       lua:add((tree[i].stub):as_lua_id(), "(")
       for argnum, arg in ipairs(tree[i]:get_args()) do
         local arg_lua = self:compile(arg)
-        if arg.type == "Block" then
+        if arg.type == "Block" and #arg > 1 then
           arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
         end
         if lua:trailing_line_len() + #arg_lua:text() > MAX_LINE then
@@ -174,6 +201,9 @@ compile = function(self, tree)
         lua:add(arg_lua)
       end
       lua:add(")")
+    end
+    if #tree > 2 then
+      lua:add("\nend)(", target_lua, ")")
     end
     return lua
   elseif "EscapedNomsu" == _exp_0 then
@@ -320,9 +350,9 @@ compile = function(self, tree)
             items_lua:add("\n")
             sep = ''
           elseif items_lua:trailing_line_len() > MAX_LINE then
-            sep = ',\n    '
+            sep = items_lua:text():sub(-1) == ";" and "\n    " or ",\n    "
           else
-            sep = ', '
+            sep = items_lua:text():sub(-1) == ";" and " " or ", "
           end
           i = i + 1
         end
@@ -360,6 +390,9 @@ compile = function(self, tree)
     if lua:text():match("['\"}]$") or lua:text():match("]=*]$") then
       lua:parenthesize()
     end
+    if lua:text() == "..." then
+      return LuaCode:from(tree.source, "select(", self:compile(tree[2][1]), ", ...)")
+    end
     for i = 2, #tree do
       local key = tree[i]
       if key.type ~= "Index" then
@@ -381,7 +414,16 @@ compile = function(self, tree)
   elseif "Comment" == _exp_0 then
     return LuaCode:from(tree.source, "-- ", (tree[1]:gsub('\n', '\n-- ')))
   elseif "Error" == _exp_0 then
-    return error("Can't compile errors")
+    local err_msg = pretty_error({
+      title = "Parse error",
+      error = tree.error,
+      hint = tree.hint,
+      source = tree:get_source_file(),
+      start = tree.source.start,
+      stop = tree.source.stop,
+      filename = tree.source.filename
+    })
+    return error(err_msg)
   else
     return error("Unknown type: " .. tostring(tree.type))
   end

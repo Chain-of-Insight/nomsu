@@ -11,14 +11,18 @@ utf8_char_patt = (
     R("\194\223")*R("\128\191") +
     R("\224\239")*R("\128\191")*R("\128\191") +
     R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
-operator_patt = S("'`~!@%#^&*+=|<>?/-")^1 * -1
-identifier_patt = (R("az","AZ","09") + P("_") + utf8_char_patt)^1 * -1
+operator_char = S("#'`~@^&*+=<>?/%!|\\-") + (P("\xE2") * (R("\x88\x8B")+R("\xA8\xAB")) * R("\128\191"))
+operator_patt = operator_char^1 * -1
+identifier_patt = (R("az","AZ","09") + P("_") + (-operator_char*utf8_char_patt))^1 * -1
 
 is_operator = (s)->
-    return not not operator_patt\match(s)
+    return type(s) == 'string' and operator_patt\match(s)
 
 is_identifier = (s)->
-    return not not identifier_patt\match(s)
+    return type(s) == 'string' and identifier_patt\match(s)
+
+can_be_unary = (t)->
+    t.type == "Action" and #t == 2 and is_operator(t[1]) and type(t[2]) != 'string' and t[2].type != "Block"
 
 inline_escaper = re.compile("{~ (%utf8_char / ('\"' -> '\\\"') / ('\n' -> '\\n') / ('\t' -> '\\t') / ('\b' -> '\\b') / ('\a' -> '\\a') / ('\v' -> '\\v') / ('\f' -> '\\f') / ('\r' -> '\\r') / ('\\' -> '\\\\') / ([^ -~] -> escape) / .)* ~}", {utf8_char: utf8_char_patt, escape:(=> ("\\%03d")\format(@byte!))})
 inline_escape = (s)->
@@ -33,6 +37,14 @@ tree_to_inline_nomsu = (tree)->
     switch tree.type
         when "Action"
             nomsu = NomsuCode\from(tree.source)
+            if can_be_unary(tree)
+                nomsu\add tree[1]
+                arg_nomsu = tree_to_inline_nomsu(tree[2])
+                if tree[2].type == "MethodCall" or tree[2].type == "Action"
+                    arg_nomsu\parenthesize!
+                nomsu\add arg_nomsu
+                return nomsu
+
             num_args, num_words = 0, 0
             for i,bit in ipairs tree
                 if type(bit) == "string"
@@ -46,13 +58,14 @@ tree_to_inline_nomsu = (tree)->
                     num_args += 1
                     arg_nomsu = tree_to_inline_nomsu(bit)
                     if bit.type == "Block"
-                        if i > 1 and i < #tree
-                            nomsu\add " "
-                        unless i == #tree
+                        if i != #tree
+                            nomsu\add " " if i > 1
                             arg_nomsu\parenthesize!
                     else
-                        nomsu\add " " if i > 1 and tree[i-1] != "#"
-                        if bit.type == "Action" or bit.type == "MethodCall"
+                        nomsu\add " " if i > 1
+                        if bit.type == "MethodCall"
+                            arg_nomsu\parenthesize!
+                        elseif bit.type == "Action" and not can_be_unary(bit)
                             arg_nomsu\parenthesize!
                     nomsu\add arg_nomsu
             if num_args == 1 and num_words == 0
@@ -112,7 +125,7 @@ tree_to_inline_nomsu = (tree)->
                 item_nomsu = tree_to_inline_nomsu(item, true)
                 --if item.type == "Block" or item.type == "Action" or item.type == "MethodCall"
                 --    item_nomsu\parenthesize!
-                if item.type == "MethodCall"
+                if item.type == "MethodCall" or (item.type == "Block" and i < #tree)
                     item_nomsu\parenthesize!
                 nomsu\add item_nomsu
             nomsu\add(tree.type == "List" and "]" or "}")
@@ -196,7 +209,7 @@ tree_to_nomsu = (tree)->
     recurse = (t, argnum=nil)->
         space = MAX_LINE - nomsu\trailing_line_len!
         try_inline = true
-        for subtree in coroutine.wrap(-> (t\map(coroutine.yield) and nil))
+        for subtree in coroutine.wrap(-> (t\with(coroutine.yield) and nil))
             switch subtree.type
                 when "Comment"
                     try_inline = false
@@ -215,7 +228,9 @@ tree_to_nomsu = (tree)->
         local inline_nomsu
         if try_inline
             inline_nomsu = tree_to_inline_nomsu(t)
-            if (t.type == "Action" or t.type == "MethodCall")
+            if t.type == "MethodCall"
+                inline_nomsu\parenthesize!
+            elseif t.type == "Action" and not can_be_unary(t)
                 inline_nomsu\parenthesize!
             if #inline_nomsu\text! <= space or #inline_nomsu\text! <= 8
                 if t.type != "Text"
@@ -223,10 +238,11 @@ tree_to_nomsu = (tree)->
         indented = tree_to_nomsu(t)
         if t.type == "Action" or t.type == "MethodCall"
             if indented\is_multiline!
-                if argnum == nil or argnum == 1
-                    return NomsuCode\from(t.source, "(\n    ", indented, "\n)")
-                else
-                    return NomsuCode\from(t.source, "\n    ", indented)
+                unless indented\text!\match("\n%S[^\n ]*$")
+                    if argnum == nil or argnum == 1
+                        return NomsuCode\from(t.source, "(\n    ", indented, "\n)")
+                    else
+                        return NomsuCode\from(t.source, "\n    ", indented)
             elseif argnum and argnum > 1
                 return NomsuCode\from(t.source, "\n    ", indented)
             else
@@ -244,7 +260,7 @@ tree_to_nomsu = (tree)->
     switch tree.type
         when "FileChunks"
             if tree.shebang
-                nomsu\add tree.shebang
+                nomsu\add tree.shebang, "\n"
 
             for chunk_no, chunk in ipairs tree
                 nomsu\add "\n\n#{("~")\rep(80)}\n\n" if chunk_no > 1
@@ -256,6 +272,11 @@ tree_to_nomsu = (tree)->
             return nomsu
 
         when "Action"
+            if can_be_unary(tree) and not can_be_unary(tree[2])
+                nomsu\add tree[1]
+                nomsu\add recurse(tree[2])
+                return nomsu
+
             next_space = ""
             word_buffer = {}
             num_args, num_words = 0, 0
@@ -429,10 +450,6 @@ tree_to_nomsu = (tree)->
                 nomsu\add "\\;"
             return NomsuCode\from(tree.source, '("\n    ', nomsu, '\n")')
 
-
-
-
-
         when "List", "Dict"
             if #tree == 0
                 nomsu\add(tree.type == "List" and "[]" or "{}")
@@ -490,7 +507,7 @@ tree_to_nomsu = (tree)->
             return nomsu
 
         when "Comment"
-            nomsu\add "#", (tree[1]\gsub("\n", "\n    "))
+            nomsu\add "###", (tree[1]\gsub("\n", "\n    "))
             return nomsu
         
         when "IndexChain", "Index", "Number", "Var", "Comment", "Error"

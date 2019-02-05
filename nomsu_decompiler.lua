@@ -14,15 +14,20 @@ local re = require('re')
 local MAX_LINE = 80
 local GOLDEN_RATIO = ((math.sqrt(5) - 1) / 2)
 local utf8_char_patt = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
-local operator_patt = S("'`~!@%#^&*+=|<>?/-") ^ 1 * -1
-local identifier_patt = (R("az", "AZ", "09") + P("_") + utf8_char_patt) ^ 1 * -1
+local operator_char = S("#'`~@^&*+=<>?/%!|\\-") + (P("\xE2") * (R("\x88\x8B") + R("\xA8\xAB")) * R("\128\191"))
+local operator_patt = operator_char ^ 1 * -1
+local identifier_patt = (R("az", "AZ", "09") + P("_") + (-operator_char * utf8_char_patt)) ^ 1 * -1
 local is_operator
 is_operator = function(s)
-  return not not operator_patt:match(s)
+  return type(s) == 'string' and operator_patt:match(s)
 end
 local is_identifier
 is_identifier = function(s)
-  return not not identifier_patt:match(s)
+  return type(s) == 'string' and identifier_patt:match(s)
+end
+local can_be_unary
+can_be_unary = function(t)
+  return t.type == "Action" and #t == 2 and is_operator(t[1]) and type(t[2]) ~= 'string' and t[2].type ~= "Block"
 end
 local inline_escaper = re.compile("{~ (%utf8_char / ('\"' -> '\\\"') / ('\n' -> '\\n') / ('\t' -> '\\t') / ('\b' -> '\\b') / ('\a' -> '\\a') / ('\v' -> '\\v') / ('\f' -> '\\f') / ('\r' -> '\\r') / ('\\' -> '\\\\') / ([^ -~] -> escape) / .)* ~}", {
   utf8_char = utf8_char_patt,
@@ -49,6 +54,15 @@ tree_to_inline_nomsu = function(tree)
   local _exp_0 = tree.type
   if "Action" == _exp_0 then
     local nomsu = NomsuCode:from(tree.source)
+    if can_be_unary(tree) then
+      nomsu:add(tree[1])
+      local arg_nomsu = tree_to_inline_nomsu(tree[2])
+      if tree[2].type == "MethodCall" or tree[2].type == "Action" then
+        arg_nomsu:parenthesize()
+      end
+      nomsu:add(arg_nomsu)
+      return nomsu
+    end
     local num_args, num_words = 0, 0
     for i, bit in ipairs(tree) do
       if type(bit) == "string" then
@@ -67,17 +81,19 @@ tree_to_inline_nomsu = function(tree)
         num_args = num_args + 1
         local arg_nomsu = tree_to_inline_nomsu(bit)
         if bit.type == "Block" then
-          if i > 1 and i < #tree then
-            nomsu:add(" ")
-          end
-          if not (i == #tree) then
+          if i ~= #tree then
+            if i > 1 then
+              nomsu:add(" ")
+            end
             arg_nomsu:parenthesize()
           end
         else
-          if i > 1 and tree[i - 1] ~= "#" then
+          if i > 1 then
             nomsu:add(" ")
           end
-          if bit.type == "Action" or bit.type == "MethodCall" then
+          if bit.type == "MethodCall" then
+            arg_nomsu:parenthesize()
+          elseif bit.type == "Action" and not can_be_unary(bit) then
             arg_nomsu:parenthesize()
           end
         end
@@ -153,7 +169,7 @@ tree_to_inline_nomsu = function(tree)
         nomsu:add(", ")
       end
       local item_nomsu = tree_to_inline_nomsu(item, true)
-      if item.type == "MethodCall" then
+      if item.type == "MethodCall" or (item.type == "Block" and i < #tree) then
         item_nomsu:parenthesize()
       end
       nomsu:add(item_nomsu)
@@ -256,7 +272,7 @@ tree_to_nomsu = function(tree)
     local space = MAX_LINE - nomsu:trailing_line_len()
     local try_inline = true
     for subtree in coroutine.wrap(function()
-      return (t:map(coroutine.yield) and nil)
+      return (t:with(coroutine.yield) and nil)
     end) do
       local _exp_0 = subtree.type
       if "Comment" == _exp_0 then
@@ -294,7 +310,9 @@ tree_to_nomsu = function(tree)
     local inline_nomsu
     if try_inline then
       inline_nomsu = tree_to_inline_nomsu(t)
-      if (t.type == "Action" or t.type == "MethodCall") then
+      if t.type == "MethodCall" then
+        inline_nomsu:parenthesize()
+      elseif t.type == "Action" and not can_be_unary(t) then
         inline_nomsu:parenthesize()
       end
       if #inline_nomsu:text() <= space or #inline_nomsu:text() <= 8 then
@@ -306,10 +324,12 @@ tree_to_nomsu = function(tree)
     local indented = tree_to_nomsu(t)
     if t.type == "Action" or t.type == "MethodCall" then
       if indented:is_multiline() then
-        if argnum == nil or argnum == 1 then
-          return NomsuCode:from(t.source, "(\n    ", indented, "\n)")
-        else
-          return NomsuCode:from(t.source, "\n    ", indented)
+        if not (indented:text():match("\n%S[^\n ]*$")) then
+          if argnum == nil or argnum == 1 then
+            return NomsuCode:from(t.source, "(\n    ", indented, "\n)")
+          else
+            return NomsuCode:from(t.source, "\n    ", indented)
+          end
         end
       elseif argnum and argnum > 1 then
         return NomsuCode:from(t.source, "\n    ", indented)
@@ -346,7 +366,7 @@ tree_to_nomsu = function(tree)
   local _exp_0 = tree.type
   if "FileChunks" == _exp_0 then
     if tree.shebang then
-      nomsu:add(tree.shebang)
+      nomsu:add(tree.shebang, "\n")
     end
     for chunk_no, chunk in ipairs(tree) do
       if chunk_no > 1 then
@@ -360,6 +380,11 @@ tree_to_nomsu = function(tree)
     end
     return nomsu
   elseif "Action" == _exp_0 then
+    if can_be_unary(tree) and not can_be_unary(tree[2]) then
+      nomsu:add(tree[1])
+      nomsu:add(recurse(tree[2]))
+      return nomsu
+    end
     local next_space = ""
     local word_buffer = { }
     local num_args, num_words = 0, 0
@@ -636,7 +661,7 @@ tree_to_nomsu = function(tree)
     end
     return nomsu
   elseif "Comment" == _exp_0 then
-    nomsu:add("#", (tree[1]:gsub("\n", "\n    ")))
+    nomsu:add("###", (tree[1]:gsub("\n", "\n    ")))
     return nomsu
   elseif "IndexChain" == _exp_0 or "Index" == _exp_0 or "Number" == _exp_0 or "Var" == _exp_0 or "Comment" == _exp_0 or "Error" == _exp_0 then
     return tree_to_inline_nomsu(tree)

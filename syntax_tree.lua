@@ -55,6 +55,9 @@ do
       if type(self) ~= type(other) or #self ~= #other or getmetatable(self) ~= getmetatable(other) then
         return false
       end
+      if self.type ~= other.type then
+        return false
+      end
       for i = 1, #self do
         if self[i] ~= other[i] then
           return false
@@ -87,7 +90,24 @@ do
     get_source_code = function(self)
       return self.__class.source_code_for_tree[self]:sub(self.source.start, self.source.stop - 1)
     end,
-    map = function(self, fn)
+    add = function(self, ...)
+      local n = #self
+      for i = 1, select('#', ...) do
+        self[n + i] = select(i, ...)
+      end
+      self.stub = nil
+    end,
+    with = function(self, fn)
+      if type(fn) == 'table' then
+        local replacements = fn
+        fn = function(t)
+          for k, v in pairs(replacements) do
+            if k == t then
+              return v
+            end
+          end
+        end
+      end
       local replacement = fn(self)
       if replacement == false then
         return nil
@@ -122,7 +142,7 @@ do
           repeat
             replacement[k] = v
             if SyntaxTree:is_instance(v) then
-              local r = v:map(fn)
+              local r = v:with(fn)
               if r == v or r == nil then
                 _continue_0 = true
                 break
@@ -142,6 +162,19 @@ do
         replacement = SyntaxTree(replacement)
       end
       return replacement
+    end,
+    contains = function(self, subtree)
+      if subtree == self then
+        return true
+      end
+      for k, v in pairs(self) do
+        if SyntaxTree:is_instance(v) then
+          if v:contains(subtree) then
+            return true
+          end
+        end
+      end
+      return false
     end,
     get_args = function(self)
       assert(self.type == "Action" or self.type == "MethodCall", "Only actions and method calls have arguments")

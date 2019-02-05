@@ -70,6 +70,13 @@ command line program with $args:
         unless $tree:
             do next
 
+        if ($tree.type == "Comment"):
+            say (dim "Comment:\($tree.1)")
+            do next
+
+        if ($tree.type != "FileChunks"):
+            $tree = [$tree]
+
         for $chunk in $tree:
             try:
                 $lua = ($chunk as lua)

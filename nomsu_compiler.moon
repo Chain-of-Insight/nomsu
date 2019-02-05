@@ -16,7 +16,7 @@ fail_at = (source, msg)->
         source = source.source
     elseif type(source) == 'string'
         source = Source\from_string(source)
-    else
+    elseif not Source\is_instance(source)
         -- debug.getinfo() output:
         assert(source.short_src and source.currentline)
         file = Files.read(source.short_src)
@@ -73,6 +73,21 @@ compile = (tree)=>
                     lua\add " " if i < #tree
                 return lua
 
+            if not compile_action
+                seen_words = {}
+                words = {}
+                for word in stub\gmatch("[^0-9 ][^ ]*")
+                    unless seen_words[word]
+                        seen_words[word] = true
+                        table.insert words, word
+                table.sort(words)
+                stub2 = table.concat(words, " ")
+                compile_action = @COMPILE_RULES[stub2]
+                if compile_action
+                    if debug.getinfo(compile_action, 'u').isvararg
+                        stub = stub2
+                    else compile_action = nil
+
             if compile_action
                 args = [arg for arg in *tree when type(arg) != "string"]
                 ret = compile_action(@, tree, unpack(args))
@@ -92,7 +107,7 @@ compile = (tree)=>
             lua\add((stub)\as_lua_id!,"(")
             for argnum, arg in ipairs tree\get_args!
                 arg_lua = @compile(arg)
-                if arg.type == "Block"
+                if arg.type == "Block" and #arg > 1
                     arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
                 if lua\trailing_line_len! + #arg_lua\text! > MAX_LINE
                     lua\add(argnum > 1 and ",\n    " or "\n    ")
@@ -129,13 +144,18 @@ compile = (tree)=>
                 tree[1].type == "IndexChain")
                 target_lua\parenthesize!
 
+            self_lua = #tree > 2 and "_self" or target_lua
+            if #tree > 2
+                lua\add "(function(", self_lua, ")\n    "
             for i=2,#tree
-                lua\add "\n" if i > 2
-                lua\add target_lua, ":"
+                lua\add "\n    " if i > 2
+                if i > 2 and i == #tree
+                    lua\add "return "
+                lua\add self_lua, ":"
                 lua\add((tree[i].stub)\as_lua_id!,"(")
                 for argnum, arg in ipairs tree[i]\get_args!
                     arg_lua = @compile(arg)
-                    if arg.type == "Block"
+                    if arg.type == "Block" and #arg > 1
                         arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
                     if lua\trailing_line_len! + #arg_lua\text! > MAX_LINE
                         lua\add(argnum > 1 and ",\n    " or "\n    ")
@@ -143,6 +163,8 @@ compile = (tree)=>
                         lua\add ", "
                     lua\add arg_lua
                 lua\add ")"
+            if #tree > 2
+                lua\add "\nend)(", target_lua, ")"
             return lua
 
         when "EscapedNomsu"
@@ -258,9 +280,9 @@ compile = (tree)=>
                             items_lua\add "\n"
                             sep = ''
                         elseif items_lua\trailing_line_len! > MAX_LINE
-                            sep = ',\n    '
+                            sep = items_lua\text!\sub(-1) == ";" and "\n    " or ",\n    "
                         else
-                            sep = ', '
+                            sep = items_lua\text!\sub(-1) == ";" and " " or ", "
                         i += 1
                     if items_lua\is_multiline!
                         lua\add LuaCode\from items_lua.source, typename, "{\n    ", items_lua, "\n}"
@@ -293,6 +315,8 @@ compile = (tree)=>
             lua = @compile(tree[1])
             if lua\text!\match("['\"}]$") or lua\text!\match("]=*]$")
                 lua\parenthesize!
+            if lua\text! == "..."
+                return LuaCode\from(tree.source, "select(", @compile(tree[2][1]), ", ...)")
             for i=2,#tree
                 key = tree[i]
                 -- TODO: remove this shim
@@ -315,7 +339,13 @@ compile = (tree)=>
             return LuaCode\from(tree.source, "-- ", (tree[1]\gsub('\n', '\n-- ')))
         
         when "Error"
-            error("Can't compile errors")
+            err_msg = pretty_error{
+                title:"Parse error"
+                error:tree.error, hint:tree.hint, source:tree\get_source_file!
+                start:tree.source.start, stop:tree.source.stop, filename:tree.source.filename
+            }
+            -- Coroutine yield here?
+            error(err_msg)
 
         else
             error("Unknown type: #{tree.type}")

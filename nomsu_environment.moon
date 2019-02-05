@@ -16,8 +16,6 @@ make_tree = (tree, userdata)->
     tree = SyntaxTree(tree)
     return tree
 
-table.map = (t, fn)-> setmetatable([fn(v) for _,v in ipairs(t)], getmetatable(t))
-
 Parsers = {}
 max_parser_version = 0
 for version=1,999
@@ -48,6 +46,11 @@ _1_as_text = (x)->
     if x == false then return "no"
     return tostring(x)
 
+_1_as_list = (x)->
+    mt = getmetatable(x)
+    if mt.as_list then return mt.as_list(x)
+    return x
+
 local nomsu_environment
 nomsu_environment = Importer{
     NOMSU_COMPILER_VERSION: 13, NOMSU_SYNTAX_VERSION: max_parser_version
@@ -74,7 +77,7 @@ nomsu_environment = Importer{
 
     -- Nomsu functions:
     _1_as_nomsu:tree_to_nomsu, _1_as_inline_nomsu:tree_to_inline_nomsu,
-    compile: compile, at_1_fail:fail_at, _1_as_text:_1_as_text,
+    compile: compile, at_1_fail:fail_at, :_1_as_text, :_1_as_list,
     exit:os.exit, quit:os.exit,
 
     _1_parsed: (nomsu_code, syntax_version)->
@@ -91,26 +94,6 @@ nomsu_environment = Importer{
         tree = parse(nomsu_code, source.filename)
         if tree.shebang
             tree.version or= tree.shebang\match("nomsu %-V[ ]*([%d.]*)")
-        errs = {}
-        find_errors = (t)->
-            if t.type == "Error"
-                errs[#errs+1] = t
-            else
-                for k,v in pairs(t)
-                    continue unless SyntaxTree\is_instance(v)
-                    find_errors(v)
-        find_errors(tree)
-        num_errs = #errs
-        if num_errs > 0
-            err_strings = [pretty_error{
-                    title:"Parse error"
-                    error:e.error, hint:e.hint, source:e\get_source_file!
-                    start:e.source.start, stop:e.source.stop, filename:e.source.filename
-                } for i, e in ipairs(errs) when i <= 3]
-            if num_errs > #err_strings
-                table.insert(err_strings, C("bright red", " +#{num_errs-#err_strings} additional errors...\n"))
-            error(table.concat(err_strings, '\n\n'), 0)
-        
         return tree
 
     Module: (package_name)=>
@@ -218,6 +201,8 @@ nomsu_environment = Importer{
         elseif LuaCode\is_instance(to_run)
             source = to_run.source
             lua_string = to_run\text!
+            -- For some reason, Lua doesn't strip shebangs from Lua files
+            lua_string = lua_string\gsub("^#![^\n]*\n","")
             -- If you replace tostring(source) with "nil", source mapping won't happen
             run_lua_fn, err = load(lua_string, tostring(source), "t", @)
             if not run_lua_fn

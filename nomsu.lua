@@ -199,6 +199,9 @@ run = function()
       local env = nomsu_environment.new_environment()
       env.MODULE_NAME = filename
       local tree = env._1_parsed(code)
+      if tree.shebang then
+        output:write(tree.shebang)
+      end
       if not (tree.type == 'FileChunks') then
         tree = {
           tree

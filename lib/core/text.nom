@@ -43,16 +43,15 @@ test:
 
 ($expr for $match in $text matching $patt) compiles to:
     define mangler
-    return
-        Lua ("
-            (function()
-                local \(mangle "comprehension") = a_List{}
-                for \($match as lua expr) in (\($text as lua expr)):gmatch(\($patt as lua expr)) do
-                    \(mangle "comprehension")[#\(mangle "comprehension")+1] = \($expr as lua)
-                end
-                return \(mangle "comprehension")
-            end)()
-        ")
+    return Lua ("
+        (function()
+            local \(mangle "comprehension") = a_List{}
+            for \($match as lua expr) in (\($text as lua expr)):gmatch(\($patt as lua expr)) do
+                \(mangle "comprehension")[#\(mangle "comprehension")+1] = \($expr as lua)
+            end
+            return \(mangle "comprehension")
+        end)()
+    ")
 
 test:
     assume "\n" == (newline)

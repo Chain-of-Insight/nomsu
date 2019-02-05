@@ -44,8 +44,8 @@ lua> ("
                 end
             elseif not arg_lua:is_lua_id() then
                 at_1_fail(SyntaxTree:is_instance(arg) and arg or nil,
-                    "Compile error: This does not compile to a Lua identifier, so it "..
-                    "can't be used as a function argument. "..
+                    "Compile error: This does not compile to a Lua identifier ("..arg_lua.."),"..
+                    "so it can't be used as a function argument. "..
                     "Hint: This should probably be a Nomsu variable instead (like $x).")
             end
             lua:add(i > 1 and ", " or "", arg_lua)
@@ -97,7 +97,7 @@ lua> ("
                 (\$action.type == "EscapedNomsu" and \$action[1].type == "Action") or
                 \$action.type == "MethodCall") then
             at_1_fail(\$action.source, "Compile error: "..
-                "This is neither an action nor an escaped action. "..
+                "This first argument to (* compiles to *) is neither an action nor an escaped action (it's a "..\$action.type.."). "..
                 "Hint: This should probably be an action like:\\n"
                 .."(foo $x) compiles to \\"(\\\\($x as lua) + 1)\\"")
         end
@@ -116,6 +116,8 @@ lua> ("
 ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(` $) compiles to (Lua (=lua "\$ or SyntaxTree{type='Action'}", as lua))
 
 ($actions all compile to $body) compiles to:
     lua> ("
@@ -308,22 +310,19 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 [$action parses as $body] all parse as ([$action] all parse as $body)
-external:
-    (in (nomsu environment) $tree as lua expr) means:
-        lua> ("
-            local tree_lua = \(nomsu environment):compile(\$tree)
-            if \$tree.type == 'Block' then
-                tree_lua = LuaCode:from(\$tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
-            elseif \$tree.type == 'MethodCall' and #\$tree > 2 then
-                at_1_fail(\$tree, "Compile error: This must be a single value instead of "..
-                (#\$tree - 1).." method calls. Hint: Replace this with a single method call.")
-            end
-            return tree_lua
-        ")
+
+((nomsu environment), $tree as lua expr) means:
+    lua> ("
+        local tree_lua = \(nomsu environment):compile(\$tree)
+        if \$tree.type == 'Block' and #\$tree > 1 then
+            tree_lua = LuaCode:from(\$tree.source, '(function()\\n    ', tree_lua, '\\nend)()')
+        end
+        return tree_lua
+    ")
 
 # Need to make sure the proper environment is used for compilation (i.e. the caller's environment)
 ($tree as lua expr) compiles to
-    \(in \(nomsu environment) $tree as lua expr) as lua
+    =lua "SyntaxTree{type='MethodCall', \(\(nomsu environment)), \(\($tree as lua expr))}"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -340,11 +339,11 @@ external:
         ")
 
 test:
-    (num args (*extra arguments*)) means (select "#" (*extra arguments*))
+    (num args (*extra arguments*)) means (#(*extra arguments*))
     assume (num args 1 2 3) == 3
     (extra args (*extra arguments*)) means [*extra arguments*]
     assume (extra args 1 2 3) == [1, 2, 3]
-    (third arg (*extra arguments*)) means (select 3 (*extra arguments*))
+    (third arg (*extra arguments*)) means ((*extra arguments*).3)
     assume (third arg 5 6 7 8) == 7
 
 (*extra arguments*) compiles to "..."
@@ -352,44 +351,6 @@ test:
 external:
     ($ is $kind syntax tree) means
         =lua "SyntaxTree:is_instance(\$) and \$.type == \$kind"
-
-($tree with $t -> $replacement) compiles to ("
-    \($tree as lua expr):map(function(\($t as lua expr))
-        \(
-            =lua ("
-                \$replacement.type == 'Block' and \($replacement as lua) or 'return '..\
-                ..\($replacement as lua expr):text()
-            ")
-        )
-    end)
-")
-
-external:
-    ($tree with vars $replacements) means
-        =lua ("
-            \$tree:map(function(\$t)
-                if \$t.type == "Var" then
-                    return \$replacements[\$t:as_var()]
-                end
-            end)
-        ")
-
-(tree $tree with vars $replacements) compiles to ("
-    \(=lua "(\$tree):as_lua()"):map(function(t)
-        if t.type == "Var" then
-            return \($replacements as lua expr)[t:as_var()]
-        end
-    end)
-")
-
-($tree has subtree $match_tree) compiles to ("
-    (function()
-        local match_tree = \($match_tree as lua expr)
-        for subtree in coroutine_wrap(function() \($tree as lua expr):map(yield) end) do
-            if subtree == match_tree then return true end
-        end
-    end)()
-")
 
 external:
     (match $tree with $patt) means:
@@ -444,12 +405,24 @@ external:
             if mt and mt.__type then return mt.__type end
             if \$ == nil then return 'nil' end
             local lua_type = \(lua type of $)
-            if lua_type == 'function' then return "an Action" end
             return 'a '..lua_type:capitalized()
         ")
 
-($ is $type) parses as ((type of $) == $type)
-[$ isn't $type, $ is not $type] all parse as ((type of $) != $type)
+    ($ is $type) means:
+        lua> ("
+            local class = getmetatable(\$)
+            ::check_parent::
+            if not class or not class.__type then return 'a '..lua_type:capitalized() == \$type end
+            if class.__type == \$type then return true end
+            local class_mt = getmetatable(class)
+            if class_mt.__index and class_mt.__index ~= class then
+                class = class_mt.__index
+                goto check_parent
+            end
+            return false
+        ")
+
+[$ isn't $type, $ is not $type] all parse as (not ($ is $type))
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -481,6 +454,9 @@ test:
         lua:add(" end")
         return lua
     ")
+
+# Convenience helper:
+(return Lua (*extra arguments*)) compiles to \(return \(Lua (*extra arguments*)))
 
 # Literals
 (yes) compiles to "(true)"
@@ -525,3 +501,14 @@ external:
         return ("
             \(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)
         ")
+
+~~~~
+# TODO: Remove shim
+($tree with $t -> $replacement) parses as
+    $tree, with ($t -> $replacement)
+
+[tree $tree with vars $replacements, $tree with vars $replacements] all parse as
+    ($tree, with $replacements)
+
+($tree has subtree $match_tree) parses as
+    $tree, contains $match_tree

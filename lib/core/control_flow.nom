@@ -64,25 +64,23 @@ test:
     #   If $when_true_expr is guaranteed to be truthy, we can use Lua's idiomatic
         equivalent of a conditional expression: (cond and if_true or if_false)
     if {.Text, .List, .Dict, .Number}.($when_true_expr.type):
-        return
-            Lua ("
-                (\($condition as lua expr) and \($when_true_expr as lua expr) or \
-                ..\($when_false_expr as lua expr))
-            ")
+        return Lua ("
+            (\($condition as lua expr) and \($when_true_expr as lua expr) or \
+            ..\($when_false_expr as lua expr))
+        ")
     ..else:
         #   Otherwise, need to do an anonymous inline function (yuck, too bad lua 
             doesn't have a proper ternary operator!)
             To see why this is necessary consider: (random()<.5 and false or 99)
-        return
-            Lua ("
-                ((function()
-                    if \($condition as lua expr) then
-                        return \($when_true_expr as lua expr)
-                    else
-                        return \($when_false_expr as lua expr)
-                    end
-                end)())
-            ")
+        return Lua ("
+            ((function()
+                if \($condition as lua expr) then
+                    return \($when_true_expr as lua expr)
+                else
+                    return \($when_false_expr as lua expr)
+                end
+            end)())
+        ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -117,15 +115,15 @@ test:
 # Basic loop control
 (stop $var) compiles to:
     if $var:
-        return (Lua "goto stop_\($var as lua identifier)")
+        return Lua "goto stop_\($var as lua identifier)"
     ..else:
-        return (Lua "break")
+        return Lua "break"
 
 (do next $var) compiles to:
     if $var:
-        return (Lua "goto continue_\($var as lua identifier)")
+        return Lua "goto continue_\($var as lua identifier)"
     ..else:
-        return (Lua "goto continue")
+        return Lua "goto continue"
 
 (---stop $var ---) compiles to "::stop_\($var as lua identifier)::"
 (---next $var ---) compiles to "::continue_\($var as lua identifier)::"
@@ -162,18 +160,75 @@ test:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# For-each loop (lua's "ipairs()")
+(for $var in $iterable at $i $body) compiles to:
+    # This uses Lua's approach of only allowing loop-scoped variables in a loop
+    if (($iterable.type == "Action") and (($iterable, get stub) == "1 to")):
+        [$start, $stop] = [$iterable.1, $iterable.3]
+        $loop =
+            Lua ("
+                local _start = \($start as lua expr)
+                for \($var as lua identifier)=_start,\($stop as lua expr) do
+                    \($i as lua identifier) = \($var as lua identifier) - _start + 1
+            ")
+    if (($iterable.type == "Action") and (($iterable, get stub) == "1 to 2 by")):
+        [$start, $stop, $step] = [$iterable.1, $iterable.3, $iterable.5]
+        $loop =
+            Lua ("
+                local _start, _step = \($start as lua expr), \($step as lua expr)
+                for \($var as lua identifier)=_start,\($stop as lua expr),_step do
+                    \($i as lua identifier) = (\($var as lua identifier) - _start)/_step + 1
+            ")
+    unless $loop:
+        $loop =
+            Lua ("
+                local _iterating = _1_as_list(\($iterable as lua expr))
+                for \($i as lua identifier)=1,#_iterating do
+                    \($var as lua identifier) = _iterating[\($i as lua identifier)]
+            ")
+    $lua =
+        Lua ("
+            do -- for-loop
+                \$loop
+                    \;
+        ")
+    $lua, add ($body as lua)
+    if ($body has subtree \(do next)):
+        $lua, add "\n        ::continue::"
+    
+    if ($body has subtree \(do next $var)):
+        $lua, add "\n        " (\(---next $var ---) as lua)
+    
+    $lua, add "\n    end"
+    if ($body has subtree \(stop $var)):
+        $lua, add "\n    " (\(---stop $var ---) as lua)
+    $lua, add "\nend -- for-loop"
+    return $lua
+
+(for $var in $iterable $body) parses as
+    for $var in $iterable at (=lua "_i") $body
+
 test:
+    $d = {.a = 10, .b = 20, .c = 30, .d = 40, .e = 50}
+    $result = []
+    for $k = $v in $d:
+        if ($k == "a"):
+            do next $k
+        
+        if ($v == 20):
+            do next $v
+        
+        $result, add "\$k = \$v"
+    assume (($result sorted) == ["c = 30", "d = 40", "e = 50"])
+
+# Numeric range for loops
+test:
+    assume ([: for $ in (1 to 5): add $] == [1, 2, 3, 4, 5])
+    assume ([: for $ in (1 to 5 by 2): add $] == [1, 3, 5])
+    assume ([: for $ in (5 to 1): add $] == [])
     $nums = []
-    for $x in 1 to 5:
-        $nums, add $x
-    assume ($nums == [1, 2, 3, 4, 5])
-    $nums = []
-    for $x in 1 to 5 via 2:
-        $nums, add $x
-    assume ($nums == [1, 3, 5])
-    $nums = []
-    for $outer in 1 to 100:
-        for $inner in $outer to ($outer + 2):
+    for $outer in (1 to 100):
+        for $inner in ($outer to ($outer + 2)):
             if ($inner == 2):
                 $nums, add -2
                 do next $inner
@@ -182,47 +237,25 @@ test:
                 stop $outer
     assume ($nums == [1, -2, 3, -2, 3, 4, 3, 4, 5])
 
-# Numeric range for loops
+# These are shims, and should be phased out:
 [
     for $var in $start to $stop by $step $body
     for $var in $start to $stop via $step $body
-] all compile to:
-    # This uses Lua's approach of only allowing loop-scoped variables in a loop
-    $lua =
-        Lua ("
-            for \($var as lua identifier)=\($start as lua expr),\($stop as lua expr),\
-            ..\($step as lua expr) do
-        ")
-    $lua, add "\n    " ($body as lua)
-    if ($body has subtree \(do next)):
-        $lua, add "\n    ::continue::"
-    
-    if ($body has subtree \(do next $var)):
-        $lua, add "\n    " (\(---next $var ---) as lua)
-    
-    $lua, add "\nend -- numeric for " ($var as lua identifier) " loop"
-    if ($body has subtree \(stop $var)):
-        $lua =
-            Lua ("
-                do -- scope for (stop \($var as lua identifier))
-                    \$lua
-                    \(\(---stop $var ---) as lua)
-                end -- scope for (stop \($var as lua identifier))
-            ")
-    return $lua
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+] all parse as (for $var in ($start to $stop by $step) $body)
 
 (for $var in $start to $stop $body) parses as
-    for $var in $start to $stop via 1 $body
+    for $var in ($start to $stop) $body
 
+# repeat $n times is a shorthand:
 test:
     $x = 0
     repeat 5 times:
         $x += 1
     assume $x == 5
 
-(repeat $n times $body) parses as (for (=lua "_XXX_") in 1 to $n $body)
+(repeat $n times $body) parses as (for (=lua "_XXX_") in (1 to $n by 1) $body)
+
+# Dict iteration (lua's "pairs()")
 test:
     $a = [10, 20, 30, 40, 50]
     $b = []
@@ -239,48 +272,9 @@ test:
         
         $b, add $x
     assume ($b == [20, 30, 40])
+    # Small memory footprint:
+    assume (1 to (1 << 31))
 
-# For-each loop (lua's "ipairs()")
-(for $var in $iterable at $i $body) compiles to:
-    # This uses Lua's approach of only allowing loop-scoped variables in a loop
-    $lua =
-        Lua ("
-            for \($i as lua identifier),\($var as lua identifier) in ipairs(\($iterable as lua expr)) do
-                \;
-        ")
-    $lua, add ($body as lua)
-    if ($body has subtree \(do next)):
-        $lua, add "\n    ::continue::"
-    
-    if ($body has subtree \(do next $var)):
-        $lua, add "\n    " (\(---next $var ---) as lua)
-    
-    $lua, add "\nend --for \($var as lua identifier) loop"
-    if ($body has subtree \(stop $var)):
-        $inner_lua = $lua
-        $lua = (Lua "do -- scope for stopping for-loop\n    ")
-        $lua, add $inner_lua "\n    "
-        $lua, add (\(---stop $var ---) as lua)
-        $lua, add "\nend -- end of scope for stopping for-loop"
-    return $lua
-
-(for $var in $iterable $body) parses as
-    for $var in $iterable at (=lua "__") $body
-
-test:
-    $d = {.a = 10, .b = 20, .c = 30, .d = 40, .e = 50}
-    $result = []
-    for $k = $v in $d:
-        if ($k == "a"):
-            do next $k
-        
-        if ($v == 20):
-            do next $v
-        
-        $result, add "\$k = \$v"
-    assume (($result sorted) == ["c = 30", "d = 40", "e = 50"])
-
-# Dict iteration (lua's "pairs()")
 [for $key = $value in $iterable $body, for $key $value in $iterable $body]
 ..all compile to:
     $lua =
@@ -453,13 +447,12 @@ test:
         ")
     
     $code, add "\nend --when"
-    return
-        Lua ("
-            do --if $ is...
-                local \(mangle "branch value") = \($branch_value as lua expr)
-                \$code
-            end -- if $ is...
-        ")
+    return Lua ("
+        do --if $ is...
+            local \(mangle "branch value") = \($branch_value as lua expr)
+            \$code
+        end -- if $ is...
+    ")
 
 # Do/finally
 (do $action) compiles to ("

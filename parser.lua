@@ -21,6 +21,7 @@ do
   local _with_0 = { }
   _with_0.nl = P("\r") ^ -1 * P("\n")
   _with_0.tab = P("\t")
+  _with_0.at_break = lpeg.B(lpeg.S(";,. \r\n\t({[")) + -lpeg.B(1)
   _with_0.tonumber = tonumber
   _with_0.tochar = string.char
   _with_0.unpack = unpack or table.unpack
@@ -34,6 +35,7 @@ do
     return true, (s:match("^ *", i))
   end)
   _with_0.utf8_char = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
+  _with_0.operator_char = S("#'`~@^&*+=<>?/%!|\\-") + (P("\xE2") * (R("\x88\x8B") + R("\xA8\xAB")) * R("\128\191"))
   _with_0.Tree = function(t, userdata)
     return userdata.make_tree(t, userdata)
   end

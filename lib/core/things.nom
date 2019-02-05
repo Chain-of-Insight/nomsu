@@ -37,6 +37,8 @@ test:
         ($self, number of commas) means ((#$bits) - 1)
     $csv = (a Comma Buffer)
     assume $csv.is_a_buffer
+    assume ($csv is "a Comma Buffer")
+    assume ($csv is "a Buffer")
     assume "\$csv" == ""
     $csv, add "x"
     $csv, add "y"
@@ -96,17 +98,20 @@ external:
                 Compile error: This is not a list of variables.
             ")
         $class_id = ($classname.stub, as lua id)
-        if $class_body:
-            $class_body =
-                $class_body with vars {
-                    : for $v in $vars:
-                        add ($v as lua expr, text) =
-                            "IndexChain" tree with ("Var" tree with "self")
-                                "Index" tree with ("Text" tree with $v.1)
-                }
+        $class_body and=
+            $class_body, with
+                $t ->:
+                    for $v in $vars:
+                        if ($t == $v):
+                            return
+                                "IndexChain" tree with ("Var" tree with "self")
+                                    "Index" tree with ("Text" tree with $v.1)
+
+        if ($parent.type == "Action"):
+            $parent = ("Var" tree with $parent)
         $lua =
             Lua ("
-                \$class_id = _1_class_named(\($parent as lua), \(quote $classname.stub)\(
+                \$class_id = _1_class_named(\($parent as lua id), \(quote $classname.stub)\(
                     (
                         Lua ("
                             , function(\$class_id)

@@ -20,6 +20,7 @@ DEFS = with {}
     -- Newline supports either windows-style CR+LF or unix-style LF
     .nl = P("\r")^-1 * P("\n")
     .tab = P("\t")
+    .at_break = lpeg.B(lpeg.S(";,. \r\n\t({[")) + -lpeg.B(1)
     .tonumber = tonumber
     .tochar = string.char
     .unpack = unpack or table.unpack
@@ -36,6 +37,7 @@ DEFS = with {}
         R("\194\223")*R("\128\191") +
         R("\224\239")*R("\128\191")*R("\128\191") +
         R("\240\244")*R("\128\191")*R("\128\191")*R("\128\191"))
+    .operator_char = S("#'`~@^&*+=<>?/%!|\\-") + (P("\xE2") * (R("\x88\x8B")+R("\xA8\xAB")) * R("\128\191"))
     .Tree = (t, userdata)-> userdata.make_tree(t, userdata)
     .foldr = foldr
 

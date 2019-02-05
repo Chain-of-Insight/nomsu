@@ -24,6 +24,7 @@ class SyntaxTree
 
     __eq: (other)=>
         return false if type(@) != type(other) or #@ != #other or getmetatable(@) != getmetatable(other)
+        return false if @type != other.type
         for i=1,#@
             return false if @[i] != other[i]
         return true
@@ -44,7 +45,20 @@ class SyntaxTree
     })
     get_source_file: => @@source_code_for_tree[@]
     get_source_code: => @@source_code_for_tree[@]\sub(@source.start, @source.stop-1)
-    map: (fn)=>
+
+    add: (...)=>
+        n = #@
+        for i=1,select('#', ...)
+            @[n+i] = select(i, ...)
+        @stub = nil
+
+    with: (fn)=>
+        if type(fn) == 'table'
+            replacements = fn
+            fn = (t)->
+                for k,v in pairs(replacements)
+                    if k == t then return v
+
         replacement = fn(@)
         if replacement == false then return nil
         if replacement
@@ -60,13 +74,20 @@ class SyntaxTree
             for k,v in pairs(@)
                 replacement[k] = v
                 if SyntaxTree\is_instance(v)
-                    r = v\map(fn)
+                    r = v\with(fn)
                     continue if r == v or r == nil
                     changes = true
                     replacement[k] = r
             return @ unless changes
             replacement = SyntaxTree(replacement)
         return replacement
+
+    contains: (subtree)=>
+        if subtree == @ then return true
+        for k,v in pairs(@)
+            if SyntaxTree\is_instance(v)
+                return true if v\contains(subtree)
+        return false
 
     get_args: =>
         assert(@type == "Action" or @type == "MethodCall", "Only actions and method calls have arguments")

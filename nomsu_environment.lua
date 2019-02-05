@@ -22,17 +22,6 @@ make_tree = function(tree, userdata)
   tree = SyntaxTree(tree)
   return tree
 end
-table.map = function(t, fn)
-  return setmetatable((function()
-    local _accum_0 = { }
-    local _len_0 = 1
-    for _, v in ipairs(t) do
-      _accum_0[_len_0] = fn(v)
-      _len_0 = _len_0 + 1
-    end
-    return _accum_0
-  end)(), getmetatable(t))
-end
 local Parsers = { }
 local max_parser_version = 0
 for version = 1, 999 do
@@ -87,6 +76,14 @@ _1_as_text = function(x)
     return "no"
   end
   return tostring(x)
+end
+local _1_as_list
+_1_as_list = function(x)
+  local mt = getmetatable(x)
+  if mt.as_list then
+    return mt.as_list(x)
+  end
+  return x
 end
 local nomsu_environment
 nomsu_environment = Importer({
@@ -160,6 +157,7 @@ nomsu_environment = Importer({
   compile = compile,
   at_1_fail = fail_at,
   _1_as_text = _1_as_text,
+  _1_as_list = _1_as_list,
   exit = os.exit,
   quit = os.exit,
   _1_parsed = function(nomsu_code, syntax_version)
@@ -178,56 +176,6 @@ nomsu_environment = Importer({
     local tree = parse(nomsu_code, source.filename)
     if tree.shebang then
       tree.version = tree.version or tree.shebang:match("nomsu %-V[ ]*([%d.]*)")
-    end
-    local errs = { }
-    local find_errors
-    find_errors = function(t)
-      if t.type == "Error" then
-        errs[#errs + 1] = t
-      else
-        for k, v in pairs(t) do
-          local _continue_0 = false
-          repeat
-            if not (SyntaxTree:is_instance(v)) then
-              _continue_0 = true
-              break
-            end
-            find_errors(v)
-            _continue_0 = true
-          until true
-          if not _continue_0 then
-            break
-          end
-        end
-      end
-    end
-    find_errors(tree)
-    local num_errs = #errs
-    if num_errs > 0 then
-      local err_strings
-      do
-        local _accum_0 = { }
-        local _len_0 = 1
-        for i, e in ipairs(errs) do
-          if i <= 3 then
-            _accum_0[_len_0] = pretty_error({
-              title = "Parse error",
-              error = e.error,
-              hint = e.hint,
-              source = e:get_source_file(),
-              start = e.source.start,
-              stop = e.source.stop,
-              filename = e.source.filename
-            })
-            _len_0 = _len_0 + 1
-          end
-        end
-        err_strings = _accum_0
-      end
-      if num_errs > #err_strings then
-        table.insert(err_strings, C("bright red", " +" .. tostring(num_errs - #err_strings) .. " additional errors...\n"))
-      end
-      error(table.concat(err_strings, '\n\n'), 0)
     end
     return tree
   end,
@@ -361,6 +309,7 @@ nomsu_environment = Importer({
     elseif LuaCode:is_instance(to_run) then
       local source = to_run.source
       local lua_string = to_run:text()
+      lua_string = lua_string:gsub("^#![^\n]*\n", "")
       local run_lua_fn, err = load(lua_string, tostring(source), "t", self)
       if not run_lua_fn then
         local lines

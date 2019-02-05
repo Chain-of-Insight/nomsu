@@ -107,7 +107,7 @@ command line program with $args:
         $matched = {}
         $user_answers = {}
         ($tree with replacements) means
-            $tree, map
+            $tree, with
                 for $t:
                     $values = ($t matches $pattern_tree with {})
                     if $values:
