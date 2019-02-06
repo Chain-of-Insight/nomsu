@@ -1,0 +1,20 @@
+#!/usr/bin/env nomsu -V6.15.9
+#
+    This file defines upgrades from Nomsu <6.15.9 to 6.15.9
+    
+use "compatibility/compatibility"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+upgrade action (assume $a == $b) to "6.15.9" as (assume ($a == $b))
+upgrade action (assume $a != $b) to "6.15.9" as (assume ($a != $b))
+upgrade action ($x to the nearest $r) to "6.15.9" as ($x, to the nearest $r)
+upgrade action [ceil $x, ceiling $x] to "6.15.9" as ($x, rounded up)
+upgrade action (floor $x) to "6.15.9" as ($x, rounded down)
+upgrade action (for $x in $start to $stop $body) to "6.15.9" as
+    for $x in ($start to $stop) $body
+
+upgrade action [
+    for $x in $start to $stop by $step $body
+    for $x in $start to $stop via $step $body
+] to "6.15.9" as (for $x in ($start to $stop by $step) $body)

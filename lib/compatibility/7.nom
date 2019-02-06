@@ -1,0 +1,24 @@
+#!/usr/bin/env nomsu -V7
+#
+    This file defines upgrades from Nomsu <7 to 7
+    
+use "compatibility/compatibility"
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+upgrade action ($tree with $t -> $replacement) to "7" as
+    $tree, with ($t -> $replacement)
+
+upgrade action [
+    tree $tree with vars $replacements, $tree with vars $replacements
+] to "7" as ($tree, with $replacements)
+
+upgrade action ($tree has subtree $match_tree) to "7" as
+    $tree, contains $match_tree
+
+upgrade $tree to "7" as:
+    if ($tree.type == "EscapedNomsu"):
+        $e = $tree.1
+        return
+            "Action" tree from $tree.source with ("Text" tree with $e.type) "tree" "with"
+                unpack $e
