@@ -17,7 +17,7 @@ external:
         $ACTION_UPGRADES.$version.$stub = $upgrade_fn
     
     (upgrade $tree to $version as $body) parses as
-        upgrade to $version via (($ $end_version) -> ($ with $tree -> $body))
+        upgrade to $version via (($ $end_version) -> ($, with ($tree -> $body)))
     
     (upgrade action $actions to $version as $body) compiles to:
         if ($actions is "Action" syntax tree):
@@ -70,12 +70,12 @@ external:
         $tree upgraded to $end_version from $start_version
     ] all mean:
         unless ($tree is syntax tree): return $tree
-        ($ver as list) means (($ as number) for $ in $ver matching "[0-9]+")
+        ($ver as version list) means (($ as number) for $ in $ver matching "[0-9]+")
         (Ver $) means:
             [$lib, $ver] = ($, match "(.*)/([0-9.]+)")
             if $lib:
-                return {.lib = $lib, .version = ($ver as list)}
-            return {.version = ($ as list)}
+                return {.lib = $lib, .version = ($ver as version list)}
+            return {.version = ($ as version list)}
         $start = (Ver $start_version)
         $end = (Ver $end_version)
         $end.lib or= $start.lib
@@ -89,20 +89,21 @@ external:
             $versions.$v = (yes)
         
         $versions = [: for $v = $ in $versions: if ((Ver $v).lib == $start.lib): add $v]
-        sort $versions by $ -> ($ as list)
+        sort $versions by $ -> ($ as version list)
         for $ver in $versions:
-            if (($ver as list) <= $start.version): do next $ver
-            if (($ver as list) > $end.version): stop $ver
+            if (($ver as version list) <= $start.version): do next $ver
+            if (($ver as version list) > $end.version): stop $ver
             if $ACTION_UPGRADES.$ver:
                 $tree =
-                    $tree with $ ->:
-                        if (($ is "Action" syntax tree) and $ACTION_UPGRADES.$ver.($.stub)):
-                            $with_upgraded_args = {
-                                : for $k = $v in $:
-                                    add $k = ($v upgraded from $start_version to $end_version)
-                            }
-                            set $with_upgraded_args's metatable to ($'s metatable)
-                            return ($ACTION_UPGRADES.$ver.($.stub) $with_upgraded_args $end_version)
+                    $tree, with
+                        $ ->:
+                            if (($ is "Action" syntax tree) and $ACTION_UPGRADES.$ver.($.stub)):
+                                $with_upgraded_args = {
+                                    : for $k = $v in $:
+                                        add $k = ($v upgraded from $start_version to $end_version)
+                                }
+                                set $with_upgraded_args's metatable to ($'s metatable)
+                                return ($ACTION_UPGRADES.$ver.($.stub) $with_upgraded_args $end_version)
             
             if $UPGRADES.$ver:
                 $with_upgraded_args = {

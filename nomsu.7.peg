@@ -180,14 +180,13 @@ number <-
     hex_integer / real_number / integer
 
 integer (Number) <-
-    (((%at_break "-")? [0-9]+)-> tonumber)
+    { (%at_break "-")? [0-9]+ (("_"+->"") [0-9]+)* }
 
 hex_integer (Number) <-
-    (((%at_break "-")? "0x" [0-9a-fA-F]+)-> tonumber)
-    {:hex: '' -> 'yes' :}
+    { (%at_break "-")? "0x" [0-9a-fA-F]+ (("_"+->"") [0-9a-fA-F]+)* }
 
 real_number (Number) <-
-    (((%at_break "-")? [0-9]+ "." [0-9]+)-> tonumber)
+    { (%at_break "-")? [0-9]+ (("_"+->"") [0-9]+)* "." [0-9]+ (("_"+->"") [0-9]+)* }
 
 
 variable (Var) <- "$" ({ident_char+} / "(" ws* (inline_action / variable) ws* ")" / {''})

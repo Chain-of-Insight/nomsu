@@ -16,10 +16,10 @@ operator_patt = operator_char^1 * -1
 identifier_patt = (R("az","AZ","09") + P("_") + (-operator_char*utf8_char_patt))^1 * -1
 
 is_operator = (s)->
-    return type(s) == 'string' and operator_patt\match(s)
+    return type(s) == 'string' and not not operator_patt\match(s)
 
 is_identifier = (s)->
-    return type(s) == 'string' and identifier_patt\match(s)
+    return type(s) == 'string' and not not identifier_patt\match(s)
 
 can_be_unary = (t)->
     t.type == "Action" and #t == 2 and is_operator(t[1]) and type(t[2]) != 'string' and t[2].type != "Block"
@@ -51,7 +51,7 @@ tree_to_inline_nomsu = (tree)->
                     num_words += 1
                     clump_words = if type(tree[i-1]) == 'string'
                         is_operator(bit) != is_operator(tree[i-1])
-                    else bit == "'"
+                    else bit == "'" and type(tree[i-1]) != 'string'
                     nomsu\add " " if i > 1 and not clump_words
                     nomsu\add bit
                 else
@@ -175,11 +175,15 @@ tree_to_inline_nomsu = (tree)->
             return nomsu
         
         when "Number"
-            s = if tree.hex and tree[1] < 0
+            -- Preserve original formatting, just make sure 0xdead_beef -> 0xDEAD_BEEF
+            n = tostring(tree[1])
+            s = if n\match("^-*0x")
+                n\upper!\gsub("0X", "0x")
+            elseif tree.hex and tonumber((n\gsub("_",""))) < 0
                 ("-0x%X")\format(-tree[1])
             elseif tree.hex
                 ("0x%X")\format(tree[1])
-            else tostring(tree[1])
+            else n
             return NomsuCode\from(tree.source, s)
 
         when "Var"
@@ -334,7 +338,7 @@ tree_to_nomsu = (tree)->
             if #word_buffer > 0
                 words = table.concat(word_buffer)
                 if next_space == " "
-                    if nomsu\trailing_line_len! + #words > MAX_LINE and nomsu\trailing_line_len! > 8
+                    if nomsu\trailing_line_len! + #words > MAX_LINE + 8 and nomsu\trailing_line_len! > 8
                         next_space = "\n.."
                     elseif word_buffer[1] == "'"
                         next_space = ""

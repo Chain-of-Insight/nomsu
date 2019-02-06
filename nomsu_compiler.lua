@@ -406,7 +406,8 @@ compile = function(self, tree)
     end
     return lua
   elseif "Number" == _exp_0 then
-    return LuaCode:from(tree.source, tostring(tree[1]))
+    local number = tostring(tree[1]):gsub("_", "")
+    return LuaCode:from(tree.source, number)
   elseif "Var" == _exp_0 then
     return LuaCode:from(tree.source, tree:as_var():as_lua_id())
   elseif "FileChunks" == _exp_0 then

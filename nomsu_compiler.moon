@@ -326,7 +326,8 @@ compile = (tree)=>
             return lua
 
         when "Number"
-            return LuaCode\from(tree.source, tostring(tree[1]))
+            number = tostring(tree[1])\gsub("_", "")
+            return LuaCode\from(tree.source, number)
 
         when "Var"
             return LuaCode\from(tree.source, tree\as_var!\as_lua_id!)

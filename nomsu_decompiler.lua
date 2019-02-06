@@ -19,11 +19,11 @@ local operator_patt = operator_char ^ 1 * -1
 local identifier_patt = (R("az", "AZ", "09") + P("_") + (-operator_char * utf8_char_patt)) ^ 1 * -1
 local is_operator
 is_operator = function(s)
-  return type(s) == 'string' and operator_patt:match(s)
+  return type(s) == 'string' and not not operator_patt:match(s)
 end
 local is_identifier
 is_identifier = function(s)
-  return type(s) == 'string' and identifier_patt:match(s)
+  return type(s) == 'string' and not not identifier_patt:match(s)
 end
 local can_be_unary
 can_be_unary = function(t)
@@ -71,7 +71,7 @@ tree_to_inline_nomsu = function(tree)
         if type(tree[i - 1]) == 'string' then
           clump_words = is_operator(bit) ~= is_operator(tree[i - 1])
         else
-          clump_words = bit == "'"
+          clump_words = bit == "'" and type(tree[i - 1]) ~= 'string'
         end
         if i > 1 and not clump_words then
           nomsu:add(" ")
@@ -235,13 +235,16 @@ tree_to_inline_nomsu = function(tree)
     end
     return nomsu
   elseif "Number" == _exp_0 then
+    local n = tostring(tree[1])
     local s
-    if tree.hex and tree[1] < 0 then
+    if n:match("^-*0x") then
+      s = n:upper():gsub("0X", "0x")
+    elseif tree.hex and tonumber((n:gsub("_", ""))) < 0 then
       s = ("-0x%X"):format(-tree[1])
     elseif tree.hex then
       s = ("0x%X"):format(tree[1])
     else
-      s = tostring(tree[1])
+      s = n
     end
     return NomsuCode:from(tree.source, s)
   elseif "Var" == _exp_0 then
@@ -449,7 +452,7 @@ tree_to_nomsu = function(tree)
     if #word_buffer > 0 then
       local words = table.concat(word_buffer)
       if next_space == " " then
-        if nomsu:trailing_line_len() + #words > MAX_LINE and nomsu:trailing_line_len() > 8 then
+        if nomsu:trailing_line_len() + #words > MAX_LINE + 8 and nomsu:trailing_line_len() > 8 then
           next_space = "\n.."
         elseif word_buffer[1] == "'" then
           next_space = ""
