@@ -17,8 +17,7 @@ make_tree = (tree, userdata)->
     return tree
 
 Parsers = {}
-max_parser_version = 0
-for version=1,999
+for version=1,NOMSU_VERSION[1]
     local peg_file
     if package.nomsupath
         pegpath = package.nomsupath\gsub("lib/%?%.nom", "?.peg")\gsub("lib/%?%.lua", "?.peg")
@@ -26,8 +25,7 @@ for version=1,999
             peg_file = io.open(path)
     else
         peg_file = io.open("nomsu.#{version}.peg")
-    break unless peg_file
-    max_parser_version = version
+    assert peg_file, "No PEG file found for Nomsu version #{version}"
     peg_contents = peg_file\read('*a')
     peg_file\close!
     Parsers[version] = make_parser(peg_contents, make_tree)
@@ -53,7 +51,6 @@ _1_as_list = (x)->
 
 local nomsu_environment
 nomsu_environment = Importer{
-    NOMSU_COMPILER_VERSION: 13, NOMSU_SYNTAX_VERSION: max_parser_version
     -- Lua stuff:
     :next, unpack: unpack or table.unpack, :setmetatable, :rawequal, :getmetatable, :pcall,
     yield:coroutine.yield, resume:coroutine.resume, coroutine_status_of:coroutine.status,
@@ -89,8 +86,9 @@ nomsu_environment = Importer{
         version = nomsu_code\match("^#![^\n]*nomsu[ ]+-V[ ]*([0-9.]+)")
         if syntax_version
             syntax_version = tonumber(syntax_version\match("^[0-9]+"))
-        syntax_version or= version and tonumber(version\match("^[0-9]+")) or max_parser_version
-        parse = Parsers[syntax_version] or Parsers[max_parser_version]
+        syntax_version or= version and tonumber(version\match("^[0-9]+")) or NOMSU_VERSION[1]
+        parse = Parsers[syntax_version]
+        assert parse, "No parser found for Nomsu syntax version #{syntax_version}"
         tree = parse(nomsu_code, source.filename)
         if tree.shebang
             tree.version or= tree.shebang\match("nomsu %-V[ ]*([%d.]*)")

@@ -72,16 +72,9 @@ All `.moon` files have been precompiled into corresponding `.lua` files, so you 
 
 ## Versioning
 
-Nomsu uses the following versioning scheme: `[syntax version].[core library API version].[compiler internal API version].[minor version]`. Which means:
-
-* Any code that parses on `Nomsu X.a.b.c` will also parse on Nomsu `X.p.w.r`
-* Any code that compiles on Nomsu `X.Y.a.b` will also compile on Nomsu `X.Y.p.q` and run without any differences, as long as it only depends on the behavior of the core library functions (i.e. stuff defined in [lib/core/\*.nom](lib/core)), and doesn't mess with the compiler internals at all.
-* Any code that compiles on Nomsu `X.Y.Z.a` will also compile on Nomsu `X.Y.Z.p` and run without any differences, unless if it messes with the compiler internals.
-* Any code that compiles on Nomsu `X.Y.Z.W` will also compile on any other Nomsu `X.Y.Z.W` and run without any differences.
-
 When Nomsu is istalled via `make install`, all of Nomsu's lua files and [lib/](lib) files are stored in `$PREFIX/share/nomsu/$NOMSU_VERSION` and the Nomsu executable is installed to `$PREFIX/bin/nomsu$NOMSU_VERSION`, along with the file `nomsu` (the version-selection script), which goes to `$PREFIX/bin/nomsu`. When `make uninstall` is run, all those files are deleted (except for `nomsu`, if there are other versions installed).
 
-To run different versions, use the `-V` flag, which will select the latest version matching the specified pattern. For example, if you have v1.0.0.0, v1.0.2.1, and 1.1.0.0 installed, then `nomsu` will run v1.1.0.0, `nomsu -V 1.0` will run v1.0.2.1, and `nomsu -V 1.0.0.0` will run v1.0.0.0.
+To run different versions, use the `-V` flag, which will select the latest version matching the specified pattern. For example, if you have v1.0.0, v1.0.2, and 1.1.0 installed, then `nomsu` will run v1.1.0, `nomsu -V1.0` will run v1.0.2, and `nomsu -V 1.0.0` will run v1.0.0.
 
 ## Extra
 

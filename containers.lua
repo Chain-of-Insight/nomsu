@@ -226,6 +226,12 @@ local _list_mt = {
         return _accum_0
       end)())
     end,
+    from = function(self, start)
+      return self:from_1_to(start, -1)
+    end,
+    up_to = function(self, stop)
+      return self:from_1_to(1, stop)
+    end,
     copy = function(self)
       return List((function()
         local _accum_0 = { }

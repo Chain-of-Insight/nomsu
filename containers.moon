@@ -88,6 +88,8 @@ _list_mt =
             start = (n+1-start) if start < 0
             stop = (n+1-stop) if stop < 0
             return List[@[i] for i=start,stop]
+        from: (start)=> @from_1_to(start, -1)
+        up_to: (stop)=> @from_1_to(1, stop)
         copy: => List[@[i] for i=1,#@]
         reverse: =>
             n = #@

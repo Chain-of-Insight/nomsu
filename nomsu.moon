@@ -1,7 +1,14 @@
 #!/usr/bin/env moon
 -- This file contains the command-line Nomsu runner.
+export NOMSU_VERSION
+NOMSU_VERSION = {7, 0, 0}
 
 clibtype = package.cpath\match("?%.(so)") or package.cpath\match("?%.(dll)")
+
+if NOMSU_PREFIX
+    package.path = "#{NOMSU_PREFIX}/share/nomsu/#{table.concat NOMSU_VERSION, "."}/?.lua;"..package.path
+    package.cpath = "#{NOMSU_PREFIX}/lib/nomsu/#{table.concat NOMSU_VERSION, "."}/?.#{clibtype};"..package.cpath
+
 export COLOR_ENABLED
 COLOR_ENABLED = true
 if clibtype == "dll"
@@ -13,9 +20,10 @@ if clibtype == "dll"
     -- Special hack to enable utf8 for windows console applications:
     os.execute("chcp 65001>nul")
 
-if NOMSU_VERSION and NOMSU_PREFIX
-    package.path = "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/?.lua;"..package.path
-    package.cpath = "#{NOMSU_PREFIX}/lib/nomsu/#{NOMSU_VERSION}/?.#{clibtype};"..package.cpath
+{:List, :Dict} = require 'containers'
+NOMSU_VERSION = List(NOMSU_VERSION)
+Text = require 'text'
+require 'builtin_metatables'
 
 usage = [=[
 Nomsu Compiler
@@ -46,9 +54,6 @@ if not ok
     os.exit(EXIT_FAILURE)
 Files = require "files"
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-{:List, :Dict} = require 'containers'
-Text = require 'text'
-require 'builtin_metatables'
 
 sep = "\3"
 parser = re.compile([[
@@ -94,6 +99,9 @@ if not args or err or args.help
         print("Didn't understand: #{err}")
     print usage
     os.exit(EXIT_FAILURE)
+if args.version
+    print(NOMSU_VERSION\joined_with("."))
+    os.exit(EXIT_SUCCESS)
 nomsu_args = Dict{}
 for argpair in *args.nomsu_args
     nomsu_args[argpair.key] = argpair.value
@@ -106,8 +114,8 @@ suffixes = if optimization > 0
 else {"?.nom", "?/init.nom"}
 add_path = (p)->
     for s in *suffixes do table.insert(nomsupath, p.."/"..s)
-if NOMSU_VERSION and NOMSU_PREFIX
-    add_path "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION}/lib"
+if NOMSU_PREFIX
+    add_path "#{NOMSU_PREFIX}/share/nomsu/#{NOMSU_VERSION\joined_with(".")}/lib"
 else
     add_path "./lib"
 NOMSU_PACKAGEPATH or= "/opt/nomsu"
@@ -117,6 +125,7 @@ package.nomsupath = table.concat(nomsupath, ";")
 package.nomsuloaded = Dict{}
 
 nomsu_environment = require('nomsu_environment')
+nomsu_environment.NOMSU_VERSION = NOMSU_VERSION
 nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
 nomsu_environment.OPTIMIZATION = optimization
 nomsu_environment.NOMSU_PACKAGEPATH = NOMSU_PACKAGEPATH
@@ -126,10 +135,6 @@ nomsu_environment.COLOR_ENABLED = COLOR_ENABLED
 run = ->
     unless args.no_core
         nomsu_environment\export("core")
-
-    if args.version
-        nomsu_environment\run("say (Nomsu version)")
-        os.exit(EXIT_SUCCESS)
 
     input_files = {}
     if args.files

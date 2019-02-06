@@ -1,4 +1,13 @@
+NOMSU_VERSION = {
+  7,
+  0,
+  0
+}
 local clibtype = package.cpath:match("?%.(so)") or package.cpath:match("?%.(dll)")
+if NOMSU_PREFIX then
+  package.path = tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(table.concat(NOMSU_VERSION, ".")) .. "/?.lua;" .. package.path
+  package.cpath = tostring(NOMSU_PREFIX) .. "/lib/nomsu/" .. tostring(table.concat(NOMSU_VERSION, ".")) .. "/?." .. tostring(clibtype) .. ";" .. package.cpath
+end
 COLOR_ENABLED = true
 if clibtype == "dll" then
   local enable_colors = require('wincolors')
@@ -8,10 +17,14 @@ if clibtype == "dll" then
   end
   os.execute("chcp 65001>nul")
 end
-if NOMSU_VERSION and NOMSU_PREFIX then
-  package.path = tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/?.lua;" .. package.path
-  package.cpath = tostring(NOMSU_PREFIX) .. "/lib/nomsu/" .. tostring(NOMSU_VERSION) .. "/?." .. tostring(clibtype) .. ";" .. package.cpath
+local List, Dict
+do
+  local _obj_0 = require('containers')
+  List, Dict = _obj_0.List, _obj_0.Dict
 end
+NOMSU_VERSION = List(NOMSU_VERSION)
+local Text = require('text')
+require('builtin_metatables')
 local usage = [=[Nomsu Compiler
 
 Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [--help | -h] [--version] [-O optimization level] [-v] [-c] [-s] [-d debugger] [--no-core] [(file | -t tool | -e "nomsu code..." | files... -- ) [nomsu args...]]
@@ -44,13 +57,6 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local List, Dict
-do
-  local _obj_0 = require('containers')
-  List, Dict = _obj_0.List, _obj_0.Dict
-end
-local Text = require('text')
-require('builtin_metatables')
 local sep = "\3"
 local parser = re.compile([[    args <- {| (flag %sep)*
          {:files: {|
@@ -98,6 +104,10 @@ if not args or err or args.help then
   print(usage)
   os.exit(EXIT_FAILURE)
 end
+if args.version then
+  print(NOMSU_VERSION:joined_with("."))
+  os.exit(EXIT_SUCCESS)
+end
 local nomsu_args = Dict({ })
 local _list_0 = args.nomsu_args
 for _index_0 = 1, #_list_0 do
@@ -128,8 +138,8 @@ add_path = function(p)
     table.insert(nomsupath, p .. "/" .. s)
   end
 end
-if NOMSU_VERSION and NOMSU_PREFIX then
-  add_path(tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION) .. "/lib")
+if NOMSU_PREFIX then
+  add_path(tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(NOMSU_VERSION:joined_with(".")) .. "/lib")
 else
   add_path("./lib")
 end
@@ -139,6 +149,7 @@ add_path(".")
 package.nomsupath = table.concat(nomsupath, ";")
 package.nomsuloaded = Dict({ })
 local nomsu_environment = require('nomsu_environment')
+nomsu_environment.NOMSU_VERSION = NOMSU_VERSION
 nomsu_environment.COMMAND_LINE_ARGS = nomsu_args
 nomsu_environment.OPTIMIZATION = optimization
 nomsu_environment.NOMSU_PACKAGEPATH = NOMSU_PACKAGEPATH
@@ -148,10 +159,6 @@ local run
 run = function()
   if not (args.no_core) then
     nomsu_environment:export("core")
-  end
-  if args.version then
-    nomsu_environment:run("say (Nomsu version)")
-    os.exit(EXIT_SUCCESS)
   end
   local input_files = { }
   if args.files then

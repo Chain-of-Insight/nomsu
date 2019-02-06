@@ -1,5 +1,5 @@
 #!/usr/bin/env nomsu -V7
-#
+###
     This file defines upgrades from Nomsu <7 to 7
     
 use "compatibility/compatibility"
@@ -22,3 +22,13 @@ upgrade $tree to "7" as:
         return
             "Action" tree from $tree.source with ("Text" tree with $e.type) "tree" "with"
                 unpack $e
+
+upgrade action "Nomsu version" to "7" via ->(`$(NOMSU VERSION))
+upgrade action [
+    "Nomsu syntax version", "Nomsu compiler version", "core version", "lib version"
+] to "7" via:
+    for $:
+        at $.source fail ("
+            Deprecation error: Actions for accessing specific parts of the version number have been deprecated.
+            Hint: Use $(NOMSU VERSION).1, etc. instead.
+        ")

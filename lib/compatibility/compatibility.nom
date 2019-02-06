@@ -70,8 +70,15 @@ external:
         $tree upgraded to $end_version from $start_version
     ] all mean:
         unless ($tree is syntax tree): return $tree
-        ($ver as version list) means (($ as number) for $ in $ver matching "[0-9]+")
+        ($ver as version list) means:
+            if ($ver is "Text"):
+                return (($ as number) for $ in $ver matching "[0-9]+")
+            return $ver
         (Ver $) means:
+            if ($ is "a List"):
+                if ($.1 is "Text"):
+                    return {.lib = $.1, .version = ($, from 2)}
+                return {.version = $}
             [$lib, $ver] = ($, match "(.*)/([0-9.]+)")
             if $lib:
                 return {.lib = $lib, .version = ($ver as version list)}
@@ -117,15 +124,15 @@ external:
             $tree = (SyntaxTree {: for $k = $v in $tree: add $k = $v})
             $tree.version = $end_version
             if $tree.shebang:
-                $tree.shebang = "#!/usr/bin/env nomsu -V\$end_version\n"
+                $tree.shebang = "#!/usr/bin/env nomsu -V\($end_version, joined with ".")\n"
         
         return $tree
     
     ($tree upgraded from $start_version) means
-        $tree upgraded from $start_version to (Nomsu version)
+        $tree upgraded from $start_version to $(NOMSU VERSION)
     
     ($tree upgraded to $end_version) means
-        $tree upgraded from ($tree.version or (Nomsu version)) to $end_version
+        $tree upgraded from ($tree.version or $(NOMSU VERSION)) to $end_version
     
     ($tree upgraded) means
-        $tree upgraded from ($tree.version or (Nomsu version)) to (Nomsu version)
+        $tree upgraded from ($tree.version or $(NOMSU VERSION)) to $(NOMSU VERSION)

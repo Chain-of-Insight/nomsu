@@ -3,8 +3,6 @@
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
     
-lua> "NOMSU_CORE_VERSION = 15"
-lua> "NOMSU_LIB_VERSION = 9"
 lua> ("
     do
         local mangle_index = 0
@@ -462,10 +460,6 @@ test:
 (yes) compiles to "(true)"
 (no) compiles to "(false)"
 [nothing, nil, null] all compile to "(nil)"
-(Nomsu syntax version) compiles to "NOMSU_SYNTAX_VERSION"
-(Nomsu compiler version) compiles to "NOMSU_COMPILER_VERSION"
-(core version) compiles to "NOMSU_CORE_VERSION"
-(lib version) compiles to "NOMSU_LIB_VERSION"
 (command line args) compiles to "COMMAND_LINE_ARGS"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -495,12 +489,6 @@ test:
         local lua = env:compile(\$body)
         return lua
     ")
-
-external:
-    (Nomsu version) means:
-        return ("
-            \(Nomsu syntax version).\(core version).\(Nomsu compiler version).\(lib version)
-        ")
 
 ~~~~
 # TODO: Remove shim

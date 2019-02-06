@@ -20,7 +20,7 @@ command line program with $args:
             use $start_version
         ..if it fails:
             fail "Could not find upgrade rules for \$start_version"
-    $version = ($args."upgrade-to" or (Nomsu version))
+    $version = ($args."upgrade-to" or $(NOMSU VERSION))
     $test = ($args.t or $args.test)
     for $filename in $args.extras:
         $file = (read file $filename)
@@ -30,7 +30,7 @@ command line program with $args:
         $code = (NomsuCode from (Source $filename 1 (size of $file)) $file)
         $tree = ($code parsed $start_version)
         $uptree =
-            $tree upgraded from ($start_version or ($tree.version or (Nomsu version))) to
+            $tree upgraded from ($start_version or ($tree.version or $(NOMSU VERSION))) to
                 $version
         $text = "\$leading_indent\($uptree as nomsu, text, with "\n" -> "\n\$leading_indent")"
         when:

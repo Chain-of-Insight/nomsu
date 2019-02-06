@@ -11,7 +11,7 @@ use "commandline"
 external:
     (help) means:
         say ("
-            This is the Nomsu v\(Nomsu version) interactive console.
+            This is the Nomsu v\($(NOMSU VERSION), joined with ".") interactive console.
             You can type in Nomsu code here and hit 'enter' twice to run it.
             To exit, type 'exit' or 'quit' and hit enter twice.
         ")
@@ -23,7 +23,7 @@ external:
 command line program with $args:
     say ("
         
-        \(bright)\(underscore)Welcome to the Nomsu v\(Nomsu version) interactive console!\
+        \(bright)\(underscore)Welcome to the Nomsu v\($(NOMSU VERSION), joined with ".") interactive console!\
         ..\(reset color)
                press 'enter' twice to run a command
                type 'tutorial' to run the tutorial
