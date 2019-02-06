@@ -218,11 +218,11 @@ I think "chihuahuas" are worse than "corgis"
 
 # The language only reserves []{}().,:;$\ as special characters, so actions
     and variables can use symbols freely:
-(>> $(∐) @&' -->< $ @&_~-^ ⊗⊞∰ $1 !) means:
+(>> $(∐) @&' -->< $ @&_~-^ ⊗⊞√ $1 !) means:
     say $(∐)
     say $
     say $1
->> "wow" @&' -->< "so flexible!" @&_~-^ ⊗⊞∰ "even numbers can be variables!" !
+>> "wow" @&' -->< "so flexible!" @&_~-^ ⊗⊞√ "even numbers can be variables!" !
 
 # You can also use unicode in variable and action names:
 $こんにちは = "こんにちは"
