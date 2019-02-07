@@ -104,13 +104,15 @@ external:
                 $tree =
                     $tree, with
                         $ ->:
-                            if (($ is "Action" syntax tree) and $ACTION_UPGRADES.$ver.($.stub)):
-                                $with_upgraded_args = {
-                                    : for $k = $v in $:
-                                        add $k = ($v upgraded from $start_version to $end_version)
-                                }
-                                set $with_upgraded_args's metatable to ($'s metatable)
-                                return ($ACTION_UPGRADES.$ver.($.stub) $with_upgraded_args $end_version)
+                            if ($ is "Action" syntax tree):
+                                $(upgrade 1 to 2) = $ACTION_UPGRADES.$ver.($.stub)
+                                if $(upgrade 1 to 2):
+                                    $with_upgraded_args = {
+                                        : for $k = $v in $:
+                                            add $k = ($v upgraded from $start_version to $end_version)
+                                    }
+                                    set $with_upgraded_args's metatable to ($'s metatable)
+                                    return (upgrade $with_upgraded_args to $end_version)
             
             if $UPGRADES.$ver:
                 $with_upgraded_args = {
