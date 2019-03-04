@@ -61,7 +61,10 @@ enhance_error = (error_message)->
     unless error_message and error_message\match("%d|")
         error_message or= ""
         -- When calling 'nil' actions, make a better error message
-        if fn_name = (error_message\match("attempt to call a nil value %(global '(.*)'%)") or
+        if fn_name = error_message\match("attempt to call a nil value %(method '(.*)'%)")
+            action_name = fn_name\from_lua_id!
+            error_message = "This object does not have the method '#{action_name}'."
+        elseif fn_name = (error_message\match("attempt to call a nil value %(global '(.*)'%)") or
             error_message\match("attempt to call global '(.*)' %(a nil value%)"))
 
             action_name = fn_name\from_lua_id!

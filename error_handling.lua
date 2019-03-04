@@ -85,79 +85,87 @@ enhance_error = function(error_message)
   if not (error_message and error_message:match("%d|")) then
     error_message = error_message or ""
     do
-      local fn_name = (error_message:match("attempt to call a nil value %(global '(.*)'%)") or error_message:match("attempt to call global '(.*)' %(a nil value%)"))
+      local fn_name = error_message:match("attempt to call a nil value %(method '(.*)'%)")
       if fn_name then
         local action_name = fn_name:from_lua_id()
-        error_message = "The action '" .. tostring(action_name) .. "' is not defined."
-        local func = debug.getinfo(2, 'f').func
-        local ename, env = debug.getupvalue(func, 1)
-        if not (ename == "_ENV" or ename == "_G") then
-          func = debug.getinfo(3, 'f').func
-          ename, env = debug.getupvalue(func, 1)
-        end
-        local THRESHOLD = math.min(4.5, .9 * #action_name)
-        local candidates = { }
-        local cache = { }
-        for i = 1, 99 do
-          local k, v = debug.getlocal(2, i)
-          if k == nil then
-            break
-          end
-          if not (k:sub(1, 1) == "(" or type(v) ~= 'function') then
-            k = k:from_lua_id()
-            if strdist(k, action_name, cache) <= THRESHOLD and k ~= "" then
-              table.insert(candidates, k)
+        error_message = "This object does not have the method '" .. tostring(action_name) .. "'."
+      else
+        do
+          fn_name = (error_message:match("attempt to call a nil value %(global '(.*)'%)") or error_message:match("attempt to call global '(.*)' %(a nil value%)"))
+          if fn_name then
+            local action_name = fn_name:from_lua_id()
+            error_message = "The action '" .. tostring(action_name) .. "' is not defined."
+            local func = debug.getinfo(2, 'f').func
+            local ename, env = debug.getupvalue(func, 1)
+            if not (ename == "_ENV" or ename == "_G") then
+              func = debug.getinfo(3, 'f').func
+              ename, env = debug.getupvalue(func, 1)
             end
-          end
-        end
-        for i = 1, debug.getinfo(func, 'u').nups do
-          local k, v = debug.getupvalue(func, i)
-          if not (k:sub(1, 1) == "(" or type(v) ~= 'function') then
-            k = k:from_lua_id()
-            if strdist(k, action_name, cache) <= THRESHOLD and k ~= "" then
-              table.insert(candidates, k)
-            end
-          end
-        end
-        local scan
-        scan = function(t, is_lua_id)
-          for k, v in pairs(t) do
-            if type(k) == 'string' and type(v) == 'function' then
-              if not (is_lua_id) then
+            local THRESHOLD = math.min(4.5, .9 * #action_name)
+            local candidates = { }
+            local cache = { }
+            for i = 1, 99 do
+              local k, v = debug.getlocal(2, i)
+              if k == nil then
+                break
+              end
+              if not (k:sub(1, 1) == "(" or type(v) ~= 'function') then
                 k = k:from_lua_id()
-              end
-              if strdist(k, action_name, cache) <= THRESHOLD and k ~= "" then
-                table.insert(candidates, k)
-              end
-            end
-          end
-        end
-        scan(env.COMPILE_RULES, true)
-        scan(env.COMPILE_RULES._IMPORTS, true)
-        scan(env)
-        scan(env._IMPORTS)
-        if #candidates > 0 then
-          for _index_0 = 1, #candidates do
-            local c = candidates[_index_0]
-            THRESHOLD = math.min(THRESHOLD, strdist(c, action_name, cache))
-          end
-          do
-            local _accum_0 = { }
-            local _len_0 = 1
-            for _index_0 = 1, #candidates do
-              local c = candidates[_index_0]
-              if strdist(c, action_name, cache) <= THRESHOLD then
-                _accum_0[_len_0] = c
-                _len_0 = _len_0 + 1
+                if strdist(k, action_name, cache) <= THRESHOLD and k ~= "" then
+                  table.insert(candidates, k)
+                end
               end
             end
-            candidates = _accum_0
-          end
-          if #candidates == 1 then
-            error_message = error_message .. "\n\x1b[3mSuggestion: Maybe you meant '" .. tostring(candidates[1]) .. "'? "
-          elseif #candidates > 0 then
-            local last = table.remove(candidates)
-            error_message = error_message .. ("\n" .. C('italic', "Suggestion: Maybe you meant '" .. tostring(table.concat(candidates, "', '")) .. "'" .. tostring(#candidates > 1 and ',' or '') .. " or '" .. tostring(last) .. "'? "))
+            for i = 1, debug.getinfo(func, 'u').nups do
+              local k, v = debug.getupvalue(func, i)
+              if not (k:sub(1, 1) == "(" or type(v) ~= 'function') then
+                k = k:from_lua_id()
+                if strdist(k, action_name, cache) <= THRESHOLD and k ~= "" then
+                  table.insert(candidates, k)
+                end
+              end
+            end
+            local scan
+            scan = function(t, is_lua_id)
+              for k, v in pairs(t) do
+                if type(k) == 'string' and type(v) == 'function' then
+                  if not (is_lua_id) then
+                    k = k:from_lua_id()
+                  end
+                  if strdist(k, action_name, cache) <= THRESHOLD and k ~= "" then
+                    table.insert(candidates, k)
+                  end
+                end
+              end
+            end
+            scan(env.COMPILE_RULES, true)
+            scan(env.COMPILE_RULES._IMPORTS, true)
+            scan(env)
+            scan(env._IMPORTS)
+            if #candidates > 0 then
+              for _index_0 = 1, #candidates do
+                local c = candidates[_index_0]
+                THRESHOLD = math.min(THRESHOLD, strdist(c, action_name, cache))
+              end
+              do
+                local _accum_0 = { }
+                local _len_0 = 1
+                for _index_0 = 1, #candidates do
+                  local c = candidates[_index_0]
+                  if strdist(c, action_name, cache) <= THRESHOLD then
+                    _accum_0[_len_0] = c
+                    _len_0 = _len_0 + 1
+                  end
+                end
+                candidates = _accum_0
+              end
+              if #candidates == 1 then
+                error_message = error_message .. "\n\x1b[3mSuggestion: Maybe you meant '" .. tostring(candidates[1]) .. "'? "
+              elseif #candidates > 0 then
+                local last = table.remove(candidates)
+                error_message = error_message .. ("\n" .. C('italic', "Suggestion: Maybe you meant '" .. tostring(table.concat(candidates, "', '")) .. "'" .. tostring(#candidates > 1 and ',' or '') .. " or '" .. tostring(last) .. "'? "))
+              end
+            end
           end
         end
       end
