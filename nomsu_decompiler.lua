@@ -11,6 +11,7 @@ do
   R, P, S = _obj_0.R, _obj_0.P, _obj_0.S
 end
 local re = require('re')
+local pretty_error = require("pretty_errors")
 local MAX_LINE = 80
 local GOLDEN_RATIO = ((math.sqrt(5) - 1) / 2)
 local utf8_char_patt = (R("\194\223") * R("\128\191") + R("\224\239") * R("\128\191") * R("\128\191") + R("\240\244") * R("\128\191") * R("\128\191") * R("\128\191"))
@@ -259,7 +260,16 @@ tree_to_inline_nomsu = function(tree)
   elseif "Comment" == _exp_0 then
     return NomsuCode:from(tree.source)
   elseif "Error" == _exp_0 then
-    return error("Can't compile errors")
+    local err_msg = pretty_error({
+      title = "Parse error",
+      error = tree.error,
+      hint = tree.hint,
+      source = tree:get_source_file(),
+      start = tree.source.start,
+      stop = tree.source.stop,
+      filename = tree.source.filename
+    })
+    return error(err_msg)
   else
     return error("Unknown type: " .. tostring(tree.type))
   end
@@ -327,12 +337,10 @@ tree_to_nomsu = function(tree)
     local indented = tree_to_nomsu(t)
     if t.type == "Action" or t.type == "MethodCall" then
       if indented:is_multiline() then
-        if not (indented:text():match("\n%S[^\n ]*$")) then
-          if argnum == nil or argnum == 1 then
-            return NomsuCode:from(t.source, "(\n    ", indented, "\n)")
-          else
-            return NomsuCode:from(t.source, "\n    ", indented)
-          end
+        if argnum == nil or argnum == 1 then
+          return NomsuCode:from(t.source, "(\n    ", indented, "\n)")
+        else
+          return NomsuCode:from(t.source, "\n    ", indented)
         end
       elseif argnum and argnum > 1 then
         return NomsuCode:from(t.source, "\n    ", indented)
@@ -598,6 +606,17 @@ tree_to_nomsu = function(tree)
     if #tree == 0 then
       nomsu:add(tree.type == "List" and "[]" or "{}")
       return nomsu
+    end
+    if #tree == 1 and tree[1].type == "Block" then
+      local block_lua = recurse(tree[1])
+      if block_lua:is_multiline() then
+        block_lua:add("\n")
+      end
+      if tree.type == "List" then
+        return NomsuCode:from(tree.source, "[", block_lua, "]")
+      else
+        return NomsuCode:from(tree.source, "{", block_lua, "}")
+      end
     end
     local sep = ''
     local prev_item, needs_space = nil, { }

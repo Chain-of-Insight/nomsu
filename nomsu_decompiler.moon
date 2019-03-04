@@ -2,6 +2,7 @@
 {:find, :sub, :match} = string
 {:R,:P,:S} = require 'lpeg'
 re = require 're'
+pretty_error = require("pretty_errors")
 
 MAX_LINE = 80
 GOLDEN_RATIO = ((math.sqrt(5)-1)/2)
@@ -201,7 +202,13 @@ tree_to_inline_nomsu = (tree)->
             return NomsuCode\from(tree.source)
         
         when "Error"
-            error("Can't compile errors")
+            err_msg = pretty_error{
+                title:"Parse error"
+                error:tree.error, hint:tree.hint, source:tree\get_source_file!
+                start:tree.source.start, stop:tree.source.stop, filename:tree.source.filename
+            }
+            -- Coroutine yield here?
+            error(err_msg)
         
         else
             error("Unknown type: #{tree.type}")
@@ -242,11 +249,10 @@ tree_to_nomsu = (tree)->
         indented = tree_to_nomsu(t)
         if t.type == "Action" or t.type == "MethodCall"
             if indented\is_multiline!
-                unless indented\text!\match("\n%S[^\n ]*$")
-                    if argnum == nil or argnum == 1
-                        return NomsuCode\from(t.source, "(\n    ", indented, "\n)")
-                    else
-                        return NomsuCode\from(t.source, "\n    ", indented)
+                if argnum == nil or argnum == 1
+                    return NomsuCode\from(t.source, "(\n    ", indented, "\n)")
+                else
+                    return NomsuCode\from(t.source, "\n    ", indented)
             elseif argnum and argnum > 1
                 return NomsuCode\from(t.source, "\n    ", indented)
             else
@@ -458,6 +464,15 @@ tree_to_nomsu = (tree)->
             if #tree == 0
                 nomsu\add(tree.type == "List" and "[]" or "{}")
                 return nomsu
+
+            if #tree == 1 and tree[1].type == "Block"
+                block_lua = recurse(tree[1])
+                if block_lua\is_multiline! then block_lua\add "\n"
+                return if tree.type == "List" then
+                    NomsuCode\from(tree.source, "[", block_lua, "]")
+                else
+                    NomsuCode\from(tree.source, "{", block_lua, "}")
+
             sep = ''
             prev_item, needs_space = nil, {}
             for i, item in ipairs tree
