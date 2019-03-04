@@ -170,7 +170,18 @@ nomsu_environment = Importer({
     assert(parse, "No parser found for Nomsu syntax version " .. tostring(syntax_version))
     local tree = parse(nomsu_code, source.filename)
     if tree.shebang then
-      tree.version = tree.version or tree.shebang:match("nomsu %-V[ ]*([%d.]*)")
+      local shebang_version = tree.shebang:match("nomsu %-V[ ]*([%d.]+)")
+      if shebang_version and shebang_version ~= "" then
+        tree.version = tree.version or List((function()
+          local _accum_0 = { }
+          local _len_0 = 1
+          for v in shebang_version:gmatch("%d+") do
+            _accum_0[_len_0] = tonumber(v)
+            _len_0 = _len_0 + 1
+          end
+          return _accum_0
+        end)())
+      end
     end
     return tree
   end,
@@ -288,6 +299,7 @@ nomsu_environment = Importer({
       return self:run(tree)
     elseif SyntaxTree:is_instance(to_run) then
       local filename = to_run.source.filename:gsub("\n.*", "...")
+      local version = to_run.version
       if to_run.type ~= "FileChunks" then
         to_run = {
           to_run
@@ -295,6 +307,7 @@ nomsu_environment = Importer({
       end
       local ret = nil
       for chunk_no, chunk in ipairs(to_run) do
+        chunk.version = version
         local lua = self:compile(chunk)
         lua:declare_locals()
         lua:prepend("-- File: " .. tostring(filename) .. " chunk #" .. tostring(chunk_no) .. "\n")

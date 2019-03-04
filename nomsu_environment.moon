@@ -91,7 +91,15 @@ nomsu_environment = Importer{
         assert parse, "No parser found for Nomsu syntax version #{syntax_version}"
         tree = parse(nomsu_code, source.filename)
         if tree.shebang
-            tree.version or= tree.shebang\match("nomsu %-V[ ]*([%d.]*)")
+            shebang_version = tree.shebang\match("nomsu %-V[ ]*([%d.]+)")
+            if shebang_version and shebang_version != ""
+                tree.version or= List[tonumber(v) for v in shebang_version\gmatch("%d+")]
+        --if tree.version and tree.version < NOMSU_VERSION\up_to(#tree.version) and not package.nomsuloaded["compatibility"]
+        --    export loading_compat
+        --    unless loading_compat
+        --        loading_compat = true
+        --        nomsu_environment\export "compatibility"
+        --        loading_compat = false
         return tree
 
     Module: (package_name)=>
@@ -184,6 +192,7 @@ nomsu_environment = Importer{
             return @run(tree)
         elseif SyntaxTree\is_instance(to_run)
             filename = to_run.source.filename\gsub("\n.*", "...")
+            version = to_run.version
             if to_run.type != "FileChunks"
                 to_run = {to_run}
             -- Each chunk's compilation is affected by the code in the previous chunks
@@ -191,6 +200,7 @@ nomsu_environment = Importer{
             -- compiles.
             ret = nil
             for chunk_no, chunk in ipairs to_run
+                chunk.version = version
                 lua = @compile(chunk)
                 lua\declare_locals!
                 lua\prepend "-- File: #{filename} chunk ##{chunk_no}\n"
