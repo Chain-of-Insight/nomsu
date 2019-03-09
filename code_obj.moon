@@ -71,6 +71,25 @@ class Code
             @__str = concat(buff, "")
         return @__str
 
+    last: (n)=>
+        if @__str
+            return @__str\sub(-n, -1)
+        last = ""
+        for i=#@bits,1,-1
+            b = @bits[i]
+            last = (type(b) == 'string' and b\sub(-(n-#last)) or b\last(n-#last))..last
+            break if #last == n
+        return last
+
+    first: (n)=>
+        if @__str
+            return @__str\sub(1,n)
+        first = ""
+        for b in *@bits
+            first ..= type(b) == 'string' and b\sub(1,n-#first+1) or b\first(n-#first+1)
+            break if #first == n
+        return first
+
     __tostring: => @text!
 
     as_lua: =>
@@ -79,7 +98,13 @@ class Code
         else
             "#{@__class.__name}(#{concat [b\as_lua! for b in *@bits], ", "})"
 
-    __len: => #@text!
+    __len: =>
+        if @__str
+            return #@__str
+        len = 0
+        for b in *@bits
+            len += #b
+        return len
     
     match: (...)=> @text!\match(...)
 
@@ -137,9 +162,7 @@ class Code
                     bits[#bits+1] = joiner
             bits[#bits+1] = b
             b.dirty = error if type(b) != 'string'
-            unless type(b) == 'string'
-                b = b\text!
-            line = match(b, "\n([^\n]*)$")
+            line = b\match("\n([^\n]*)$")
             if line
                 line_len = #line
             else
@@ -231,7 +254,6 @@ class LuaCode extends Code
                         nomsu_to_lua[lua.source.start] = pos
                 else
                     walk b, pos
-                    b = b\text!
                 pos += #b
         walk self, 1
         return {

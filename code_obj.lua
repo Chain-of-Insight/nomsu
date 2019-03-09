@@ -105,6 +105,35 @@ do
       end
       return self.__str
     end,
+    last = function(self, n)
+      if self.__str then
+        return self.__str:sub(-n, -1)
+      end
+      local last = ""
+      for i = #self.bits, 1, -1 do
+        local b = self.bits[i]
+        last = (type(b) == 'string' and b:sub(-(n - #last)) or b:last(n - #last)) .. last
+        if #last == n then
+          break
+        end
+      end
+      return last
+    end,
+    first = function(self, n)
+      if self.__str then
+        return self.__str:sub(1, n)
+      end
+      local first = ""
+      local _list_0 = self.bits
+      for _index_0 = 1, #_list_0 do
+        local b = _list_0[_index_0]
+        first = first .. (type(b) == 'string' and b:sub(1, n - #first + 1) or b:first(n - #first + 1))
+        if #first == n then
+          break
+        end
+      end
+      return first
+    end,
     __tostring = function(self)
       return self:text()
     end,
@@ -139,7 +168,16 @@ do
       end
     end,
     __len = function(self)
-      return #self:text()
+      if self.__str then
+        return #self.__str
+      end
+      local len = 0
+      local _list_0 = self.bits
+      for _index_0 = 1, #_list_0 do
+        local b = _list_0[_index_0]
+        len = len + #b
+      end
+      return len
     end,
     match = function(self, ...)
       return self:text():match(...)
@@ -222,10 +260,7 @@ do
         if type(b) ~= 'string' then
           b.dirty = error
         end
-        if not (type(b) == 'string') then
-          b = b:text()
-        end
-        local line = match(b, "\n([^\n]*)$")
+        local line = b:match("\n([^\n]*)$")
         if line then
           line_len = #line
         else
@@ -404,7 +439,6 @@ do
             end
           else
             walk(b, pos)
-            b = b:text()
           end
           pos = pos + #b
         end
