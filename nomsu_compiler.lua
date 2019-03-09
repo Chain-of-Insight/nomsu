@@ -64,6 +64,9 @@ local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
 local MAX_LINE = 80
 local compile
 compile = function(self, tree)
+  if tree.version and tree.version < self.NOMSU_VERSION:up_to(#tree.version) and self._1_upgraded_from_2_to then
+    tree = self._1_upgraded_from_2_to(tree, tree.version, self.NOMSU_VERSION)
+  end
   local _exp_0 = tree.type
   if "Action" == _exp_0 then
     local stub = tree.stub
@@ -141,7 +144,7 @@ compile = function(self, tree)
       if arg.type == "Block" and #arg > 1 then
         arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
       end
-      if lua:trailing_line_len() + #arg_lua:text() > MAX_LINE then
+      if lua:trailing_line_len() + #arg_lua > MAX_LINE then
         lua:add(argnum > 1 and ",\n    " or "\n    ")
       elseif argnum > 1 then
         lua:add(", ")
@@ -193,7 +196,7 @@ compile = function(self, tree)
         if arg.type == "Block" and #arg > 1 then
           arg_lua = LuaCode:from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
         end
-        if lua:trailing_line_len() + #arg_lua:text() > MAX_LINE then
+        if lua:trailing_line_len() + #arg_lua > MAX_LINE then
           lua:add(argnum > 1 and ",\n    " or "\n    ")
         elseif argnum > 1 then
           lua:add(", ")
@@ -234,7 +237,7 @@ compile = function(self, tree)
       if needs_comma then
         lua:add(",")
       end
-      if lua:trailing_line_len() + #(entry_lua:text():match("^[\n]*")) > MAX_LINE then
+      if lua:trailing_line_len() + #(entry_lua:match("^[\n]*")) > MAX_LINE then
         lua:add("\n    ")
       elseif needs_comma then
         lua:add(" ")
@@ -250,7 +253,11 @@ compile = function(self, tree)
       if i > 1 then
         lua:add("\n")
       end
-      lua:add(self:compile(line))
+      local line_lua = self:compile(line)
+      lua:add(line_lua)
+      if not (line_lua:last(1) == ";" or line_lua:last(4):match("[^a-zA-Z0-9]end$")) then
+        lua:add(";")
+      end
     end
     return lua
   elseif "Text" == _exp_0 then
@@ -325,7 +332,9 @@ compile = function(self, tree)
           lua:add(" + ")
         end
         lua:add(typename, "(function(", (tree.type == 'List' and "add" or ("add, " .. ("add 1 ="):as_lua_id())), ")")
-        lua:add("\n    ", self:compile(tree[i]), "\nend)")
+        local body = self:compile(tree[i])
+        body:declare_locals()
+        lua:add("\n    ", body, "\nend)")
         chunks = chunks + 1
         i = i + 1
       else
@@ -339,7 +348,7 @@ compile = function(self, tree)
             break
           end
           local item_lua = self:compile(tree[i])
-          if item_lua:text():match("^%.[a-zA-Z_]") then
+          if item_lua:match("^%.[a-zA-Z_]") then
             item_lua = item_lua:text():sub(2)
           end
           if tree.type == 'Dict' and tree[i].type == 'Index' then
@@ -350,9 +359,9 @@ compile = function(self, tree)
             items_lua:add("\n")
             sep = ''
           elseif items_lua:trailing_line_len() > MAX_LINE then
-            sep = items_lua:text():sub(-1) == ";" and "\n    " or ",\n    "
+            sep = items_lua:last(1) == ";" and "\n    " or ",\n    "
           else
-            sep = items_lua:text():sub(-1) == ";" and " " or ", "
+            sep = items_lua:last(1) == ";" and " " or ", "
           end
           i = i + 1
         end
@@ -367,10 +376,10 @@ compile = function(self, tree)
     return lua
   elseif "Index" == _exp_0 then
     local key_lua = self:compile(tree[1])
-    local key_str = match(key_lua:text(), '^"([a-zA-Z_][a-zA-Z0-9_]*)"$')
+    local key_str = key_lua:match('^"([a-zA-Z_][a-zA-Z0-9_]*)"$')
     if key_str and key_str:is_lua_id() then
       return LuaCode:from(tree.source, ".", key_str)
-    elseif sub(key_lua:text(), 1, 1) == "[" then
+    elseif key_lua:first(1) == "[" then
       return LuaCode:from(tree.source, "[ ", key_lua, "]")
     else
       return LuaCode:from(tree.source, "[", key_lua, "]")
@@ -387,7 +396,7 @@ compile = function(self, tree)
     return LuaCode:from(tree.source, self:compile(key), "=", (tree[2] and self:compile(tree[2]) or "true"))
   elseif "IndexChain" == _exp_0 then
     local lua = self:compile(tree[1])
-    if lua:text():match("['\"}]$") or lua:text():match("]=*]$") then
+    if lua:match("['\"}]$") or lua:match("]=*]$") then
       lua:parenthesize()
     end
     if lua:text() == "..." then

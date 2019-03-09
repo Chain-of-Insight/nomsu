@@ -56,6 +56,10 @@ math_expression = re.compile [[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]]
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 compile = (tree)=>
+    -- Automatically upgrade trees from older versions:
+    if tree.version and tree.version < @NOMSU_VERSION\up_to(#tree.version) and @_1_upgraded_from_2_to
+        tree = @._1_upgraded_from_2_to(tree, tree.version, @NOMSU_VERSION)
+
     switch tree.type
         when "Action"
             stub = tree.stub
@@ -109,7 +113,7 @@ compile = (tree)=>
                 arg_lua = @compile(arg)
                 if arg.type == "Block" and #arg > 1
                     arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
-                if lua\trailing_line_len! + #arg_lua\text! > MAX_LINE
+                if lua\trailing_line_len! + #arg_lua > MAX_LINE
                     lua\add(argnum > 1 and ",\n    " or "\n    ")
                 elseif argnum > 1
                     lua\add ", "
@@ -157,7 +161,7 @@ compile = (tree)=>
                     arg_lua = @compile(arg)
                     if arg.type == "Block" and #arg > 1
                         arg_lua = LuaCode\from(arg.source, "(function()\n    ", arg_lua, "\nend)()")
-                    if lua\trailing_line_len! + #arg_lua\text! > MAX_LINE
+                    if lua\trailing_line_len! + #arg_lua > MAX_LINE
                         lua\add(argnum > 1 and ",\n    " or "\n    ")
                     elseif argnum > 1
                         lua\add ", "
@@ -189,7 +193,7 @@ compile = (tree)=>
                     entry_lua\add("[", as_lua(k), "]= ")
                 entry_lua\add as_lua(v)
                 if needs_comma then lua\add ","
-                if lua\trailing_line_len! + #(entry_lua\text!\match("^[\n]*")) > MAX_LINE
+                if lua\trailing_line_len! + #(entry_lua\match("^[\n]*")) > MAX_LINE
                     lua\add "\n    "
                 elseif needs_comma
                     lua\add " "
@@ -202,7 +206,10 @@ compile = (tree)=>
             lua = LuaCode\from(tree.source)
             for i, line in ipairs tree
                 if i > 1 then lua\add "\n"
-                lua\add @compile(line)
+                line_lua = @compile(line)
+                lua\add line_lua
+                unless line_lua\last(1) == ";" or line_lua\last(4)\match("[^a-zA-Z0-9]end$")
+                    lua\add ";"
             return lua
 
         when "Text"
@@ -260,7 +267,9 @@ compile = (tree)=>
                 if tree[i].type == 'Block'
                     lua\add " + " if chunks > 0
                     lua\add typename, "(function(", (tree.type == 'List' and "add" or ("add, "..("add 1 =")\as_lua_id!)), ")"
-                    lua\add "\n    ", @compile(tree[i]), "\nend)"
+                    body = @compile(tree[i])
+                    body\declare_locals!
+                    lua\add "\n    ", body, "\nend)"
                     chunks += 1
                     i += 1
                 else
@@ -271,7 +280,7 @@ compile = (tree)=>
                         if tree[i].type == "Block"
                             break
                         item_lua = @compile tree[i]
-                        if item_lua\text!\match("^%.[a-zA-Z_]")
+                        if item_lua\match("^%.[a-zA-Z_]")
                             item_lua = item_lua\text!\sub(2)
                         if tree.type == 'Dict' and tree[i].type == 'Index'
                             item_lua = LuaCode\from tree[i].source, item_lua, "=true"
@@ -280,9 +289,9 @@ compile = (tree)=>
                             items_lua\add "\n"
                             sep = ''
                         elseif items_lua\trailing_line_len! > MAX_LINE
-                            sep = items_lua\text!\sub(-1) == ";" and "\n    " or ",\n    "
+                            sep = items_lua\last(1) == ";" and "\n    " or ",\n    "
                         else
-                            sep = items_lua\text!\sub(-1) == ";" and " " or ", "
+                            sep = items_lua\last(1) == ";" and " " or ", "
                         i += 1
                     if items_lua\is_multiline!
                         lua\add LuaCode\from items_lua.source, typename, "{\n    ", items_lua, "\n}"
@@ -294,10 +303,10 @@ compile = (tree)=>
 
         when "Index"
             key_lua = @compile(tree[1])
-            key_str = match(key_lua\text!, '^"([a-zA-Z_][a-zA-Z0-9_]*)"$')
+            key_str = key_lua\match('^"([a-zA-Z_][a-zA-Z0-9_]*)"$')
             return if key_str and key_str\is_lua_id!
                 LuaCode\from tree.source, ".", key_str
-            elseif sub(key_lua\text!,1,1) == "["
+            elseif key_lua\first(1) == "["
                 -- NOTE: this *must* use a space after the [ to avoid freaking out
                 -- Lua's parser if the inner expression is a long string. Lua
                 -- parses x[[[y]]] as x("[y]"), not as x["y"]
@@ -313,7 +322,7 @@ compile = (tree)=>
         
         when "IndexChain"
             lua = @compile(tree[1])
-            if lua\text!\match("['\"}]$") or lua\text!\match("]=*]$")
+            if lua\match("['\"}]$") or lua\match("]=*]$")
                 lua\parenthesize!
             if lua\text! == "..."
                 return LuaCode\from(tree.source, "select(", @compile(tree[2][1]), ", ...)")
