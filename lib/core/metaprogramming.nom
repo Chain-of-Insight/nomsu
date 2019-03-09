@@ -410,7 +410,7 @@ external:
         lua> ("
             local class = getmetatable(\$)
             ::check_parent::
-            if not class or not class.__type then return 'a '..lua_type:capitalized() == \$type end
+            if not class or not class.__type then return 'a '..\(lua type of $):capitalized() == \$type end
             if class.__type == \$type then return true end
             local class_mt = getmetatable(class)
             if class_mt.__index and class_mt.__index ~= class then
