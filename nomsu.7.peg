@@ -193,6 +193,7 @@ variable (Var) <- "$" ({ident_char+} / "(" ws* (inline_action / variable) ws* ")
 
 
 inline_list (List) <-
+    !indented_list
     "[" ws* !eol
         (inline_list_item (ws* ',' ws* inline_list_item)* (ws* ',')?)? ws*
     ("]" / eof / (","? (missing_bracket_error / unexpected_code)))
@@ -200,8 +201,9 @@ inline_list_item <- inline_action / inline_expression
 
 indented_list (List) <-
     ({|
-        "[" eol nl_indent
-            list_line (nl_nodent list_line)*
+        "[" (
+           (ws* indented_block)
+         / (eol nl_indent list_line (nl_nodent list_line)*))
         {:curr_indent: %nil :}
     |} -> unpack)
     (nl_nodent "]" / eof / missing_bracket_error / unexpected_code)
@@ -211,15 +213,17 @@ list_line <-
 
 
 inline_dict (Dict) <-
+    !indented_dict
     "{" ws* !eol
         ((inline_action / inline_expression) (ws* ',' ws* (inline_action / inline_expression))*)? ws*
     ("}" / eof / (","? (missing_brace_error / unexpected_code)))
 
 indented_dict (Dict) <-
     ({|
-        "{" eol nl_indent
-            dict_line (nl_nodent dict_line)*
-            (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*
+        "{" (
+           (ws* indented_block)
+         / (eol nl_indent dict_line (nl_nodent dict_line)*
+            (%nl (ws* %nl)* nodent (comment / eol / unexpected_code))*))
         {:curr_indent: %nil :}
     |} -> unpack)
     (nl_nodent "}" / eof / missing_brace_error / unexpected_code)
