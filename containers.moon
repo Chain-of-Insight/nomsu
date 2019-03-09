@@ -1,5 +1,5 @@
 -- This file contains container classes, i.e. Lists and Dicts, plus some extended string functionality
-local List, Dict, Undict, _undict_mt, _dict_mt
+local List, Dict, Undict, DictEntries, _undict_mt, _dict_mt, _dict_entries_mt
 {:insert,:remove,:concat} = table
 
 as_nomsu = =>
@@ -134,16 +134,24 @@ _list_mt =
 _list_mt.__index.as_lua = _list_mt.as_lua
 _list_mt.__index.as_nomsu = _list_mt.as_nomsu
 
-List = (t)->
+List = (t,...)->
+    local l
     if type(t) == 'table'
-        return setmetatable(t, _list_mt)
+        l = setmetatable(t, _list_mt)
     elseif type(t) == 'function'
         l = setmetatable({}, _list_mt)
         add = (...)->
             for i=1,select('#',...) do l[#l+1] = select(i,...)
         t(add)
-        return l
+    elseif type(t) == 'thread'
+        l = setmetatable({}, _list_mt)
+        for val in coroutine.wrap(t)
+            l[#l+1] = val
     else error("Unsupported List type: "..type(t))
+    if select(1,...)
+        for x in *List(...)
+            l[#l+1] = x
+    return l
 
 
 compliments = setmetatable({}, {__mode:'k'})
@@ -191,6 +199,34 @@ Undict = (d)->
     compliments[u] = Dict{k,true for k,v in pairs(d) when v}
     return u
 
+local _dict_entries_mt
+_dict_entries_mt =
+    __type: "a Dict's Entries"
+    __index: (k)=>
+        if type(k) == 'number'
+            return nil if k == 0
+            if k < 0 then k = #@dict+k+1 if k < 0
+            i, last_k = @_last_i, @_last_k
+            if k < i
+                i, last_k = 0, nil
+            d = @dict
+            for i=i+1,k
+                last_k = next(d, last_k)
+                return nil if last_k == nil
+            @_last_i, @_last_k = k, last_k
+            return Dict{key:last_k, d[last_k]}
+        else
+            return _dict_entries_mt[k]
+    __len: => #@dict
+    __eq: (other)=>
+        type(other) == type(@) and getmetatable(other) == getmetatable(@) and other.dict == @dict
+    __tostring: => "(entries in "..tostring(@dict)..")"
+    as_nomsu: => "(entries in ".._dict_mt.as_nomsu(@dict)..")"
+    as_lua: => "entries_in".._dict_mt.as_lua(@dict)
+
+DictEntries = (d)->
+    setmetatable {dict:d, _last_i:0, _last_k:nil}, _dict_entries_mt
+
 _dict_mt =
     __type: "a Dict"
     __eq: (other)=>
@@ -211,7 +247,7 @@ _dict_mt =
         "{"..concat([v == true and "."..as_nomsu(k) or ".#{as_nomsu(k)} = #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_lua: =>
         "a_Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
-    as_list: => List[k for k,v in pairs(@)]
+    as_iterable: => DictEntries(@)
     __band: (other)=>
         Dict{k,v for k,v in pairs(@) when other[k]}
     __bor: (other)=>
@@ -244,16 +280,24 @@ _dict_mt =
             else ret[k] -= v
         return ret
 
-Dict = (t)->
+Dict = (t,more,...)->
+    local d
     if type(t) == 'table'
-        return setmetatable(t, _dict_mt)
+        d = setmetatable(t, _dict_mt)
     elseif type(t) == 'function'
         d = setmetatable({}, _dict_mt)
         add = (...)->
             for i=1,select('#',...) do d[select(i,...)] = true
         add_1_eq_2 = (k, v)-> d[k] = v
         t(add, add_1_eq_2)
-        return d
+    elseif type(t) == 'thread'
+        d = setmetatable({}, _dict_mt)
+        for k,v in coroutine.wrap(t)
+            d[k] = v
     else error("Unsupported Dict type: "..type(t))
+    if more
+        for k,v in pairs(Dict(more,...))
+            d[k] = v
+    return d
 
-return {:List, :Dict}
+return {:List, :Dict, :DictEntries}

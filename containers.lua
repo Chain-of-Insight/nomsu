@@ -1,4 +1,4 @@
-local List, Dict, Undict, _undict_mt, _dict_mt
+local List, Dict, Undict, DictEntries, _undict_mt, _dict_mt, _dict_entries_mt
 local insert, remove, concat
 do
   local _obj_0 = table
@@ -311,11 +311,12 @@ local _list_mt = {
 }
 _list_mt.__index.as_lua = _list_mt.as_lua
 _list_mt.__index.as_nomsu = _list_mt.as_nomsu
-List = function(t)
+List = function(t, ...)
+  local l
   if type(t) == 'table' then
-    return setmetatable(t, _list_mt)
+    l = setmetatable(t, _list_mt)
   elseif type(t) == 'function' then
-    local l = setmetatable({ }, _list_mt)
+    l = setmetatable({ }, _list_mt)
     local add
     add = function(...)
       for i = 1, select('#', ...) do
@@ -323,10 +324,22 @@ List = function(t)
       end
     end
     t(add)
-    return l
+  elseif type(t) == 'thread' then
+    l = setmetatable({ }, _list_mt)
+    for val in coroutine.wrap(t) do
+      l[#l + 1] = val
+    end
   else
-    return error("Unsupported List type: " .. type(t))
+    error("Unsupported List type: " .. type(t))
   end
+  if select(1, ...) then
+    local _list_0 = List(...)
+    for _index_0 = 1, #_list_0 do
+      local x = _list_0[_index_0]
+      l[#l + 1] = x
+    end
+  end
+  return l
 end
 local compliments = setmetatable({ }, {
   __mode = 'k'
@@ -413,6 +426,62 @@ Undict = function(d)
   end)())
   return u
 end
+local _dict_entries_mt
+_dict_entries_mt = {
+  __type = "a Dict's Entries",
+  __index = function(self, k)
+    if type(k) == 'number' then
+      if k == 0 then
+        return nil
+      end
+      if k < 0 then
+        if k < 0 then
+          k = #self.dict + k + 1
+        end
+      end
+      local i, last_k = self._last_i, self._last_k
+      if k < i then
+        i, last_k = 0, nil
+      end
+      local d = self.dict
+      for i = i + 1, k do
+        last_k = next(d, last_k)
+        if last_k == nil then
+          return nil
+        end
+      end
+      self._last_i, self._last_k = k, last_k
+      return Dict({
+        key = last_k,
+        d[last_k]
+      })
+    else
+      return _dict_entries_mt[k]
+    end
+  end,
+  __len = function(self)
+    return #self.dict
+  end,
+  __eq = function(self, other)
+    return type(other) == type(self) and getmetatable(other) == getmetatable(self) and other.dict == self.dict
+  end,
+  __tostring = function(self)
+    return "(entries in " .. tostring(self.dict) .. ")"
+  end,
+  as_nomsu = function(self)
+    return "(entries in " .. _dict_mt.as_nomsu(self.dict) .. ")"
+  end,
+  as_lua = function(self)
+    return "entries_in" .. _dict_mt.as_lua(self.dict)
+  end
+}
+DictEntries = function(d)
+  return setmetatable({
+    dict = d,
+    _last_i = 0,
+    _last_k = nil
+  }, _dict_entries_mt)
+end
 _dict_mt = {
   __type = "a Dict",
   __eq = function(self, other)
@@ -471,16 +540,8 @@ _dict_mt = {
       return _accum_0
     end)(), ", ") .. "}"
   end,
-  as_list = function(self)
-    return List((function()
-      local _accum_0 = { }
-      local _len_0 = 1
-      for k, v in pairs(self) do
-        _accum_0[_len_0] = k
-        _len_0 = _len_0 + 1
-      end
-      return _accum_0
-    end)())
+  as_iterable = function(self)
+    return DictEntries(self)
   end,
   __band = function(self, other)
     return Dict((function()
@@ -567,11 +628,12 @@ _dict_mt = {
     return ret
   end
 }
-Dict = function(t)
+Dict = function(t, more, ...)
+  local d
   if type(t) == 'table' then
-    return setmetatable(t, _dict_mt)
+    d = setmetatable(t, _dict_mt)
   elseif type(t) == 'function' then
-    local d = setmetatable({ }, _dict_mt)
+    d = setmetatable({ }, _dict_mt)
     local add
     add = function(...)
       for i = 1, select('#', ...) do
@@ -583,12 +645,23 @@ Dict = function(t)
       d[k] = v
     end
     t(add, add_1_eq_2)
-    return d
+  elseif type(t) == 'thread' then
+    d = setmetatable({ }, _dict_mt)
+    for k, v in coroutine.wrap(t) do
+      d[k] = v
+    end
   else
-    return error("Unsupported Dict type: " .. type(t))
+    error("Unsupported Dict type: " .. type(t))
   end
+  if more then
+    for k, v in pairs(Dict(more, ...)) do
+      d[k] = v
+    end
+  end
+  return d
 end
 return {
   List = List,
-  Dict = Dict
+  Dict = Dict,
+  DictEntries = DictEntries
 }
