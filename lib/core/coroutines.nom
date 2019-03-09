@@ -9,32 +9,60 @@ use "core/control_flow"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    $co =
+    $fn =
         ->:
             yield 4
             yield 5
             repeat 3 times:
                 yield 6
     $nums = []
-    for $ in coroutine $co:
+    for $ in (coroutine from $fn):
         $nums, add $
     
-    unless ($nums == [4, 5, 6, 6, 6]):
-        fail "Coroutine iteration failed"
+    assume ($nums == [4, 5, 6, 6, 6])
     
     $d = {.x = 0}
-    $co2 =
+    $co =
         coroutine:
             $d.x += 1
             yield 1
             $d.x += 1
             yield
             $d.x += 1
-    repeat while ((coroutine status of $co2) != "dead"): resume $co2
+    repeat while ((coroutine status of $co) != "dead"): resume $co
     assume $d.x == 3
+    $(co) = (coroutine: yield 5)
+    [$ok, $val] = (co)
+    assume ($ok == (yes))
+    assume ($val == 5)
+
+    $t = []
+    $i = 1
+    for $ in
+        coroutine:
+            yield 4
+            yield 5
+            yield
+            yield 6
+    ..:
+        $t.$i = $
+        $i += 1
+    assume ($t == [4,5,nil,6])
+
+    $t = []
+    for ($k = $) in
+        coroutine:
+            yield 4
+            yield 5
+            yield
+            yield 6
+    ..:
+        $t, add {.key = $k, .value = $}
+    assume $t == [
+        {.key = 1, .value = 4}, {.key = 2, .value = 5}, {.key = 3}, {.key = 4, .value = 6}
+    ]
+
 (coroutine $body) parses as (coroutine from (-> $body))
-(for $ in coroutine $co $body) compiles to ("
-    for \($ as lua expr) in coroutine_wrap(\($co as lua expr)) do
-        \($body as lua)
-    end
-")
+external:
+    ($ is a dead coroutine) means
+        ((lua type of $) == "thread") and ((coroutine status of $) == "dead")
