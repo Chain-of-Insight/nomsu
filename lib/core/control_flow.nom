@@ -161,31 +161,71 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # For-each loop (lua's "ipairs()")
-(for $var in $iterable at $i $body) compiles to:
+(for $var in $iterable $body) compiles to:
+    unless $var:
+        at (this tree) fail "No var here"
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
+    if (($var.type == "Action") and ($var.stub == "1 =")):
+        [$key, $value] = [$var.1, $var.3]
+        go to (vars set)
+    if (($var.type == "Action") and ($var.stub == "1 at")):
+        [$key, $value] = [$var.3, $var.1]
+    ..else:
+        [$key, $value] = [nil, $var]
+
+    --- (vars set) ---
+    unless $value:
+        at (this tree) fail "No value here"
+
+    # Numeric loop:
     if (($iterable.type == "Action") and (($iterable, get stub) == "1 to")):
         [$start, $stop] = [$iterable.1, $iterable.3]
         $loop =
             Lua ("
                 local _start = \($start as lua expr)
-                for \($var as lua identifier)=_start,\($stop as lua expr) do
-                    \($i as lua identifier) = \($var as lua identifier) - _start + 1
+                for \($value as lua identifier)=_start,\($stop as lua expr) do
             ")
+        if $key:
+            $loop, add ("
+
+                    local \($key as lua identifier) = \($value as lua identifier) - _start + 1;
+            ")
+        go to (loop set)
+
+    # Numeric loop with step:
     if (($iterable.type == "Action") and (($iterable, get stub) == "1 to 2 by")):
         [$start, $stop, $step] = [$iterable.1, $iterable.3, $iterable.5]
         $loop =
             Lua ("
-                local _start, _step = \($start as lua expr), \($step as lua expr)
-                for \($var as lua identifier)=_start,\($stop as lua expr),_step do
-                    \($i as lua identifier) = (\($var as lua identifier) - _start)/_step + 1
+                local _start, _step = \($start as lua expr), \($step as lua expr);
+                for \($value as lua identifier)=_start,\($stop as lua expr),_step do
             ")
-    unless $loop:
+        if $key:
+            $loop, add ("
+
+                    local \($key as lua identifier) = (\($value as lua identifier) - _start)/_step + 1
+            ")
+        go to (loop set)
+
+    # for $ in (...):
+    if $key:
         $loop =
             Lua ("
-                local _iterating = _1_as_list(\($iterable as lua expr))
-                for \($i as lua identifier)=1,#_iterating do
-                    \($var as lua identifier) = _iterating[\($i as lua identifier)]
+                local _iterating = \($iterable as lua expr);
+                local _next = getmetatable(_iterating).__next or next;
+                for \($key as lua identifier),\($value as lua identifier) in _next,_iterating,nil do
+                    if \($value as lua identifier) == nil and _1_is_a_dead_coroutine(_iterating) then break end
             ")
+    ..else:
+        $loop =
+            Lua ("
+                local _iterating = _1_as_an_iterable(\($iterable as lua expr))
+                for _i=1,#_iterating do
+                    local \($value as lua identifier) = _iterating[_i]
+                    if \($value as lua identifier) == nil and _1_is_a_dead_coroutine(_iterating) then break end
+            ")
+
+    --- (loop set) ---
     $lua =
         Lua ("
             do -- for-loop
@@ -196,17 +236,27 @@ test:
     if ($body has subtree \(do next)):
         $lua, add "\n        ::continue::"
     
-    if ($body has subtree \(do next $var)):
-        $lua, add "\n        " (\(---next $var ---) as lua)
+    if ($key and ($body has subtree \(do next $key))):
+        $lua, add "\n        " (\(---next $key ---) as lua)
+    
+    if ($body has subtree \(do next $value)):
+        $lua, add "\n        " (\(---next $value ---) as lua)
     
     $lua, add "\n    end"
-    if ($body has subtree \(stop $var)):
-        $lua, add "\n    " (\(---stop $var ---) as lua)
+    if ($key and ($body has subtree \(stop $key))):
+        $lua, add "\n    " (\(---stop $key ---) as lua)
+    if ($body has subtree \(stop $value)):
+        $lua, add "\n    " (\(---stop $value ---) as lua)
     $lua, add "\nend -- for-loop"
+    $lua, remove free vars [($value as lua identifier, text), $key and ($key as lua identifier, text)]
     return $lua
 
-(for $var in $iterable $body) parses as
-    for $var in $iterable at (=lua "_i") $body
+# TODO: remove these shims:
+(for $var in $iterable at $i $body) parses as
+    for ($i = $var) in $iterable $body
+
+(for $k = $v in $iterable $body) parses as
+    for ($k = $v) in $iterable $body
 
 test:
     $d = {.a = 10, .b = 20, .c = 30, .d = 40, .e = 50}
@@ -237,7 +287,7 @@ test:
                 stop $outer
     assume ($nums == [1, -2, 3, -2, 3, 4, 3, 4, 5])
 
-# These are shims, and should be phased out:
+# TODO: These are shims, and should be phased out:
 [
     for $var in $start to $stop by $step $body
     for $var in $start to $stop via $step $body
@@ -253,59 +303,7 @@ test:
         $x += 1
     assume $x == 5
 
-(repeat $n times $body) parses as (for (=lua "_XXX_") in (1 to $n by 1) $body)
-
-# Dict iteration (lua's "pairs()")
-test:
-    $a = [10, 20, 30, 40, 50]
-    $b = []
-    for $x in $a:
-        $b, add $x
-    assume ($a == $b)
-    $b = []
-    for $x in $a:
-        if ($x == 10):
-            do next $x
-        
-        if ($x == 50):
-            stop $x
-        
-        $b, add $x
-    assume ($b == [20, 30, 40])
-    # Small memory footprint:
-    assume (1 to (1 << 31))
-
-[for $key = $value in $iterable $body, for $key $value in $iterable $body]
-..all compile to:
-    $lua =
-        Lua ("
-            for \($key as lua identifier),\($value as lua identifier) in pairs(\
-            ..\($iterable as lua expr)) do
-        ")
-    $lua, add "\n    " ($body as lua)
-    if ($body has subtree \(do next)):
-        $lua, add "\n    ::continue::"
-    
-    if ($body has subtree \(do next $key)):
-        $lua, add "\n    " (\(---next $key ---) as lua)
-    
-    if ($body has subtree \(do next $value)):
-        $lua, add "\n    " (\(---next $value ---) as lua)
-    
-    $lua, add "\nend --foreach-loop"
-    $stop_labels = (Lua "")
-    if ($body has subtree \(stop $key)):
-        $stop_labels, add "\n" (\(---stop $key ---) as lua)
-    
-    if ($body has subtree \(stop $value)):
-        $stop_labels, add "\n" (\(---stop $value ---) as lua)
-    
-    if ((size of "\$stop_labels") > 0):
-        $inner_lua = $lua
-        $lua = (Lua "do -- scope for stopping for $ = $ loop\n    ")
-        $lua, add $inner_lua $stop_labels "\nend"
-    
-    return $lua
+(repeat $n times $body) parses as (for (=lua "_i") in (1 to $n by 1) $body)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
