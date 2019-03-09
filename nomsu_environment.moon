@@ -1,7 +1,7 @@
 -- This file defines the environment in which Nomsu code runs, including some
 -- basic bootstrapping functionality.
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-{:List, :Dict} = require 'containers'
+{:List, :Dict, :DictEntries} = require 'containers'
 Text = require 'text'
 SyntaxTree = require "syntax_tree"
 Files = require "files"
@@ -44,9 +44,10 @@ _1_as_text = (x)->
     if x == false then return "no"
     return tostring(x)
 
-_1_as_list = (x)->
-    mt = getmetatable(x)
-    if mt.as_list then return mt.as_list(x)
+_1_as_an_iterable = (x)->
+    if mt = getmetatable(x)
+        if mt.as_iterable
+            return mt.as_iterable(x)
     return x
 
 local nomsu_environment
@@ -61,7 +62,7 @@ nomsu_environment = Importer{
     :pairs, :ipairs, :jit, :_VERSION, LUA_VERSION: (jit and jit.version or _VERSION),
     LUA_API: _VERSION, Bit: (jit or _VERSION == "Lua 5.2") and require('bitops') or nil
     -- Nomsu types:
-    a_List:List, a_Dict:Dict, Text:Text,
+    a_List:List, a_Dict:Dict, Text:Text, Dict_Entries:DictEntries,
     -- Utilities and misc.
     lpeg:lpeg, re:re, Files:Files,
     :SyntaxTree, TESTS: Dict({}), globals: Dict({}),
@@ -74,7 +75,7 @@ nomsu_environment = Importer{
 
     -- Nomsu functions:
     _1_as_nomsu:tree_to_nomsu, _1_as_inline_nomsu:tree_to_inline_nomsu,
-    compile: compile, at_1_fail:fail_at, :_1_as_text, :_1_as_list,
+    compile: compile, at_1_fail:fail_at, :_1_as_text, :_1_as_an_iterable,
     exit:os.exit, quit:os.exit,
 
     _1_parsed: (nomsu_code, syntax_version)->

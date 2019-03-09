@@ -3,10 +3,10 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local List, Dict
+local List, Dict, DictEntries
 do
   local _obj_0 = require('containers')
-  List, Dict = _obj_0.List, _obj_0.Dict
+  List, Dict, DictEntries = _obj_0.List, _obj_0.Dict, _obj_0.DictEntries
 end
 local Text = require('text')
 local SyntaxTree = require("syntax_tree")
@@ -73,11 +73,15 @@ _1_as_text = function(x)
   end
   return tostring(x)
 end
-local _1_as_list
-_1_as_list = function(x)
-  local mt = getmetatable(x)
-  if mt.as_list then
-    return mt.as_list(x)
+local _1_as_an_iterable
+_1_as_an_iterable = function(x)
+  do
+    local mt = getmetatable(x)
+    if mt then
+      if mt.as_iterable then
+        return mt.as_iterable(x)
+      end
+    end
   end
   return x
 end
@@ -128,6 +132,7 @@ nomsu_environment = Importer({
   a_List = List,
   a_Dict = Dict,
   Text = Text,
+  Dict_Entries = DictEntries,
   lpeg = lpeg,
   re = re,
   Files = Files,
@@ -151,7 +156,7 @@ nomsu_environment = Importer({
   compile = compile,
   at_1_fail = fail_at,
   _1_as_text = _1_as_text,
-  _1_as_list = _1_as_list,
+  _1_as_an_iterable = _1_as_an_iterable,
   exit = os.exit,
   quit = os.exit,
   _1_parsed = function(nomsu_code, syntax_version)
