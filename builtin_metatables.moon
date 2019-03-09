@@ -3,7 +3,6 @@ require "text"
 
 number_mt =
     __type: "a Number"
-    __len: => @
     as_lua: tostring
     as_nomsu: tostring
     as_text: tostring
@@ -74,10 +73,25 @@ fn_mt =
 fn_mt.__index = fn_mt
 debug.setmetatable (->), fn_mt
 
+_last_co_i = setmetatable({}, {__mode:'k'})
+local co_mt
 co_mt =
     __type: "a Coroutine"
-    as_text: => (tostring(@)\gsub("thread", "Coroutine"))
-co_mt.__index = co_mt
+    as_text: => (tostring(@)\gsub("thread", "Coroutine")).." ("..coroutine.status(@)..")"
+    __len: => math.huge
+    __call: coroutine.resume
+    __next: (k)=>
+        ok, val = coroutine.resume(@)
+        if ok then return (k or 0) + 1, val
+    __index: (k)=>
+        if k == (_last_co_i[@] or 0) + 1
+            ret = {coroutine.resume(@, k)}
+            _last_co_i[@] = k
+            if ret[1]
+                return table.unpack(ret, 2)
+            else
+                return nil
+        return co_mt[k]
 debug.setmetatable(coroutine.create(->), co_mt)
 
 nil_mt =

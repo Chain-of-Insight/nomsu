@@ -1,9 +1,6 @@
 require("text")
 local number_mt = {
   __type = "a Number",
-  __len = function(self)
-    return self
-  end,
   as_lua = tostring,
   as_nomsu = tostring,
   as_text = tostring,
@@ -176,13 +173,40 @@ local fn_mt = {
 }
 fn_mt.__index = fn_mt
 debug.setmetatable((function() end), fn_mt)
-local co_mt = {
+local _last_co_i = setmetatable({ }, {
+  __mode = 'k'
+})
+local co_mt
+co_mt = {
   __type = "a Coroutine",
   as_text = function(self)
-    return (tostring(self):gsub("thread", "Coroutine"))
+    return (tostring(self):gsub("thread", "Coroutine")) .. " (" .. coroutine.status(self) .. ")"
+  end,
+  __len = function(self)
+    return math.huge
+  end,
+  __call = coroutine.resume,
+  __next = function(self, k)
+    local ok, val = coroutine.resume(self)
+    if ok then
+      return (k or 0) + 1, val
+    end
+  end,
+  __index = function(self, k)
+    if k == (_last_co_i[self] or 0) + 1 then
+      local ret = {
+        coroutine.resume(self, k)
+      }
+      _last_co_i[self] = k
+      if ret[1] then
+        return table.unpack(ret, 2)
+      else
+        return nil
+      end
+    end
+    return co_mt[k]
   end
 }
-co_mt.__index = co_mt
 debug.setmetatable(coroutine.create(function() end), co_mt)
 local nil_mt = {
   __type = "Nil",
