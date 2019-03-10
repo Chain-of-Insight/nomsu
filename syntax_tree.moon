@@ -2,6 +2,7 @@
 -- as well as the logic for converting them to Lua code.
 {:insert, :remove, :concat} = table
 {:Source} = require "code_obj"
+{:List, :Dict} = require 'containers'
 Files = require 'files'
 unpack or= table.unpack
 
@@ -14,6 +15,7 @@ as_lua = =>
     return @as_lua! if @as_lua
     error("Not supported: #{@}")
 
+local SyntaxTree
 class SyntaxTree
     __tostring: =>
         bits = [type(b) == 'string' and b\as_lua! or tostring(b) for b in *@]
@@ -56,8 +58,9 @@ class SyntaxTree
         if type(fn) == 'table'
             replacements = fn
             fn = (t)->
-                for k,v in pairs(replacements)
-                    if k == t then return v
+                if t.type == "Var"
+                    if r = replacements[t\as_var!]
+                        return r
 
         replacement = fn(@)
         if replacement == false then return nil
@@ -103,19 +106,23 @@ class SyntaxTree
         return args
 
     get_stub: =>
-        if @type == "MethodCall"
-            return "0, "..table.concat([@[i]\get_stub! for i=2,#@], "; ")
-        stub_bits = {}
-        arg_i = 1
-        for a in *@
-            if type(a) == 'string'
-                stub_bits[#stub_bits+1] = a
+        switch @type
+            when "Action"
+                stub_bits = {}
+                arg_i = 1
+                for a in *@
+                    if type(a) == 'string'
+                        stub_bits[#stub_bits+1] = a
+                    else
+                        stub_bits[#stub_bits+1] = arg_i
+                        arg_i += 1
+                while type(stub_bits[#stub_bits]) == 'number'
+                    stub_bits[#stub_bits] = nil
+                return concat stub_bits, " "
+            when "MethodCall"
+                return "0, "..table.concat([@[i]\get_stub! for i=2,#@], "; ")
             else
-                stub_bits[#stub_bits+1] = arg_i
-                arg_i += 1
-        while type(stub_bits[#stub_bits]) == 'number'
-            stub_bits[#stub_bits] = nil
-        return concat stub_bits, " "
+                error("#{@type}s do not have stubs")
 
     as_var: =>
         assert(@type == "Var")
@@ -123,6 +130,43 @@ class SyntaxTree
             return @[1]
         else
             return @[1]\get_stub!
+
+    matching: (patt)=>
+        if patt.type == "Var"
+            return {[patt\as_var!]:@}
+        return nil if patt\get_stub! != @get_stub!
+        -- TODO: support vararg matches like (\(say 1 2 3), matching \(say *$values))
+        return nil if #@ != #patt
+        match = {}
+        for i=1,#@
+            v = @[i]
+            pv = patt[i]
+            return nil if type(v) != type(pv)
+            if type(v) != 'table'
+                return nil unless v == pv
+            else
+                m = v\matching(pv)
+                return nil unless m
+                for mk,mv in pairs(m)
+                    return nil if match[mk] and match[mk] != mv
+                    match[mk] = mv
+        return Dict(match)
+
+    _breadth_first: =>
+        coroutine.yield @
+        for child in *@
+            if getmetatable(child) == SyntaxTree.__base
+                child\_breadth_first!
+        return
+    breadth_first: => coroutine.create(-> @_breadth_first!)
+
+    _depth_first: =>
+        coroutine.yield @
+        for child in *@
+            if getmetatable(child) == SyntaxTree.__base
+                child\_depth_first!
+        return
+    depth_first: => coroutine.create(-> @_depth_first!)
 
     @is_instance: (t)=>
         type(t) == 'table' and getmetatable(t) == @__base

@@ -5,6 +5,11 @@ do
 end
 local Source
 Source = require("code_obj").Source
+local List, Dict
+do
+  local _obj_0 = require('containers')
+  List, Dict = _obj_0.List, _obj_0.Dict
+end
 local Files = require('files')
 local unpack = unpack or table.unpack
 local as_lua
@@ -101,9 +106,12 @@ do
       if type(fn) == 'table' then
         local replacements = fn
         fn = function(t)
-          for k, v in pairs(replacements) do
-            if k == t then
-              return v
+          if t.type == "Var" then
+            do
+              local r = replacements[t:as_var()]
+              if r then
+                return r
+              end
             end
           end
         end
@@ -201,7 +209,24 @@ do
       return args
     end,
     get_stub = function(self)
-      if self.type == "MethodCall" then
+      local _exp_0 = self.type
+      if "Action" == _exp_0 then
+        local stub_bits = { }
+        local arg_i = 1
+        for _index_0 = 1, #self do
+          local a = self[_index_0]
+          if type(a) == 'string' then
+            stub_bits[#stub_bits + 1] = a
+          else
+            stub_bits[#stub_bits + 1] = arg_i
+            arg_i = arg_i + 1
+          end
+        end
+        while type(stub_bits[#stub_bits]) == 'number' do
+          stub_bits[#stub_bits] = nil
+        end
+        return concat(stub_bits, " ")
+      elseif "MethodCall" == _exp_0 then
         return "0, " .. table.concat((function()
           local _accum_0 = { }
           local _len_0 = 1
@@ -211,22 +236,9 @@ do
           end
           return _accum_0
         end)(), "; ")
+      else
+        return error(tostring(self.type) .. "s do not have stubs")
       end
-      local stub_bits = { }
-      local arg_i = 1
-      for _index_0 = 1, #self do
-        local a = self[_index_0]
-        if type(a) == 'string' then
-          stub_bits[#stub_bits + 1] = a
-        else
-          stub_bits[#stub_bits + 1] = arg_i
-          arg_i = arg_i + 1
-        end
-      end
-      while type(stub_bits[#stub_bits]) == 'number' do
-        stub_bits[#stub_bits] = nil
-      end
-      return concat(stub_bits, " ")
     end,
     as_var = function(self)
       assert(self.type == "Var")
@@ -235,6 +247,72 @@ do
       else
         return self[1]:get_stub()
       end
+    end,
+    matching = function(self, patt)
+      if patt.type == "Var" then
+        return {
+          [patt:as_var()] = self
+        }
+      end
+      if patt:get_stub() ~= self:get_stub() then
+        return nil
+      end
+      if #self ~= #patt then
+        return nil
+      end
+      local match = { }
+      for i = 1, #self do
+        local v = self[i]
+        local pv = patt[i]
+        if type(v) ~= type(pv) then
+          return nil
+        end
+        if type(v) ~= 'table' then
+          if not (v == pv) then
+            return nil
+          end
+        else
+          local m = v:matching(pv)
+          if not (m) then
+            return nil
+          end
+          for mk, mv in pairs(m) do
+            if match[mk] and match[mk] ~= mv then
+              return nil
+            end
+            match[mk] = mv
+          end
+        end
+      end
+      return Dict(match)
+    end,
+    _breadth_first = function(self)
+      coroutine.yield(self)
+      for _index_0 = 1, #self do
+        local child = self[_index_0]
+        if getmetatable(child) == SyntaxTree.__base then
+          child:_breadth_first()
+        end
+      end
+    end,
+    breadth_first = function(self)
+      return coroutine.create(function()
+        return self:_breadth_first()
+      end)
+    end,
+    _depth_first = function(self)
+      coroutine.yield(self)
+      for _index_0 = 1, #self do
+        local child = self[_index_0]
+        if getmetatable(child) == SyntaxTree.__base then
+          child:_depth_first()
+        end
+      end
+    end,
+    depth_first = function(self)
+      return coroutine.create(function()
+        return self:_depth_first()
+      end)
     end
   }
   _base_0.__index = _base_0
