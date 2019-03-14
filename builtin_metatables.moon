@@ -80,8 +80,9 @@ co_mt =
     as_text: => (tostring(@)\gsub("thread", "Coroutine")).." ("..coroutine.status(@)..")"
     __len: => math.huge
     __call: coroutine.resume
-    __next: (k)=>
+    __inext: (k)=>
         ok, val = coroutine.resume(@)
+        return if coroutine.status(@) == 'dead'
         if ok then return (k or 0) + 1, val
     __index: (k)=>
         if k == (_last_co_i[@] or 0) + 1
@@ -92,6 +93,7 @@ co_mt =
             else
                 return nil
         return co_mt[k]
+co_mt.__next = co_mt.__inext
 debug.setmetatable(coroutine.create(->), co_mt)
 
 nil_mt =

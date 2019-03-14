@@ -1,5 +1,5 @@
 -- This file contains container classes, i.e. Lists and Dicts, plus some extended string functionality
-local List, Dict, Undict, DictEntries, _undict_mt, _dict_mt, _dict_entries_mt
+local List, Dict, Undict, _undict_mt, _dict_mt
 {:insert,:remove,:concat} = table
 
 as_nomsu = =>
@@ -199,34 +199,6 @@ Undict = (d)->
     compliments[u] = Dict{k,true for k,v in pairs(d) when v}
     return u
 
-local _dict_entries_mt
-_dict_entries_mt =
-    __type: "a Dict's Entries"
-    __index: (k)=>
-        if type(k) == 'number'
-            return nil if k == 0
-            if k < 0 then k = #@dict+k+1 if k < 0
-            i, last_k = @_last_i, @_last_k
-            if k < i
-                i, last_k = 0, nil
-            d = @dict
-            for i=i+1,k
-                last_k = next(d, last_k)
-                return nil if last_k == nil
-            @_last_i, @_last_k = k, last_k
-            return Dict{key:last_k, d[last_k]}
-        else
-            return _dict_entries_mt[k]
-    __len: => #@dict
-    __eq: (other)=>
-        type(other) == type(@) and getmetatable(other) == getmetatable(@) and other.dict == @dict
-    __tostring: => "(entries in "..tostring(@dict)..")"
-    as_nomsu: => "(entries in ".._dict_mt.as_nomsu(@dict)..")"
-    as_lua: => "entries_in".._dict_mt.as_lua(@dict)
-
-DictEntries = (d)->
-    setmetatable {dict:d, _last_i:0, _last_k:nil}, _dict_entries_mt
-
 _dict_mt =
     __type: "a Dict"
     __eq: (other)=>
@@ -247,7 +219,10 @@ _dict_mt =
         "{"..concat([v == true and "."..as_nomsu(k) or ".#{as_nomsu(k)} = #{as_nomsu(v)}" for k,v in pairs @], ", ").."}"
     as_lua: =>
         "a_Dict{"..concat(["[ #{as_lua(k)}]= #{as_lua(v)}" for k,v in pairs @], ", ").."}"
-    as_iterable: => DictEntries(@)
+    __inext: (key)=>
+        nextkey, value = next(@, key)
+        if nextkey != nil
+            return nextkey, Dict{key:nextkey, value:value}
     __band: (other)=>
         Dict{k,v for k,v in pairs(@) when other[k]}
     __bor: (other)=>
@@ -300,4 +275,4 @@ Dict = (t,more,...)->
             d[k] = v
     return d
 
-return {:List, :Dict, :DictEntries}
+return {:List, :Dict}

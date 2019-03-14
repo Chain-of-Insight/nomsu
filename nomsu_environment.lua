@@ -3,10 +3,10 @@ do
   local _obj_0 = require("code_obj")
   NomsuCode, LuaCode, Source = _obj_0.NomsuCode, _obj_0.LuaCode, _obj_0.Source
 end
-local List, Dict, DictEntries
+local List, Dict
 do
   local _obj_0 = require('containers')
-  List, Dict, DictEntries = _obj_0.List, _obj_0.Dict, _obj_0.DictEntries
+  List, Dict = _obj_0.List, _obj_0.Dict
 end
 local Text = require('text')
 local SyntaxTree = require("syntax_tree")
@@ -73,21 +73,39 @@ _1_as_text = function(x)
   end
   return tostring(x)
 end
-local _1_as_an_iterable
-_1_as_an_iterable = function(x)
-  do
-    local mt = getmetatable(x)
-    if mt then
-      if mt.as_iterable then
-        return mt.as_iterable(x)
-      end
+local nomsu_pairs
+nomsu_pairs = function(self)
+  local mt = getmetatable(self)
+  if mt and mt.__next then
+    return mt.__next, self, nil
+  else
+    return next, self, nil
+  end
+end
+local inext
+if _VERSION == "Lua 5.2" or _VERSION == "Lua 5.1" then
+  inext = function(self, i)
+    local value = self[i + 1]
+    if value ~= nil then
+      return i + 1, value
     end
   end
-  return x
+else
+  inext = ipairs({ })
+end
+local nomsu_ipairs
+nomsu_ipairs = function(self)
+  local mt = getmetatable(self)
+  if mt and mt.__inext then
+    return mt.__inext, self, 0
+  else
+    return inext, self, 0
+  end
 end
 local nomsu_environment
 nomsu_environment = Importer({
   next = next,
+  inext = inext,
   unpack = unpack or table.unpack,
   setmetatable = setmetatable,
   rawequal = rawequal,
@@ -122,8 +140,9 @@ nomsu_environment = Importer({
   math = math,
   io = io,
   load = load,
-  pairs = pairs,
+  pairs = nomsu_pairs,
   ipairs = ipairs,
+  _ipairs = nomsu_ipairs,
   jit = jit,
   _VERSION = _VERSION,
   LUA_VERSION = (jit and jit.version or _VERSION),
@@ -132,7 +151,6 @@ nomsu_environment = Importer({
   a_List = List,
   a_Dict = Dict,
   Text = Text,
-  Dict_Entries = DictEntries,
   lpeg = lpeg,
   re = re,
   Files = Files,

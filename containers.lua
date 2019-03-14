@@ -1,4 +1,4 @@
-local List, Dict, Undict, DictEntries, _undict_mt, _dict_mt, _dict_entries_mt
+local List, Dict, Undict, _undict_mt, _dict_mt
 local insert, remove, concat
 do
   local _obj_0 = table
@@ -426,62 +426,6 @@ Undict = function(d)
   end)())
   return u
 end
-local _dict_entries_mt
-_dict_entries_mt = {
-  __type = "a Dict's Entries",
-  __index = function(self, k)
-    if type(k) == 'number' then
-      if k == 0 then
-        return nil
-      end
-      if k < 0 then
-        if k < 0 then
-          k = #self.dict + k + 1
-        end
-      end
-      local i, last_k = self._last_i, self._last_k
-      if k < i then
-        i, last_k = 0, nil
-      end
-      local d = self.dict
-      for i = i + 1, k do
-        last_k = next(d, last_k)
-        if last_k == nil then
-          return nil
-        end
-      end
-      self._last_i, self._last_k = k, last_k
-      return Dict({
-        key = last_k,
-        d[last_k]
-      })
-    else
-      return _dict_entries_mt[k]
-    end
-  end,
-  __len = function(self)
-    return #self.dict
-  end,
-  __eq = function(self, other)
-    return type(other) == type(self) and getmetatable(other) == getmetatable(self) and other.dict == self.dict
-  end,
-  __tostring = function(self)
-    return "(entries in " .. tostring(self.dict) .. ")"
-  end,
-  as_nomsu = function(self)
-    return "(entries in " .. _dict_mt.as_nomsu(self.dict) .. ")"
-  end,
-  as_lua = function(self)
-    return "entries_in" .. _dict_mt.as_lua(self.dict)
-  end
-}
-DictEntries = function(d)
-  return setmetatable({
-    dict = d,
-    _last_i = 0,
-    _last_k = nil
-  }, _dict_entries_mt)
-end
 _dict_mt = {
   __type = "a Dict",
   __eq = function(self, other)
@@ -540,8 +484,14 @@ _dict_mt = {
       return _accum_0
     end)(), ", ") .. "}"
   end,
-  as_iterable = function(self)
-    return DictEntries(self)
+  __inext = function(self, key)
+    local nextkey, value = next(self, key)
+    if nextkey ~= nil then
+      return nextkey, Dict({
+        key = nextkey,
+        value = value
+      })
+    end
   end,
   __band = function(self, other)
     return Dict((function()
@@ -662,6 +612,5 @@ Dict = function(t, more, ...)
 end
 return {
   List = List,
-  Dict = Dict,
-  DictEntries = DictEntries
+  Dict = Dict
 }

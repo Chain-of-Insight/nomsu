@@ -180,7 +180,6 @@ test:
     for $ in $r:
         $visited, add $
     assume ($visited == [1, 3, 5, 7, 9])
-$(inext) = (=lua "ipairs({})")
 $range_mt = {
     .__type = "a Range"
     .__index =
@@ -212,7 +211,8 @@ $range_mt = {
                     ($self.last == $other.last) and ($self.step == $other.step)
     
     .backwards = (for $self ($self.last to $self.first by (- $self.step)))
-    .__ipairs = (for $self: return $(inext) $self 0)
+    .__inext = $(inext)
+    .__next = $(inext)
     .as_text =
         for $self:
             if ($self.step == 1):

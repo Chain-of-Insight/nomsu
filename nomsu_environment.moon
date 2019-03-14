@@ -1,7 +1,7 @@
 -- This file defines the environment in which Nomsu code runs, including some
 -- basic bootstrapping functionality.
 {:NomsuCode, :LuaCode, :Source} = require "code_obj"
-{:List, :Dict, :DictEntries} = require 'containers'
+{:List, :Dict} = require 'containers'
 Text = require 'text'
 SyntaxTree = require "syntax_tree"
 Files = require "files"
@@ -44,25 +44,38 @@ _1_as_text = (x)->
     if x == false then return "no"
     return tostring(x)
 
-_1_as_an_iterable = (x)->
-    if mt = getmetatable(x)
-        if mt.as_iterable
-            return mt.as_iterable(x)
-    return x
+nomsu_pairs = =>
+    mt = getmetatable(@)
+    if mt and mt.__next
+        return mt.__next, @, nil
+    else
+        return next, @, nil
+inext = if _VERSION == "Lua 5.2" or _VERSION == "Lua 5.1"
+    inext = (i)=>
+        value = @[i+1]
+        return i+1, value if value != nil
+else ipairs{}
+nomsu_ipairs = =>
+    mt = getmetatable(@)
+    if mt and mt.__inext
+        return mt.__inext, @, 0
+    else
+        return inext, @, 0
 
 local nomsu_environment
 nomsu_environment = Importer{
     -- Lua stuff:
-    :next, unpack: unpack or table.unpack, :setmetatable, :rawequal, :getmetatable, :pcall,
+    :next, :inext, unpack: unpack or table.unpack, :setmetatable, :rawequal, :getmetatable, :pcall,
     yield:coroutine.yield, resume:coroutine.resume, coroutine_status_of:coroutine.status,
     coroutine_wrap:coroutine.wrap, coroutine_from: coroutine.create,
     :error, :package, :os, :require, :tonumber, :tostring, :string, :xpcall,
     :print, :loadfile, :rawset, :_VERSION, :collectgarbage, :rawget, :rawlen,
     :table, :assert, :dofile, :loadstring, lua_type_of:type, :select, :math, :io, :load,
-    :pairs, :ipairs, :jit, :_VERSION, LUA_VERSION: (jit and jit.version or _VERSION),
+    pairs:nomsu_pairs, :ipairs, _ipairs:nomsu_ipairs, :jit,
+    :_VERSION, LUA_VERSION: (jit and jit.version or _VERSION),
     LUA_API: _VERSION, Bit: (jit or _VERSION == "Lua 5.2") and require('bitops') or nil
     -- Nomsu types:
-    a_List:List, a_Dict:Dict, Text:Text, Dict_Entries:DictEntries,
+    a_List:List, a_Dict:Dict, Text:Text,
     -- Utilities and misc.
     lpeg:lpeg, re:re, Files:Files,
     :SyntaxTree, TESTS: Dict({}), globals: Dict({}),

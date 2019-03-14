@@ -167,13 +167,9 @@ test:
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     if (($var.type == "Action") and ($var.stub == "1 =")):
         [$key, $value] = [$var.1, $var.3]
-        go to (vars set)
-    if (($var.type == "Action") and ($var.stub == "1 at")):
-        [$key, $value] = [$var.3, $var.1]
     ..else:
         [$key, $value] = [nil, $var]
 
-    --- (vars set) ---
     unless $value:
         at (this tree) fail "No value here"
 
@@ -211,21 +207,16 @@ test:
     if $key:
         $loop =
             Lua ("
-                local _iterating = \($iterable as lua expr);
-                local _next = getmetatable(_iterating).__next or next;
-                for \($key as lua identifier),\($value as lua identifier) in _next,_iterating,nil do
-                    if \($value as lua identifier) == nil and _1_is_a_dead_coroutine(_iterating) then break end
+                for \($key as lua identifier),\($value as lua identifier) in pairs(\($iterable as lua expr)) do
             ")
     ..else:
         $loop =
             Lua ("
-                local _iterating = _1_as_an_iterable(\($iterable as lua expr))
-                for _i=1,#_iterating do
-                    local \($value as lua identifier) = _iterating[_i]
-                    if \($value as lua identifier) == nil and _1_is_a_dead_coroutine(_iterating) then break end
+                for _i,\($value as lua identifier) in _ipairs(\($iterable as lua expr)) do
             ")
 
     --- (loop set) ---
+    # TODO: don't always wrap in block
     $lua =
         Lua ("
             do -- for-loop

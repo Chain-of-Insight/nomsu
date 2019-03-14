@@ -186,8 +186,11 @@ co_mt = {
     return math.huge
   end,
   __call = coroutine.resume,
-  __next = function(self, k)
+  __inext = function(self, k)
     local ok, val = coroutine.resume(self)
+    if coroutine.status(self) == 'dead' then
+      return 
+    end
     if ok then
       return (k or 0) + 1, val
     end
@@ -207,6 +210,7 @@ co_mt = {
     return co_mt[k]
   end
 }
+co_mt.__next = co_mt.__inext
 debug.setmetatable(coroutine.create(function() end), co_mt)
 local nil_mt = {
   __type = "Nil",
