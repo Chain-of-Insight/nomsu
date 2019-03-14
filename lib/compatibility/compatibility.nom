@@ -126,7 +126,7 @@ external:
             $tree = (SyntaxTree {: for $k = $v in $tree: add $k = $v})
             $tree.version = $end_version
             if $tree.shebang:
-                $tree.shebang = "#!/usr/bin/env nomsu -V\($end_version, joined with ".")\n"
+                $tree.shebang = "#!/usr/bin/env nomsu -V\$end_version\n"
         
         return $tree
     
