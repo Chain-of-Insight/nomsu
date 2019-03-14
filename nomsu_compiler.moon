@@ -208,7 +208,7 @@ compile = (tree)=>
                 if i > 1 then lua\add "\n"
                 line_lua = @compile(line)
                 lua\add line_lua
-                unless line_lua\last(1) == ";" or line_lua\last(4)\match("[^a-zA-Z0-9]end$")
+                unless line_lua\last(1) == ";" or line_lua\last(4)\match("[^_a-zA-Z0-9]end$")
                     lua\add ";"
             return lua
 

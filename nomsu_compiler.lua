@@ -255,7 +255,7 @@ compile = function(self, tree)
       end
       local line_lua = self:compile(line)
       lua:add(line_lua)
-      if not (line_lua:last(1) == ";" or line_lua:last(4):match("[^a-zA-Z0-9]end$")) then
+      if not (line_lua:last(1) == ";" or line_lua:last(4):match("[^_a-zA-Z0-9]end$")) then
         lua:add(";")
       end
     end
