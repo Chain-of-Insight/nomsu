@@ -60,7 +60,7 @@ command line program with $args:
         $file = (read file $filename)
         unless $file:
             fail "File does not exist: \$filename"
-        $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
+        $code = (NomsuCode from ($Source $filename 1 (#$file)) $file)
         try:
             $tree = ($code parsed)
         ..if it fails with $msg:

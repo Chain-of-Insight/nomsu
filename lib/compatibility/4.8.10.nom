@@ -11,7 +11,7 @@ upgrade action "local action" to "4.8.10" via
         $body = $tree.4
         if $spec.type is:
             "List":
-                if ((size of $spec) == 1):
+                if ((#$spec) == 1):
                     return \($spec.1 means $body)
                 ..else:
                     return \($spec all mean $body)
@@ -26,7 +26,7 @@ upgrade action "action" to "4.8.10" via
         if $body:
             if $spec.type is:
                 "List":
-                    if ((size of $spec) == 1):
+                    if ((#$spec) == 1):
                         return \(externally $spec.1 means $body)
                     ..else:
                         return \(externally $spec all mean $body)
@@ -42,7 +42,7 @@ upgrade action "compile 1 to" to "4.8.10" via
         $body = $tree.4
         if $spec.type is:
             "List":
-                if ((size of $spec) == 1):
+                if ((#$spec) == 1):
                     return \($spec.1 compiles to $body)
                 ..else:
                     return \($spec all compile to $body)
@@ -56,7 +56,7 @@ upgrade action "parse 1 as" to "4.8.10" via
         $body = $tree.4
         if $spec.type is:
             "List":
-                if ((size of $spec) == 1):
+                if ((#$spec) == 1):
                     return \($spec.1 parses as $body)
                 ..else:
                     return \($spec all parse as $body)

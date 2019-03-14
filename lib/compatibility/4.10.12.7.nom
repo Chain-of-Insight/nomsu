@@ -40,7 +40,7 @@ upgrade action ($k = $v for $i in $start to $stop via $step) to "4.10.12.7" as
     {: for $i in $start to $stop by $step: add $k = $v}
 
 upgrade action (parse $text from $filename) to "4.10.12.7" as
-    (NomsuCode from (Source $filename 1 (size of $text)) $text) parsed
+    (NomsuCode from (Source $filename 1 (#$text)) $text) parsed
 
 upgrade action ($ as lua statements) to "4.10.12.7" as ($ as lua)
 upgrade action (compile error at $pos $err hint $hint) to "4.10.12.7" as
@@ -54,7 +54,7 @@ upgrade $tree to "4.10.12.7" as:
         $first_chunk = $tree.1
         $i = 1
         $has_use = (no)
-        repeat while ($i <= (size of $first_chunk)):
+        repeat while ($i <= (#$first_chunk)):
             if (($first_chunk.$i.type == "Action") and ($first_chunk.$i.stub == "use")):
                 $has_use = (yes)
             ..else:
@@ -69,12 +69,10 @@ upgrade $tree to "4.10.12.7" as:
         for $j in 1 to ($i - 1):
             $chunk1.$j = $first_chunk.$j
         
-        for $j in $i to (size of $first_chunk):
+        for $j in $i to (#$first_chunk):
             $chunk2.($j - $i + 1) = $first_chunk.$j
         
         $new_tree = ("FileChunks" tree from $tree.source with $chunk1 $chunk2)
-        
-        for $i in 2 to (size of $tree):
+        for $i in 2 to (#$tree):
             $new_tree.($i + 1) = $tree.$i
-        
         return $new_tree

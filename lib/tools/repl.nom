@@ -15,7 +15,7 @@ external:
             You can type in Nomsu code here and hit 'enter' twice to run it.
             To exit, type 'exit' or 'quit' and hit enter twice.
         ")
-
+    
     (tutorial) means:
         (use "tools/tutorial").run_with {.extras = []}
         exit
@@ -29,19 +29,18 @@ command line program with $args:
                type 'tutorial' to run the tutorial
         
     ")
-
+    
     # Best way I know of to detect the number of return values and only
         print if it's >0:
     (say results of (*extra arguments*)) means:
         $N = (select "#" (*extra arguments*))
-        if ($N == 0):
-            return
+        if ($N == 0): return
         for $ in 1 to $N:
             $ret = (select $ (*extra arguments*))
             if ($ret is "Text"):
                 $ret = (quote $ret)
             say "\$ret"
-
+    
     repeat:
         say (bright (yellow ">> ")) inline
         $buff = []
@@ -50,7 +49,7 @@ command line program with $args:
             $line = ($io.read "*L")
             say (reset color) inline
             if (($line == "\n") or (not $line)):
-                if ((size of $buff) > 0):
+                if ((#$buff) > 0):
                     # clear the line
                     if $(COLOR ENABLED):
                         say "\027[1A\027[2K" inline
@@ -58,7 +57,7 @@ command line program with $args:
             $buff, add ($line, with "\t" -> "    ")
             say (dim (yellow ".. ")) inline
         --- (run buffer) ---
-        if ((size of $buff) == 0): stop
+        if ((#$buff) == 0): stop
         $buff = ($buff, joined)
         spoof file $buff
         try:
@@ -69,14 +68,12 @@ command line program with $args:
         
         unless $tree:
             do next
-
+        
         if ($tree.type == "Comment"):
             say (dim "Comment:\($tree.1)")
             do next
-
-        if ($tree.type != "FileChunks"):
-            $tree = [$tree]
-
+        
+        if ($tree.type != "FileChunks"): $tree = [$tree]
         for $chunk in $tree:
             try:
                 $lua = ($chunk as lua)
@@ -91,7 +88,7 @@ command line program with $args:
             $lua, remove free vars
             if (load "return \($lua, text)"):
                 $lua, prepend "return "
-
+            
             try:
                 say results of (run $lua)
             ..if it fails with $err: say $err

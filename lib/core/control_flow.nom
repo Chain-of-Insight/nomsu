@@ -42,8 +42,8 @@ test:
 (else $) compiles to:
     at (this tree) fail ("
         Compile error: This 'else' is not connected to any 'if' or 'unless' condition.
-        Hint: You should probably have a ".." in front of the "else", to indicate \
-        ..that it's attached to the previous condition.
+        Hint: You should probably have a ".." in front of the "else", to indicate that it's attached \
+        ..to the previous condition.
     ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,15 +164,16 @@ test:
 (for $var in $iterable $body) compiles to:
     unless $var:
         at (this tree) fail "No var here"
+    
     # This uses Lua's approach of only allowing loop-scoped variables in a loop
     if (($var.type == "Action") and ($var.stub == "1 =")):
         [$key, $value] = [$var.1, $var.3]
     ..else:
         [$key, $value] = [nil, $var]
-
+    
     unless $value:
         at (this tree) fail "No value here"
-
+    
     # Numeric loop:
     if (($iterable.type == "Action") and (($iterable, get stub) == "1 to")):
         [$start, $stop] = [$iterable.1, $iterable.3]
@@ -181,13 +182,15 @@ test:
                 local _start = \($start as lua expr)
                 for \($value as lua identifier)=_start,\($stop as lua expr) do
             ")
+        
         if $key:
             $loop, add ("
-
+                
                     local \($key as lua identifier) = \($value as lua identifier) - _start + 1;
             ")
+        
         go to (loop set)
-
+    
     # Numeric loop with step:
     if (($iterable.type == "Action") and (($iterable, get stub) == "1 to 2 by")):
         [$start, $stop, $step] = [$iterable.1, $iterable.3, $iterable.5]
@@ -196,13 +199,15 @@ test:
                 local _start, _step = \($start as lua expr), \($step as lua expr);
                 for \($value as lua identifier)=_start,\($stop as lua expr),_step do
             ")
+        
         if $key:
             $loop, add ("
-
+                
                     local \($key as lua identifier) = (\($value as lua identifier) - _start)/_step + 1
             ")
+        
         go to (loop set)
-
+    
     # for $ in (...):
     if $key:
         $loop =
@@ -216,6 +221,7 @@ test:
             ")
 
     --- (loop set) ---
+    
     # TODO: don't always wrap in block
     $lua =
         Lua ("
@@ -236,8 +242,10 @@ test:
     $lua, add "\n    end"
     if ($key and ($body has subtree \(stop $key))):
         $lua, add "\n    " (\(---stop $key ---) as lua)
+    
     if ($body has subtree \(stop $value)):
         $lua, add "\n    " (\(---stop $value ---) as lua)
+    
     $lua, add "\nend -- for-loop"
     $lua, remove free vars [($value as lua identifier, text), $key and ($key as lua identifier, text)]
     return $lua
@@ -293,7 +301,6 @@ test:
     repeat 5 times:
         $x += 1
     assume $x == 5
-
 (repeat $n times $body) parses as (for (=lua "_i") in (1 to $n by 1) $body)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -325,41 +332,41 @@ test:
     
     for $line in $body:
         unless
-            (($line.type == "Action") and ((size of $line) >= 2)) and
-                $line.(size of $line) is "Block" syntax tree
+            (($line.type == "Action") and ((#$line) >= 2)) and
+                $line.(#$line) is "Block" syntax tree
         ..:
             at $line fail ("
                 Compile error: Invalid line for the body of an 'if' block.
-                Hint: Each line should contain one or more conditional expressions followed \
-                ..by a block, or "else" followed by a block.
+                Hint: Each line should contain one or more conditional expressions followed by a block, \
+                ..or "else" followed by a block.
             ")
-        $action = $line.(size of $line)
-        if (($line.1 == "else") and ((size of $line) == 2)):
+        $action = $line.(#$line)
+        if (($line.1 == "else") and ((#$line) == 2)):
             unless $else_allowed:
                 at $line fail ("
                     Compile error: You can't have two 'else' blocks.
                     Hint: Merge all of the 'else' blocks together.
                 ")
             
-            unless ((size of "\$code") > 0):
+            unless ((#"\$code") > 0):
                 at $line fail ("
                     Compile error: You can't have an 'else' block without a preceding condition.
-                    Hint: If you want the code in this block to always execute, you don't need a \
-                    ..conditional block around it. Otherwise, make sure the 'else' block comes last.
+                    Hint: If you want the code in this block to always execute, you don't need a conditional \
+                    ..block around it. Otherwise, make sure the 'else' block comes last.
                 ")
             
             $code, add "\nelse\n    " ($action as lua)
             $else_allowed = (no)
         ..else:
             $code, add $clause " "
-            for $i in 1 to ((size of $line) - 1):
+            for $i in 1 to ((#$line) - 1):
                 if ($i > 1):
                     $code, add " or "
                 $code, add ($line.$i as lua expr)
             $code, add " then\n    " ($action as lua)
             $clause = "\nelseif"
     
-    if ((size of "\$code") == 0):
+    if ((#"\$code") == 0):
         at $body fail ("
             Compile error: 'if' block has an empty body.
             Hint: This means nothing would happen, so the 'if' block should be deleted.
@@ -396,40 +403,40 @@ test:
     
     for $line in $body:
         unless
-            (($line.type == "Action") and ((size of $line) >= 2)) and
-                $line.(size of $line) is "Block" syntax tree
+            (($line.type == "Action") and ((#$line) >= 2)) and
+                $line.(#$line) is "Block" syntax tree
         ..:
             at $line fail ("
                 Compile error: Invalid line for 'if' block.
                 Hint: Each line should contain expressions followed by a block, or "else" followed by a block.
             ")
-        $action = $line.(size of $line)
-        if (($line.1 == "else") and ((size of $line) == 2)):
+        $action = $line.(#$line)
+        if (($line.1 == "else") and ((#$line) == 2)):
             unless $else_allowed:
                 at $line fail ("
                     Compile error: You can't have two 'else' blocks.
                     Hint: Merge all of the 'else' blocks together.
                 ")
             
-            unless ((size of "\$code") > 0):
+            unless ((#"\$code") > 0):
                 at $line fail ("
                     Compile error: You can't have an 'else' block without a preceding condition.
-                    Hint: If you want the code in this block to always execute, you don't need \
-                    ..a conditional block around it. Otherwise, make sure the 'else' block comes last.
+                    Hint: If you want the code in this block to always execute, you don't need a conditional \
+                    ..block around it. Otherwise, make sure the 'else' block comes last.
                 ")
             
             $code, add "\nelse\n    " ($action as lua)
             $else_allowed = (no)
         ..else:
             $code, add $clause " "
-            for $i in 1 to ((size of $line) - 1):
+            for $i in 1 to ((#$line) - 1):
                 if ($i > 1):
                     $code, add " or "
                 $code, add "\(mangle "branch value") == " ($line.$i as lua expr)
             $code, add " then\n    " ($action as lua)
             $clause = "\nelseif"
     
-    if ((size of "\$code") == 0):
+    if ((#"\$code") == 0):
         at $body fail ("
             Compile error: 'if' block has an empty body.
             Hint: This means nothing would happen, so the 'if' block should be deleted.

@@ -10,7 +10,8 @@ upgrade $tree to "2.4" as:
     unless ($tree is "Action" syntax tree): return
     if $tree.stub is:
         "when" "if":
-            if ((size of $tree) == 3): return $tree
+            if ((#$tree) == 3):
+                return $tree
             $conditions = []
             $new_lines = []
             $body =
@@ -22,7 +23,7 @@ upgrade $tree to "2.4" as:
                         $new_lines, add $line
                     
                     ($line.stub == "*"):
-                        if ((size of $line) == 2):
+                        if ((#$line) == 2):
                             $conditions, add $line.2
                         ..else:
                             $new_lines, add $line
@@ -60,7 +61,7 @@ upgrade $tree to "2.4" as:
                         $new_lines, add $line
                     
                     ($line.stub == "*"):
-                        if ((size of $line) == 2):
+                        if ((#$line) == 2):
                             $values, add $line.2
                         ..else:
                             $new_lines, add $line

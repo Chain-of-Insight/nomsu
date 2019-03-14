@@ -94,7 +94,7 @@ external:
             $prod *= $
         return $prod
     
-    [avg of $items, average of $items] all mean ((sum of $items) / (size of $items))
+    [avg of $items, average of $items] all mean ((sum of $items) / (#$items))
     
     # Min/max
     [min of $items, smallest of $items, lowest of $items] all mean:

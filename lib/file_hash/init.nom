@@ -47,9 +47,9 @@ if $use_sha1:
         (hash $) means:
             $bytes = ($, bytes)
             $hash = ($bytes.1 << 7)
-            for $i in 2 to (size of $bytes):
+            for $i in 2 to (#$bytes):
                 $hash = ((1000003 * $hash) ~ $bytes.$i)
-            $hash = ($hash ~ (size of $bytes))
+            $hash = ($hash ~ (#$bytes))
             return "\$hash"
 
 external:

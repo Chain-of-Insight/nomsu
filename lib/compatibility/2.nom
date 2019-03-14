@@ -33,6 +33,5 @@ upgrade $tree to "2" as:
             $bits = [: for $ in $tree: add (($ upgraded) if ($ is syntax tree) else $)]
             unless (($bits, last) is "Block" syntax tree):
                 $body = ($bits, last)
-                $bits.(size of $bits) =
-                    =lua "SyntaxTree{type='Block', source=\$body.source, \$body}"
+                $bits.(#$bits) = (=lua "SyntaxTree{type='Block', source=\$body.source, \$body}")
             return (=lua "SyntaxTree{type='Action', source=\$tree.source, unpack(\$bits)}")

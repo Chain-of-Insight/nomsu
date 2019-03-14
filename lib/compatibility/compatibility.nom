@@ -25,7 +25,7 @@ external:
         $lua = (Lua "")
         for $action in $actions:
             $replacements = {}
-            for $i in 1 to (size of $action):
+            for $i in 1 to (#$action):
                 if ($action.$i is "Var" syntax tree):
                     $replacements.($action.$i.1) = "\(\$tree as lua id)[\$i]"
             define mangler
@@ -74,6 +74,7 @@ external:
             if ($ver is "Text"):
                 return (($ as number) for $ in $ver matching "[0-9]+")
             return $ver
+        
         (Ver $) means:
             if ($ is "a List"):
                 if ($.1 is "Text"):
@@ -83,6 +84,7 @@ external:
             if $lib:
                 return {.lib = $lib, .version = ($ver as version list)}
             return {.version = ($ as version list)}
+        
         $start = (Ver $start_version)
         $end = (Ver $end_version)
         $end.lib or= $start.lib

@@ -27,7 +27,7 @@ command line program with $args:
         unless $file:
             fail "File does not exist: \$filename"
         $leading_indent = ($file, matching "\n*([ ]*)")
-        $code = (NomsuCode from (Source $filename 1 (size of $file)) $file)
+        $code = (NomsuCode from (Source $filename 1 (#$file)) $file)
         $tree = ($code parsed $start_version)
         $uptree =
             $tree upgraded from ($start_version or ($tree.version or $(NOMSU VERSION))) to
