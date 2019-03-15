@@ -96,10 +96,16 @@ enhance_error = function(error_message)
             local action_name = fn_name:from_lua_id()
             error_message = "The action '" .. tostring(action_name) .. "' is not defined."
             local func = debug.getinfo(2, 'f').func
-            local ename, env = debug.getupvalue(func, 1)
-            if not (ename == "_ENV" or ename == "_G") then
-              func = debug.getinfo(3, 'f').func
+            local env
+            if _VERSION == "Lua 5.1" then
+              env = getfenv(func)
+            else
+              local ename
               ename, env = debug.getupvalue(func, 1)
+              if not (ename == "_ENV" or ename == "_G") then
+                func = debug.getinfo(3, 'f').func
+                ename, env = debug.getupvalue(func, 1)
+              end
             end
             local THRESHOLD = math.min(4.5, .9 * #action_name)
             local candidates = { }

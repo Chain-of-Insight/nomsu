@@ -74,10 +74,14 @@ enhance_error = (error_message)->
 
             -- This check is necessary for handling both top-level code and code inside a fn
             func = debug.getinfo(2,'f').func
-            ename,env = debug.getupvalue(func, 1)
-            unless ename == "_ENV" or ename == "_G"
-                func = debug.getinfo(3,'f').func
+            local env
+            if _VERSION == "Lua 5.1"
+                env = getfenv(func)
+            else
                 ename,env = debug.getupvalue(func, 1)
+                unless ename == "_ENV" or ename == "_G"
+                    func = debug.getinfo(3,'f').func
+                    ename,env = debug.getupvalue(func, 1)
 
             THRESHOLD = math.min(4.5, .9*#action_name) -- Ignore matches with strdist > THRESHOLD
             candidates = {}
