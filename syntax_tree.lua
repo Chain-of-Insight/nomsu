@@ -254,7 +254,10 @@ do
           [patt:as_var()] = self
         }
       end
-      if patt:get_stub() ~= self:get_stub() then
+      if patt.type ~= self.type then
+        return nil
+      end
+      if patt.type == "Action" and patt:get_stub() ~= self:get_stub() then
         return nil
       end
       if #self ~= #patt then

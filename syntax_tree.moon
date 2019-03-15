@@ -134,7 +134,8 @@ class SyntaxTree
     matching: (patt)=>
         if patt.type == "Var"
             return {[patt\as_var!]:@}
-        return nil if patt\get_stub! != @get_stub!
+        return nil if patt.type != @type
+        return nil if patt.type == "Action" and patt\get_stub! != @get_stub!
         -- TODO: support vararg matches like (\(say 1 2 3), matching \(say *$values))
         return nil if #@ != #patt
         match = {}
