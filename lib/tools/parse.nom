@@ -42,15 +42,29 @@ use "commandline"
         "a Syntax Tree":
             $body = ([: for $bit in $: add ($bit as xml)], joined with " ")
             if ($.type == "Action"):
-                return ("
-                    <Action name="\(($, get stub) as xml)">\$body</Action>
-                ")
+                return "<Action name=\"\(($, get stub) as xml)\">\$body</Action>"
             ..else:
-                return ("
-                    <\($.type)>\$body</\($.type)>
-                ")
+                return "<\($.type)>\$body</\($.type)>"
+        
         "Text":
-            return ($, with "&" -> "&amp;", with "\"" -> "&quot;", with "'" -> "&apos;", with "<" -> "&lt;", with ">" -> "&gt;")
+            return
+                (
+                    ($, with "&" -> "&amp;", with "\"" -> "&quot;", with "'" -> "&apos;"), 
+                        with "<" -> "&lt;"
+                ), with ">" -> "&gt;"
+        
+        else:
+            return "\$"
+
+($ as lisp) means:
+    when (type of $) is:
+        "a Syntax Tree":
+            $body = ([$.type, : for $bit in $: add ($bit as lisp)], joined with " ")
+            return "(\$body)"
+        
+        "Text":
+            return "\"\($, with "\\" -> "\\\\", with "\"" -> "\\\"", with "\n" -> "\\n")\""
+        
         else:
             return "\$"
 
@@ -59,9 +73,14 @@ command line program with $args:
         $file = (read file $filename)
         unless $file:
             fail "File does not exist: \$filename"
-        $nomsu = (NomsuCode from (Source $filename 1 (size of $file)) $file)
+        $nomsu = (NomsuCode from (Source $filename 1 (#$file)) $file)
         $tree = ($nomsu parsed)
-        if ($args.x or $args.xml):
-            say ($tree as xml)
-        ..else:
-            print tree $tree at indent ""
+        when:
+            ($args.x or $args.xml):
+                say ($tree as xml)
+            
+            ($args.l or $args.lisp):
+                say ($tree as lisp)
+            
+            else:
+                print tree $tree at indent ""
