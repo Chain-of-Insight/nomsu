@@ -1,20 +1,22 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu <5.13 to 5.13
 use "compatibility/compatibility"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-upgrade action (size of $) to "5.13" as (#$)
+upgrade action (size of $) to "5.13" as #$
 upgrade action "with" to "5.13" via
     for $tree:
         $assignments = $tree.2
         $body = $tree.3
         if ($assignments.type != "Dict"): return $tree
-        $new_assignments = \[]
-        for $a in $assignments at $i:
+        $new_assignments = `[]
+        for ($i = $a) in $assignments:
             when:
-                (($a.type == "DictEntry") and ((#$a) == 1)): $a = $a.1
-                (all of [$a.type == "DictEntry", (#$a) == 2]): $a = \($a.1 = $a.2)
+                (($a.type == "DictEntry") and (#$a == 1)): $a = $a.1
+                (all of [$a.type == "DictEntry", #$a == 2]):
+                    $a = ("Action" tree with $a.1 "=" $a.2)
             $new_assignments.$i = $a
-        return \(with $new_assignments $body)
+        return ("Action" tree with "with" $new_assignments $body)

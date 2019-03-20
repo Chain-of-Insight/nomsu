@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu <2.4 to Nomsu 2.4
     
 use "compatibility/compatibility"
@@ -10,7 +11,7 @@ upgrade $tree to "2.4" as:
     unless ($tree is "Action" syntax tree): return
     if $tree.stub is:
         "when" "if":
-            if ((#$tree) == 3):
+            if (#$tree == 3):
                 return $tree
             $conditions = []
             $new_lines = []
@@ -23,13 +24,13 @@ upgrade $tree to "2.4" as:
                         $new_lines, add $line
                     
                     ($line.stub == "*"):
-                        if ((#$line) == 2):
+                        if (#$line == 2):
                             $conditions, add $line.2
                         ..else:
                             $new_lines, add $line
                     
                     ($line.stub == "* else"):
-                        $new_lines, add (\(else $block) with vars {.block = $line.3})
+                        $new_lines, add ("Action" tree with "else" $line.3)
                     
                     else:
                         $conditions, add $line.2
@@ -44,10 +45,8 @@ upgrade $tree to "2.4" as:
                         $conditions = []
             
             return
-                \(when $body) with vars {
-                    .body =
-                        =lua "SyntaxTree{type='Block', source=\$tree[2].source, unpack(\$new_lines)}"
-                }
+                "Action" tree with "when"
+                    "Block" tree from $tree.2.source with (unpack $new_lines)
         
         "if 1 is ?" "if 1 = ?":
             $values = []
@@ -61,26 +60,24 @@ upgrade $tree to "2.4" as:
                         $new_lines, add $line
                     
                     ($line.stub == "*"):
-                        if ((#$line) == 2):
+                        if (#$line == 2):
                             $values, add $line.2
                         ..else:
                             $new_lines, add $line
                     
                     ($line.stub == "* else"):
-                        $new_lines, add (\(else $block) with vars {.block = $line.3})
+                        $new_lines, add ("Action" tree with "else" $line.3)
                     
                     else:
                         $values, add $line.2
                         $action = $line.3
-                        unless ($action is "Block" syntax tree): $action = \(: $action)
+                        unless ($action is "Block" syntax tree):
+                            $action = ("Block" tree with $action)
                         $values, add $action
                         $new_lines, add
                             =lua "SyntaxTree{type='Action', source=\$values[1].source, unpack(\$values)}"
                         $values = []
             
             return
-                \(if $var is $body) with vars {
-                    .var = ($tree.2 upgraded)
-                    .body =
-                        =lua "SyntaxTree{type='Block', source=\$tree[5].source, unpack(\$new_lines)}"
-                }
+                "Action" tree with "if" ($tree.2 upgraded) "is"
+                    "Block" tree from $tree.5.source with (unpack $new_lines)

@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This is a tool to find syntax trees matching a pattern. "*" is a wildcard
     that will match any subtree, and "**" is a wildcard that will match any
     0 or more subtrees. "**" is greedy, so extra arguments after it will
@@ -40,17 +41,19 @@ command line program with $args:
             ($tree.type == "Action"):
                 if (($tree, get stub) != ($patt, get stub)): return (no)
         
-        for $ in 1 to (#$patt):
+        for $ in (1 to #$patt):
             if ($patt.$ is syntax tree):
-                if ($patt.$ == \$multi_wildcard): return (yes)
+                if ($patt.$ == ("Var" tree with "multi_wildcard")): return (yes)
                 unless ($tree.$ matches $patt.$): return (no)
             ..else:
                 unless ($tree.$ == $patt.$): return (no)
         
-        if ((#$tree) != (#$patt)): return (no)
+        if (#$tree != #$patt):
+            return (no)
+        
         return (yes)
     $filenames = ($args.extras, from 2 to -1)
-    if ((#$filenames) == 0):
+    if (#$filenames == 0):
         say ("
             Warning: searching stdin (ctrl-d to abort). To avoid this message, use nomsu -t find -
         ")
@@ -60,7 +63,7 @@ command line program with $args:
         $file = (read file $filename)
         unless $file:
             fail "File does not exist: \$filename"
-        $code = (NomsuCode from ($Source $filename 1 (#$file)) $file)
+        $code = (NomsuCode from ($Source $filename 1 #$file) $file)
         try:
             $tree = ($code parsed)
         ..if it fails with $msg:
@@ -91,7 +94,7 @@ command line program with $args:
                     recurse $t on $sub
         
         if $args.l:
-            if ((#$results) > 0):
+            if (#$results > 0):
                 say $filename
         ..else:
             sort $results by $ -> $.line

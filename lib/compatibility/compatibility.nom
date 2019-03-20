@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
     
@@ -21,13 +22,13 @@ external:
     
     (upgrade action $actions to $version as $body) compiles to:
         if ($actions is "Action" syntax tree):
-            $actions = \[$actions]
+            $actions = ("List" tree with $actions)
         $lua = (Lua "")
         for $action in $actions:
             $replacements = {}
-            for $i in 1 to (#$action):
+            for $i in (1 to #$action):
                 if ($action.$i is "Var" syntax tree):
-                    $replacements.($action.$i.1) = "\(\$tree as lua id)[\$i]"
+                    $replacements.($action.$i.1) = "\(`$tree as lua id)[\$i]"
             define mangler
             (make tree $t) means:
                 when:
@@ -42,7 +43,7 @@ external:
                     
                     ($t is syntax tree):
                         $args = []
-                        for $k = $v in $t:
+                        for ($k = $v) in $t:
                             if ((type of $k) == "a Number"):
                                 $args, add (make tree $v)
                             ..else:
@@ -59,7 +60,7 @@ external:
             $lua, add
                 Lua ("
                     upgrade_action_1_to_2_via(\(quote $action.stub), \($version as lua expr), function(\
-                    ..\(\$tree as lua id))
+                    ..\(`$tree as lua id))
                         return \$retval
                     end)
                 ")
@@ -91,13 +92,15 @@ external:
         assume $start.lib == $end.lib
         $seen = {}
         $versions = {}
-        for $v = $ in $UPGRADES:
+        for ($v = $) in $UPGRADES:
             $versions.$v = (yes)
         
-        for $v = $ in $ACTION_UPGRADES:
+        for ($v = $) in $ACTION_UPGRADES:
             $versions.$v = (yes)
         
-        $versions = [: for $v = $ in $versions: if ((Ver $v).lib == $start.lib): add $v]
+        $versions =
+            [: for ($v = $) in $versions: if ((Ver $v).lib == $start.lib): add $v]
+        
         sort $versions by $ -> ($ as version list)
         for $ver in $versions:
             if (($ver as version list) <= $start.version): do next $ver
@@ -109,23 +112,20 @@ external:
                             if ($ is "Action" syntax tree):
                                 $(upgrade 1 to 2) = $ACTION_UPGRADES.$ver.($.stub)
                                 if $(upgrade 1 to 2):
-                                    $with_upgraded_args = {
-                                        : for $k = $v in $:
-                                            add $k = ($v upgraded from $start_version to $end_version)
-                                    }
+                                    $with_upgraded_args = {: for ($k = $v) in $: add $k = ($v upgraded from $start_version to $end_version)}
                                     set $with_upgraded_args's metatable to ($'s metatable)
                                     return (upgrade $with_upgraded_args to $end_version)
             
             if $UPGRADES.$ver:
-                $with_upgraded_args = {
-                    : for $k = $v in $tree:
+                $with_upgraded_args = {:
+                    for ($k = $v) in $tree:
                         add $k = ($v upgraded from $start_version to $end_version)
                 }
                 set $with_upgraded_args's metatable to ($tree's metatable)
                 $tree = ($UPGRADES.$ver $with_upgraded_args $end_version)
         
         if ($tree.version != $end_version):
-            $tree = (SyntaxTree {: for $k = $v in $tree: add $k = $v})
+            $tree = (SyntaxTree {: for ($k = $v) in $tree: add $k = $v})
             $tree.version = $end_version
             if $tree.shebang:
                 $tree.shebang = "#!/usr/bin/env nomsu -V\$end_version\n"

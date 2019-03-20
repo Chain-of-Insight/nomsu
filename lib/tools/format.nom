@@ -1,4 +1,5 @@
-#!/usr/bin/env nomsu -V7
+#!/usr/bin/env nomsu -V7.0.0
+
 ###
     Auto-format Nomsu code. Usage:
     nomsu -t format [-i] file1 file2...

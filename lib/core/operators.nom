@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file contains definitions of operators like "+" and "and".
     
 use "core/metaprogramming"
@@ -9,7 +10,7 @@ use "core/metaprogramming"
 test:
     assume (all [1 < 2, 2 > 1, 1 <= 2, 2 >= 1, 1 == 1, 1 != 2])
 
-# Comparison Operators
+### Comparison Operators
 ($x < $y) compiles to "(\($x as lua expr) < \($y as lua expr))"
 ($x > $y) compiles to "(\($x as lua expr) > \($y as lua expr))"
 ($x <= $y) compiles to "(\($x as lua expr) <= \($y as lua expr))"
@@ -33,7 +34,7 @@ test:
     unless (($x == 4) and ($y == 5)):
         fail "unpacking failed"
 
-# Variable assignment operator
+### Variable assignment operator
 ($var = $value) compiles to:
     lua> ("
         local lua = LuaCode()
@@ -113,7 +114,7 @@ test:
         end -- 'with' block
     ")
 
-# Math Operators
+### Math Operators
 test:
     unless ((5 wrapped around 2) == 1):
         fail "mod not working"
@@ -121,8 +122,8 @@ test:
 [$x wrapped around $y, $x mod $y, $x % $y] all compile to
     "((\($x as lua expr)) % (\($y as lua expr)))"
 
-# 3-part chained comparisons
-# (uses a lambda to avoid re-evaluating middle value, while still being an expression)
+### 3-part chained comparisons
+### (uses a lambda to avoid re-evaluating middle value, while still being an expression)
 test:
     $calls = 0
     (one) means:
@@ -144,8 +145,8 @@ test:
 ($x > $y >= $z) parses as ((($a $b $c) -> (($a > $b) and ($b >= $c))) $x $y $z)
 ($x >= $y >= $z) parses as ((($a $b $c) -> (($a >= $b) and ($b >= $c))) $x $y $z)
 
-# TODO: optimize for common case where x,y,z are all either variables or number literals
-# Boolean Operators
+### TODO: optimize for common case where x,y,z are all either variables or number literals
+### Boolean Operators
 test:
     (barfer) means (fail "short circuiting failed")
     assume (((no) and (barfer)) == (no))
@@ -156,8 +157,8 @@ test:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Bitwise Operators
-# These can break if running the precompiled code from another Lua version:
+### Bitwise Operators
+### These can break if running the precompiled code from another Lua version:
 lua> ("
     if \(at compilation $(LUA VERSION)) ~= \$(LUA VERSION) then
         \(
@@ -169,19 +170,19 @@ lua> ("
     end
 ")
 
-# TODO: implement OR, XOR, AND for multiple operands?
+### TODO: implement OR, XOR, AND for multiple operands?
 test:
-    assume ((~ (~ 5)) == 5)
+    assume (~(~5) == 5)
     assume ((1 | 4) == 5)
     assume ((1 ~ 3) == 2)
     assume ((1 & 3) == 1)
     assume ((1 << 2) == 4)
     assume ((4 >> 2) == 1)
 
-# Lua 5.3 introduced bit operators like | and &. Use them when possible, otherwise
+### Lua 5.3 introduced bit operators like | and &. Use them when possible, otherwise
     fall back to bit.bor(), bit.band(), etc.
 lua> "if \((is jit) or ($(LUA API) == "Lua 5.2")) then"
-[NOT $, ~ $] all compile to "Bit.bnot(\($ as lua expr))"
+[NOT $, ~$] all compile to "Bit.bnot(\($ as lua expr))"
 [$x OR $y, $x | $y] all compile to
     "Bit.bor(\($x as lua expr), \($y as lua expr))"
 
@@ -198,7 +199,7 @@ lua> "if \((is jit) or ($(LUA API) == "Lua 5.2")) then"
     "Bit.rshift(\($x as lua expr), \($shift as lua expr))"
 
 lua> "else"
-[NOT $, ~ $] all compile to "(~(\($ as lua expr)))"
+[NOT $, ~$] all compile to "(~(\($ as lua expr)))"
 [$x OR $y, $x | $y] all compile to "(\($x as lua expr) | \($y as lua expr))"
 [$x XOR $y, $x ~ $y] all compile to "(\($x as lua expr) ~ \($y as lua expr))"
 [$x AND $y, $x & $y] all compile to "(\($x as lua expr) & \($y as lua expr))"
@@ -210,16 +211,17 @@ lua> "else"
 
 lua> "end"
 
-# Unary operators
+### Unary operators
 test:
-    assume ((- 5) == -5)
+    assume (-(5) == -5)
     assume ((not (yes)) == (no))
-(- $) compiles to "(-(\($ as lua expr)))"
+-$ compiles to "(-(\($ as lua expr)))"
 (not $) compiles to "(not \($ as lua expr))"
 test:
     assume ((size of [1, 2, 3]) == 3)
-    assume ((#[1, 2, 3]) == 3)
-# Length
+    assume (#[1, 2, 3] == 3)
+
+### Length
 [#$list, size of $list] all compile to:
     lua> ("
         local list_lua = \($list as lua expr)
@@ -228,11 +230,11 @@ test:
         end
         return LuaCode("(#", list_lua, ")")
     ")
-($list is empty) parses as ((#$list) == 0)
+($list is empty) parses as (#$list == 0)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Update operators
+### Update operators
 test:
     $x = 1
     $x += 1

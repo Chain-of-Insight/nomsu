@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-# A progress bar
+#!/usr/bin/env nomsu -V7.0.0
+
+### A progress bar
 use "consolecolor"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -13,13 +14,12 @@ external:
         $x = ($x clamped between 0 and $w)
         if $(COLOR ENABLED):
             $bits = [" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"]
-            $middle = ("" if ($x == $w) else $bits.(1 + (floor ((#$bits) * ($x mod 1)))))
+            $middle = ("" if ($x == $w) else $bits.(1 + (floor (#$bits * ($x mod 1)))))
             return ("
-                \(reset color)[\(green)\($bits, last, rep (floor $x))\$middle\(" ", rep ($w - ((floor $x) + 1)))\(reset color)]
+                \(reset color)[\(green)\($bits, last, rep (floor $x))\$middle\
+                ..\(" ", rep ($w - ((floor $x) + 1)))\(reset color)]
             ")
         ..else:
-            # Probably not unicode support either:
-            return ("
-                [\("#", rep ($x, rounded down))\("-", rep ($w - ($x, rounded down)))]
-            ")
+            ### Probably not unicode support either:
+            return "[\("#", rep ($x, rounded down))\("-", rep ($w - ($x, rounded down)))]"
     ($w wide $ progress bar) means (($ * $w) / $w progress bar)

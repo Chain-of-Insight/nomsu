@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file contains some definitions of text escape sequences, including ANSI console
     color codes.
     
@@ -62,17 +63,17 @@ test:
 external:
     ($num as hex) means:
         if ($num < 0):
-            return ("-0x%X", formatted with (- $num))
+            return ("-0x%X", formatted with -$num)
         ..else:
             return ("0x%X", formatted with $num)
 
-# Text literals
+### Text literals
 $escapes = {
     .nl = "\n", .newline = "\n", .tab = "\t", .bell = "\a", .cr = "\r"
     ."carriage return" = "\r", .backspace = "\b", ."form feed" = "\f"
     .formfeed = "\f", ."vertical tab" = "\v"
 }
 
-for $name = $str in $escapes:
+for ($name = $str) in $escapes:
     with [$lua = (Lua (quote $str))]:
-        $(COMPILE RULES).$name = (-> $lua)
+        $(COMPILE RULES).$name = ->$lua

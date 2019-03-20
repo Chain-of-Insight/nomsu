@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines some common math literals and functions
     
 use "core/metaprogramming"
@@ -11,7 +12,7 @@ use "core/collections"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 external:
-    # Literals:
+    ### Literals:
     test:
         unless (all of [inf, NaN, pi, tau, golden ratio, e]):
             fail "math constants failed"
@@ -25,7 +26,7 @@ external:
     (golden ratio) compiles to "((1+math.sqrt(5))/2)"
     (e) compiles to "math.exp(1)"
     
-    # Functions:
+    ### Functions:
     test:
         assume (("5" as a number) == 5)
     $($ as a number) = $(tonumber $)
@@ -33,7 +34,7 @@ external:
     test:
         unless
             all of [
-                abs 5, | 5 |, sqrt 5, √ 5, sine 5, cosine 5, tangent 5, arc sine 5, arc cosine 5
+                abs 5, | 5 |, sqrt 5, √5, sine 5, cosine 5, tangent 5, arc sine 5, arc cosine 5
                 arc tangent 5, arc tangent 5 / 10, hyperbolic sine 5, hyperbolic cosine 5
                 hyperbolic tangent 5, e^ 5, ln 5, log 5 base 2, floor 5, ceiling 5, round 5
             ]
@@ -43,7 +44,7 @@ external:
     [$(absolute value $), $(absolute value of $), $(| $ |), $(abs $)] =
         [$math.abs, $math.abs, $math.abs, $math.abs]
     
-    [$(square root $), $(square root of $), $(√ $), $(sqrt $)] =
+    [$(square root $), $(square root of $), $(√$), $(sqrt $)] =
         [$math.sqrt, $math.sqrt, $math.sqrt, $math.sqrt]
     
     [$(sine $), $(sin $)] = [$math.sin, $math.sin]
@@ -67,7 +68,7 @@ external:
         unless ((2.6 to the nearest 0.25) == 2.5): fail "rounding failed"
     ($n to the nearest $rounder) means ($rounder * (floor ($n / $rounder + 0.5)))
     
-    # Any/all
+    ### Any/all
     [all of $items, all $items] all mean:
         for $ in $items:
             unless $:
@@ -81,7 +82,7 @@ external:
         return (no)
     [none of $items, none $items] all parse as (not (any of $items))
     
-    # Sum/product
+    ### Sum/product
     [sum of $items, sum $items] all mean:
         $total = 0
         for $ in $items:
@@ -94,9 +95,9 @@ external:
             $prod *= $
         return $prod
     
-    [avg of $items, average of $items] all mean ((sum of $items) / (#$items))
+    [avg of $items, average of $items] all mean ((sum of $items) / #$items)
     
-    # Min/max
+    ### Min/max
     [min of $items, smallest of $items, lowest of $items] all mean:
         $best = (nil)
         for $ in $items:
@@ -186,13 +187,13 @@ external:
     
     ($nums mixed by $amount) means:
         $ = ($amount clamped between 0 and 1)
-        $i = (1 + ($ * ((#$nums) - 1)))
-        if ((floor $i) == (#$nums)):
+        $i = (1 + ($ * (#$nums - 1)))
+        if ((floor $i) == #$nums):
             return $nums.(floor $i)
         [$lo, $hi] = [$nums.(floor $i), $nums.(floor ($i + 1))]
         return ($lo to $hi mixed by ($i mod 1))
     
-    # Random functions
+    ### Random functions
     (seed random with $) means:
         lua> ("
             math.randomseed(\$);

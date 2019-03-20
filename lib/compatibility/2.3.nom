@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu <2.3 to Nomsu 2.3
     
 use "compatibility/compatibility"
@@ -7,7 +8,7 @@ use "compatibility/compatibility"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 upgrade action ($a = $b) to "2.3" as ($a == $b)
-upgrade action (<- $) to "2.3" as (set $)
+upgrade action <-$ to "2.3" as (set $)
 upgrade action (assign $) to "2.3" as (set $)
 upgrade action ($a <- $b) to "2.3" as ($a = $b)
 upgrade action (external $a <- $b) to "2.3" as (external $a = $b)

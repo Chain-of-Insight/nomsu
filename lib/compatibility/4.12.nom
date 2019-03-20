@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu <4.11 to Nomsu 4.11
     (overhaul of function literals, deleting (if all of ...), etc. shorthand)
     

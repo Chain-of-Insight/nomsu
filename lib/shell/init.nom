@@ -1,7 +1,8 @@
-#!/usr/bin/env nomsu -V6
-#
-    This file defines some actions for running shell commands.
+#!/usr/bin/env nomsu -V7.0.0
 
+###
+    This file defines some actions for running shell commands.
+    
 external:
     (at $callsite =sh $cmd) means:
         $f = ($io.popen $cmd)
@@ -9,19 +10,26 @@ external:
         [$ok, $return_type, $return] = ($f, close)
         unless $ok:
             if ($return_type == "exit"):
-                at $callsite fail "Command failure: Command `\$cmd` failed with exit code \$return"
+                at $callsite fail
+                    "Command failure: Command `\($cmd)` failed with exit code \$return"
             ..else:
-                at $callsite fail "Command failure: Command `\$cmd` was terminated by signal \$return"
+                at $callsite fail
+                    "Command failure: Command `\($cmd)` was terminated by signal \$return"
         return $contents
-
+    
     (at $callsite sh> $cmd) means:
         [$ok, $return_type, $return] = ($os.execute $cmd)
         unless $ok:
             if ($return_type == "exit"):
-                at $callsite fail "Command failure: Command `\$cmd` failed with exit code \$return"
+                at $callsite fail
+                    "Command failure: Command `\($cmd)` failed with exit code \$return"
             ..else:
-                at $callsite fail "Command failure: Command `\$cmd` was terminated by signal \$return"
-
-    # Attach callsite information for better error reporting
-    (=sh $cmd) compiles to (\(at ("Text" tree with "\($cmd.source)") =sh $cmd) as lua)
-    (sh> $cmd) compiles to (\(at ("Text" tree with "\($cmd.source)") sh> $cmd) as lua)
+                at $callsite fail
+                    "Command failure: Command `\($cmd)` was terminated by signal \$return"
+    
+    ### Attach callsite information for better error reporting
+    (=sh $cmd) compiles to
+        ("Action" tree with "at" ("Text" tree with "\($cmd.source)") "=" "sh" $cmd) as lua
+    
+    (sh> $cmd) compiles to
+        ("Action" tree with "at" ("Text" tree with "\($cmd.source)") "sh" ">" $cmd) as lua

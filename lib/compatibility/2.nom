@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu 1 to Nomsu 2
     
 use "compatibility/compatibility"
@@ -11,15 +12,13 @@ upgrade $tree to "2" as:
     if ($tree.stub == "if 1 2 else"):
         $true_body = ($tree.3 upgraded)
         unless ($true_body is "Block" syntax tree):
-            $true_body = \(: $true_body)
+            $true_body = ("Block" tree with $true_body)
         $false_body = ($tree.5 upgraded)
         unless ($false_body is "Block" syntax tree):
             $false_body = (=lua "Block(\$false_body.source, \$false_body)")
         
         return
-            \(if $cond $true_body else $false_body) with vars {
-                .cond = ($tree.2 upgraded), .true_body = $true_body, .false_body = $false_body
-            }
+            "Action" tree with "if" ($tree.2 upgraded) $true_body "else" $false_body
     
     $need_blocks = [
         "if", "unless", "for 1 in", "for 1 = 2 in", "repeat while 1", "repeat 1 times"

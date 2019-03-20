@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file contains basic input/output code
     
 use "core/metaprogramming"
@@ -10,14 +11,12 @@ use "core/control_flow"
 
 external:
     (say (*extra arguments*)) means:
-        for $ in 1 to (select "#" (*extra arguments*)):
+        for $ in (1 to (select "#" (*extra arguments*))):
             $arg = (select $ (*extra arguments*))
             $io.write ($arg as text)
         $io.write "\n"
         $io.flush()
-    
     (say $message inline) means ($io.write $message)
-    
     (ask $prompt) means:
         $io.write $prompt
         return ($io.read())

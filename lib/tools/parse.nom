@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     Tool to print out a parse tree of files in an easy-to-read format. Usage:
     nomsu tools/parse.nom file1 file2 directory1 ...        
     
@@ -42,9 +43,9 @@ use "commandline"
         "a Syntax Tree":
             $body = ([: for $bit in $: add ($bit as xml)], joined with " ")
             if ($.type == "Action"):
-                return "<Action name=\"\(($, get stub) as xml)\">\$body</Action>"
+                return "<Action name=\"\(($, get stub) as xml)\">\($body)</Action>"
             ..else:
-                return "<\($.type)>\$body</\($.type)>"
+                return "<\($.type)>\($body)</\($.type)>"
         
         "Text":
             return
@@ -73,7 +74,7 @@ command line program with $args:
         $file = (read file $filename)
         unless $file:
             fail "File does not exist: \$filename"
-        $nomsu = (NomsuCode from (Source $filename 1 (#$file)) $file)
+        $nomsu = (NomsuCode from (Source $filename 1 #$file) $file)
         $tree = ($nomsu parsed)
         when:
             ($args.x or $args.xml):

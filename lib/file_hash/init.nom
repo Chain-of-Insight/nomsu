@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines some actions for hashing files and looking up files by hash.
     
 use "filesystem"
@@ -37,7 +38,7 @@ if $use_sha1:
             $hash = (=lua "\$hashlib.new('sha1'):final(\$)")
             return (base64 $hash)
 ..else:
-    # TODO: remove warning?
+    ### TODO: remove warning?
     say ("
         \027[31;1mWARNING: OpenSSL module not found. Defaulting to a non-cryptographically secure \
         ..hash function.\027[0m
@@ -47,9 +48,9 @@ if $use_sha1:
         (hash $) means:
             $bytes = ($, bytes)
             $hash = ($bytes.1 << 7)
-            for $i in 2 to (#$bytes):
+            for $i in (2 to #$bytes):
                 $hash = ((1000003 * $hash) ~ $bytes.$i)
-            $hash = ($hash ~ (#$bytes))
+            $hash = ($hash ~ #$bytes)
             return "\$hash"
 
 external:

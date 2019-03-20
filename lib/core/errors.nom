@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file contains basic error reporting code
     
 use "core/metaprogramming"
@@ -63,8 +64,7 @@ use "core/control_flow"
                         if not _1_is(_a, _b) then
                             _a = type_of(_a) == 'Text' and _a:as_lua() or _1_as_text(_a)
                             at_1_fail(\(quote "\($condition.1.source)"),
-                                "Assumption failed: This value (".._a..") was expected to be "..\
-                    .._b..", but wasn't.")
+                                "Assumption failed: This value (".._a..") was expected to be ".._b..", but wasn't.")
                         end
                     end
                 ")
@@ -76,8 +76,7 @@ use "core/control_flow"
                         if _1_is(_a, _b) then
                             _a = type_of(_a) == 'Text' and _a:as_lua() or _1_as_text(_a)
                             at_1_fail(\(quote "\($condition.1.source)"),
-                                "Assumption failed: This value (".._a..") was expected to not be \
-                    ..".._b..", but it was.")
+                                "Assumption failed: This value (".._a..") was expected to not be ".._b..", but it was.")
                         end
                     end
                 ")
@@ -104,21 +103,21 @@ test:
     unless $worked:
         fail "'try' failed to recover from failure"
 
-# Try/except
+### Try/except
 [
     try $action if it succeeds $success if it fails with $msg $fallback
     try $action if it fails with $msg $fallback if it succeeds $success
 ] all compile to:
     $success_lua = ($success as lua)
-    if ((#"\$success_lua") > 0):
+    if (#"\$success_lua" > 0):
         $success_lua, add "\n"
     $success_lua, prepend "-- Success:\n"
     $success_lua, 
         add "if not _fell_through then return table.unpack(_result, 2) end"
     $fallback_lua = ($fallback as lua)
-    if ((#"\$fallback_lua") > 0):
+    if (#"\$fallback_lua" > 0):
         $msg_lua = ($msg as lua expr)
-        if ((#"\$msg_lua") > 0):
+        if (#"\$msg_lua" > 0):
             $fallback_lua, prepend "\n\$msg_lua = _result[2]\n"
             if ($msg_lua, text, is lua id):
                 $fallback_lua, add free vars [($msg_lua, text)]

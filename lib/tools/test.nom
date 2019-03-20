@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     Tool to run all tests in a file (i.e. the code block inside a call to 'test $'). Usage:
     nomsu tools/test.nom file1 file2 directory1 ...
     
@@ -10,7 +11,7 @@ use "commandline"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 command line program with $args:
-    for $filename in $args.extras at $i:
+    for ($i = $filename) in $args.extras:
         $file = (read file $filename)
         unless $file:
             fail "Couldn't find \$filename"
@@ -22,7 +23,7 @@ command line program with $args:
                 ]* nomsu %-V[ ]*([%d.]*)
             ")
         $file_tests = []
-        for $src = $test in (nomsu environment, Module $filename).TESTS:
+        for ($src = $test) in (nomsu environment, Module $filename).TESTS:
             if $version:
                 $test = ("
                     #!/usr/bin/env nomsu -V\$version

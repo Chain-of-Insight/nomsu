@@ -1,7 +1,8 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
-    A library for simple object oriented programming.
+#!/usr/bin/env nomsu -V7.0.0
 
+###
+    A library for simple object oriented programming.
+    
 use "core/metaprogramming"
 use "core/operators"
 use "core/control_flow"
@@ -34,7 +35,7 @@ test:
     assume $b != (a Buffer {.bits = []})
     (a Comma Buffer) is (a Buffer) with [$bits]:
         ($self, as text) means ($bits, joined with ",")
-        ($self, number of commas) means ((#$bits) - 1)
+        ($self, number of commas) means (#$bits - 1)
     $csv = (a Comma Buffer)
     assume $csv.is_a_buffer
     assume ($csv is "a Comma Buffer")
@@ -45,7 +46,7 @@ test:
     assume "\$csv" == "x,y"
     assume ($csv, number of commas) == 1
     (a Vec) is (a thing) with [$x, $y]:
-        ($self, + $other) means (Vec ($x + $other.x) ($y + $other.y))
+        ($self, +$other) means (Vec ($x + $other.x) ($y + $other.y))
         ($self, length) means (sqrt ($x * $x + $y * $y))
     (Vec $x $y) means (a Vec {.x = $x, .y = $y})
     assume ((Vec 1 2) + (Vec 10 10)) == (Vec 11 12)
@@ -70,7 +71,6 @@ external:
         $class.__tostring = ($ -> "\($.__type) \($ as text like a dict)")
         $class.__eq = ({}'s metatable).__eq
         $class.__len = ({}'s metatable).__len
-        
         set $class's metatable to {
             .__index = $parent, .__tostring = ($class -> $class.__type)
             .__call =
@@ -84,19 +84,15 @@ external:
         
         if $(initialize $):
             initialize $class
-            for $stub = $metamethod in $METAMETHOD_MAP:
+            for ($stub = $metamethod) in $METAMETHOD_MAP:
                 if $class.($stub, as lua id):
                     $class.$metamethod = $class.($stub, as lua id)
         
         return $class
-
     $(a thing) = ((nil) class named "thing")
-
     ($classname is $parent with $vars $class_body) compiles to:
         unless ($vars.type == "List"):
-            at $vars fail ("
-                Compile error: This is not a list of variables.
-            ")
+            at $vars fail "Compile error: This is not a list of variables."
         $class_id = ($classname.stub, as lua id)
         $class_body and=
             $class_body, with
@@ -106,9 +102,10 @@ external:
                             return
                                 "IndexChain" tree with ("Var" tree with "self")
                                     "Index" tree with ("Text" tree with $v.1)
-
+        
         if ($parent.type == "Action"):
             $parent = ("Var" tree with $parent)
+        
         $lua =
             Lua ("
                 \$class_id = _1_class_named(\($parent as lua id), \(quote $classname.stub)\(
@@ -122,5 +119,6 @@ external:
                     ) if $class_body else ""
                 ))
             ")
+        
         $lua, add free vars [$class_id]
         return $lua

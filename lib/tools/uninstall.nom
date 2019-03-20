@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     A tool to uninstall third party Nomsu packages (the inverse of the install tool)
     
     Usage:
@@ -23,16 +24,16 @@ use "shell"
 
 command line program with $args:
     $searchpath =
-        [
-            : for $ in ["?.lua", "?/init.lua", "?.nom", "?/init.nom"]:
+        [:
+            for $ in ["?.lua", "?/init.lua", "?.nom", "?/init.nom"]:
                 add "\$(NOMSU PACKAGEPATH)\$"
         ], joined with ";"
-
+    
     for $package_name in $args.extras:
         $path = ($package.searchpath $package_name $package.nomsupath "/")
         unless $path:
             say "Sorry, couldn't find \$package_name in \$(NOMSU PACKAGEPATH)"
             exit 1
         $path = ($path, with "/init%.nom" -> "")
-        unless ((ask "Do you want to delete \$path? [Y/n] ") == "n"):
+        unless ((ask "Do you want to delete \($path)? [Y/n] ") == "n"):
             run command "rm -rv \$path"

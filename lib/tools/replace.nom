@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This is a tool to replace syntax trees with something new.
     
     Usage:
@@ -22,7 +23,7 @@ use "commandline"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 command line program with $args:
-    if ((#$args.extras) < 2):
+    if (#$args.extras < 2):
         fail ("
             Usage: nomsu -t replace [--literal="$v1 $v2..."] <pattern> <replacement> file1 file2...
         ")
@@ -38,19 +39,19 @@ command line program with $args:
     if (($pattern_tree.type == "Var") and (not $literal_vars.($pattern_tree.1))):
         fail "Pattern matches every part of the file."
     
-    $pattern_vars = {
-        : for $ in recursive $pattern_tree:
+    $pattern_vars = {:
+        for $ in recursive $pattern_tree:
             if (($.type == "Var") and (not $literal_vars.($.1))): add $.1
             for $child in $:
                 if ($child is "a Syntax Tree"):
                     recurse $ on $child
     }
     
-    # TODO: support wildcards and unpacking
+    ### TODO: support wildcards and unpacking
         e.g. nomsu -t replace "test(: $test; *$more_tests)" "*$more_tests; *$test"
     ($tree matches $patt with $substitution_values) means:
-        # TODO: optimize
-        $substitution_values = {: for $k = $v in $substitution_values: add $k = $v}
+        ### TODO: optimize
+        $substitution_values = {: for ($k = $v) in $substitution_values: add $k = $v}
         when:
             (not ($tree is syntax tree)): return (no)
             (($patt.type == "Var") and $pattern_vars.($patt.1)):
@@ -66,21 +67,23 @@ command line program with $args:
             ($tree.type == "Action"):
                 if (($tree, get stub) != ($patt, get stub)): return (nil)
         
-        for $ in 1 to (#$patt):
+        for $ in (1 to #$patt):
             if ($patt.$ is syntax tree):
                 $new_values = ($tree.$ matches $patt.$ with $substitution_values)
                 unless $new_values:
                     return (nil)
                 
-                for $k = $v in $new_values:
+                for ($k = $v) in $new_values:
                     $substitution_values.$k = $v
             ..else:
                 unless ($tree.$ == $patt.$): return (nil)
         
-        if ((#$tree) != (#$patt)): return (nil)
+        if (#$tree != #$patt):
+            return (nil)
+        
         return $substitution_values
     $filenames = ($args.extras, from 3 to -1)
-    if ((#$filenames) == 0):
+    if (#$filenames == 0):
         say ("
             Warning: searching stdin (ctrl-d to abort). To avoid this message, use nomsu -t find -
         ")
@@ -90,7 +93,7 @@ command line program with $args:
         $file = (read file $filename)
         unless $file:
             fail "File does not exist: \$filename"
-        $code = (NomsuCode from ($Source $filename 1 (#$file)) $file)
+        $code = (NomsuCode from ($Source $filename 1 #$file) $file)
         try:
             $tree = ($code parsed)
         ..if it fails with $msg:
@@ -112,12 +115,12 @@ command line program with $args:
                     $values = ($t matches $pattern_tree with {})
                     if $values:
                         $matched.$t = (yes)
-                        for $k = $v in $values:
+                        for ($k = $v) in $values:
                             $values.$k = ($v with replacements)
-                        $ret = ($replacement_tree with vars $values)
+                        $ret = ($replacement_tree, with $values)
                         if ($args.i and (not $args.f)):
                             if ($user_answers.$t == (nil)):
-                                if ((#$user_answers) > 0): say ""
+                                if (#$user_answers > 0): say ""
                                 $user_answers.$t = "n"
                                 say "\(bright)Should this:"
                                 say ("
@@ -134,12 +137,12 @@ command line program with $args:
                         return $ret
         $tree2 = ($tree with replacements)
         if $args.i:
-            if ((#$user_answers) > 0): say ""
+            if (#$user_answers > 0): say ""
             say ("
-                \(#$replaced)/\(#$matched) replacement\("" if ((#$replaced) == 1) else "s") in \$filename
+                \(#$replaced)/\(#$matched) replacement\("" if (#$replaced == 1) else "s") in \$filename
             ")
             
-            if ((#$replaced) > 0):
+            if (#$replaced > 0):
                 write "\($tree2 as nomsu)" to file $filename
         ..else:
             say ($tree2 as nomsu)

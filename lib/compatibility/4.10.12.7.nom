@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu <4.10.12.7 to 4.10.12.7
 use "compatibility/compatibility"
 
@@ -22,10 +23,8 @@ upgrade action ($e for $i in $start to $stop by $step) to "4.10.12.7" as
 upgrade action ($e for $i in $start to $stop via $step) to "4.10.12.7" as
     [: for $i in $start to $stop by $step: add $e]
 
-upgrade action ($k = $v for $ in $items) to "4.10.12.7" as {
-    : for $ in $items:
-        add $k = $v
-}
+upgrade action ($k = $v for $ in $items) to "4.10.12.7" as
+    {: for $ in $items: add $k = $v}
 
 upgrade action ($k = $v for $k0 = $v0 in $items) to "4.10.12.7" as
     {: for $k0 = $v0 in $items: add $k = $v}
@@ -40,13 +39,13 @@ upgrade action ($k = $v for $i in $start to $stop via $step) to "4.10.12.7" as
     {: for $i in $start to $stop by $step: add $k = $v}
 
 upgrade action (parse $text from $filename) to "4.10.12.7" as
-    (NomsuCode from (Source $filename 1 (#$text)) $text) parsed
+    (NomsuCode from (Source $filename 1 #$text) $text) parsed
 
 upgrade action ($ as lua statements) to "4.10.12.7" as ($ as lua)
 upgrade action (compile error at $pos $err hint $hint) to "4.10.12.7" as
     compile error at $pos $err $hint
 
-# In old code, it was okay to have imports at the top of the file in the same chunk,
+### In old code, it was okay to have imports at the top of the file in the same chunk,
     but changes to the API now require imports to be in their own file chunk in order
     for compilation to work properly.
 upgrade $tree to "4.10.12.7" as:
@@ -54,7 +53,7 @@ upgrade $tree to "4.10.12.7" as:
         $first_chunk = $tree.1
         $i = 1
         $has_use = (no)
-        repeat while ($i <= (#$first_chunk)):
+        repeat while ($i <= #$first_chunk):
             if (($first_chunk.$i.type == "Action") and ($first_chunk.$i.stub == "use")):
                 $has_use = (yes)
             ..else:
@@ -66,13 +65,13 @@ upgrade $tree to "4.10.12.7" as:
         [$chunk1, $chunk2] =
             ["Block" tree from $first_chunk.source, "Block" tree from $first_chunk.source]
         
-        for $j in 1 to ($i - 1):
+        for $j in (1 to ($i - 1)):
             $chunk1.$j = $first_chunk.$j
         
-        for $j in $i to (#$first_chunk):
+        for $j in ($i to #$first_chunk):
             $chunk2.($j - $i + 1) = $first_chunk.$j
         
         $new_tree = ("FileChunks" tree from $tree.source with $chunk1 $chunk2)
-        for $i in 2 to (#$tree):
+        for $i in (2 to #$tree):
             $new_tree.($i + 1) = $tree.$i
         return $new_tree

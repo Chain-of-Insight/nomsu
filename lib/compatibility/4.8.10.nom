@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu <4.8.10 to 4.8.10 (renaming "action" -> "means")
 use "compatibility/compatibility"
 
@@ -11,13 +12,13 @@ upgrade action "local action" to "4.8.10" via
         $body = $tree.4
         if $spec.type is:
             "List":
-                if ((#$spec) == 1):
-                    return \($spec.1 means $body)
+                if (#$spec == 1):
+                    return ("Action" tree with $spec.1 "means" $body)
                 ..else:
-                    return \($spec all mean $body)
+                    return ("Action" tree with $spec "all" "mean" $body)
             
             else:
-                return \($spec means $body)
+                return ("Action" tree with $spec "means" $body)
 
 upgrade action "action" to "4.8.10" via
     for ($tree $end_version):
@@ -26,15 +27,15 @@ upgrade action "action" to "4.8.10" via
         if $body:
             if $spec.type is:
                 "List":
-                    if ((#$spec) == 1):
-                        return \(externally $spec.1 means $body)
+                    if (#$spec == 1):
+                        return ("Action" tree with "externally" $spec.1 "means" $body)
                     ..else:
-                        return \(externally $spec all mean $body)
+                        return ("Action" tree with "externally" $spec "all" "mean" $body)
                 
                 else:
-                    return \(externally $spec means $body)
+                    return ("Action" tree with "externally" $spec "means" $body)
         ..else:
-            return \($spec's meaning)
+            return ("Action" tree with $spec "'" "s" "meaning")
 
 upgrade action "compile 1 to" to "4.8.10" via
     for ($tree $end_version):
@@ -42,13 +43,13 @@ upgrade action "compile 1 to" to "4.8.10" via
         $body = $tree.4
         if $spec.type is:
             "List":
-                if ((#$spec) == 1):
-                    return \($spec.1 compiles to $body)
+                if (#$spec == 1):
+                    return ("Action" tree with $spec.1 "compiles" "to" $body)
                 ..else:
-                    return \($spec all compile to $body)
+                    return ("Action" tree with $spec "all" "compile" "to" $body)
             
             else:
-                return \($spec compiles to $body)
+                return ("Action" tree with $spec "compiles" "to" $body)
 
 upgrade action "parse 1 as" to "4.8.10" via
     for ($tree $end_version):
@@ -56,13 +57,13 @@ upgrade action "parse 1 as" to "4.8.10" via
         $body = $tree.4
         if $spec.type is:
             "List":
-                if ((#$spec) == 1):
-                    return \($spec.1 parses as $body)
+                if (#$spec == 1):
+                    return ("Action" tree with $spec.1 "parses" "as" $body)
                 ..else:
-                    return \($spec all parse as $body)
+                    return ("Action" tree with $spec "all" "parse" "as" $body)
             
             else:
-                return \($spec parse as $body)
+                return ("Action" tree with $spec "parse" "as" $body)
 
 upgrade action (compile as $) to "4.8.10" as (what $ compiles to)
 upgrade action (remove action $) to "4.8.10" as (($'s meaning) = (nil))

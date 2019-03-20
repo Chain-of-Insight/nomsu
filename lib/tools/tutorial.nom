@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.13.12.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This is a Nomsu tutorial.
     
 use "filesystem"
@@ -14,71 +15,71 @@ use "shell"
 ")
 
 [<your code here>, ???] all compile to
-    \(
-        at ("Text" tree with "\((this tree).source)") fail
-            \("Incomplete code: This needs to be filled in.")
+    (
+        "Action" tree with "at" ("Text" tree with "\((this tree).source)") "fail"
+            `"Incomplete code: This needs to be filled in."
     ) as lua
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 $lessons = [
     lesson "Variables":
-        # In Nomsu, variables have a "$" prefix, and you can just assign to them
+        ### In Nomsu, variables have a "$" prefix, and you can just assign to them
             without declaring them first:
         $x = 1
         test that ($x == 1)
         
-        # Variables which have not yet been set have the value (nil)
+        ### Variables which have not yet been set have the value (nil)
         test that ($foobar == (nil))
         
-        # Variables can be nameless:
+        ### Variables can be nameless:
         $ = 99
         
-        # Or have spaces, if surrounded with parentheses:
+        ### Or have spaces, if surrounded with parentheses:
         $(my favorite number) = 23
         
-        # Figure out what value $my_var should have:
+        ### Figure out what value $my_var should have:
         $my_var = 100
         $my_var = ($my_var + $x + $(my favorite number))
         test that ($my_var == (???))
     
     lesson "Actions":
-        # Fix this action so the tests pass:
+        ### Fix this action so the tests pass:
         ($x doubled) means ((???) * $x)
         
-        # Tests:
+        ### Tests:
         test that ((2 doubled) == 4)
         test that ((-5 doubled) == -10)
     
     lesson "Blocks":
-        # When you need to do multiple things inside an action, use a block.
-        # Blocks are written with a colon followed by some indented code:
+        ### When you need to do multiple things inside an action, use a block.
+        ### Blocks are written with a colon followed by some indented code:
         ($x doubled then squared) means:
             $x = (2 * $x)
             $x = (???)
             return $x
         
-        # Blocks are also used for loops and conditionals:
+        ### Blocks are also used for loops and conditionals:
         for $num in [0, -1, 10, 4]:
             $correct_answer = (4 * ($num * $num))
             if (($num doubled then squared) != $correct_answer):
                 fail "Wrong answer for \($num)!"
-
+    
     lesson "Text":
-        # Nomsu text is enclosed in double quotation marks:
+        ### Nomsu text is enclosed in double quotation marks:
         $text = "Hello"
         
-        # You can insert values into text using a backslash:
+        ### You can insert values into text using a backslash:
         test that ("two plus three is \(2 + 3)" == (???))
         
-        # Variables don't require parentheses, but other expressions do:
+        ### Variables don't require parentheses, but other expressions do:
         $x = 99
         test that ("$x is \$x" == (???))
         
-        # This can be used to convert values to text:
+        ### This can be used to convert values to text:
         test that ("\$x" == (???))
         
-        # Longer strings use '("' followed by an indented region:
+        ### Longer strings use '("' followed by an indented region:
         $long = ("
             line one
               line two with spaces at the front
@@ -91,234 +92,231 @@ $lessons = [
             ")
     
     lesson "Conditionals":
-        # Make this action return "big" if its argument
-        # is bigger than 99, otherwise return "small"
+        ### Make this action return "big" if its argument
+        ### is bigger than 99, otherwise return "small"
         (the size of $n) means:
             if (???):
                 <your code here>
             ..else:
                 <your code here>
         
-        # Tests:
+        ### Tests:
         for $big_number in [9999, 100]:
             test that ((the size of $big_number) == "big")
-
+        
         for $small_number in [0, 1, -5, -999, 99]:
             test that ((the size of $small_number) == "small")
     
     lesson "Loops":
-        # Fix this action so the tests pass:
+        ### Fix this action so the tests pass:
         (the sum of $numbers) means:
             $sum = 0
             
-            # You can loop over the values in a list like this:
+            ### You can loop over the values in a list like this:
             for $number in $numbers:
-                # Hint: math expressions may need parentheses
+                ### Hint: math expressions may need parentheses
                 <your code here>
             return $sum
         
-        # Tests:
+        ### Tests:
         test that ((the sum of [1, 2, 3, 4, 5]) == 15)
         test that ((the sum of [100, 200]) == 300)
         
-        # You can also loop over a number range like this:
+        ### You can also loop over a number range like this:
         $total = 0
-        for $i in 1 to 3:
+        for $i in (1 to 3):
             $total = ($total + $i)
         test that ($total == (???))
     
     lesson "Variable Scopes":
-        # Nomsu's variables are local by default, and actions have their own scopes:
+        ### Nomsu's variables are local by default, and actions have their own scopes:
         $x = 1
         $y = 2
         
-        # Define an action that sets a variable:
+        ### Define an action that sets a variable:
         (do something) means:
-            # The variable $y is never set in this action, so it has the same value
+            ### The variable $y is never set in this action, so it has the same value
                 it has outside this action.
             test that ($y == (???))
             
-            # $x is set inside this action, and actions have their own scopes.
+            ### $x is set inside this action, and actions have their own scopes.
             $x = $y
             
-            # What number should $x be here?
+            ### What number should $x be here?
             test that ($x == (???))
         
-        # After running the action, what value should $x have?
+        ### After running the action, what value should $x have?
         do something
         test that ($x == (???))
     
     lesson "More Variable Scopes":
-        # Loops and conditionals do *not* have their own scopes:
+        ### Loops and conditionals do *not* have their own scopes:
         $z = 1
         if (1 == 1):
-            # Set $z inside a conditional:
+            ### Set $z inside a conditional:
             $z = 2
         
-        # After assigning in a conditional, what should $z be?
+        ### After assigning in a conditional, what should $z be?
         test that ($z == (???))
-        for $ in 1 to 1:
-            # Set $z inside a loop:
+        for $ in (1 to 1):
+            ### Set $z inside a loop:
             $z = 3
         
-        # After assigning in a loop, what should $z be?
+        ### After assigning in a loop, what should $z be?
         test that ($z == (???))
     
     lesson "Externals":
-        # The 'external' block lets you modify variables outside an action:
+        ### The 'external' block lets you modify variables outside an action:
         $x = 1
         (do something) means:
             external: $x = 2
         do something
         
-        # After running the action that sets $x in an 'external' block, what should $x be?
+        ### After running the action that sets $x in an 'external' block, what should $x be?
         test that ($x == (???))
     
     lesson "Locals":
-        # The 'with' block lets you create a local scope for the variables you list:
+        ### The 'with' block lets you create a local scope for the variables you list:
         $y = 1
         $z = 1
         with [$y]:
             $y = 2
             $z = 2
         
-        # After setting $y and $z in the 'with [$y]' block, what should $y and $z be?
+        ### After setting $y and $z in the 'with [$y]' block, what should $y and $z be?
         test that ($y == (???))
         test that ($z == (???))
     
     lesson "Failure and Recovery":
         $what_happened = "nothing"
         
-        # In Nomsu, sometimes things fail, but you can recover from failures with 'try':
+        ### In Nomsu, sometimes things fail, but you can recover from failures with 'try':
         try:
-            # The 'fail' action triggers failure
+            ### The 'fail' action triggers failure
             fail "Oh no!"
         ..if it fails:
             $what_happened = "failure"
         ..if it succeeds:
             $what_happened = "success"
         
-        # What do you think happened?
+        ### What do you think happened?
         test that ($what_happened == (???))
         
-        # Note: a 'try' block will silence failures, so this has no effect:
+        ### Note: a 'try' block will silence failures, so this has no effect:
         try: fail
     
     lesson "Indexing":
-        # Nomsu uses the "." operator to access things inside an object:
+        ### Nomsu uses the "." operator to access things inside an object:
         $dictionary = {.dog = "A lovable doofus", .cat = "An internet superstar"}
         test that ($dictionary.dog == "A lovable doofus")
         test that ($dictionary.cat == (???))
         
-        # If you try to access a key that's not in an object, the result is (nil):
+        ### If you try to access a key that's not in an object, the result is (nil):
         test that ($dictionary.mimsy == (???))
         
-        # $dictionary.dog is just a shorthand for $dictionary."dog".
+        ### $dictionary.dog is just a shorthand for $dictionary."dog".
             You may need to use the longer form for strings with spaces:
         $dictionary."guinea pig" = "A real-life tribble"
         
-        # Dictionaries are created with curly braces ({}) and can have
+        ### Dictionaries are created with curly braces ({}) and can have
             anything as a key or value, including numbers or other dictionaries:
         $dictionary.5 = "The number five"
         $dictionary.five = 5
         $dictionary.myself = $dictionary
         test that ($dictionary.myself == (???))
         
-        # Lists are similar, but use square brackets ([])
+        ### Lists are similar, but use square brackets ([])
             and can only have numbers as keys, starting at 1:
         $list = ["first", "second", 999]
         test that ($list.1 == "first")
         test that ($list.2 == (???))
         test that ($list.3 == (???))
         
-        # Hint: 4 should be a missing key
+        ### Hint: 4 should be a missing key
         test that ($list.4 == (???))
         test that ($list.foobar == (???))
         
-        # The "#" action gets the number of items inside something:
-        test that ((#$list) == (???))
-        test that ((#{.x = 10, .y = 20}) == (???))
+        ### The "#" action gets the number of items inside something:
+        test that (#$list == (???))
+        test that (#{.x = 10, .y = 20} == (???))
     
     lesson "Methods":
-        # The "," is used for method calls, which means calling an action
+        ### The "," is used for method calls, which means calling an action
             that's stored on an object (with the object as the first argument).
-        # Lists have an "add" method that puts new items at the end:
+        ### Lists have an "add" method that puts new items at the end:
         $list = [-4, -6, 5]
         $list, add 3
         test that ($list == [-4, -6, 5, 3])
         $list, add 7
         test that ($list == [???])
         
-        # Text also has some methods like:
+        ### Text also has some methods like:
         $name = "Harry Tuttle"
         test that (($name, from 7 to 12) == "Tuttle")
         test that (($name, with "Tuttle" -> "Buttle") == (???))
         
-        # Methods can be chained too:
+        ### Methods can be chained too:
         test that (($name, with "Tuttle" -> "Buttle", from 7 to 12) == (???))
     
     lesson "Object Oriented Programming":
-        # Object Oriented Programming deals with things that have
+        ### Object Oriented Programming deals with things that have
             associated values and behaviors.
-        # Here, we define a Buffer to be a thing that has a .bits value:
+        ### Here, we define a Buffer to be a thing that has a .bits value:
         (a Buffer) is (a thing) with [$bits]:
-            # And some methods:
+            ### And some methods:
             ($self, set up) means:
-                # This method runs when a new buffer is created
+                ### This method runs when a new buffer is created
                 $bits = []
             
-            # This method is used to add to a buffer
+            ### This method is used to add to a buffer
             ($self, add $bit) means:
                 $bits, add $bit
-
-            # ($list, joined) is a list method that concatenates the list items:
+            
+            ### ($list, joined) is a list method that concatenates the list items:
             ($self, as text) means ($bits, joined)
             
-            # Write a method called ($self, length) that returns the sum
+            ### Write a method called ($self, length) that returns the sum
                 of the lengths of each bit in the buffer:
             <your code here>
-
-        # Create an instance of a Buffer:
+        
+        ### Create an instance of a Buffer:
         $b = (a Buffer)
-        test that ($b is "a Buffer")
+        test that ($b == "a Buffer")
         test that ((type of $b) == "a Buffer")
         $b, add "xx"
         $b, add "yyy"
         test that (($b, as text) == "xxyy")
         test that (($b, length) == 5)
-
-        # You can define a thing that inherits the behaviors of another thing like this:
+        
+        ### You can define a thing that inherits the behaviors of another thing like this:
         (a Backwards Buffer) is (a Buffer) with [$bits]:
-            # ($list, reversed) is a method that returns a copy of $list with
+            ### ($list, reversed) is a method that returns a copy of $list with
                 the order of the items reversed.
             ($self, as text) means ($bits, reversed, joined)
-
         $bb = (a Backwards Buffer)
         $bb, add "one"
         $bb, add "two"
         test that (($bb, length) == (???))
         test that (($bb, as text) == (???))
-
+    
     lesson "Files Part 1":
-        # Define an external action here:
+        ### Define an external action here:
         external:
-            # These will be used in the next lesson
+            ### These will be used in the next lesson
             $foobar = 23
             ($x tripled) means:
                 <your code here>
         test that ((5 tripled) == 15)
         test that ((2 tripled) == 6)
-
+    
     lesson "Files Part 2":
-        # 'use' is the action for importing from other files
-        # It takes the path to the file (without the .nom extension):
+        ### 'use' is the action for importing from other files
+        ### It takes the path to the file (without the .nom extension):
         use (<prev lesson>)
         test that ((10 tripled) == (???))
         test that ($foobar == (???))
 ]
-
 $(ask normally) = $(ask)
-
 command line program with $args:
     if ($args.help or $args.h):
         say ("
@@ -334,18 +332,16 @@ command line program with $args:
                 +------------------------------------+
             
         ")
-
-    # For this tutorial questions are hilighted in bold cyan:
+    
+    ### For this tutorial questions are hilighted in bold cyan:
     (ask $q) means (ask normally (bold (cyan $q)))
     
-    # Find the tutorial file directory:
+    ### Find the tutorial file directory:
     if ($args.extras is empty):
         $tutorial_dir = "./nomsu_tutorial"
         unless ($Files.exists $tutorial_dir):
             when
-                ask ("
-                    The Nomsu tutorial files will be in \$tutorial_dir is that okay? [Y/n/exit] \;
-                ")
+                ask "The Nomsu tutorial files will be in \$tutorial_dir is that okay? [Y/n/exit] "
             ..is:
                 "n" "N" "no":
                     $tutorial_dir = (ask "Where do you want to put the tutorial? ")
@@ -353,11 +349,11 @@ command line program with $args:
     ..else:
         $tutorial_dir = $args.extras.1
     
-    # Set up the tutorial file directory:
+    ### Set up the tutorial file directory:
     if (not ($Files.exists $tutorial_dir)):
         make directory $tutorial_dir
     (filename of $i) means ("\($tutorial_dir)/lesson\$i.nom", with "//" -> "/")
-    for $lesson in $lessons at $i:
+    for ($i = $lesson) in $lessons:
         $filename = (filename of $i)
         unless ($Files.exists $filename):
             $lesson_text =
@@ -365,7 +361,7 @@ command line program with $args:
                     "\"\(filename of ($i - 1), with "%.nom$" -> "", with "^%./" -> "")\""
             write $lesson_text to file $filename
     
-    # Display info about editing the tutorial files:
+    ### Display info about editing the tutorial files:
     if $args.x:
         say ("
             The tutorial files are located in \$tutorial_dir.
@@ -381,7 +377,7 @@ command line program with $args:
             ..is:
                 "n" "N" "no":
                     $EDITOR = (nil)
-
+        
         unless $EDITOR:
             say
             $EDITOR =
@@ -390,22 +386,24 @@ command line program with $args:
                     (leave blank if you want to edit on your own in a different window)
                     > \;
                 ")
-            if ($EDITOR == ""): $EDITOR = (nil)
-
+            
+            if ($EDITOR == ""):
+                $EDITOR = (nil)
+    
     (run lesson $i) means:
         $filename = (filename of $i)
         $file = (read file $filename)
-        $file = ($NomsuCode, from (Source $filename 1 (#$file)) $file)
+        $file = ($NomsuCode, from (Source $filename 1 #$file) $file)
         $tree = ($file parsed)
         $tree =
-            $tree with $ ->:
-                if ($ == \(<prev lesson>)):
-                    return ("Text" tree with (filename of ($i - 1), with "%.nom$" -> ""))
+            $tree, with
+                $ ->:
+                    if ($ == `(<prev lesson>)):
+                        return ("Text" tree with (filename of ($i - 1), with "%.nom$" -> ""))
         run $tree
-
     
-    (get failures) means [
-        : for $lesson in $lessons at $i:
+    (get failures) means [:
+        for ($i = $lesson) in $lessons:
             try:
                 run lesson $i
             ..if it fails with $msg:
@@ -429,7 +427,7 @@ command line program with $args:
             
         ")
     $failures = (get failures)
-    for $lesson in $lessons at $i:
+    for ($i = $lesson) in $lessons:
         for $f in $failures:
             if ($f.lesson_number == $i):
                 say "\(red "  - ")\(bold (red "\$i. \($lesson.name) [incomplete]"))"
@@ -439,20 +437,18 @@ command line program with $args:
     if $(COLOR ENABLED):
         say ("
             
-            \(bold "Your progress:") \(
-                20 wide (((#$lessons) - (#$failures)) / (#$lessons)) progress bar
-            )
+            \(bold "Your progress:") \(20 wide ((#$lessons - #$failures) / #$lessons) progress bar)
         ")
     ..else:
         say
-        say (((#$lessons) - (#$failures)) / (#$lessons) progress bar)
-        
+        say ((#$lessons - #$failures) / #$lessons progress bar)
+    
     repeat until ($failures is empty):
         show first failure from $failures
         
-        # Have the user fix the first failure:
+        ### Have the user fix the first failure:
         unless $EDITOR:
-            # If the user is using an external editor, wait for the file to change
+            ### If the user is using an external editor, wait for the file to change
             $filename = (filename of $failures.1.lesson_number)
             say ("
                 \(yellow "Waiting for you to fix ")\(bold $filename) \
@@ -460,10 +456,10 @@ command line program with $args:
             ")
             
             try:
-                $files = [: for $ in 1 to (#$lessons): add (read file (filename of $))]
+                $files = [: for $ in (1 to #$lessons): add (read file (filename of $))]
                 repeat:
                     sleep for 0.5 seconds
-                    $new_files = [: for $ in 1 to (#$lessons): add (read file (filename of $))]
+                    $new_files = [: for $ in (1 to #$lessons): add (read file (filename of $))]
                     if ($new_files != $files):
                         $files = $new_files
                         stop
@@ -471,13 +467,14 @@ command line program with $args:
                 say "\nGoodbye."
                 exit
         ..else:
-            # If the user is using $EDITOR, launch it so they can edit the file:
+            ### If the user is using $EDITOR, launch it so they can edit the file:
             $filename = (filename of $failures.1.lesson_number)
             --- (retry file) ---
             when (ask "Edit \$filename to get it to pass? [Y/n/exit] ") is:
                 "q" "quit" "exit" "n" "N" "no": exit
                 "c":
                     write "# cheater!\n" to file $filename
+                
                 "y" "Y" "yes" "":
                     $f = (read file $filename)
                     [$line, $col] = ($failures.1.failure, match ":(%d+),(%d+)")
@@ -500,6 +497,7 @@ command line program with $args:
                 else:
                     say "Sorry, I don't understand that."
                     go to (retry file)
+            
             try:
                 run lesson $failures.1.lesson_number
             ..if it fails with $msg:
@@ -509,29 +507,31 @@ command line program with $args:
                 say ($msg, indented)
                 say
                 go to (retry file)
-        $prev_progress = (((#$lessons) - (#$failures)) / (#$lessons))
+        $prev_progress = ((#$lessons - #$failures) / #$lessons)
         $failures = (get failures)
-        $progress = (((#$lessons) - (#$failures)) / (#$lessons))
+        $progress = ((#$lessons - #$failures) / #$lessons)
         
-        # Update the progressbar if progess has changed:
+        ### Update the progressbar if progess has changed:
         if ($progress != $prev_progress):
             if ($progress > $prev_progress):
                 say (bold (green "\nSuccess!\n"))
             ..else:
                 say (bold (red "\nUh oh, that broke something.\n"))
+            
             if $(COLOR ENABLED):
                 $N = 100
-                for $ in 0 to $N:
+                for $ in (0 to $N):
                     $k = (($ / $N) smoothed by 2)
                     $p = ($prev_progress to $progress mixed by $k)
                     say "\r\(bold "Your progress:") \(20 wide $p progress bar)" inline
                     $io.flush()
                     sleep for (1 / $N) seconds
             ..else:
-                say (((#$lessons) - (#$failures)) / (#$lessons) progress bar)
+                say ((#$lessons - #$failures) / #$lessons progress bar)
+            
             say
     
-    # All done, no more failures:
+    ### All done, no more failures:
     say ("
         
                     \(bold "\(slow blink "Congratulations!")")

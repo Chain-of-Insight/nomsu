@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu <4.9 to 4.9
 use "compatibility/compatibility"
 
@@ -7,6 +8,6 @@ use "compatibility/compatibility"
 
 upgrade action "if" to "4.9" via
     for ($tree $end_version):
-        if ((#$tree) > 2):
+        if (#$tree > 2):
             return $tree
-        return \(when $tree.2)
+        return ("Action" tree with "when" $tree.2)

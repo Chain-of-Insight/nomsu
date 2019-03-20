@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file contains code that supports manipulating and using collections like lists
     and dictionaries.
     
@@ -9,11 +10,11 @@ use "core/operators"
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# List functionality:
+### List functionality:
 test:
     $list = [1, 2, 3, 4, 5]
     $visited = {}
-    for $i = $x in $list:
+    for ($i = $x) in $list:
         $visited.$i = (yes)
     assume ($visited == {.1, .2, .3, .4, .5})
     $visited = {}
@@ -24,7 +25,7 @@ test:
     assume (($list, first) == 1)
     assume ($list, has 3)
     assume (($list, index of 3) == 3)
-    assume ((#$list) == 5)
+    assume (#$list == 5)
     $list, add 6
     assume (($list, last) == 6)
     $list, pop
@@ -33,11 +34,11 @@ test:
     assume (($list, first) == 2)
     assume (([1, 2] + [3, 4]) == [1, 2, 3, 4])
 
-# Dict functionality
+### Dict functionality
 test:
     $dict = {.x = 1, .y = 2, .z = 3}
-    assume (#$dict) == 3
-    assume [: for $k = $v in {.x = 1}: add {.key = $k, .value = $v}] ==
+    assume #$dict == 3
+    assume [: for ($k = $v) in {.x = 1}: add {.key = $k, .value = $v}] ==
         [{.key = "x", .value = 1}]
     assume ({.x = 1, .y = 1} + {.y = 10, .z = 10}) == {.x = 1, .y = 11, .z = 10}
     assume ({.x = 1, .y = 1} - {.y = 10, .z = 10}) == {.x = 1, .y = -9, .z = -10}
@@ -45,54 +46,54 @@ test:
     assume ({.x = 1, .y = 1} & {.y = 10, .z = 10}) == {.y = 1}
     assume ({.x = 1, .y = 1} ~ {.y = 10, .z = 10}) == {.x = 1, .z = 10}
     
-    # Set compliments:
+    ### Set compliments:
     assume (~{.x}).y
     assume ((~{.x}).x == (nil))
-    $sc = (~{.x, .y})
+    $sc = ~{.x, .y}
     $sc.y = 99
     
-    # For now, whether $sc.y == 99 or $sc.y == (yes) is unspecified,
+    ### For now, whether $sc.y == 99 or $sc.y == (yes) is unspecified,
         (but the actual behavior is (yes))
     assume ($sc.y and (not $sc.x))
-    assume ($sc == ((~{.x, .y}) | {.y = 99}))
+    assume ($sc == (~{.x, .y} | {.y = 99}))
     
-    # Both sets:
+    ### Both sets:
     assume (({.x, .y} & {.y, .z}) == {.y})
     assume (({.x, .y} | {.y, .z}) == {.x, .y, .z})
     assume (({.x, .y} ~ {.y, .z}) == {.z, .x})
     
-    # Mixed:
-    assume (({.x, .y} & (~{.y, .z})) == {.x})
-    assume (({.x, .y} | (~{.y, .z})) == (~{.z}))
-    assume (({.x, .y} ~ (~{.y, .z})) == (~{.x}))
+    ### Mixed:
+    assume (({.x, .y} & ~{.y, .z}) == {.x})
+    assume (({.x, .y} | ~{.y, .z}) == ~{.z})
+    assume (({.x, .y} ~ ~{.y, .z}) == ~{.x})
     
-    # Mixed reversed:
-    assume (((~{.y, .z}) & {.x, .y}) == {.x})
-    assume (((~{.y, .z}) | {.x, .y}) == (~{.z}))
-    assume (((~{.y, .z}) ~ {.x, .y}) == (~{.x}))
+    ### Mixed reversed:
+    assume ((~{.y, .z} & {.x, .y}) == {.x})
+    assume ((~{.y, .z} | {.x, .y}) == ~{.z})
+    assume ((~{.y, .z} ~ {.x, .y}) == ~{.x})
     
-    # Both set compliments:
-    assume (((~{.x, .y}) & (~{.y, .z})) == (~{.x, .y, .z}))
-    assume (((~{.x, .y}) | (~{.y, .z})) == (~{.y}))
-    assume (((~{.x, .y}) ~ (~{.y, .z})) == {.x, .z})
+    ### Both set compliments:
+    assume ((~{.x, .y} & ~{.y, .z}) == ~{.x, .y, .z})
+    assume ((~{.x, .y} | ~{.y, .z}) == ~{.y})
+    assume ((~{.x, .y} ~ ~{.y, .z}) == {.x, .z})
 
 test:
     assume ((entries in {.x = 1}) == [{.key = "x", .value = 1}])
 
-(entries in $dict) parses as [
-    : for $k = $v in $dict:
-        add {.key = $k, .value = $v}
-]
+(entries in $dict) parses as
+    [: for ($k = $v) in $dict: add {.key = $k, .value = $v}]
 
 test:
     assume ((keys in {.x = 1}) == ["x"])
 
-[keys in $dict, keys of $dict] all parse as [: for $k = $v in $dict: add $k]
+[keys in $dict, keys of $dict] all parse as [: for ($k = $v) in $dict: add $k]
 test:
     assume ((values in {.x = 1}) == [1])
-[values in $dict, values of $dict] all parse as [: for $k = $v in $dict: add $v]
 
-# Metatable stuff
+[values in $dict, values of $dict] all parse as
+    [: for ($k = $v) in $dict: add $v]
+
+### Metatable stuff
 test:
     $t = {}
     set $t's metatable to {.__tostring = ($ -> "XXX")}
@@ -118,12 +119,12 @@ test:
     end)(\($dict as lua expr))
 ")
 
-# Sorting
+### Sorting
 test:
     $x = [3, 1, 2]
     sort $x
     assume ($x == [1, 2, 3])
-    sort $x by $ = (- $)
+    sort $x by $ = -$
     assume ($x == [3, 2, 1])
     $keys = {.1 = 999, .2 = 0, .3 = 50}
     sort $x by $ = $keys.$
@@ -164,13 +165,13 @@ external:
                 $seen.$ = (yes)
         return $unique
 
-# Ranges:
+### Ranges:
 test:
     $r = (3 to 5)
     assume ($r.2 == 4)
     assume ($r is "a Range")
     assume ((1 to 10, backwards) == (10 to 1 by -1))
-    assume ((#(1 to 10 by 2)) == 5)
+    assume (#(1 to 10 by 2) == 5)
     $visited = []
     for $ in (1 to 10 by 2):
         $visited, add $
@@ -211,7 +212,7 @@ $range_mt = {
                 ($self.first == $other.first) and
                     ($self.last == $other.last) and ($self.step == $other.step)
     
-    .backwards = (for $self ($self.last to $self.first by (- $self.step)))
+    .backwards = (for $self ($self.last to $self.first by -$self.step))
     .__inext = $(inext), .__next = $(inext)
     .as_text =
         for $self:

@@ -1,4 +1,5 @@
-#!/usr/bin/env nomsu -V7
+#!/usr/bin/env nomsu -V7.0.0
+
 ###
     This file defines upgrades from Nomsu <7 to 7
     
@@ -33,10 +34,15 @@ upgrade action (for $var in $start to $stop $body) to "7" as
 upgrade $tree to "7" as:
     if ($tree.type == "EscapedNomsu"):
         $t =
-            "Action" tree from $tree.source with ("Text" tree with $tree.1.type) "tree" "with"
+            "Action" tree from $tree.source with ("Text" tree with $tree.1.type) "tree"
+                "with"
+        
         for $tok in $tree.1:
-            if ($tok is "Text"): $t, add ("Text" tree with $tok)
-            ..else: $t, add $tok
+            if ($tok is "Text"):
+                $t, add ("Text" tree with $tok)
+            ..else:
+                $t, add $tok
+        
         return $t
 
 upgrade action "Nomsu version" to "7" via ->(`$(NOMSU VERSION))

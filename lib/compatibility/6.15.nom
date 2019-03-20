@@ -1,5 +1,6 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7.0.0
+
+###
     This file defines upgrades from Nomsu <6.15 to 6.15
     
 use "compatibility/compatibility"
@@ -11,8 +12,8 @@ upgrade action (externally $x means $y) to "6.15" as (external ($x means $y))
 upgrade action (externally $x all mean $y) to "6.15" as
     external ($x all mean $y)
 
-upgrade action ($lists flattened) to "6.15" as [
-    : for $ in recursive $lists:
+upgrade action ($lists flattened) to "6.15" as [:
+    for $ in recursive $lists:
         if ($ is "a List"):
             for $child in $:
                 recurse $ on $child
