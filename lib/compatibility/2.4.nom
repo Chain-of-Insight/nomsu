@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines upgrades from Nomsu <2.4 to Nomsu 2.4
     
@@ -30,7 +29,7 @@ upgrade $tree to "2.4" as:
                             $new_lines, add $line
                     
                     ($line.stub == "* else"):
-                        $new_lines, add (else `$line.3)
+                        $new_lines, add (else \$line.3)
                     
                     else:
                         $conditions, add $line.2
@@ -44,7 +43,7 @@ upgrade $tree to "2.4" as:
                             ")
                         $conditions = []
             
-            return `(when `("Block" tree from $tree.2.source with (unpack $new_lines)))
+            return \(when \("Block" tree from $tree.2.source with (unpack $new_lines)))
         
         "if 1 is ?" "if 1 = ?":
             $values = []
@@ -64,7 +63,7 @@ upgrade $tree to "2.4" as:
                             $new_lines, add $line
                     
                     ($line.stub == "* else"):
-                        $new_lines, add (else `$line.3)
+                        $new_lines, add (else \$line.3)
                     
                     else:
                         $values, add $line.2
@@ -77,7 +76,7 @@ upgrade $tree to "2.4" as:
                         $values = []
             
             return
-                `(
-                    if `($tree.2 upgraded) is
-                        `("Block" tree from $tree.5.source with (unpack $new_lines))
+                \(
+                    if \($tree.2 upgraded) is
+                        \("Block" tree from $tree.5.source with (unpack $new_lines))
                 )

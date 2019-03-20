@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This is a tool to find syntax trees matching a pattern. "*" is a wildcard
     that will match any subtree, and "**" is a wildcard that will match any
@@ -43,7 +42,7 @@ command line program with $args:
         
         for $ in (1 to #$patt):
             if ($patt.$ is syntax tree):
-                if ($patt.$ == `$multi_wildcard): return (yes)
+                if ($patt.$ == \$multi_wildcard): return (yes)
                 unless ($tree.$ matches $patt.$): return (no)
             ..else:
                 unless ($tree.$ == $patt.$): return (no)

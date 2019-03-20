@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This is a Nomsu tutorial.
     
@@ -15,9 +14,9 @@ use "shell"
 ")
 
 [<your code here>, ???] all compile to
-    `(
-        at `("Text" tree with "\((this tree).source)") fail
-            `"Incomplete code: This needs to be filled in."
+    \(
+        at \("Text" tree with "\((this tree).source)") fail
+            \"Incomplete code: This needs to be filled in."
     )
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -398,7 +397,7 @@ command line program with $args:
         $tree =
             $tree, with
                 $ ->:
-                    if ($ == `(<prev lesson>)):
+                    if ($ == \(<prev lesson>)):
                         return ("Text" tree with (filename of ($i - 1), with "%.nom$" -> ""))
         run $tree
     

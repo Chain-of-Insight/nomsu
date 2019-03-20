@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file contains compile-time actions that define basic control flow structures
     like "if" statements and loops.
@@ -150,7 +149,7 @@ test:
                 \($body as lua)
         ")
     
-    if ($body, contains `(do next)):
+    if ($body, contains \(do next)):
         $lua, add "\n    ::continue::"
     
     $lua, add "\nend --while-loop"
@@ -229,21 +228,21 @@ test:
                     \;
         ")
     $lua, add ($body as lua)
-    if ($body, contains `(do next)):
+    if ($body, contains \(do next)):
         $lua, add "\n        ::continue::"
     
-    if ($key and ($body, contains `(do next `$key))):
-        $lua, add "\n        " (`(---next `$key ---) as lua)
+    if ($key and ($body, contains \(do next \$key))):
+        $lua, add "\n        " (\(---next \$key ---) as lua)
     
-    if ($body, contains `(do next `$value)):
-        $lua, add "\n        " (`(---next `$value ---) as lua)
+    if ($body, contains \(do next \$value)):
+        $lua, add "\n        " (\(---next \$value ---) as lua)
     
     $lua, add "\n    end"
-    if ($key and ($body, contains `(stop `$key))):
-        $lua, add "\n    " (`(---stop `$key ---) as lua)
+    if ($key and ($body, contains \(stop \$key))):
+        $lua, add "\n    " (\(---stop \$key ---) as lua)
     
-    if ($body, contains `(stop `$value)):
-        $lua, add "\n    " (`(---stop `$value ---) as lua)
+    if ($body, contains \(stop \$value)):
+        $lua, add "\n    " (\(---stop \$value ---) as lua)
     
     $lua, add "\nend -- for-loop"
     $lua, remove free vars
@@ -445,7 +444,7 @@ test:
     assume ((result of: return 99) == 99)
 
 ### Inline thunk:
-(result of $body) compiles to "\(`(-> `$body) as lua)()"
+(result of $body) compiles to "\(\(->(\$body)) as lua)()"
 test:
     $t = [1, [2, [[3], 4], 5, [[[6]]]]]
     $flat = []
@@ -471,14 +470,14 @@ test:
                     \($body as lua)
         ")
     
-    if ($body, contains `(do next)):
+    if ($body, contains \(do next)):
         $lua, add "\n        ::continue::"
     
-    if ($body, contains `(do next `$var)):
-        $lua, add "\n        \(`(---next `$var ---) as lua)"
+    if ($body, contains \(do next \$var)):
+        $lua, add "\n        \(\(---next \$var ---) as lua)"
     
     $lua, add "\n    end -- Recursive loop"
-    if ($body, contains `(stop `$var)):
-        $lua, add "\n        \(`(---stop `$var ---) as lua)"
+    if ($body, contains \(stop \$var)):
+        $lua, add "\n        \(\(---stop \$var ---) as lua)"
     $lua, add "\nend -- Recursive scope"
     return $lua

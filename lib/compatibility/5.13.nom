@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines upgrades from Nomsu <5.13 to 5.13
 use "compatibility/compatibility"
@@ -12,11 +11,10 @@ upgrade action "with" to "5.13" via
         $assignments = $tree.2
         $body = $tree.3
         if ($assignments.type != "Dict"): return $tree
-        $new_assignments = `[]
+        $new_assignments = \[]
         for ($i = $a) in $assignments:
             when:
                 (($a.type == "DictEntry") and (#$a == 1)): $a = $a.1
-                (all of [$a.type == "DictEntry", #$a == 2]):
-                    $a = `(`$a.1 = `$a.2)
+                (all of [$a.type == "DictEntry", #$a == 2]): $a = \(\$a.1 = \$a.2)
             $new_assignments.$i = $a
-        return `(with `$new_assignments `$body)
+        return \(with \$new_assignments \$body)

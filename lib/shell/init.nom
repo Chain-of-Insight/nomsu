@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines some actions for running shell commands.
     
@@ -28,5 +27,5 @@ external:
                     "Command failure: Command `\($cmd)` was terminated by signal \$return"
     
     ### Attach callsite information for better error reporting
-    (=sh $cmd) compiles to `(at `("Text" tree with "\($cmd.source)") =sh `$cmd)
-    (sh> $cmd) compiles to `(at `("Text" tree with "\($cmd.source)") sh> `$cmd)
+    (=sh $cmd) compiles to \(at \("Text" tree with "\($cmd.source)") =sh \$cmd)
+    (sh> $cmd) compiles to \(at \("Text" tree with "\($cmd.source)") sh> \$cmd)

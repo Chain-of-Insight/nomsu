@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file contains code for defining ways to upgrade code between different versions
     of Nomsu.
@@ -22,13 +21,13 @@ external:
     
     (upgrade action $actions to $version as $body) compiles to:
         if ($actions is "Action" syntax tree):
-            $actions = `[`$actions]
+            $actions = \[\$actions]
         $lua = (Lua "")
         for $action in $actions:
             $replacements = {}
             for $i in (1 to #$action):
                 if ($action.$i is "Var" syntax tree):
-                    $replacements.($action.$i.1) = "\(`$tree as lua id)[\$i]"
+                    $replacements.($action.$i.1) = "\(\$tree as lua id)[\$i]"
             define mangler
             (make tree $t) means:
                 when:
@@ -60,7 +59,7 @@ external:
             $lua, add
                 Lua ("
                     upgrade_action_1_to_2_via(\(quote $action.stub), \($version as lua expr), function(\
-                    ..\(`$tree as lua id))
+                    ..\(\$tree as lua id))
                         return \$retval
                     end)
                 ")

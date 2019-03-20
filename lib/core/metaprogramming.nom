@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This File contains actions for making actions and compile-time actions and some helper
     functions to make that easier.
@@ -56,10 +55,10 @@ lua> ("
     end
     COMPILE_RULES["->"] = COMPILE_RULES["1 ->"]
     COMPILE_RULES["for"] = COMPILE_RULES["1 ->"]
-
-    COMPILE_RULES["`"] = function(\(nomsu environment), _tree, escaped)
+    
+    COMPILE_RULES["\\\\"] = function(\(nomsu environment), _tree, escaped)
         local function escape(t)
-            if t.type == "Action" and t:get_stub() == "`" and #t == 2 then
+            if t.type == "Action" and t:get_stub() == "\\\\" and #t == 2 then
                 return \(nomsu environment):compile(t[2])
             else
                 local bits = {}
@@ -128,11 +127,11 @@ lua> ("
                 if a.type == "EscapedNomsu" then \$args:add(a[1]) end
             end
             return LuaCode("COMPILE_RULES[", \($action as lua), ":get_stub()] = ",
-                \(`(`$args -> `$body) as lua))
+                \(\(\$args -> \$body) as lua))
         else
             for _,a in ipairs(\$action:get_args()) do \$args:add(a) end
             return LuaCode("COMPILE_RULES[", \$action:get_stub():as_lua(),
-                "] = ", \(`(`$args -> `$body) as lua))
+                "] = ", \(\(\$args -> \$body) as lua))
         end
     end
 ")
@@ -144,7 +143,7 @@ lua> ("
         if \$actions.type ~= "List" then
             at_1_fail(\$actions, "Compile error: This should be a list of actions.")
         end
-        local lua = \(`(`$actions.1 compiles to `$body) as lua)
+        local lua = \(\(\$actions.1 compiles to \$body) as lua)
         local \$args = a_List{"\(nomsu environment)", "\(this tree)", unpack(\$actions[1]:get_args())}
         local \$compiled_args = a_List{"\(nomsu environment)", "\(this tree)"};
         for i=3,#\$args do \$compiled_args[i] = \(nomsu environment):compile(\$args[i]) end
@@ -196,13 +195,13 @@ test:
         else
             at_1_fail(\$action, "Compile error: This is not an action or method call.")
         end
-        lua:add(" = ", \(`(`$action -> `$body) as lua), ";")
+        lua:add(" = ", \(\(\$action -> \$body) as lua), ";")
         return lua
     ")
 
 ($actions all mean $body) compiles to:
     lua> ("
-        local lua = \(`(`$actions.1 means `$body) as lua)
+        local lua = \(\(\$actions.1 means \$body) as lua)
         local first_def = (\$actions[1].type == "MethodCall"
             and LuaCode(\(nomsu environment):compile(\$actions[1][1]), ".", \$actions[1][2]:get_\
         ..stub():as_lua_id())
@@ -221,7 +220,7 @@ test:
             if \$args == \$alias_args then
                 lua:add(" = ", first_def, ";")
             else
-                lua:add(" = ", \(`(`$alias_args -> `$actions.1) as lua), ";")
+                lua:add(" = ", \(\(\$alias_args -> \$actions.1) as lua), ";")
             end
         end
         return lua
@@ -323,7 +322,7 @@ test:
         local \$new_body = LuaCode:from(\$body.source,
             "local mangle = mangler()",
             "\\nreturn ", make_tree(\$body))
-        return \(`(`$actions all compile to `$new_body) as lua)
+        return \(\(\$actions all compile to \$new_body) as lua)
     ")
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -339,7 +338,7 @@ test:
     ")
 
 ### Need to make sure the proper environment is used for compilation (i.e. the caller's environment)
-($tree as lua expr) compiles to `((nomsu environment), `$tree as lua expr)
+($tree as lua expr) compiles to \(nomsu environment, \$tree as lua expr)
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -444,7 +443,7 @@ external:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 test:
-    assume ("Action" tree with "foo" ("Var" tree with "x")) == `(foo $x)
+    assume ("Action" tree with "foo" ("Var" tree with "x")) == \(foo $x)
 
 external:
     ($type tree with (*extra arguments*)) means
@@ -475,7 +474,7 @@ test:
     ")
 
 ### Convenience helper:
-(return Lua (*extra arguments*)) compiles to `(return (Lua `(*extra arguments*)))
+(return Lua (*extra arguments*)) compiles to \(return (Lua \(*extra arguments*)))
 
 ### Literals
 (yes) compiles to "(true)"
@@ -487,7 +486,7 @@ test:
 
 (at compilation $expr) compiles to:
     lua> ("
-        local value = \(nomsu environment):run(\(`(return `$expr)))
+        local value = \(nomsu environment):run(\(\(return \$expr)))
         if lua_type_of(value) == 'table' or lua_type_of(value) == 'string' and value.as_lua then
             return LuaCode(value:as_lua())
         else
@@ -514,11 +513,7 @@ test:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ### TODO: Remove shim
-($tree with $t -> $replacement) parses as
-    $tree, with ($t -> $replacement)
-
+($tree with $t -> $replacement) parses as ($tree, with ($t -> $replacement))
 [tree $tree with vars $replacements, $tree with vars $replacements] all parse as
-    ($tree, with $replacements)
-
-($tree has subtree $match_tree) parses as
-    $tree, contains $match_tree
+    $tree, with $replacements
+($tree has subtree $match_tree) parses as ($tree, contains $match_tree)

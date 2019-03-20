@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines upgrades from Nomsu <4.11 to Nomsu 4.11
     (overhaul of function literals, deleting (if all of ...), etc. shorthand)
@@ -20,7 +19,7 @@ upgrade action ->$yield_value to "4.11" as (yield $yield_value)
 ### Replace set {$x:1, $y:2} with [$x, $y] = [1, 2]
 upgrade action "set" to "4.11" via
     for ($tree $end_version):
-        [$lhs, $rhs] = [`[], `[]]
+        [$lhs, $rhs] = [\[], \[]]
         $lhs.source = $tree.2.source
         $rhs.source = $tree.2.source
         for ($i = $entry) in $tree.2:
