@@ -28,7 +28,7 @@ is_identifier = function(s)
 end
 local can_be_unary
 can_be_unary = function(t)
-  return t.type == "Action" and #t == 2 and is_operator(t[1]) and type(t[2]) ~= 'string' and t[2].type ~= "Block"
+  return t.type == "Action" and #t == 2 and is_operator(t[1]) and type(t[2]) ~= 'string' and t[2].type ~= "Block" and not (t[2].type == "Number" and t[1] == "-")
 end
 local inline_escaper = re.compile("{~ (%utf8_char / ('\"' -> '\\\"') / ('\n' -> '\\n') / ('\t' -> '\\t') / ('\b' -> '\\b') / ('\a' -> '\\a') / ('\v' -> '\\v') / ('\f' -> '\\f') / ('\r' -> '\\r') / ('\\' -> '\\\\') / ([^ -~] -> escape) / .)* ~}", {
   utf8_char = utf8_char_patt,
@@ -72,7 +72,7 @@ tree_to_inline_nomsu = function(tree)
         if type(tree[i - 1]) == 'string' then
           clump_words = is_operator(bit) ~= is_operator(tree[i - 1])
         else
-          clump_words = bit == "'" and type(tree[i - 1]) ~= 'string'
+          clump_words = bit == "'"
         end
         if i > 1 and not clump_words then
           nomsu:add(" ")
@@ -81,6 +81,9 @@ tree_to_inline_nomsu = function(tree)
       else
         num_args = num_args + 1
         local arg_nomsu = tree_to_inline_nomsu(bit)
+        if tree[i + 1] == "'" and bit.type == "Action" and can_be_unary(bit) then
+          arg_nomsu:parenthesize()
+        end
         if bit.type == "Block" then
           if i ~= #tree then
             if i > 1 then
@@ -426,6 +429,9 @@ tree_to_nomsu = function(tree)
         end
         num_args = num_args + 1
         local bit_nomsu = recurse(bit, i)
+        if tree[i + 1] == "'" and bit.type == "Action" and not bit_nomsu:is_multiline() and can_be_unary(bit) then
+          bit_nomsu:parenthesize()
+        end
         if bit.type == "Block" then
           if not bit_nomsu:is_multiline() and (#bit_nomsu:text() > nomsu:trailing_line_len() * GOLDEN_RATIO and #bit_nomsu:text() > 8) or #bit_nomsu:text() + nomsu:trailing_line_len() > MAX_LINE then
             bit_nomsu = tree_to_nomsu(bit)
@@ -587,6 +593,8 @@ tree_to_nomsu = function(tree)
                 end
               end
             elseif bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain" then
+              interp_nomsu:parenthesize()
+            elseif bit.type == "Action" and can_be_unary(bit) then
               interp_nomsu:parenthesize()
             end
           end

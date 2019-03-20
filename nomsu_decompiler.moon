@@ -23,7 +23,7 @@ is_identifier = (s)->
     return type(s) == 'string' and not not identifier_patt\match(s)
 
 can_be_unary = (t)->
-    t.type == "Action" and #t == 2 and is_operator(t[1]) and type(t[2]) != 'string' and t[2].type != "Block"
+    t.type == "Action" and #t == 2 and is_operator(t[1]) and type(t[2]) != 'string' and t[2].type != "Block" and not (t[2].type == "Number" and t[1] == "-")
 
 inline_escaper = re.compile("{~ (%utf8_char / ('\"' -> '\\\"') / ('\n' -> '\\n') / ('\t' -> '\\t') / ('\b' -> '\\b') / ('\a' -> '\\a') / ('\v' -> '\\v') / ('\f' -> '\\f') / ('\r' -> '\\r') / ('\\' -> '\\\\') / ([^ -~] -> escape) / .)* ~}", {utf8_char: utf8_char_patt, escape:(=> ("\\%03d")\format(@byte!))})
 inline_escape = (s)->
@@ -52,12 +52,14 @@ tree_to_inline_nomsu = (tree)->
                     num_words += 1
                     clump_words = if type(tree[i-1]) == 'string'
                         is_operator(bit) != is_operator(tree[i-1])
-                    else bit == "'" and type(tree[i-1]) != 'string'
+                    else bit == "'"
                     nomsu\add " " if i > 1 and not clump_words
                     nomsu\add bit
                 else
                     num_args += 1
                     arg_nomsu = tree_to_inline_nomsu(bit)
+                    if tree[i+1] == "'" and bit.type == "Action" and can_be_unary(bit)
+                        arg_nomsu\parenthesize!
                     if bit.type == "Block"
                         if i != #tree
                             nomsu\add " " if i > 1
@@ -312,6 +314,8 @@ tree_to_nomsu = (tree)->
 
                 num_args += 1
                 bit_nomsu = recurse(bit, i)
+                if tree[i+1] == "'" and bit.type == "Action" and not bit_nomsu\is_multiline! and can_be_unary(bit)
+                    bit_nomsu\parenthesize!
                 if bit.type == "Block"
                     -- Rule of thumb: nontrivial one-liner block arguments should be no more
                     -- than golden ratio * the length of the proceeding part of the line
@@ -451,6 +455,8 @@ tree_to_nomsu = (tree)->
                                     if bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain"
                                         interp_nomsu\parenthesize!
                             elseif bit.type == "EscapedNomsu" or bit.type == "Block" or bit.type == "IndexChain"
+                                interp_nomsu\parenthesize!
+                            elseif bit.type == "Action" and can_be_unary(bit)
                                 interp_nomsu\parenthesize!
                         nomsu\add interp_nomsu
                         if interp_nomsu\is_multiline! and bit.type == "Block"
