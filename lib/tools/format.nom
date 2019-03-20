@@ -1,5 +1,5 @@
-#!/usr/bin/env nomsu -V6.15.13.8
-#
+#!/usr/bin/env nomsu -V7
+###
     Auto-format Nomsu code. Usage:
     nomsu -t format [-i] file1 file2...
     
@@ -14,7 +14,7 @@ use "commandline"
 
 command line program with $args:
     $filenames = $args.extras
-    if ((#$filenames) == 0):
+    if (#$filenames == 0):
         say ("
             Warning: reading from stdin (ctrl-d to abort). To avoid this message, use nomsu -t format -
         ")
@@ -25,21 +25,18 @@ command line program with $args:
         unless $file:
             fail "File does not exist: \$filename"
         $leading_indent = ($file, matching "^\n*([ ]*)")
-        $code = (NomsuCode from ($Source $filename 1 (size of $file)) $file)
+        $code = (NomsuCode from (Source $filename 1 #$file) $file)
         try:
             $tree = ($code parsed)
+            $formatted = ($tree as nomsu, text, indented $leading_indent)
         ..if it fails with $msg:
-            $tree = (nil)
             if $args.q:
                 $formatted = $file
             ..else:
                 say $msg
+                do next $filename
         
-        if $tree:
-            $formatted = ($tree as nomsu, text, indented $leading_indent)
-        
-        if $formatted:
-            if $args.i:
-                write $formatted to file $filename
-            ..else:
-                say $formatted inline
+        if $args.i:
+            write $formatted to file $filename
+        ..else:
+            say $formatted inline
