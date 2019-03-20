@@ -28,8 +28,5 @@ external:
                     "Command failure: Command `\($cmd)` was terminated by signal \$return"
     
     ### Attach callsite information for better error reporting
-    (=sh $cmd) compiles to
-        ("Action" tree with "at" ("Text" tree with "\($cmd.source)") "=" "sh" $cmd) as lua
-    
-    (sh> $cmd) compiles to
-        ("Action" tree with "at" ("Text" tree with "\($cmd.source)") "sh" ">" $cmd) as lua
+    (=sh $cmd) compiles to `(at `("Text" tree with "\($cmd.source)") =sh `$cmd)
+    (sh> $cmd) compiles to `(at `("Text" tree with "\($cmd.source)") sh> `$cmd)

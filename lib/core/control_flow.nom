@@ -232,18 +232,18 @@ test:
     if ($body, contains `(do next)):
         $lua, add "\n        ::continue::"
     
-    if ($key and ($body, contains ("Action" tree with "do" "next" $key))):
-        $lua, add "\n        " (("Action" tree with "---" "next" $key "---") as lua)
+    if ($key and ($body, contains `(do next `$key))):
+        $lua, add "\n        " (`(---next `$key ---) as lua)
     
-    if ($body, contains ("Action" tree with "do" "next" $value)):
-        $lua, add "\n        " (("Action" tree with "---" "next" $value "---") as lua)
+    if ($body, contains `(do next `$value)):
+        $lua, add "\n        " (`(---next `$value ---) as lua)
     
     $lua, add "\n    end"
-    if ($key and ($body, contains ("Action" tree with "stop" $key))):
-        $lua, add "\n    " (("Action" tree with "---" "stop" $key "---") as lua)
+    if ($key and ($body, contains `(stop `$key))):
+        $lua, add "\n    " (`(---stop `$key ---) as lua)
     
-    if ($body, contains ("Action" tree with "stop" $value)):
-        $lua, add "\n    " (("Action" tree with "---" "stop" $value "---") as lua)
+    if ($body, contains `(stop `$value)):
+        $lua, add "\n    " (`(---stop `$value ---) as lua)
     
     $lua, add "\nend -- for-loop"
     $lua, remove free vars
@@ -445,7 +445,7 @@ test:
     assume ((result of: return 99) == 99)
 
 ### Inline thunk:
-(result of $body) compiles to "\(("Action" tree with "->" $body) as lua)()"
+(result of $body) compiles to "\(`(-> `$body) as lua)()"
 test:
     $t = [1, [2, [[3], 4], 5, [[[6]]]]]
     $flat = []
@@ -474,11 +474,11 @@ test:
     if ($body, contains `(do next)):
         $lua, add "\n        ::continue::"
     
-    if ($body, contains ("Action" tree with "do" "next" $var)):
-        $lua, add "\n        \(("Action" tree with "---" "next" $var "---") as lua)"
+    if ($body, contains `(do next `$var)):
+        $lua, add "\n        \(`(---next `$var ---) as lua)"
     
     $lua, add "\n    end -- Recursive loop"
-    if ($body, contains ("Action" tree with "stop" $var)):
-        $lua, add "\n        \(("Action" tree with "---" "stop" $var "---") as lua)"
+    if ($body, contains `(stop `$var)):
+        $lua, add "\n        \(`(---stop `$var ---) as lua)"
     $lua, add "\nend -- Recursive scope"
     return $lua

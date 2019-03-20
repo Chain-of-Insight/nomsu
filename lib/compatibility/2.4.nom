@@ -30,7 +30,7 @@ upgrade $tree to "2.4" as:
                             $new_lines, add $line
                     
                     ($line.stub == "* else"):
-                        $new_lines, add ("Action" tree with "else" $line.3)
+                        $new_lines, add (else `$line.3)
                     
                     else:
                         $conditions, add $line.2
@@ -44,9 +44,7 @@ upgrade $tree to "2.4" as:
                             ")
                         $conditions = []
             
-            return
-                "Action" tree with "when"
-                    "Block" tree from $tree.2.source with (unpack $new_lines)
+            return `(when `("Block" tree from $tree.2.source with (unpack $new_lines)))
         
         "if 1 is ?" "if 1 = ?":
             $values = []
@@ -66,7 +64,7 @@ upgrade $tree to "2.4" as:
                             $new_lines, add $line
                     
                     ($line.stub == "* else"):
-                        $new_lines, add ("Action" tree with "else" $line.3)
+                        $new_lines, add (else `$line.3)
                     
                     else:
                         $values, add $line.2
@@ -79,5 +77,7 @@ upgrade $tree to "2.4" as:
                         $values = []
             
             return
-                "Action" tree with "if" ($tree.2 upgraded) "is"
-                    "Block" tree from $tree.5.source with (unpack $new_lines)
+                `(
+                    if `($tree.2 upgraded) is
+                        `("Block" tree from $tree.5.source with (unpack $new_lines))
+                )

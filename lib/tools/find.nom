@@ -43,7 +43,7 @@ command line program with $args:
         
         for $ in (1 to #$patt):
             if ($patt.$ is syntax tree):
-                if ($patt.$ == ("Var" tree with "multi_wildcard")): return (yes)
+                if ($patt.$ == `$multi_wildcard): return (yes)
                 unless ($tree.$ matches $patt.$): return (no)
             ..else:
                 unless ($tree.$ == $patt.$): return (no)

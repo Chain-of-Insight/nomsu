@@ -15,10 +15,10 @@ use "shell"
 ")
 
 [<your code here>, ???] all compile to
-    (
-        "Action" tree with "at" ("Text" tree with "\((this tree).source)") "fail"
+    `(
+        at `("Text" tree with "\((this tree).source)") fail
             `"Incomplete code: This needs to be filled in."
-    ) as lua
+    )
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

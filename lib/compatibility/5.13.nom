@@ -17,6 +17,6 @@ upgrade action "with" to "5.13" via
             when:
                 (($a.type == "DictEntry") and (#$a == 1)): $a = $a.1
                 (all of [$a.type == "DictEntry", #$a == 2]):
-                    $a = ("Action" tree with $a.1 "=" $a.2)
+                    $a = `(`$a.1 = `$a.2)
             $new_assignments.$i = $a
-        return ("Action" tree with "with" $new_assignments $body)
+        return `(with `$new_assignments `$body)

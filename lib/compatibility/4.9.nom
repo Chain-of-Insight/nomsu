@@ -10,4 +10,4 @@ upgrade action "if" to "4.9" via
     for ($tree $end_version):
         if (#$tree > 2):
             return $tree
-        return ("Action" tree with "when" $tree.2)
+        return `(when `$tree.2)

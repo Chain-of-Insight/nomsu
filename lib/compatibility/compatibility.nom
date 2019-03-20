@@ -22,7 +22,7 @@ external:
     
     (upgrade action $actions to $version as $body) compiles to:
         if ($actions is "Action" syntax tree):
-            $actions = ("List" tree with $actions)
+            $actions = `[`$actions]
         $lua = (Lua "")
         for $action in $actions:
             $replacements = {}
