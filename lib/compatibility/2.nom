@@ -9,13 +9,13 @@ use "compatibility/compatibility"
 upgrade $tree to "2" as:
     unless ($tree is "Action" syntax tree): return
     if ($tree.stub == "if 1 2 else"):
-        $true_body = ($tree.3 upgraded)
+        $true_body = $tree.3
         unless ($true_body is "Block" syntax tree):
             $true_body = ("Block" tree with $true_body)
-        $false_body = ($tree.5 upgraded)
+        $false_body = $tree.5
         unless ($false_body is "Block" syntax tree):
             $false_body = (=lua "Block(\$false_body.source, \$false_body)")
-        return \(if \($tree.2 upgraded) \$true_body else \$false_body)
+        return \(if \($tree.2) \$true_body else \$false_body)
     
     $need_blocks = [
         "if", "unless", "for 1 in", "for 1 = 2 in", "repeat while 1", "repeat 1 times"
@@ -26,7 +26,7 @@ upgrade $tree to "2" as:
     
     for $n in $need_blocks:
         if ($tree.stub == $n):
-            $bits = [: for $ in $tree: add (($ upgraded) if ($ is syntax tree) else $)]
+            $bits = [: for $ in $tree: add ($ if ($ is syntax tree) else $)]
             unless (($bits, last) is "Block" syntax tree):
                 $body = ($bits, last)
                 $bits.(#$bits) = (=lua "SyntaxTree{type='Block', source=\$body.source, \$body}")

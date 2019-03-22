@@ -6,7 +6,7 @@ use "compatibility/compatibility"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 upgrade action "local action" to "4.8.10" via
-    for ($tree $end_version):
+    for $tree:
         $spec = $tree.3
         $body = $tree.4
         if $spec.type is:
@@ -20,7 +20,7 @@ upgrade action "local action" to "4.8.10" via
                 return \(\$spec means \$body)
 
 upgrade action "action" to "4.8.10" via
-    for ($tree $end_version):
+    for $tree:
         $spec = $tree.2
         $body = $tree.3
         if $body:
@@ -37,7 +37,7 @@ upgrade action "action" to "4.8.10" via
             return \((\$spec)'s meaning)
 
 upgrade action "compile 1 to" to "4.8.10" via
-    for ($tree $end_version):
+    for $tree:
         $spec = $tree.2
         $body = $tree.4
         if $spec.type is:
@@ -51,7 +51,7 @@ upgrade action "compile 1 to" to "4.8.10" via
                 return \(\$spec compiles to \$body)
 
 upgrade action "parse 1 as" to "4.8.10" via
-    for ($tree $end_version):
+    for $tree:
         $spec = $tree.2
         $body = $tree.4
         if $spec.type is:

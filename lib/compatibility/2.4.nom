@@ -15,7 +15,7 @@ upgrade $tree to "2.4" as:
             $conditions = []
             $new_lines = []
             $body =
-                ($tree.2 upgraded) if ($tree.2 is "Block" syntax tree) else [$tree.2 upgraded]
+                $tree.2 if ($tree.2 is "Block" syntax tree) else [$tree.2]
             
             for $line in $body:
                 when:
@@ -29,7 +29,7 @@ upgrade $tree to "2.4" as:
                             $new_lines, add $line
                     
                     ($line.stub == "* else"):
-                        $new_lines, add (else \$line.3)
+                        $new_lines, add \(else \$line.3)
                     
                     else:
                         $conditions, add $line.2
@@ -49,7 +49,7 @@ upgrade $tree to "2.4" as:
             $values = []
             $new_lines = []
             $body =
-                ($tree.5 upgraded) if ($tree.5 is "Block" syntax tree) else [$tree.5 upgraded]
+                $tree.5 if ($tree.5 is "Block" syntax tree) else [$tree.5]
             
             for $line in $body:
                 when:
@@ -63,7 +63,7 @@ upgrade $tree to "2.4" as:
                             $new_lines, add $line
                     
                     ($line.stub == "* else"):
-                        $new_lines, add (else \$line.3)
+                        $new_lines, add \(else \$line.3)
                     
                     else:
                         $values, add $line.2
@@ -77,6 +77,6 @@ upgrade $tree to "2.4" as:
             
             return
                 \(
-                    if \($tree.2 upgraded) is
+                    if \($tree.2) is
                         \("Block" tree from $tree.5.source with (unpack $new_lines))
                 )

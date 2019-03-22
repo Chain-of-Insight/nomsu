@@ -9,7 +9,7 @@ use "compatibility/compatibility"
 
 ### Overhaul of function literals:
 upgrade action "call 1 with" to "4.11" via
-    for ($tree $end_version):
+    for $tree:
         $tree2 = {.type = "Action", .source = $tree.source, .1 = $tree.2}
         for ($i = $arg) in $tree.4:
             $tree2.($i + 1) = $arg
@@ -18,7 +18,7 @@ upgrade action ->$yield_value to "4.11" as (yield $yield_value)
 
 ### Replace set {$x:1, $y:2} with [$x, $y] = [1, 2]
 upgrade action "set" to "4.11" via
-    for ($tree $end_version):
+    for $tree:
         [$lhs, $rhs] = [\[], \[]]
         $lhs.source = $tree.2.source
         $rhs.source = $tree.2.source
