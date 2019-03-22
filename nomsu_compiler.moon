@@ -30,6 +30,12 @@ fail_at = (source, msg)->
 
     if source and not file
         file = Files.read(source.filename)
+    if not file
+        if NOMSU_PREFIX
+            path = "#{NOMSU_PREFIX}/share/nomsu/#{table.concat NOMSU_VERSION, "."}/#{source.filename}"
+            file = Files.read(path)
+    if not file
+        error("Can't find file: "..tostring(source.filename))
 
     title, err_msg, hint = msg\match("([^:]*):[ \n]+(.*)[ \n]+Hint: (.*)")
     if not err_msg

@@ -36,6 +36,15 @@ fail_at = function(source, msg)
   if source and not file then
     file = Files.read(source.filename)
   end
+  if not file then
+    if NOMSU_PREFIX then
+      local path = tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(table.concat(NOMSU_VERSION, ".")) .. "/" .. tostring(source.filename)
+      file = Files.read(path)
+    end
+  end
+  if not file then
+    error("Can't find file: " .. tostring(source.filename))
+  end
   local title, err_msg, hint = msg:match("([^:]*):[ \n]+(.*)[ \n]+Hint: (.*)")
   if not err_msg then
     err_msg, hint = msg:match("(.*)[ \n]+Hint:[ \n]+(.*)")

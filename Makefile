@@ -84,7 +84,7 @@ install: lua version optimize optimize_extra
 	fi; \
 	version="`cat version`"; \
 	mkdir -pv $$prefix/bin $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/share/man/man1 $$packagepath/nomsu \
-	&& echo "#!$(LUA_BIN)\\nlocal NOMSU_PREFIX, NOMSU_PACKAGEPATH = [[$$prefix]], [[$$packagepath/nomsu]]" \
+	&& echo "#!$(LUA_BIN)\\nNOMSU_PREFIX, NOMSU_PACKAGEPATH = [[$$prefix]], [[$$packagepath/nomsu]]" \
 	  | cat - nomsu.lua > $$prefix/bin/nomsu$$version \
 	&& chmod +x $$prefix/bin/nomsu$$version \
 	&& cp -v nomsu $$prefix/bin \
