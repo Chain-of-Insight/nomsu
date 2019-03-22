@@ -19,8 +19,6 @@ command line program with $args:
     if $start_version:
         try:
             use $start_version
-        ..if it fails:
-            fail "Could not find upgrade rules for \$start_version"
     $version = ($args."upgrade-to" or $(NOMSU VERSION))
     $test = ($args.t or $args.test)
     for $filename in $args.extras:
