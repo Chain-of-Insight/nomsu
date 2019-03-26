@@ -52,7 +52,7 @@ use "core/control_flow"
                             _b = type_of(_b) == 'Text' and _b:as_lua() or _1_as_text(_b)
                             at_1_fail(\(quote "\($condition.1.source)"),
                                 "Assumption failed: This value was ".._a..", but it was expected to be \
-                    ..\($condition.3)".._b..".")
+                    ..\($condition.2)".._b..".")
                         end
                     end
                 ")
