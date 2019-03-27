@@ -22,7 +22,7 @@ external:
                     Hint: One of these two should be a number, not a time.
                 ")
             
-            if ($other isn'tt "a Number"):
+            if ($other isn't "a Number"):
                 $other = ($os.time $other)
             
             if ($self isn't "a Number"):
@@ -37,7 +37,9 @@ external:
             if ($other is "a Time"):
                 return ($os.difftime $self ($os.time $other))
             return (a Time ($os.date "*t" ($self - $other, rounded)))
-        
+
+        ($self, <$other) means (($self, since epoch) < ($other, since epoch))
+        ($self, <=$other) means (($self, since epoch) <= ($other, since epoch))
         ($self, as text) means ($os.date "%I:%M%p %a %b %e %Y" ($os.time $self))
         ($self, as text in format $format) means ($os.date $format ($os.time $self))
         ($self, since epoch) means ($os.time $self)
