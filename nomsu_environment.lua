@@ -360,6 +360,9 @@ nomsu_environment = Importer({
       if not (self.SOURCE_MAP[source_key] or self.OPTIMIZATION >= 2) then
         local map = { }
         local file = Files.read(source.filename)
+        if not file and NOMSU_PREFIX then
+          file = Files.read(tostring(NOMSU_PREFIX) .. "/share/nomsu/" .. tostring(table.concat(NOMSU_VERSION, ".")) .. "/" .. tostring(source.filename))
+        end
         if not file then
           error("Failed to find file: " .. tostring(source.filename))
         end

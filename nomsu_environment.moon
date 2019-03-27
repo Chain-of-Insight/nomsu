@@ -235,6 +235,8 @@ nomsu_environment = Importer{
             unless @SOURCE_MAP[source_key] or @OPTIMIZATION >= 2
                 map = {}
                 file = Files.read(source.filename)
+                if not file and NOMSU_PREFIX
+                    file = Files.read("#{NOMSU_PREFIX}/share/nomsu/#{table.concat NOMSU_VERSION, "."}/#{source.filename}")
                 if not file
                     error "Failed to find file: #{source.filename}"
                 nomsu_str = file\sub(source.start, source.stop)
