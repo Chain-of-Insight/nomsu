@@ -16,6 +16,17 @@ use "core/control_flow"
 ")
 
 (assume $condition) compiles to:
+    if ($condition.type == "IndexChain"):
+        return Lua ("
+            do -- Assumption:
+                local _thing, _key = \($condition.1 as lua expr), \($condition.2.1 as lua expr)
+                if not _thing[_key] then
+                    _key = type_of(_key) == 'Text' and _key:as_lua() or _1_as_text(_key)
+                    at_1_fail(\(quote "\($condition.source)"),
+                        "Assumption failed: \($condition.1 as nomsu, text) does not have a value for ".._key..".")
+                end
+            end
+        ")
     if ($condition.type == "Action"):
         when $condition.stub is:
             "1 ==":
@@ -47,7 +58,7 @@ use "core/control_flow"
                 return Lua ("
                     do -- Assumption:
                         local _a, _b = \($condition.1 as lua expr), \($condition.3 as lua expr)
-                        if _a ~= _b then
+                        if not (_a \($condition.2) _b) then
                             _a = type_of(_a) == 'Text' and _a:as_lua() or _1_as_text(_a)
                             _b = type_of(_b) == 'Text' and _b:as_lua() or _1_as_text(_b)
                             at_1_fail(\(quote "\($condition.1.source)"),
