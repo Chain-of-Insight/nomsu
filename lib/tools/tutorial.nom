@@ -16,7 +16,7 @@ use "shell"
 [<your code here>, ???] all compile to
     \(
         at \("Text" tree with "\((this tree).source)") fail
-            \"Incomplete code: This needs to be filled in."
+            "Incomplete code: This needs to be filled in."
     )
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -29,7 +29,7 @@ $lessons = [
         test that ($x == 1)
         
         ### Variables which have not yet been set have the value (nil)
-        test that ($foobar == (nil))
+        test that ($not_yet_set == (nil))
         
         ### Variables can be nameless:
         $ = 99
@@ -43,6 +43,9 @@ $lessons = [
         test that ($my_var == (???))
     
     lesson "Actions":
+        ### In Nomsu, actions are bits of code that run to produce a value or
+            do something. They have flexible syntax, so the values passed to
+            them can be interspersed with the action's name in any order.
         ### Fix this action so the tests pass:
         ($x doubled) means ((???) * $x)
         
@@ -91,8 +94,8 @@ $lessons = [
             ")
     
     lesson "Conditionals":
-        ### Make this action return "big" if its argument
-        ### is bigger than 99, otherwise return "small"
+        ### Make this action return "big" if its argument is bigger
+            than 99, otherwise return "small"
         (the size of $n) means:
             if (???):
                 <your code here>
@@ -302,18 +305,19 @@ $lessons = [
         ### Define an external action here:
         external:
             ### These will be used in the next lesson
-            $foobar = 23
+            $global_var = 23
             ($x tripled) means:
                 <your code here>
+        
         test that ((5 tripled) == 15)
         test that ((2 tripled) == 6)
     
     lesson "Files Part 2":
-        ### 'use' is the action for importing from other files
+        ### 'use' is the action for importing from other files.
         ### It takes the path to the file (without the .nom extension):
         use (<prev lesson>)
         test that ((10 tripled) == (???))
-        test that ($foobar == (???))
+        test that ($global_var == (???))
 ]
 $(ask normally) = $(ask)
 command line program with $args:
@@ -358,6 +362,7 @@ command line program with $args:
             $lesson_text =
                 $lesson.lesson, with "%(<prev lesson>%)" ->
                     "\"\(filename of ($i - 1), with "%.nom$" -> "", with "^%./" -> "")\""
+            
             write $lesson_text to file $filename
     
     ### Display info about editing the tutorial files:
@@ -389,6 +394,14 @@ command line program with $args:
             if ($EDITOR == ""):
                 $EDITOR = (nil)
     
+    say ("
+        
+        For this tutorial, a set of files has been created in \$tutorial_dir.
+        Each file corresponds to a lesson. Your task is to fix each file
+        so that it passes the tests.
+        
+    ")
+    
     (run lesson $i) means:
         $filename = (filename of $i)
         $file = (read file $filename)
@@ -399,6 +412,7 @@ command line program with $args:
                 $ ->:
                     if ($ == \(<prev lesson>)):
                         return ("Text" tree with (filename of ($i - 1), with "%.nom$" -> ""))
+        
         run $tree
     
     (get failures) means [:
@@ -410,7 +424,6 @@ command line program with $args:
                 add {.lesson_number = $i, .failure = $msg}
     ]
     
-    say
     say (bold "Lessons:")
     (show first failure from $failures) means:
         say ("
@@ -426,11 +439,15 @@ command line program with $args:
             
         ")
     $failures = (get failures)
+    $current_lesson = (nil)
     for ($i = $lesson) in $lessons:
         for $f in $failures:
             if ($f.lesson_number == $i):
-                say "\(red "  - ")\(bold (red "\$i. \($lesson.name) [incomplete]"))"
+                $color = ((red) if $current_lesson else (yellow))
+                $current_lesson or= $i
+                say "\$color  - \(bold "\$color\$i. \($lesson.name) [incomplete]")"
                 do next $lesson
+        
         say "\(green "  + ")\(bold (green "\$i. \($lesson.name) [passed]"))"
     
     if $(COLOR ENABLED):
@@ -506,6 +523,7 @@ command line program with $args:
                 say ($msg, indented)
                 say
                 go to (retry file)
+        
         $prev_progress = ((#$lessons - #$failures) / #$lessons)
         $failures = (get failures)
         $progress = ((#$lessons - #$failures) / #$lessons)
