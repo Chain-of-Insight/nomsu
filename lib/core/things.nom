@@ -59,7 +59,8 @@ $METAMETHOD_MAP = {
     .mod = "__mod", ."^" = "__pow", ."&" = "__band", ."|" = "__bor", ."~" = "__bxor"
     ."~" = "__bnot", ."<<" = "__bshl", .">>" = "__bshr", ."==" = "__eq"
     ."<" = "__lt", ."<=" = "__le", ."set 1 =" = "__newindex"
-    .size = "__len", .iterate = "__ipairs", ."iterate all" = "__pairs"
+    ."fallback for" = "__index", .size = "__len", .iterate = "__ipairs"
+    ."iterate all" = "__pairs"
 }
 
 $($ as text like a dict) = ({}'s metatable).__tostring
