@@ -133,6 +133,9 @@ enhance_error = function(error_message)
             end
             local scan
             scan = function(t, is_lua_id)
+              if not (t) then
+                return 
+              end
               for k, v in pairs(t) do
                 if type(k) == 'string' and type(v) == 'function' then
                   if not (is_lua_id) then

@@ -106,6 +106,7 @@ enhance_error = (error_message)->
 
             -- Globals and global compile rules:
             scan = (t, is_lua_id)->
+                return unless t
                 for k,v in pairs(t)
                     if type(k) == 'string' and type(v) == 'function'
                         k = k\from_lua_id! unless is_lua_id
