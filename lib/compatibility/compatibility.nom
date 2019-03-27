@@ -127,6 +127,8 @@ external:
             $tree = (SyntaxTree {: for ($k = $v) in $tree: add $k = $v})
             $tree.version = $end_version
             if $tree.shebang:
+                unless ($end_version is "Text"):
+                    $end_version = ($end_version, joined with ".")
                 $tree.shebang = "#!/usr/bin/env nomsu -V\$end_version\n"
         
         return $tree
