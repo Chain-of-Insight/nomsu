@@ -189,7 +189,7 @@ real_number (Number) <-
     { (%at_break "-")? [0-9]+ (("_"+->"") [0-9]+)* "." [0-9]+ (("_"+->"") [0-9]+)* }
 
 
-variable (Var) <- "$" ({ident_char+} / "(" ws* (inline_action / variable) ws* ")" / {''})
+variable (Var) <- "$" ({ident_char+} / "(" ws* (inline_methodchain / inline_action / variable) ws* ")" / {''})
 
 
 inline_list (List) <-

@@ -73,6 +73,9 @@ local math_expression = re.compile([[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]])
 local MAX_LINE = 80
 local compile
 compile = function(self, tree)
+  if tree == nil then
+    error("No tree was passed in.")
+  end
   if tree.version and tree.version < self.NOMSU_VERSION:up_to(#tree.version) and self._1_upgraded_from_2_to then
     tree = self._1_upgraded_from_2_to(tree, tree.version, self.NOMSU_VERSION)
   end
@@ -259,6 +262,11 @@ compile = function(self, tree)
   elseif "Block" == _exp_0 then
     local lua = LuaCode:from(tree.source)
     for i, line in ipairs(tree) do
+      if line.type == "Error" then
+        return self:compile(line)
+      end
+    end
+    for i, line in ipairs(tree) do
       if i > 1 then
         lua:add("\n")
       end
@@ -427,6 +435,9 @@ compile = function(self, tree)
     local number = tostring(tree[1]):gsub("_", "")
     return LuaCode:from(tree.source, number)
   elseif "Var" == _exp_0 then
+    if tree[1].type == "MethodCall" then
+      return LuaCode:from(tree.source, self:compile(tree[1][1]), ".", tree[1][2]:get_stub():as_lua_id())
+    end
     return LuaCode:from(tree.source, tree:as_var():as_lua_id())
   elseif "FileChunks" == _exp_0 then
     return error("Can't convert FileChunks to a single block of lua, since each chunk's " .. "compilation depends on the earlier chunks")

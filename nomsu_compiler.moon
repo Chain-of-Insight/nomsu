@@ -62,6 +62,9 @@ math_expression = re.compile [[ (([*/^+-] / [0-9]+) " ")* [*/^+-] !. ]]
 
 MAX_LINE = 80 -- For beautification purposes, try not to make lines much longer than this value
 compile = (tree)=>
+    if tree == nil
+        error("No tree was passed in.")
+
     -- Automatically upgrade trees from older versions:
     if tree.version and tree.version < @NOMSU_VERSION\up_to(#tree.version) and @_1_upgraded_from_2_to
         tree = @._1_upgraded_from_2_to(tree, tree.version, @NOMSU_VERSION)
@@ -211,6 +214,9 @@ compile = (tree)=>
         when "Block"
             lua = LuaCode\from(tree.source)
             for i, line in ipairs tree
+                if line.type == "Error"
+                    return @compile(line)
+            for i, line in ipairs tree
                 if i > 1 then lua\add "\n"
                 line_lua = @compile(line)
                 lua\add line_lua
@@ -345,6 +351,8 @@ compile = (tree)=>
             return LuaCode\from(tree.source, number)
 
         when "Var"
+            if tree[1].type == "MethodCall"
+                return LuaCode\from(tree.source, @compile(tree[1][1]), ".", tree[1][2]\get_stub!\as_lua_id!)
             return LuaCode\from(tree.source, tree\as_var!\as_lua_id!)
 
         when "FileChunks"

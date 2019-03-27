@@ -43,7 +43,7 @@ test:
                 if i > 1 then lua:add(", ") end
                 local assignment_lua = \($assignment as lua expr)
                 lua:add(assignment_lua)
-                if \$assignment.type == 'Var' then
+                if \$assignment.type == 'Var' and \$assignment[1].type ~= "MethodCall" then
                     lua:add_free_vars({assignment_lua:text()})
                 end
             end
@@ -67,7 +67,7 @@ test:
         else
             local var_lua = \($var as lua expr)
             lua:add(var_lua)
-            if \$var.type == 'Var' then
+            if \$var.type == 'Var' and \$var[1].type ~= "MethodCall" then
                 lua:add_free_vars({var_lua:text()})
             end
             lua:add(' = ', \($value as lua expr), ';')
