@@ -393,7 +393,8 @@ tree_to_nomsu = (tree)->
                     -- or if the last line starts with ".."
                     if tree[i-1].type != "Comment"
                         needs_space[i] = (line_nomsu\is_multiline! and prev_line\is_multiline!)
-                        if tree[i].type == "Comment" or needs_space[i] or needs_space[i-1]
+                        if (tree[i].type == "Comment" or needs_space[i] or needs_space[i-1] or
+                            prev_line\text!\match("\n        [^\n]*$"))
                             nomsu\add "\n"
                 nomsu\add line_nomsu
                 prev_line = line_nomsu
@@ -503,9 +504,10 @@ tree_to_nomsu = (tree)->
                     -- Rule of thumb: add a blank line between two lines if both are
                     -- multi-line non-comments, or if a comment comes after a non-comment,
                     -- or if the last line starts with ".."
-                    if tree[i-1].type != "Comment"
+                    if i > 1 and tree[i-1].type != "Comment"
                         needs_space[i] = (item_nomsu\is_multiline! and prev_item\is_multiline!)
-                        if tree[i].type == "Comment" or needs_space[i] or needs_space[i-1]
+                        if (tree[i].type == "Comment" or needs_space[i] or needs_space[i-1] or
+                            prev_item\text!\match("\n        [^\n]*$"))
                             nomsu\add "\n"
                 nomsu\add item_nomsu
                 prev_item = item_nomsu

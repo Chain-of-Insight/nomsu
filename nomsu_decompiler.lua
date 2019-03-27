@@ -515,7 +515,7 @@ tree_to_nomsu = function(tree)
         nomsu:add("\n")
         if tree[i - 1].type ~= "Comment" then
           needs_space[i] = (line_nomsu:is_multiline() and prev_line:is_multiline())
-          if tree[i].type == "Comment" or needs_space[i] or needs_space[i - 1] then
+          if (tree[i].type == "Comment" or needs_space[i] or needs_space[i - 1] or prev_line:text():match("\n        [^\n]*$")) then
             nomsu:add("\n")
           end
         end
@@ -654,9 +654,9 @@ tree_to_nomsu = function(tree)
       end
       nomsu:add(sep)
       if sep == '\n' then
-        if tree[i - 1].type ~= "Comment" then
+        if i > 1 and tree[i - 1].type ~= "Comment" then
           needs_space[i] = (item_nomsu:is_multiline() and prev_item:is_multiline())
-          if tree[i].type == "Comment" or needs_space[i] or needs_space[i - 1] then
+          if (tree[i].type == "Comment" or needs_space[i] or needs_space[i - 1] or prev_item:text():match("\n        [^\n]*$")) then
             nomsu:add("\n")
           end
         end
