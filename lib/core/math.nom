@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines some common math literals and functions
     
@@ -19,6 +18,7 @@ external:
         $nan = (NaN)
         unless ($nan != $nan):
             fail "NaN failed"
+    
     [infinity, inf] all compile to "math.huge"
     [not a number, NaN, nan] all compile to "(0/0)"
     [pi, Pi, PI] all compile to "math.pi"
@@ -73,12 +73,14 @@ external:
         for $ in $items:
             unless $:
                 return (no)
+        
         return (yes)
     [not all of $items, not all $items] all parse as (not (all of $items))
     [any of $items, any $items] all mean:
         for $ in $items:
             if $:
                 return (yes)
+        
         return (no)
     [none of $items, none $items] all parse as (not (any of $items))
     
@@ -123,6 +125,7 @@ external:
                 if (($best == (nil)) or ($key < $best_key)):
                     $best = $item
                     $best_key = $key
+            
             return $best
     
     (max of $items by $item = $value_expr) parses as
@@ -134,6 +137,7 @@ external:
                 if (($best == (nil)) or ($key > $best_key)):
                     $best = $item
                     $best_key = $key
+            
             return $best
     
     test:

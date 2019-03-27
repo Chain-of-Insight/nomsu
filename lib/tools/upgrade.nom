@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     Tool to automatically update code from old versions of Nomsu. Usage:
     nomsu tools/upgrade.nom [-i] file1 file2 directory1 ...
@@ -19,6 +18,7 @@ command line program with $args:
     if $start_version:
         try:
             use $start_version
+    
     $version = ($args."upgrade-to" or $(NOMSU VERSION))
     $test = ($args.t or $args.test)
     for $filename in $args.extras:
@@ -31,6 +31,7 @@ command line program with $args:
         $uptree =
             $tree upgraded from ($start_version or ($tree.version or $(NOMSU VERSION))) to
                 $version
+        
         $text = "\$leading_indent\($uptree as nomsu, text, with "\n" -> "\n\$leading_indent")"
         when:
             $inplace:

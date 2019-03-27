@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines some actions for hashing files and looking up files by hash.
     
@@ -60,4 +59,5 @@ external:
             $file_hash = (hash $contents)
             if ($file_hash == $hash):
                 return $filename
+    
     (hash of file $filename) parses as (hash (read file $filename))

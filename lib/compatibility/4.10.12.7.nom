@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines upgrades from Nomsu <4.10.12.7 to 4.10.12.7
 use "compatibility/compatibility"
@@ -59,6 +58,7 @@ upgrade $tree to "4.10.12.7" as:
             ..else:
                 if $has_use:
                     go to (insert chunk)
+            
             $i += 1
         return
         --- (insert chunk) ---

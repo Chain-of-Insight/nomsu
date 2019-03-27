@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines a Read-Evaluate-Print-Loop (REPL) for Nomsu
     
@@ -54,6 +53,7 @@ command line program with $args:
                     ### clear the line
                     if $(COLOR ENABLED):
                         say "\027[1A\027[2K" inline
+                
                 go to (run buffer)
             $buff, add ($line, with "\t" -> "    ")
             say (dim (yellow ".. ")) inline

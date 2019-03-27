@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     A simple UUID function based on RFC 4122: http://www.ietf.org/rfc/rfc4122.txt
     

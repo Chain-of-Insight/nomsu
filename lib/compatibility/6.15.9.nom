@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines upgrades from Nomsu <6.15.9 to 6.15.9
     

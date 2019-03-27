@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ### How do I...
 ### Write a comment? Put a # and go till the end of the line
 ### How do I write a multi-line comment?
@@ -199,6 +198,7 @@ say both "Hello" and also "world!"
         $f2 = $tmp
         if ($f2 > $n):
             return $f2
+
 say (first fibonacci above 10)
 
 ### Actions can have aliases, which may or may not have the arguments in different order
@@ -290,6 +290,7 @@ say "The square root of 2 is \(square root of 2)"
             ")
     ..else:
         return (Lua "-- (debug code removed for production)")
+
 $DEBUG_ENABLED = (yes)
 
 ### Constants can be defined as macros
@@ -318,6 +319,7 @@ debug only:
         $key = ($key_fn $item)
         if (($best == (nil)) or ($key > $best_key)):
             [$best, $best_key] = [$item, $key]
+    
     return $best
 
 ### Function literals look like: $x -> ($x * $x)
@@ -338,6 +340,7 @@ say (best of [2, -3, 4, -8] according to $($ squared))
             $key = $key_expr
             if (($best == (nil)) or ($key > $best_key)):
                 [$best, $best_key] = [$item, $key]
+        
         return $best
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -352,4 +355,5 @@ say
             $key = ($x * $x)
             if (($best == (nil)) or ($key > $best_key)):
                 [$best, $best_key] = [$x, $key]
+        
         return $best

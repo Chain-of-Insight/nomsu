@@ -14,6 +14,7 @@ external:
             ..else:
                 at $callsite fail
                     "Command failure: Command `\($cmd)` was terminated by signal \$return"
+        
         return $contents
     
     (at $callsite sh> $cmd) means:

@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file defines time-related actions.
     
@@ -37,7 +36,7 @@ external:
             if ($other is "a Time"):
                 return ($os.difftime $self ($os.time $other))
             return (a Time ($os.date "*t" ($self - $other, rounded)))
-
+        
         ($self, <$other) means (($self, since epoch) < ($other, since epoch))
         ($self, <=$other) means (($self, since epoch) <= ($other, since epoch))
         ($self, as text) means ($os.date "%I:%M%p %a %b %e %Y" ($os.time $self))

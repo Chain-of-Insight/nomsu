@@ -248,6 +248,7 @@ test:
             with external [$x]:
                 $x = "inner"
                 $y = "inner"
+    
     set external x local y
     unless (($x == "inner") and ($y == "outer")):
         fail "'with external' failed."

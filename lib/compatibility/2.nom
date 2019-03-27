@@ -15,7 +15,7 @@ upgrade $tree to "2" as:
         $false_body = $tree.5
         unless ($false_body is "Block" syntax tree):
             $false_body = (=lua "Block(\$false_body.source, \$false_body)")
-        return \(if \($tree.2) \$true_body else \$false_body)
+        return \(if \$tree.2 \$true_body else \$false_body)
     
     $need_blocks = [
         "if", "unless", "for 1 in", "for 1 = 2 in", "repeat while 1", "repeat 1 times"

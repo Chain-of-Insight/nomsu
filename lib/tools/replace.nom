@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This is a tool to replace syntax trees with something new.
     
@@ -63,6 +62,7 @@ command line program with $args:
                 ..else:
                     $substitution_values.($patt.1) = $tree
                     return $substitution_values
+            
             ($tree.type != $patt.type): return (nil)
             ($tree.type == "Action"):
                 if (($tree, get stub) != ($patt, get stub)): return (nil)
@@ -135,6 +135,7 @@ command line program with $args:
                             if ($user_answers.$t == "n"): return (nil)
                         $replaced.$t = (yes)
                         return $ret
+        
         $tree2 = ($tree with replacements)
         if $args.i:
             if (#$user_answers > 0): say ""

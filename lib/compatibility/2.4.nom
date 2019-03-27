@@ -14,9 +14,7 @@ upgrade $tree to "2.4" as:
                 return $tree
             $conditions = []
             $new_lines = []
-            $body =
-                $tree.2 if ($tree.2 is "Block" syntax tree) else [$tree.2]
-            
+            $body = ($tree.2 if ($tree.2 is "Block" syntax tree) else [$tree.2])
             for $line in $body:
                 when:
                     (not ($line is "Action" syntax tree)):
@@ -48,9 +46,7 @@ upgrade $tree to "2.4" as:
         "if 1 is ?" "if 1 = ?":
             $values = []
             $new_lines = []
-            $body =
-                $tree.5 if ($tree.5 is "Block" syntax tree) else [$tree.5]
-            
+            $body = ($tree.5 if ($tree.5 is "Block" syntax tree) else [$tree.5])
             for $line in $body:
                 when:
                     (not ($line is "Action" syntax tree)):
@@ -76,7 +72,4 @@ upgrade $tree to "2.4" as:
                         $values = []
             
             return
-                \(
-                    if \($tree.2) is
-                        \("Block" tree from $tree.5.source with (unpack $new_lines))
-                )
+                \(if \$tree.2 is \("Block" tree from $tree.5.source with (unpack $new_lines)))

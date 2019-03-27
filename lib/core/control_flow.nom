@@ -218,6 +218,7 @@ test:
     ..else:
         $loop =
             Lua "for _i,\($value as lua identifier) in _ipairs(\($iterable as lua expr)) do"
+    
     --- (loop set) ---
     
     ### TODO: don't always wrap in block
@@ -276,6 +277,7 @@ test:
             $nums, add $inner
             if ($inner == 5):
                 stop $outer
+    
     assume ($nums == [1, -2, 3, -2, 3, 4, 3, 4, 5])
 
 ### repeat $n times is a shorthand:
@@ -454,6 +456,7 @@ test:
                 recurse $ on $2
         ..else:
             $flat, add $
+    
     assume (sorted $flat) == [1, 2, 3, 4, 5, 6]
 
 ### Recurion control flow

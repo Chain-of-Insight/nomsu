@@ -1,5 +1,4 @@
 #!/usr/bin/env nomsu -V7.0.0
-
 ###
     This file contains definitions of operators like "+" and "and".
     
@@ -136,6 +135,7 @@ test:
     
     unless ($calls == 1):
         fail "Three-way comparison evaluated middle value multiple times"
+
 ($x < $y < $z) parses as ((($a $b $c) -> (($a < $b) and ($b < $c))) $x $y $z)
 ($x <= $y < $z) parses as ((($a $b $c) -> (($a <= $b) and ($b < $c))) $x $y $z)
 ($x < $y <= $z) parses as ((($a $b $c) -> (($a < $b) and ($b <= $c))) $x $y $z)
@@ -213,7 +213,7 @@ lua> "end"
 
 ### Unary operators
 test:
-    assume (-(5) == -5)
+    assume ((- 5) == -5)
     assume ((not (yes)) == (no))
 -$ compiles to "(-(\($ as lua expr)))"
 (not $) compiles to "(not \($ as lua expr))"
@@ -246,6 +246,7 @@ test:
     wrap $x around 3
     unless ($x == 1):
         fail "wrap around failed"
+
 ($var += $) parses as ($var = (($var or 0) + $))
 ($var -= $) parses as ($var = (($var or 0) - $))
 ($var *= $) parses as ($var = (($var or 1) * $))
