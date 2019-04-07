@@ -287,7 +287,7 @@ $lessons = [
         test that ((type of $b) is "a Buffer")
         $b, add "xx"
         $b, add "yyy"
-        test that (($b, as text) == "xxyy")
+        test that (($b, as text) == "xxyyy")
         test that (($b, length) == 5)
         
         ### You can define a thing that inherits the behaviors of another thing like this:
