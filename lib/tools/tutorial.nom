@@ -283,8 +283,8 @@ $lessons = [
         
         ### Create an instance of a Buffer:
         $b = (a Buffer)
-        test that ($b == "a Buffer")
-        test that ((type of $b) == "a Buffer")
+        test that ($b is "a Buffer")
+        test that ((type of $b) is "a Buffer")
         $b, add "xx"
         $b, add "yyy"
         test that (($b, as text) == "xxyy")
