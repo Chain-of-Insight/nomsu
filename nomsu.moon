@@ -13,12 +13,14 @@ export COLOR_ENABLED
 COLOR_ENABLED = true
 if clibtype == "dll"
     -- Enable colors:
-    enable_colors = require('wincolors')
-    ok,_ = pcall(enable_colors)
-    if not ok
-        COLOR_ENABLED = false
+    ok,enable_colors = pcall(require, 'wincolors')
+    COLOR_ENABLED = false
+    if ok
+        ok,_ = pcall(enable_colors)
+        if ok
+            COLOR_ENABLED = false
     -- Special hack to enable utf8 for windows console applications:
-    os.execute("chcp 65001>nul")
+    pcall(os.execute,"chcp 65001>nul")
 
 {:List, :Dict} = require 'containers'
 NOMSU_VERSION = List(NOMSU_VERSION)

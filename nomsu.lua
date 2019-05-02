@@ -10,12 +10,16 @@ if NOMSU_PREFIX then
 end
 COLOR_ENABLED = true
 if clibtype == "dll" then
-  local enable_colors = require('wincolors')
-  local ok, _ = pcall(enable_colors)
-  if not ok then
-    COLOR_ENABLED = false
+  local ok, enable_colors = pcall(require, 'wincolors')
+  COLOR_ENABLED = false
+  if ok then
+    local _
+    ok, _ = pcall(enable_colors)
+    if ok then
+      COLOR_ENABLED = false
+    end
   end
-  os.execute("chcp 65001>nul")
+  pcall(os.execute, "chcp 65001>nul")
 end
 local List, Dict
 do
