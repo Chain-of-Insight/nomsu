@@ -31,7 +31,7 @@ NOM_FILES=$(CORE_NOM_FILES) $(COMPAT_NOM_FILES) $(TOOL_NOM_FILES) $(LIB_NOM_FILE
 PEG_FILES= $(wildcard nomsu.*.peg)
 GET_VERSION= $(LUA_BIN) nomsu.lua --version
 
-all: lua optimize
+all: lua optimize optimize_extra
 
 .PHONY: test
 test: lua optimize
