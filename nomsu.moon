@@ -1,7 +1,7 @@
 #!/usr/bin/env moon
 -- This file contains the command-line Nomsu runner.
 export NOMSU_VERSION
-NOMSU_VERSION = {7, 0, 0}
+NOMSU_VERSION = {7, 0, 1}
 
 clibtype = package.cpath\match("?%.(so)") or package.cpath\match("?%.(dll)")
 
@@ -26,11 +26,11 @@ if clibtype == "dll"
 NOMSU_VERSION = List(NOMSU_VERSION)
 Text = require 'text'
 require 'builtin_metatables'
+EXIT_FAILURE = 1
+EXIT_SUCCESS = 0
 
 usage = [=[
-Nomsu Compiler
-
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [--help | -h] [--version] [-O optimization level] [-v] [-c] [-s] [-d debugger] [--no-core] [(file | -t tool | -e "nomsu code..." | files... -- ) [nomsu args...]]
+Nomsu Usage: nomsu [-V version] [--help | -h] [--version] [-O optimization level] [-v] [-c] [-s] [-d debugger] [--no-core] [(file | -t tool | -e "nomsu code..." | files... -- ) [nomsu args...]]
 
 OPTIONS
     -t <tool> Run a tool.
@@ -96,11 +96,16 @@ parser = re.compile([[
 })
 arg_string = table.concat(arg, sep)..sep
 args, err = parser\match(arg_string)
-if not args or err or args.help
+if not args or err
     if err
         print("Didn't understand: #{err}")
     print usage
     os.exit(EXIT_FAILURE)
+if args.help
+    print "Nomsu - A dynamically typed programming language with natural syntax and strong metaprogramming abilities."
+    print "https://nomsu.org\n"
+    print usage
+    os.exit(EXIT_SUCCESS)
 if args.version
     print(NOMSU_VERSION\joined_with("."))
     os.exit(EXIT_SUCCESS)
@@ -139,7 +144,7 @@ run = ->
         nomsu_environment\export("core")
 
     input_files = {}
-    if args.files
+    if args.files and #args.files > 0
         for f in *args.files
             if nomsu_name = f\match("^nomsu://(.*)%.nom")
                 path, err = package.searchpath(nomsu_name, package.nomsupath, "/")
@@ -204,6 +209,13 @@ run = ->
         else
             -- Just run the file
             f = Files.read(filename)
+            if not f
+                if filename\match "^-"
+                    print "Not a valid flag: "..filename.."\n"
+                    print usage
+                else
+                    print "File not found: "..filename
+                os.exit EXIT_FAILURE
             if filename\match("%.lua$")
                 f = LuaCode\from(Source(filename, 1, #f), f)
             env = nomsu_environment.new_environment!

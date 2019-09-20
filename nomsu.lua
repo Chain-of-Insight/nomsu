@@ -1,7 +1,7 @@
 NOMSU_VERSION = {
   7,
   0,
-  0
+  1
 }
 local clibtype = package.cpath:match("?%.(so)") or package.cpath:match("?%.(dll)")
 if NOMSU_PREFIX then
@@ -29,9 +29,9 @@ end
 NOMSU_VERSION = List(NOMSU_VERSION)
 local Text = require('text')
 require('builtin_metatables')
-local usage = [=[Nomsu Compiler
-
-Usage: (nomsu | lua nomsu.lua | moon nomsu.moon) [-V version] [--help | -h] [--version] [-O optimization level] [-v] [-c] [-s] [-d debugger] [--no-core] [(file | -t tool | -e "nomsu code..." | files... -- ) [nomsu args...]]
+local EXIT_FAILURE = 1
+local EXIT_SUCCESS = 0
+local usage = [=[Nomsu Usage: nomsu [-V version] [--help | -h] [--version] [-O optimization level] [-v] [-c] [-s] [-d debugger] [--no-core] [(file | -t tool | -e "nomsu code..." | files... -- ) [nomsu args...]]
 
 OPTIONS
     -t <tool> Run a tool.
@@ -101,12 +101,18 @@ local parser = re.compile([[    args <- {| (flag %sep)*
 })
 local arg_string = table.concat(arg, sep) .. sep
 local args, err = parser:match(arg_string)
-if not args or err or args.help then
+if not args or err then
   if err then
     print("Didn't understand: " .. tostring(err))
   end
   print(usage)
   os.exit(EXIT_FAILURE)
+end
+if args.help then
+  print("Nomsu - A dynamically typed programming language with natural syntax and strong metaprogramming abilities.")
+  print("https://nomsu.org\n")
+  print(usage)
+  os.exit(EXIT_SUCCESS)
 end
 if args.version then
   print(NOMSU_VERSION:joined_with("."))
@@ -165,7 +171,7 @@ run = function()
     nomsu_environment:export("core")
   end
   local input_files = { }
-  if args.files then
+  if args.files and #args.files > 0 then
     local _list_1 = args.files
     for _index_0 = 1, #_list_1 do
       local f = _list_1[_index_0]
@@ -258,6 +264,15 @@ run = function()
       end
     else
       local f = Files.read(filename)
+      if not f then
+        if filename:match("^-") then
+          print("Not a valid flag: " .. filename .. "\n")
+          print(usage)
+        else
+          print("File not found: " .. filename)
+        end
+        os.exit(EXIT_FAILURE)
+      end
       if filename:match("%.lua$") then
         f = LuaCode:from(Source(filename, 1, #f), f)
       end
