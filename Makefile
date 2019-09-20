@@ -35,9 +35,9 @@ all: lua optimize optimize_extra
 
 .PHONY: test
 test: lua optimize
-	@echo "\033[1;4mRunning unoptimized tests...\033[0m"
+	@printf "\033[1;4mRunning unoptimized tests...\033[0m\n"
 	@$(LUA_BIN) nomsu.lua -O0 -t test $(CORE_NOM_FILES) $(LIB_NOM_FILES)
-	@echo "\n\033[1;4mRunning optimized tests...\033[0m"
+	@printf "\n\033[1;4mRunning optimized tests...\033[0m\n"
 	@$(LUA_BIN) nomsu.lua -O1 -t test $(CORE_LUA_FILES) $(LIB_LUA_FILES)
 
 %.lua: %.moon
@@ -60,7 +60,7 @@ optimize_extra: lua $(COMPAT_LUA_FILES) $(TOOL_LUA_FILES)
 
 .PHONY: clean
 clean:
-	@echo "\033[1mDeleting...\033[0m"
+	@printf "\033[1mDeleting...\033[0m"
 	@rm -rvf version lib/*.lua lib/*/*.lua
 
 .PHONY: install
@@ -76,7 +76,7 @@ install: lua version optimize optimize_extra
 	fi; \
 	if [[ ! $$packagepath ]]; then packagepath="/opt"; fi; \
 	if [[ $$prefix != "`realpath $$prefix`" ]]; then \
-		echo $$'\033[1;31mWarning: '$$prefix$$' is not an absolute path. This may cause problems.\033[0m'; \
+		printf $$'\033[1;31mWarning: '$$prefix$$' is not an absolute path. This may cause problems.\033[0m\n'; \
 		read -p $$'\033[1mWould you rather use '`realpath $$prefix`$$' instead? (recommended)[Y/n]\033[0m ' use_real; \
 		if [[ ! $$use_real =~ ^[Nn] ]]; then \
 			prefix="`realpath $$prefix`"; \
@@ -84,7 +84,7 @@ install: lua version optimize optimize_extra
 	fi; \
 	version="`cat version`"; \
 	mkdir -pv $$prefix/bin $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/share/man/man1 $$packagepath/nomsu \
-	&& echo "#!$(LUA_BIN)\\nNOMSU_PREFIX, NOMSU_PACKAGEPATH = [[$$prefix]], [[$$packagepath/nomsu]]" \
+	&& printf "#!$(LUA_BIN)\nNOMSU_PREFIX, NOMSU_PACKAGEPATH = [[$$prefix]], [[$$packagepath/nomsu]]" \
 	  | cat - nomsu.lua > $$prefix/bin/nomsu$$version \
 	&& chmod +x $$prefix/bin/nomsu$$version \
 	&& cp -v nomsu $$prefix/bin \
@@ -98,13 +98,13 @@ uninstall: version
 		read -p $$'\033[1mWhere do you want to uninstall Nomsu from? (default: /usr/local) \033[0m' prefix; \
 	fi; \
 	if [[ ! $$prefix ]]; then prefix="/usr/local"; fi; \
-	echo "\033[1mNomsu will be uninstalled from:\033[0m"; \
+	printf "\033[1mNomsu will be uninstalled from:\033[0m\n"; \
 	echo "    $$prefix/bin"; \
 	echo "    $$prefix/lib"; \
 	echo "    $$prefix/share"; \
 	read -p $$'\033[1mis this okay? [Y/n]\033[0m ' ans; \
 	if [[ $$ans =~ ^[Nn] ]]; then exit; fi; \
-	echo "\033[1mDeleting...\033[0m"; \
+	printf "\033[1mDeleting...\033[0m\n"; \
 	version="$(UNINSTALL_VERSION)"; \
 	if [[ ! $$version ]]; then version="`cat version`"; fi;\
 	rm -rvf $$prefix/lib/nomsu/$$version $$prefix/share/nomsu/$$version $$prefix/bin/nomsu$$version; \
@@ -114,14 +114,14 @@ uninstall: version
 		if [ -f $$prefix/bin/nomsu ]; then \
 			read -p $$'\033[1mIt looks like there are other versions of Nomsu installed. Is it okay to leave the "nomsu" cross-version launcher in place? (recommended) [Y/n]\033[0m ' ans; \
 			if [[ $$ans =~ ^[Nn] ]]; then \
-				echo "\033[1mDeleting...\033[0m"; \
+				printf "\033[1mDeleting...\033[0m\n"; \
 				rm -vf $$prefix/bin/nomsu $$prefix/share/man/man1/nomsu.1; \
 			fi; \
 		fi; \
 	fi; \
 	if [ "`ls $$prefix/lib/nomsu 2>/dev/null`" == "" ]; then rm -rvf $$prefix/lib/nomsu; fi;\
 	if [ "`ls $$prefix/share/nomsu 2>/dev/null`" == "" ]; then rm -rvf $$prefix/share/nomsu; fi;\
-	echo $$'\033[1mDone.\033[0m';
+	printf $$'\033[1mDone.\033[0m\n';
 
 uninstallpackages:
 	@packagepath="$(PACKAGEPATH)"; \
