@@ -1,0 +1,35 @@
+### Nomsu uses the "." operator to access things inside an object:
+$dictionary = {.dog = "A lovable doofus", .cat = "An internet superstar"}
+test that ($dictionary.dog == "A lovable doofus")
+test that ($dictionary.cat == ("An internet superstar"))
+
+### If you try to access a key that's not in an object, the result is (nil):
+test that ($dictionary.mimsy == (nil))
+
+### $dictionary.dog is just a shorthand for $dictionary."dog".
+    You may need to use the longer form for strings with spaces:
+$dictionary."guinea pig" = "A real-life tribble"
+
+### Dictionaries are created with curly braces ({}) and can have
+    anything as a key or value, including numbers or other dictionaries:
+$dictionary.5 = "The number five"
+$dictionary.five = 5
+$dictionary.myself = $dictionary
+test that ($dictionary.myself == ($dictionary))
+
+### Lists are similar, but use square brackets ([])
+    and can only have numbers as keys, starting at 1:
+$list = ["first", "second", 999]
+test that ($list.1 == "first")
+test that ($list.2 == ("second"))
+test that ($list.3 == ($list.3))
+
+### Hint: 4 should be a missing key
+test that ($list.4 == (nil))
+test that ($list.foobar == (nil))
+
+### The "#" action gets the number of items inside something:
+test that (#$list == (3))
+test that (#{.x = 10, .y = 20} == (2))
+
+say("OK!")

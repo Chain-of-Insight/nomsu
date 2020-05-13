@@ -1,0 +1,18 @@
+### The "," is used for method calls, which means calling an action
+    that's stored on an object (with the object as the first argument).
+### Lists have an "add" method that puts new items at the end:
+$list = [-4, -6, 5]
+$list, add 3
+test that ($list == [-4, -6, 5, 3])
+$list, add 7
+test that ($list == [-4, -6, 5, 3, 7])
+
+### Text also has some methods like:
+$name = "Harry Tuttle"
+test that (($name, from 7 to 12) == "Tuttle")
+test that (($name, with "Tuttle" -> "Buttle") == ("Harry Buttle"))
+
+### Methods can be chained too:
+test that (($name, with "Tuttle" -> "Buttle", from 7 to 12) == ("Buttle"))
+
+say("OK!")

@@ -1,0 +1,18 @@
+$what_happened = "nothing"
+
+### In Nomsu, sometimes things fail, but you can recover from failures with 'try':
+try:
+    ### The 'fail' action triggers failure
+    fail "Oh no!"
+..if it fails:
+    $what_happened = "failure"
+..if it succeeds:
+    $what_happened = "success"
+
+### What do you think happened?
+test that ($what_happened == ("failure"))
+
+### Note: a 'try' block will silence failures, so this has no effect:
+try: fail
+
+say("OK!")

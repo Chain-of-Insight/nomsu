@@ -1,0 +1,26 @@
+### Nomsu text is enclosed in double quotation marks:
+$text = "Hello"
+
+### You can insert values into text using a backslash:
+test that ((5) == (5))
+
+### Variables don't require parentheses, but other expressions do:
+$x = 99
+test that ((99) == (99))
+
+### This can be used to convert values to text:
+test that ("\$x" == ("99"))
+
+### Longer strings use '("' followed by an indented region:
+$long = ("
+    line one
+      line two with spaces at the front
+")
+
+test that
+    $long == ("
+        line one
+          line two with spaces at the front
+    ")
+
+say("OK!")

@@ -1,0 +1,11 @@
+### in Nomsu, actions are bits of code that run to produce a value or
+### do something. They have flexible syntax, so the values passed to
+### them can be interspersed with the action's name in any order.
+
+### Fix this action so the tests pass:
+($x doubled) means ($x * 2)
+
+### Tests:
+test that ((2 doubled) == 4)
+test that ((-5 doubled) == -10)
+say("OK!")

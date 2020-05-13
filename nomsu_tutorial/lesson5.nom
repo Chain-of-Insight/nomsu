@@ -1,0 +1,16 @@
+### Make this action return "big" if its argument is bigger
+    than 99, otherwise return "small"
+(the size of $n) means:
+    if ($n > 99):
+        return "big"
+    ..else:
+        return "smal"
+
+### Tests:
+for $big_number in [9999, 100]:
+    test that ((the size of $big_number) == "big")
+
+for $small_number in [0, 1, -5, -999, 99]:
+    test that ((the size of $small_number) == "smal")
+
+say("OK!")

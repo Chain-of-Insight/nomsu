@@ -1,0 +1,21 @@
+### Nomsu's variables are local by default, and actions have their own scopes:
+$x = 1
+$y = 2
+
+### Define an action that sets a variable:
+(do something) means:
+    ### The variable $y is never set in this action, so it has the same value
+        it has outside this action.
+    test that ($y == ($y))
+    
+    ### $x is set inside this action, and actions have their own scopes.
+    $x = $y
+    
+    ### What number should $x be here?
+    test that ($x == ($y))
+
+### After running the action, what value should $x have?
+do something
+test that ($x == ($x))
+
+say("OK!")

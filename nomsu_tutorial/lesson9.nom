@@ -1,0 +1,10 @@
+### The 'external' block lets you modify variables outside an action:
+$x = 1
+(do something) means:
+    external: $x = 2
+do something
+
+### After running the action that sets $x in an 'external' block, what should $x be?
+test that ($x == 2)
+
+say("OK!")

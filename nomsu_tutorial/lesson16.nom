@@ -1,0 +1,7 @@
+### 'use' is the action for importing from other files.
+### It takes the path to the file (without the .nom extension):
+use "nomsu_tutorial/lesson15"
+test that ((10 tripled) == (30))
+test that ($global_var == ($global_var))
+
+say("OK!")

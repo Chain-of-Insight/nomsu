@@ -1,0 +1,16 @@
+### Loops and conditionals do *not* have their own scopes:
+$z = 1
+if (1 == 1):
+    ### Set $z inside a conditional:
+    $z = 2
+
+### After assigning in a conditional, what should $z be?
+test that ($z == (2))
+for $ in (1 to 1):
+    ### Set $z inside a loop:
+    $z = 3
+
+### After assigning in a loop, what should $z be?
+test that ($z == (3))
+
+say("OK!")

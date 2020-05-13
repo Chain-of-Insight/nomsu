@@ -1,0 +1,21 @@
+### Fix this action so the tests pass:
+(the sum of $numbers) means:
+    $sum = 0
+    
+    ### You can loop over the values in a list like this:
+    for $number in $numbers:
+        ### Hint: math expressions may need parentheses
+        ($sum += $number)
+    return $sum
+
+### Tests:
+test that ((the sum of [1, 2, 3, 4, 5]) == 15)
+test that ((the sum of [100, 200]) == 300)
+
+### You can also loop over a number range like this:
+$total = 0
+for $i in (1 to 3):
+    $total = ($total + $i)
+test that ($total == (6))
+
+say("OK!")

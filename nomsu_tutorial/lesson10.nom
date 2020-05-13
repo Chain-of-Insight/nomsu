@@ -1,0 +1,12 @@
+### The 'with' block lets you create a local scope for the variables you list:
+$y = 1
+$z = 1
+with [$y]:
+    $y = 2
+    $z = 2
+
+### After setting $y and $z in the 'with [$y]' block, what should $y and $z be?
+test that ($y == (1))
+test that ($z == (2))
+
+say("OK!")

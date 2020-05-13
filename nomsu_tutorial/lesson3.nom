@@ -1,0 +1,14 @@
+### When you need to do multiple things inside an action, use a block.
+### Blocks are written with a colon followed by some indented code:
+($x doubled then squared) means:
+    $x = (2 * $x)
+    $x = ($x * $x)
+    return $x
+
+### Blocks are also used for loops and conditionals:
+for $num in [0, -1, 10, 4]:
+    $correct_answer = (4 * ($num * $num))
+    if (($num doubled then squared) != $correct_answer):
+        fail "Wrong answer for \($num)!"
+
+say("OK!")
